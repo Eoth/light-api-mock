@@ -6,7 +6,7 @@ SPA pure (sans SvelteKit) servie en statique par le backend Rust.
 
 ```bash
 npm install
-npm run dev       # http://localhost:5173, proxy /api/* vers :3000
+npm run dev       # http://localhost:5173, proxy /api/* vers :7342
 ```
 
 ## Build / Tests

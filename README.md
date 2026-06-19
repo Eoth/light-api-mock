@@ -58,7 +58,7 @@ $env:STATIC_DIR = "frontend/dist"; $env:DATA_PATH = "data"; .\target\release\lig
 STATIC_DIR=./frontend/dist DATA_PATH=./data ./target/release/light-mock
 ```
 
-Ouvrir http://localhost:3000
+Ouvrir http://localhost:7342
 
 ### Dev frontend (hot-reload)
 
@@ -94,7 +94,7 @@ En mode proxy, le prefixe `/{name}` est strippe avant forward vers le vrai backe
 ### Exemple : creer un service
 
 ```bash
-curl -X PUT http://localhost:3000/api/services/demo \
+curl -X PUT http://localhost:7342/api/services/demo \
   -H "Content-Type: application/json" \
   -d '{
     "name": "demo",
@@ -115,7 +115,7 @@ curl -X PUT http://localhost:3000/api/services/demo \
   }'
 
 # Tester : GET /demo/anything
-curl http://localhost:3000/demo/anything
+curl http://localhost:7342/demo/anything
 ```
 
 ## Variables d'environnement
@@ -124,7 +124,7 @@ curl http://localhost:3000/demo/anything
 |---|---|---|
 | `DATA_PATH` | `./data` | Repertoire du fichier `mock-config.yaml` |
 | `STATIC_DIR` | `./frontend/dist` | Assets Svelte compiles |
-| `PORT` | `3000` | Port d'ecoute HTTP |
+| `PORT` | `7342` | Port d'ecoute HTTP |
 | `RUST_LOG` | `light_mock=info` | Filtre de logs (ex: `light_mock=debug`) |
 
 ## Tests
@@ -169,7 +169,7 @@ kubectl apply -k k8s/
 | Probleme | Solution |
 |---|---|
 | `cargo build` echoue avec `link.exe not found` | Installer VS Build Tools : `winget install Microsoft.VisualStudio.2022.BuildTools --override "--quiet --add Microsoft.VisualStudio.Workload.VCTools"` |
-| Port 3000 deja utilise | `$env:PORT = "3001"` ou tuer le processus existant |
+| Port 7342 deja utilise | `$env:PORT = "7343"` ou tuer le processus existant |
 | Frontend ne s'affiche pas | Verifier `STATIC_DIR` pointe vers `frontend/dist` (chemin absolu recommande sur Windows) |
 | Tests Rust flaky sur env var | Utiliser `cargo test -- --test-threads=1` |
 | Requete mock retourne 404 | Verifier l'URL inclut le namespace : `/{service_name}/{path}` |

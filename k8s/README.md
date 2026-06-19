@@ -9,7 +9,7 @@ Deploiement dans le namespace `entreprise-tools` avec exposition via Gloo Edge.
 | `pvc.yaml`           | PVC             | Volume 64Mi pour la persistance YAML              |
 | `configmap.yaml`     | ConfigMap       | Variables d'env (DATA_PATH, STATIC_DIR, PORT)     |
 | `deployment.yaml`    | Deployment      | Pod unique (replicas: 1), probes, security context |
-| `service.yaml`       | Service         | ClusterIP port 80 -> 3000                         |
+| `service.yaml`       | Service         | ClusterIP port 80 -> 7342                         |
 | `upstream.yaml`      | Gloo Upstream   | Reference au Service K8s pour Gloo                |
 | `routetable.yaml`    | Gloo RouteTable | Route `/lightmock` -> upstream avec prefix rewrite |
 | `virtualservice.yaml`| Gloo VS         | Expose le domaine et delegue a la RouteTable      |
@@ -48,10 +48,10 @@ Gloo RouteTable
 Upstream (lightmock:80)
   |
   v
-Service ClusterIP (port 80 -> 3000)
+Service ClusterIP (port 80 -> 7342)
   |
   v
-Pod lightMock (port 3000)
+Pod lightMock (port 7342)
   |-- /api/*        -> API REST de configuration
   |-- /svc-a/*      -> Mock ou Proxy selon is_mocked
   |-- /*            -> Frontend Svelte (assets statiques)
