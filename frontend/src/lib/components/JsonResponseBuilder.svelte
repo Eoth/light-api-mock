@@ -25,6 +25,7 @@
     'FirstName', 'LastName', 'Email', 'PhoneNumberFR', 'CompanyName',
     'StreetName', 'CityFR', 'PostcodeFR', 'Siren', 'Siret',
     'FullAddressFR', 'DatePast', 'DateFuture', 'TimestampMs',
+    'BoolRandom', 'LoremSentence', 'CountryFR', 'IbanFR',
   ];
 
   function deepClone(obj) { return JSON.parse(JSON.stringify(obj)); }
@@ -42,8 +43,24 @@
     emit();
   }
 
+  const pipeOptions = [
+    { value: '', label: '(aucun)' },
+    { value: 'lower', label: 'lower — minuscules' },
+    { value: 'upper', label: 'upper — majuscules' },
+    { value: 'trim', label: 'trim — suppr. espaces' },
+    { value: 'capitalize', label: 'capitalize — 1ere maj.' },
+    { value: 'first(N)', label: 'first(N) — N premiers car.' },
+    { value: 'last(N)', label: 'last(N) — N derniers car.' },
+    { value: 'substr(start,len)', label: 'substr(start,len)' },
+    { value: 'default("val")', label: 'default("val") — si vide' },
+    { value: 'replace("a","b")', label: 'replace("a","b")' },
+    { value: 'prepend("prefix")', label: 'prepend("prefix")' },
+    { value: 'append("suffix")', label: 'append("suffix")' },
+    { value: 'length', label: 'length — nb car.' },
+  ];
+
   function newValueField() {
-    return { key: '', fieldType: 'value', source: 'fixed', value: '', asNumber: false };
+    return { key: '', fieldType: 'value', source: 'fixed', value: '', pipe: '', asNumber: false };
   }
 
   function addFieldAt(path) {
@@ -113,19 +130,22 @@
   }
 
   function buildExpr(f) {
+    if (f.source === 'fixed') return f.value;
+    let varPart;
     switch (f.source) {
-      case 'fixed': return f.asNumber ? f.value : f.value;
-      case 'path': return `{path.${f.value}}`;
-      case 'query': return `{query.${f.value}}`;
-      case 'header': return `{header.${f.value}}`;
-      case 'body': return `{body.${f.value}}`;
-      case 'fake': return `{fake.${f.value}}`;
-      case 'uuid': return '{uuid}';
-      case 'now_ms': return '{now_ms}';
-      case 'now_iso': return '{now_iso}';
-      case 'seq': return '{seq}';
+      case 'path': varPart = `path.${f.value}`; break;
+      case 'query': varPart = `query.${f.value}`; break;
+      case 'header': varPart = `header.${f.value}`; break;
+      case 'body': varPart = `body.${f.value}`; break;
+      case 'fake': varPart = `fake.${f.value}`; break;
+      case 'uuid': varPart = 'uuid'; break;
+      case 'now_ms': varPart = 'now_ms'; break;
+      case 'now_iso': varPart = 'now_iso'; break;
+      case 'seq': varPart = 'seq'; break;
       default: return f.value;
     }
+    const pipe = f.pipe?.trim();
+    return pipe ? `{${varPart} | ${pipe}}` : `{${varPart}}`;
   }
 
   function nodeToJson(field) {
@@ -211,6 +231,18 @@
         aria-label="Valeur"
       />
     {/if}
+    {#if field.source !== 'fixed'}
+      <input
+        type="text"
+        class="pipe-input"
+        value={field.pipe || ''}
+        oninput={(e) => updateProp(path, idx, 'pipe', e.target.value)}
+        placeholder="ex: first(9) | upper"
+        aria-label="Pipe de transformation"
+        list="dl-pipes"
+        autocomplete="off"
+      />
+    {/if}
     <label class="number-toggle" title="Rendre sans guillemets (nombre JSON)">
       <input type="checkbox" checked={field.asNumber} onchange={(e) => updateProp(path, idx, 'asNumber', e.target.checked)} />
       <span class="number-label">#</span>
@@ -281,6 +313,10 @@
 
   <button type="button" class="btn btn-sm btn-outline" onclick={() => addFieldAt([])}>+ Ajouter un champ</button>
 
+  <datalist id="dl-pipes">
+    {#each pipeOptions.filter(p => p.value) as p}<option value={p.value}>{p.label}</option>{/each}
+  </datalist>
+
   {#if fields.length > 0}
     <details class="preview-section">
       <summary>Apercu du template genere</summary>
@@ -312,6 +348,7 @@
   .value-input { flex: 1; min-width: 6rem; padding: 0.3rem 0.5rem; border: 1px solid var(--color-border); border-radius: var(--radius); font-size: 0.8125rem; }
   select { padding: 0.3rem 0.5rem; border: 1px solid var(--color-border); border-radius: var(--radius); font-size: 0.8125rem; }
 
+  .pipe-input { min-width: 8rem; max-width: 14rem; padding: 0.3rem 0.5rem; border: 1px solid var(--color-border); border-radius: var(--radius); font-size: 0.75rem; font-family: 'Cascadia Code', 'Fira Code', monospace; color: var(--color-primary); }
   .number-toggle { display: flex; align-items: center; gap: 0.2rem; cursor: pointer; }
   .number-toggle input { width: 1rem; height: 1rem; }
   .number-label { font-size: 0.75rem; font-weight: 700; color: var(--color-text-muted); }

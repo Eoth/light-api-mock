@@ -3,7 +3,7 @@
   import JsonResponseBuilder from './JsonResponseBuilder.svelte';
   import XmlResponseBuilder from './XmlResponseBuilder.svelte';
 
-  let { rule = null, onSave = () => {}, onCancel = () => {} } = $props();
+  let { rule = null, existingRuleNames = [], onSave = () => {}, onCancel = () => {} } = $props();
 
   function deepCopy(obj) { return JSON.parse(JSON.stringify(obj)); }
 
@@ -21,6 +21,7 @@
   let chaos = $state(initial?.response?.chaos ?? { delay_ms: 0, delay_min_ms: null, delay_max_ms: null, error_rate: 0, error_status: 500 });
 
   let responseOpen = $state(true);
+  let formError = $state('');
 
   function detectMode() {
     if (!initial?.response?.body?.length) return 'json-guided';
@@ -75,10 +76,28 @@
     { value: 'DatePast', label: 'Date passee' },
     { value: 'DateFuture', label: 'Date future' },
     { value: 'TimestampMs', label: 'Timestamp (ms)' },
+    { value: 'BoolRandom', label: 'Booleen aleatoire' },
+    { value: 'LoremSentence', label: 'Phrase Lorem Ipsum' },
+    { value: 'CountryFR', label: 'Pays francophone' },
+    { value: 'IbanFR', label: 'IBAN francais' },
   ];
 
   function handleSubmit(e) {
     e.preventDefault();
+    formError = '';
+
+    const trimmedName = name.trim();
+    if (!trimmedName) { formError = 'Le nom de la regle est requis.'; return; }
+    if (existingRuleNames.some(n => n.toLowerCase() === trimmedName.toLowerCase())) {
+      formError = `Une regle avec le nom "${trimmedName}" existe deja dans ce service.`;
+      return;
+    }
+
+    if (ruleAction === 'mock') {
+      const validationErr = validateResponseContent();
+      if (validationErr) { formError = validationErr; return; }
+    }
+
     const finalStatus = responseMode === 'empty' ? 204 : status;
     const finalHeaders = responseMode === 'empty' ? [] : respHeaders.filter(h => h.name.trim());
     if (responseMode === 'json-guided' && !finalHeaders.some(h => h.name.toLowerCase() === 'content-type')) {
@@ -118,6 +137,421 @@
     return `${src} ${op}`;
   }
 
+  let pendingMode = $state(null);
+  let modeKey = $state(0);
+
+  function requestModeSwitch(newMode) {
+    if (newMode === responseMode) return;
+    const hasContent = currentModeHasContent();
+    if (!hasContent) {
+      applyModeSwitch(newMode);
+      return;
+    }
+    const convResult = tryConvert(responseMode, newMode);
+    if (convResult.ok) {
+      applyModeSwitch(newMode, convResult);
+      return;
+    }
+    pendingMode = newMode;
+    pendingConvMessage = convResult.reason || '';
+    modeKey++;
+  }
+
+  let pendingConvMessage = $state('');
+
+  function confirmModeSwitch() {
+    if (pendingMode) {
+      applyModeSwitch(pendingMode);
+      pendingMode = null;
+      pendingConvMessage = '';
+    }
+  }
+
+  function cancelModeSwitch() {
+    pendingMode = null;
+    pendingConvMessage = '';
+    modeKey++;
+  }
+
+  function applyModeSwitch(newMode, convResult) {
+    if (convResult?.jsonFields) jsonFields = convResult.jsonFields;
+    if (convResult?.xmlFields) xmlFields = convResult.xmlFields;
+    if (convResult?.textContent !== undefined) textContent = convResult.textContent;
+    if (convResult?.fragments) fragments = convResult.fragments;
+    responseMode = newMode;
+    modeKey++;
+  }
+
+  function currentModeHasContent() {
+    if (responseMode === 'json-guided') return jsonFields.length > 0;
+    if (responseMode === 'xml-guided') return xmlFields.length > 0;
+    if (responseMode === 'text') return textContent.trim().length > 0;
+    if (responseMode === 'advanced') return fragments.some(f => {
+      if (f.type === 'Template') return f.template?.trim();
+      if (f.type === 'Literal') return f.value?.trim();
+      return true;
+    });
+    return false;
+  }
+
+  function getAdvancedTemplate() {
+    return fragments.map(f => {
+      if (f.type === 'Literal') return f.value ?? '';
+      if (f.type === 'Template') return f.template ?? '';
+      return '';
+    }).join('');
+  }
+
+  function templateToTestJson(tpl) {
+    let out = '';
+    const chars = tpl;
+    let i = 0;
+    while (i < chars.length) {
+      if (chars[i] === '{' && i + 1 < chars.length && chars[i + 1] === '{') {
+        out += '{';
+        i += 2;
+      } else if (chars[i] === '}' && i + 1 < chars.length && chars[i + 1] === '}') {
+        out += '}';
+        i += 2;
+      } else if (chars[i] === '{') {
+        const end = chars.indexOf('}', i + 1);
+        if (end === -1) { out += chars[i]; i++; }
+        else { out += '"__var__"'; i = end + 1; }
+      } else {
+        out += chars[i];
+        i++;
+      }
+    }
+    return out;
+  }
+
+  function tryConvert(from, to) {
+    if (from === 'advanced' && to === 'text') {
+      return { ok: true, textContent: getAdvancedTemplate() };
+    }
+    if (from === 'text' && to === 'advanced') {
+      return { ok: true, fragments: [{ type: 'Literal', value: textContent }] };
+    }
+    if (from === 'advanced' && to === 'json-guided') {
+      return tryAdvancedToJsonGuided();
+    }
+    if (from === 'advanced' && to === 'xml-guided') {
+      return tryAdvancedToXmlGuided();
+    }
+    if (from === 'json-guided' && to === 'advanced') {
+      if (jsonBuilderRef) {
+        return { ok: true, fragments: [{ type: 'Template', template: jsonBuilderRef.toTemplate() }] };
+      }
+      return { ok: true };
+    }
+    if (from === 'xml-guided' && to === 'advanced') {
+      if (xmlBuilderRef) {
+        return { ok: true, fragments: [{ type: 'Template', template: xmlBuilderRef.toTemplate() }] };
+      }
+      return { ok: true };
+    }
+    if (from === 'json-guided' && to === 'xml-guided') {
+      return tryJsonGuidedToXmlGuided();
+    }
+    if (from === 'xml-guided' && to === 'json-guided') {
+      return { ok: false, reason: 'La conversion XML vers JSON guide n\'est pas supportee. Passez par le mode template avance comme intermediaire.' };
+    }
+    return { ok: false };
+  }
+
+  function tryAdvancedToJsonGuided() {
+    const tpl = getAdvancedTemplate();
+    if (!tpl.trim()) return { ok: true, jsonFields: [] };
+    const testStr = templateToTestJson(tpl);
+    let parsed;
+    try { parsed = JSON.parse(testStr); } catch {
+      return { ok: false, reason: 'Le template actuel n\'est pas un JSON valide et ne peut pas etre converti vers la vue guidee. Verifiez les accolades ({{ pour JSON literal, { pour variable).' };
+    }
+    if (typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return { ok: false, reason: 'Le JSON doit etre un objet (pas un tableau ou une valeur scalaire) pour etre converti en vue guidee.' };
+    }
+    try {
+      const fields = tplObjectToFields(tpl);
+      return { ok: true, jsonFields: fields };
+    } catch (e) {
+      return { ok: false, reason: `Conversion partielle impossible : ${e.message}` };
+    }
+  }
+
+  function tplObjectToFields(tpl) {
+    const entries = parseTplJsonEntries(tpl);
+    return entries.map(([key, rawValue]) => {
+      const trimmed = rawValue.trim();
+      if (trimmed.startsWith('{{') && !trimmed.startsWith('{{{')) {
+        try {
+          const children = tplObjectToFields(trimmed);
+          return { key, fieldType: 'object', children };
+        } catch { /* fall through to value */ }
+      }
+      if (trimmed.startsWith('[')) {
+        return parseTplArrayField(key, trimmed);
+      }
+      return parseTplValueField(key, trimmed);
+    });
+  }
+
+  function parseTplValueField(key, raw) {
+    const trimmed = raw.trim();
+    const isQuoted = trimmed.startsWith('"') && trimmed.endsWith('"');
+    const inner = isQuoted ? trimmed.slice(1, -1) : trimmed;
+    const varMatch = inner.match(/^\{([^}]+)\}$/);
+    if (varMatch) {
+      const expr = varMatch[1];
+      const parts = expr.split('|').map(s => s.trim());
+      const varName = parts[0];
+      const pipes = parts.slice(1).join(' | ');
+      const { source, value } = varNameToSource(varName);
+      return { key, fieldType: 'value', source, value, pipe: pipes, asNumber: !isQuoted };
+    }
+    return { key, fieldType: 'value', source: 'fixed', value: inner, pipe: '', asNumber: !isQuoted };
+  }
+
+  function parseTplArrayField(key, raw) {
+    const inner = raw.trim().slice(1, -1).trim();
+    if (!inner) return { key, fieldType: 'array-values', items: [] };
+    if (inner.startsWith('{{') && !inner.startsWith('{{{')) {
+      try {
+        const template = tplObjectToFields(inner);
+        return { key, fieldType: 'array-objects', template };
+      } catch { /* fall through */ }
+    }
+    const items = splitTplJsonArray(inner).map(item => {
+      const t = item.trim();
+      const f = parseTplValueField('', t);
+      return { source: f.source, value: f.value, pipe: f.pipe || '', asNumber: f.asNumber };
+    });
+    return { key, fieldType: 'array-values', items };
+  }
+
+  function varNameToSource(varName) {
+    if (varName.startsWith('path.')) return { source: 'path', value: varName.slice(5) };
+    if (varName.startsWith('query.')) return { source: 'query', value: varName.slice(6) };
+    if (varName.startsWith('header.')) return { source: 'header', value: varName.slice(7) };
+    if (varName.startsWith('body.')) return { source: 'body', value: varName.slice(5) };
+    if (varName.startsWith('fake.')) return { source: 'fake', value: varName.slice(5) };
+    if (varName === 'uuid') return { source: 'uuid', value: '' };
+    if (varName === 'now_ms') return { source: 'now_ms', value: '' };
+    if (varName === 'now_iso') return { source: 'now_iso', value: '' };
+    if (varName === 'seq') return { source: 'seq', value: '' };
+    return { source: 'fixed', value: varName };
+  }
+
+  function isTplDoubleOpen(str, i) {
+    return str[i] === '{' && i + 1 < str.length && str[i + 1] === '{';
+  }
+  function isTplDoubleClose(str, i) {
+    return str[i] === '}' && i + 1 < str.length && str[i + 1] === '}';
+  }
+  function isTplVar(str, i) {
+    return str[i] === '{' && (i + 1 >= str.length || str[i + 1] !== '{');
+  }
+
+  function parseTplJsonEntries(objStr) {
+    const trimmed = objStr.trim();
+    let inner;
+    if (isTplDoubleOpen(trimmed, 0)) {
+      inner = trimmed.slice(2, -2);
+    } else if (trimmed.startsWith('{')) {
+      inner = trimmed.slice(1, -1);
+    } else {
+      inner = trimmed;
+    }
+    const entries = [];
+    let i = 0, len = inner.length;
+    while (i < len) {
+      while (i < len && /\s/.test(inner[i])) i++;
+      if (i >= len) break;
+      if (inner[i] === ',') { i++; continue; }
+      if (inner[i] !== '"') break;
+      const keyEnd = inner.indexOf('"', i + 1);
+      if (keyEnd === -1) break;
+      const key = inner.slice(i + 1, keyEnd);
+      i = keyEnd + 1;
+      while (i < len && /[\s:]/.test(inner[i])) i++;
+      const [value, consumed] = readTplValue(inner, i);
+      entries.push([key, value]);
+      i += consumed;
+    }
+    return entries;
+  }
+
+  function readTplValue(str, start) {
+    let i = start;
+    if (i >= str.length) return ['', 0];
+    if (str[i] === '"') {
+      let j = i + 1;
+      while (j < str.length) {
+        if (str[j] === '\\') { j += 2; continue; }
+        if (str[j] === '"') return [str.slice(i, j + 1), j + 1 - i];
+        j++;
+      }
+      return [str.slice(i), str.length - i];
+    }
+    if (isTplDoubleOpen(str, i)) {
+      return readTplBalanced(str, i);
+    }
+    if (isTplVar(str, i)) {
+      const end = str.indexOf('}', i + 1);
+      if (end !== -1) return [str.slice(i, end + 1), end + 1 - i];
+    }
+    if (str[i] === '[') {
+      return readTplBracket(str, i);
+    }
+    let j = i;
+    while (j < str.length && str[j] !== ',' && !isTplDoubleClose(str, j)) j++;
+    return [str.slice(i, j).trim(), j - i];
+  }
+
+  function readTplBalanced(str, start) {
+    let depth = 0, i = start, inStr = false;
+    while (i < str.length) {
+      if (str[i] === '\\' && inStr) { i += 2; continue; }
+      if (str[i] === '"') { inStr = !inStr; i++; continue; }
+      if (!inStr) {
+        if (isTplDoubleOpen(str, i)) { depth++; i += 2; continue; }
+        if (isTplDoubleClose(str, i)) { depth--; if (depth === 0) return [str.slice(start, i + 2), i + 2 - start]; i += 2; continue; }
+        if (isTplVar(str, i)) {
+          const end = str.indexOf('}', i + 1);
+          if (end !== -1) { i = end + 1; continue; }
+        }
+      }
+      i++;
+    }
+    return [str.slice(start), str.length - start];
+  }
+
+  function readTplBracket(str, start) {
+    let depth = 0, i = start, inStr = false;
+    while (i < str.length) {
+      if (str[i] === '\\' && inStr) { i += 2; continue; }
+      if (str[i] === '"') { inStr = !inStr; i++; continue; }
+      if (!inStr) {
+        if (str[i] === '[') { depth++; i++; continue; }
+        if (str[i] === ']') { depth--; if (depth === 0) return [str.slice(start, i + 1), i + 1 - start]; i++; continue; }
+        if (isTplDoubleOpen(str, i)) {
+          const [, c] = readTplBalanced(str, i);
+          i += c; continue;
+        }
+        if (isTplVar(str, i)) {
+          const end = str.indexOf('}', i + 1);
+          if (end !== -1) { i = end + 1; continue; }
+        }
+      }
+      i++;
+    }
+    return [str.slice(start), str.length - start];
+  }
+
+  function splitTplJsonArray(inner) {
+    const items = [];
+    let i = 0, start = 0;
+    while (i < inner.length) {
+      if (inner[i] === '"') { const [, c] = readTplValue(inner, i); i += c; continue; }
+      if (isTplDoubleOpen(inner, i)) { const [, c] = readTplBalanced(inner, i); i += c; continue; }
+      if (isTplVar(inner, i)) { const end = inner.indexOf('}', i + 1); if (end !== -1) { i = end + 1; continue; } }
+      if (inner[i] === '[') { const [, c] = readTplBracket(inner, i); i += c; continue; }
+      if (inner[i] === ',') { items.push(inner.slice(start, i)); start = i + 1; }
+      i++;
+    }
+    if (start < inner.length) items.push(inner.slice(start));
+    return items;
+  }
+
+  function tryAdvancedToXmlGuided() {
+    const tpl = getAdvancedTemplate();
+    if (!tpl.trim()) return { ok: true, xmlFields: [] };
+    const testXml = tpl.replace(/\{[^}]*\}/g, 'x');
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(testXml, 'application/xml');
+      if (doc.querySelector('parsererror')) {
+        return { ok: false, reason: 'Le template actuel n\'est pas un XML valide et ne peut pas etre converti vers la vue guidee.' };
+      }
+    } catch {
+      return { ok: false, reason: 'Le template XML est malformed.' };
+    }
+    return { ok: false, reason: 'La conversion automatique XML template vers XML guide n\'est pas encore supportee. Utilisez la vue guidee pour reconstruire la structure.' };
+  }
+
+  function tryJsonGuidedToXmlGuided() {
+    if (!jsonFields.length) return { ok: true, xmlFields: [] };
+    try {
+      const xmlF = jsonFields.filter(f => f.key?.trim()).map(f => jsonFieldToXmlNode(f));
+      return { ok: true, xmlFields: xmlF };
+    } catch {
+      return { ok: false, reason: 'La structure JSON contient des elements incompatibles avec XML (tableaux de valeurs scalaires).' };
+    }
+  }
+
+  function jsonFieldToXmlNode(f) {
+    const ft = f.fieldType || 'value';
+    if (ft === 'object') {
+      return { tag: f.key, nodeType: 'parent', children: (f.children || []).filter(c => c.key?.trim()).map(c => jsonFieldToXmlNode(c)) };
+    }
+    if (ft === 'array-objects') {
+      return { tag: f.key, nodeType: 'parent', children: (f.template || []).filter(c => c.key?.trim()).map(c => jsonFieldToXmlNode(c)) };
+    }
+    if (ft === 'array-values') {
+      throw new Error('incompatible');
+    }
+    return { tag: f.key, nodeType: 'value', source: f.source || 'fixed', value: f.value || '' };
+  }
+
+  function validateResponseContent() {
+    if (responseMode === 'json-guided' && jsonBuilderRef) {
+      try {
+        const tpl = jsonBuilderRef.toTemplate();
+        const testJson = templateToTestJson(tpl);
+        JSON.parse(testJson);
+      } catch {
+        return 'Le JSON genere est invalide. Verifiez la structure (cles manquantes, virgules, imbrication).';
+      }
+    }
+    if (responseMode === 'xml-guided' && xmlBuilderRef) {
+      try {
+        const tpl = xmlBuilderRef.toTemplate();
+        const testXml = tpl.replace(/\{[^}]*\}/g, 'x');
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(testXml, 'application/xml');
+        if (doc.querySelector('parsererror')) {
+          return 'Le XML genere est invalide. Verifiez les tags (noms vides, imbrication incorrecte).';
+        }
+      } catch {
+        return 'Le XML genere est invalide.';
+      }
+    }
+    if (responseMode === 'advanced') {
+      const tpl = getAdvancedTemplate();
+      const ct = respHeaders.find(h => h.name?.toLowerCase() === 'content-type')?.value?.toLowerCase() || '';
+      if (ct.includes('json') && tpl.trim()) {
+        try {
+          const testJson = templateToTestJson(tpl);
+          JSON.parse(testJson);
+        } catch {
+          return 'Le Content-Type indique JSON mais le template n\'est pas un JSON valide. Verifiez les accolades, virgules et guillemets.';
+        }
+      }
+      if (ct.includes('xml') && tpl.trim()) {
+        try {
+          const testXml = tpl.replace(/\{[^}]*\}/g, 'x');
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(testXml, 'application/xml');
+          if (doc.querySelector('parsererror')) {
+            return 'Le Content-Type indique XML mais le template n\'est pas un XML valide.';
+          }
+        } catch {
+          return 'Le Content-Type indique XML mais le template est malformed.';
+        }
+      }
+    }
+    return null;
+  }
+
   function addFragment() { fragments = [...fragments, { type: 'Literal', value: '' }]; }
   function removeFragment(idx) { fragments = fragments.filter((_, i) => i !== idx); }
   function moveFragment(idx, dir) {
@@ -148,11 +582,27 @@
   function removePickValue(fi, vi) {
     const c = [...fragments]; c[fi] = { ...c[fi], values: c[fi].values.filter((_, i) => i !== vi) }; fragments = c;
   }
+  const commonHeaders = [
+    'Content-Type', 'Accept', 'Authorization', 'Cache-Control',
+    'X-Request-Id', 'X-Correlation-Id', 'X-Forwarded-For',
+    'Access-Control-Allow-Origin', 'Access-Control-Allow-Methods',
+  ];
+
+  const commonContentTypes = [
+    'application/json', 'application/xml', 'text/plain', 'text/html',
+    'application/x-www-form-urlencoded', 'multipart/form-data',
+    'application/octet-stream', 'application/pdf',
+  ];
+
   function addHeader() { respHeaders = [...respHeaders, { name: '', value: '' }]; }
   function removeHeader(idx) { respHeaders = respHeaders.filter((_, i) => i !== idx); }
 </script>
 
 <form class="rule-form" onsubmit={handleSubmit} aria-label={initial ? `Modifier la regle ${initial.name}` : 'Nouvelle regle'}>
+
+  {#if formError}
+    <div class="form-error" role="alert" aria-live="assertive">{formError}</div>
+  {/if}
 
   <div class="form-field">
     <label for="rule-name">Nom de la regle</label>
@@ -227,13 +677,23 @@
     </legend>
 
     {#if responseOpen}
-      <div class="mode-selector">
-        <label class="mode-option"><input type="radio" bind:group={responseMode} value="json-guided" /> JSON guide</label>
-        <label class="mode-option"><input type="radio" bind:group={responseMode} value="xml-guided" /> XML guide</label>
-        <label class="mode-option"><input type="radio" bind:group={responseMode} value="text" /> Texte</label>
-        <label class="mode-option"><input type="radio" bind:group={responseMode} value="advanced" /> Template avance</label>
-        <label class="mode-option"><input type="radio" bind:group={responseMode} value="empty" /> Vide (204)</label>
+      {#key modeKey}
+      <div class="mode-selector" role="radiogroup" aria-label="Mode de reponse">
+        {#each [['json-guided','JSON guide'],['xml-guided','XML guide'],['text','Texte'],['advanced','Template avance'],['empty','Vide (204)']] as [val, label]}
+          <button type="button" class="mode-btn" class:mode-active={responseMode === val} onclick={() => requestModeSwitch(val)} role="radio" aria-checked={responseMode === val}>{label}</button>
+        {/each}
       </div>
+      {/key}
+
+      {#if pendingMode}
+        <div class="mode-warning" role="alert">
+          <p>{pendingConvMessage || `Changer vers le mode "${pendingMode}" pourrait entrainer une perte de donnees.`}</p>
+          <div class="mode-warning-actions">
+            <button type="button" class="btn btn-sm btn-primary" onclick={confirmModeSwitch}>Changer quand meme</button>
+            <button type="button" class="btn btn-sm btn-secondary" onclick={cancelModeSwitch}>Annuler</button>
+          </div>
+        </div>
+      {/if}
 
       {#if responseMode !== 'empty'}
         <div class="form-row">
@@ -247,11 +707,17 @@
           <strong>En-tetes</strong>
           {#each respHeaders as hdr, idx}
             <div class="header-row">
-              <input type="text" bind:value={hdr.name} placeholder="Content-Type" aria-label="Nom de l'en-tete {idx + 1}" />
-              <input type="text" bind:value={hdr.value} placeholder="application/json" aria-label="Valeur de l'en-tete {idx + 1}" />
+              <input type="text" bind:value={hdr.name} placeholder="Content-Type" aria-label="Nom de l'en-tete {idx + 1}" list="dl-header-names" autocomplete="off" />
+              <input type="text" bind:value={hdr.value} placeholder="application/json" aria-label="Valeur de l'en-tete {idx + 1}" list={hdr.name?.toLowerCase() === 'content-type' ? 'dl-content-types' : undefined} autocomplete="off" />
               <button type="button" class="btn-icon btn-delete" onclick={() => removeHeader(idx)} aria-label="Supprimer l'en-tete">&#10005;</button>
             </div>
           {/each}
+          <datalist id="dl-header-names">
+            {#each commonHeaders as h}<option value={h}></option>{/each}
+          </datalist>
+          <datalist id="dl-content-types">
+            {#each commonContentTypes as ct}<option value={ct}></option>{/each}
+          </datalist>
           <button type="button" class="btn btn-sm btn-outline" onclick={addHeader}>+ En-tete</button>
           {#if responseMode === 'json-guided'}
             <span class="field-hint">Content-Type: application/json sera ajoute automatiquement.</span>
@@ -320,7 +786,7 @@
                     aria-label="Template"></textarea>
                   <div class="template-help">
                     <span class="field-hint"><strong>Variables :</strong> <code>{`{path.nom}`}</code>, <code>{`{query.id}`}</code>, <code>{`{uuid}`}</code>, <code>{`{now_ms}`}</code>, <code>{`{fake.CompanyName}`}</code>, <code>{`{seq}`}</code></span>
-                    <span class="field-hint"><strong>Pipes :</strong> <code>| lower</code>, <code>| upper</code>, <code>| first(N)</code>, <code>| default("val")</code>. JSON : <code>{`{{`}</code> / <code>{`}}`}</code></span>
+                    <span class="field-hint"><strong>Pipes :</strong> <code>| lower</code>, <code>| upper</code>, <code>| capitalize</code>, <code>| first(N)</code>, <code>| last(N)</code>, <code>| substr(start,len)</code>, <code>| replace("a","b")</code>, <code>| prepend("x")</code>, <code>| append("x")</code>, <code>| default("val")</code>, <code>| length</code>, <code>| trim</code>. JSON : <code>{`{{`}</code> / <code>{`}}`}</code></span>
                   </div>
                 {/if}
               </div>
@@ -366,6 +832,8 @@
 
 <style>
   .rule-form { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius); padding: 1.25rem; }
+  .form-error { background: #f8d7da; border: 1px solid #f1aeb5; color: #58151c; padding: 0.5rem 0.75rem; border-radius: var(--radius); margin-bottom: 1rem; font-weight: 500; }
+  :global([data-theme="dark"]) .form-error { background: #3b1219; border-color: #dc3545; color: #f1aeb5; }
 
   .action-section { border-color: var(--color-success); }
   .action-selector { display: flex; gap: 0.75rem; flex-wrap: wrap; }
@@ -375,10 +843,15 @@
   .action-label { font-weight: 700; font-size: 0.9375rem; }
   .action-desc { font-size: 0.8125rem; color: var(--color-text-muted); }
 
-  .mode-selector { display: flex; gap: 1rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
-  .mode-option { display: flex; align-items: center; gap: 0.375rem; font-size: 0.875rem; font-weight: 500; cursor: pointer; padding: 0.375rem 0.75rem; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-bg); }
-  .mode-option:has(input:checked) { border-color: var(--color-primary); background: #e8f0fe; }
-  .mode-option input { margin: 0; }
+  .mode-selector { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
+  .mode-btn { font-size: 0.875rem; font-weight: 500; cursor: pointer; padding: 0.375rem 0.75rem; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-bg); color: var(--color-text); font-family: inherit; }
+  .mode-btn:hover { border-color: var(--color-primary); }
+  .mode-btn.mode-active { border-color: var(--color-primary); background: var(--color-focus); font-weight: 600; }
+
+  .mode-warning { background: #fff3cd; border: 1px solid #ffc107; color: #664d03; padding: 0.75rem; border-radius: var(--radius); margin-bottom: 0.75rem; }
+  :global([data-theme="dark"]) .mode-warning { background: #332701; border-color: #e5a50a; color: #ffe082; }
+  .mode-warning p { margin: 0 0 0.5rem; font-size: 0.875rem; }
+  .mode-warning-actions { display: flex; gap: 0.5rem; }
   .form-field { margin-bottom: 1rem; }
   .form-field label { display: block; font-weight: 600; margin-bottom: 0.25rem; }
   .form-field input, .form-field select { width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--color-border); border-radius: var(--radius); font-size: 1rem; font-family: inherit; }

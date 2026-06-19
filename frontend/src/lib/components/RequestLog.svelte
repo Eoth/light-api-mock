@@ -4,6 +4,7 @@
   let logs = $state([]);
   let loading = $state(true);
   let detailLog = $state(null);
+  let filterService = $state('');
 
   async function refresh() {
     loading = true;
@@ -17,6 +18,9 @@
   }
 
   $effect(() => { refresh(); });
+
+  let serviceNames = $derived([...new Set(logs.map(l => l.service_name))].sort());
+  let filteredLogs = $derived(filterService ? logs.filter(l => l.service_name === filterService) : logs);
 
   function modeBadge(mode) {
     if (mode === 'mock') return 'badge-mock';
@@ -48,13 +52,23 @@
 <section class="log-section" aria-label="Journal des requetes">
   <div class="log-header">
     <h2>Journal des requetes</h2>
-    <button type="button" class="btn btn-sm btn-outline" onclick={refresh}>Rafraichir</button>
+    <div class="log-controls">
+      {#if serviceNames.length > 1}
+        <select class="filter-select" bind:value={filterService} aria-label="Filtrer par service">
+          <option value="">Tous les services</option>
+          {#each serviceNames as sn}
+            <option value={sn}>{sn}</option>
+          {/each}
+        </select>
+      {/if}
+      <button type="button" class="btn btn-sm btn-outline" onclick={refresh}>Rafraichir</button>
+    </div>
   </div>
 
   {#if loading}
     <p class="loading">Chargement...</p>
-  {:else if logs.length === 0}
-    <p class="empty">Aucune requete interceptee pour le moment.</p>
+  {:else if filteredLogs.length === 0}
+    <p class="empty">{filterService ? `Aucune requete pour le service "${filterService}".` : 'Aucune requete interceptee pour le moment.'}</p>
   {:else}
     <div class="table-wrap">
       <table class="log-table" aria-label="Dernieres requetes">
@@ -71,7 +85,7 @@
           </tr>
         </thead>
         <tbody>
-          {#each logs as log}
+          {#each filteredLogs as log}
             <tr>
               <td class="col-time">{formatTime(log.timestamp)}</td>
               <td><strong>{log.service_name}</strong></td>
@@ -148,6 +162,8 @@
   .log-section { margin-top: 1rem; }
   .log-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
   .log-header h2 { margin: 0; font-size: 1.25rem; }
+  .log-controls { display: flex; gap: 0.5rem; align-items: center; }
+  .filter-select { padding: 0.25rem 0.5rem; border: 1px solid var(--color-border); border-radius: var(--radius); font-size: 0.8125rem; background: var(--color-surface); color: var(--color-text); }
   .loading, .empty { color: var(--color-text-muted); text-align: center; padding: 2rem; }
 
   .table-wrap { overflow-x: auto; }

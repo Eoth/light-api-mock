@@ -69,6 +69,10 @@ impl TemplateRenderer {
             FakeKind::DatePast => Self::gen_date_offset(-1825, -1),
             FakeKind::DateFuture => Self::gen_date_offset(1, 1825),
             FakeKind::TimestampMs => Self::gen_timestamp_ms(),
+            FakeKind::BoolRandom => if fastrand::bool() { "true" } else { "false" }.into(),
+            FakeKind::LoremSentence => Self::pick_lorem(),
+            FakeKind::CountryFR => Self::pick_country_fr(),
+            FakeKind::IbanFR => Self::gen_iban_fr(),
         }
     }
 
@@ -192,6 +196,33 @@ impl TemplateRenderer {
             .unwrap()
             .as_millis()
             .to_string()
+    }
+
+    fn pick_lorem() -> String {
+        const SENTENCES: &[&str] = &[
+            "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+            "Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+            "Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris.",
+            "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore.",
+            "Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt.",
+        ];
+        SENTENCES[fastrand::usize(..SENTENCES.len())].to_string()
+    }
+
+    fn pick_country_fr() -> String {
+        const COUNTRIES: &[&str] = &[
+            "France", "Belgique", "Suisse", "Canada", "Luxembourg",
+            "Monaco", "Allemagne", "Espagne", "Italie", "Portugal",
+        ];
+        COUNTRIES[fastrand::usize(..COUNTRIES.len())].to_string()
+    }
+
+    fn gen_iban_fr() -> String {
+        let bank: u64 = fastrand::u64(10000..99999);
+        let branch: u64 = fastrand::u64(10000..99999);
+        let account: u64 = fastrand::u64(10000000000..99999999999);
+        let key: u8 = fastrand::u8(10..99);
+        format!("FR76{bank:05}{branch:05}{account:011}{key:02}")
     }
 }
 

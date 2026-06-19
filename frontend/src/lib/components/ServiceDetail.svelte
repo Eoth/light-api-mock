@@ -127,11 +127,16 @@
   {#if editingRuleIdx !== null}
     <RuleForm
       rule={service.rules[editingRuleIdx]}
+      existingRuleNames={(service.rules ?? []).filter((_, i) => i !== editingRuleIdx).map(r => r.name)}
       onSave={handleSaveRule}
       onCancel={() => editingRuleIdx = null}
     />
   {:else if addingRule}
-    <RuleForm onSave={handleSaveRule} onCancel={() => addingRule = false} />
+    <RuleForm
+      existingRuleNames={(service.rules ?? []).map(r => r.name)}
+      onSave={handleSaveRule}
+      onCancel={() => addingRule = false}
+    />
   {:else}
     <RuleList
       rules={service.rules ?? []}

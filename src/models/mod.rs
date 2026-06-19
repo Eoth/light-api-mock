@@ -126,6 +126,10 @@ pub enum FakeKind {
     DatePast,
     DateFuture,
     TimestampMs,
+    BoolRandom,
+    LoremSentence,
+    CountryFR,
+    IbanFR,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

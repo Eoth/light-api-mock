@@ -23,6 +23,7 @@
     'FirstName', 'LastName', 'Email', 'PhoneNumberFR', 'CompanyName',
     'StreetName', 'CityFR', 'PostcodeFR', 'Siren', 'Siret',
     'FullAddressFR', 'DatePast', 'DateFuture', 'TimestampMs',
+    'BoolRandom', 'LoremSentence', 'CountryFR', 'IbanFR',
   ];
 
   function deepClone(obj) { return JSON.parse(JSON.stringify(obj)); }
