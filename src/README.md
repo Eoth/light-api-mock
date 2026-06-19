@@ -1,38 +1,34 @@
-# src/ - Backend Rust
+# src/ — Backend Rust
 
-## Structure des modules
+## Modules
 
 ### `models/`
-Structures de donnees serialisables (Serde) representant la configuration :
-- `MockConfig` : racine contenant la liste des services
-- `Service` : chemin d'ecoute, URL cible, flag `is_mocked`, regles
-- `Rule` : nom, groupe de conditions, reponse mockee
-- `ConditionGroup` : combinaison `all_of` (ET) et `any_of` (OU)
-- `Condition` : source (QueryParam, Header, JsonPointer, XPath, FormField, BodyRaw) + operateur (Eq, Contains, Regex, Exists)
-- `MockResponse` : status HTTP, headers, fragments de body, config chaos
-- `BodyFragment` : Literal, Uuid, PickFrom, FakeData
-- `ChaosConfig` : delay_ms, error_rate, error_status
+Types serialisables (Serde) :
+- `Service` : name (= namespace URL), method, listen_path, real_target_url, is_mocked, rules
+- `Rule`, `ConditionGroup`, `Condition`
+- `ConditionSource` : QueryParam, Header, PathParam, JsonPointer, XPath, FormField, BodyRaw
+- `Operator` : Eq, Contains, Regex, Exists
+- `BodyFragment` : Literal, Template, Uuid, PickFrom, FakeData, PathSegment
+- `FakeKind` : FirstName, LastName, Email, PhoneNumberFR, CompanyName, Siren, Siret, CityFR, PostcodeFR, StreetName, FullAddressFR, DatePast, DateFuture, TimestampMs, Integer
+- `ChaosConfig` : delay_ms, delay_min_ms/delay_max_ms, error_rate, error_status
 
 ### `engine/`
-Logique metier sans dependance au framework web :
-- `matcher.rs` : evaluation first-match des regles, extraction de valeurs depuis query params, headers, JSON (RFC 6901), XML/SOAP (XPath simplifie), formulaires, body brut
-- `proxy.rs` : reverse proxy transparent via reqwest (nettoyage headers hop-by-hop, forwarding body)
-- `renderer.rs` : rendu des fragments dynamiques (UUID v4, donnees fictives FR, choix aleatoire) + mode chaos (latence, erreurs)
+- `matcher.rs` : evaluation first-match, extraction depuis path params, query, headers, JSON, XML, form, body
+- `proxy.rs` : reverse proxy (hop-by-hop filtering, X-Forwarded-Host/Proto)
+- `renderer.rs` : rendu des fragments + fake data generators + chaos mode
+- `template.rs` : parser d'expressions `{path.siret | first(9)}`, variables, pipes
 
 ### `store/`
-Persistance fichier YAML avec coherence garantie :
-- `MockStore` : `Arc<RwLock<MockConfig>>` pour acces concurrent
-- Ecriture atomique : fichier temporaire + `rename(2)`
-- Chemin configurable via `DATA_PATH`
+- `MockStore` : `Arc<RwLock<MockConfig>>`, ecriture atomique temp+rename, chemin via DATA_PATH
 
 ### `server/`
-Serveur HTTP Axum :
-- `api.rs` : routes CRUD REST (`/api/config`, `/api/services/:name`, toggle, reorder)
-- `intercept.rs` : middleware qui intercepte les requetes non-API, les route vers le mock ou le proxy selon la config
-- `mod.rs` : assemblage du routeur (API + middleware intercept + ServeDir pour les assets)
+- `intercept.rs` : middleware — namespace URL `/{name}/...`, filtre methode HTTP, matching, logs enrichis
+- `api.rs` : CRUD REST + GET /api/logs
+- `request_log.rs` : ring buffer 200 entrees (LogEntry), helpers log_mock/log_proxy/log_no_rule
+- `mod.rs` : AppState (store, proxy, seq_counters, request_log), build_router
 
-## Lancer les tests
+## Tests
 
 ```bash
-cargo test
+cargo test -- --test-threads=1
 ```

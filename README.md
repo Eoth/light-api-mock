@@ -2,213 +2,179 @@
 
 Mock & Proxy Intelligent pour environnements Kubernetes.
 
-Un seul binaire Rust qui intercepte les requetes HTTP, les mock ou les proxifie vers le vrai backend, le tout configurable en temps reel via une interface web sans redemarrage de pod.
+Un seul binaire Rust qui intercepte les requetes HTTP, les mock ou les proxifie vers le vrai backend, configurable en temps reel via une interface web. Chaque service est expose sous `/{service_name}/...` avec une methode HTTP explicite, sans redemarrage de pod.
 
 ## Fonctionnalites
 
-- **Bascule Mock / Proxy** : chaque service peut etre bascule ON (mock) ou OFF (proxy transparent) depuis l'IHM, sans redemarrage
-- **Moteur de regles** : conditions combinables (ET/OU) sur query params, headers, body JSON/XML/SOAP/form
-- **Reponses dynamiques** : fragments composables (texte fixe, UUID, choix aleatoire, donnees fictives)
-- **Mode Chaos** : injection de latence et d'erreurs HTTP pour tester la resilience
-- **Reverse Proxy transparent** : nettoyage des prefixes de routage, forwarding des headers et body
+- **Namespace URL par service** : chaque service est expose sous `/{name}/{listen_path}`, pas de collision
+- **Methode HTTP explicite** : un service = une methode (GET, POST, PUT, etc.)
+- **Bascule Mock / Proxy** : toggle ON/OFF depuis l'IHM, sans redemarrage
+- **Moteur de regles** : conditions combinables (ET/OU) sur path params, query, headers, body JSON/XML/form
+- **Templates dynamiques** : expressions `{path.siret}`, `{fake.CompanyName}`, `{now_ms}`, pipes `| first(9)`, `| upper`
+- **Mode Chaos** : injection de latence (fixe ou plage) et d'erreurs HTTP
+- **Journal des requetes** : historique consultable dans l'IHM (service, methode, path, mode, status)
+- **Import / Export** : sauvegarde et restauration de la configuration en JSON
 - **Zero dependance externe** : pas de base de donnees, persistance fichier YAML atomique
-- **Interface accessible** : conformite RGAA niveau AA (labels, aria, focus, contrastes)
+- **Interface accessible** : conformite RGAA niveau AA
 
 ## Prerequis
 
-| Outil    | Version minimale |
-|----------|------------------|
-| Rust     | 1.75+            |
-| Node.js  | 20+              |
-| npm      | 9+               |
+| Outil    | Version min | Notes |
+|----------|-------------|-------|
+| Rust     | 1.75+       | Avec toolchain MSVC sur Windows |
+| Node.js  | 20+         | Pour le frontend Svelte |
+| npm      | 9+          | |
 
-Pour le deploiement K8s : `kubectl` + acces au cluster avec le namespace `entreprise-tools`.
+> **Setup automatise** : voir [scripts/bootstrap-windows.ps1](scripts/bootstrap-windows.ps1) ou [scripts/bootstrap-linux.sh](scripts/bootstrap-linux.sh)
 
----
+## Demarrage rapide
 
-## Lancer l'application (dev local)
+### Bootstrap automatique
 
-Il y a **deux facons** de lancer lightMock en local :
-
-### Option A : Tout-en-un (recommande pour tester)
-
-Le backend Rust sert directement l'IHM. Un seul processus, une seule URL.
+```powershell
+# Windows PowerShell
+.\scripts\bootstrap-windows.ps1
+```
 
 ```bash
-# 1. Build du frontend (une seule fois, ou apres modif frontend)
-cd frontend
-npm install
-npm run build
-cd ..
+# Linux / macOS
+chmod +x scripts/bootstrap-linux.sh && ./scripts/bootstrap-linux.sh
+```
 
-# 2. Build du backend
+### Demarrage manuel
+
+```bash
+# 1. Frontend
+cd frontend && npm install && npm run build && cd ..
+
+# 2. Backend
 cargo build --release
 
-# 3. Lancer (Windows PowerShell)
-$env:STATIC_DIR = "frontend/dist"
-$env:DATA_PATH = "data"
-.\target\release\light-mock.exe
+# 3. Lancer
+# PowerShell :
+$env:STATIC_DIR = "frontend/dist"; $env:DATA_PATH = "data"; .\target\release\light-mock.exe
 
-# 3. Lancer (Linux / macOS / Git Bash)
+# Bash :
 STATIC_DIR=./frontend/dist DATA_PATH=./data ./target/release/light-mock
 ```
 
-**Resultat :**
-- IHM : [http://localhost:3000](http://localhost:3000)
-- API : [http://localhost:3000/api/services](http://localhost:3000/api/services)
+Ouvrir http://localhost:3000
 
-### Option B : Dev frontend avec hot-reload
+### Dev frontend (hot-reload)
 
-Pour modifier les composants Svelte avec rechargement instantane.
-Il faut **deux terminaux** :
+Terminal 1 : `DATA_PATH=./data ./target/release/light-mock`
+Terminal 2 : `cd frontend && npm run dev` → http://localhost:5173
 
-**Terminal 1 — Backend Rust** (API + moteur de mock) :
+## Concept cle : URL namespace
+
+Chaque service est expose sous **`/{name}/{listen_path}`**. Exemples :
+
+| Service name | Methode | listen_path | URL finale de test |
+|---|---|---|---|
+| `insee` | GET | `/v4/sirene/{siret}` | `GET /insee/v4/sirene/{siret}` |
+| `auth` | POST | `/login` | `POST /auth/login` |
+| `users` | GET | `/*` | `GET /users/anything` |
+
+En mode proxy, le prefixe `/{name}` est strippe avant forward vers le vrai backend.
+
+## API REST
+
+| Methode | Endpoint | Description |
+|---|---|---|
+| GET | `/api/config` | Configuration complete |
+| PUT | `/api/config` | Remplacer toute la config |
+| GET | `/api/services` | Liste des services |
+| GET | `/api/services/:name` | Detail d'un service |
+| PUT | `/api/services/:name` | Creer / modifier un service |
+| DELETE | `/api/services/:name` | Supprimer un service |
+| PUT | `/api/services/:name/toggle` | Basculer mock/proxy |
+| PUT | `/api/services/:name/rules/reorder` | Reordonner les regles |
+| GET | `/api/logs?limit=50` | Journal des requetes |
+
+### Exemple : creer un service
+
 ```bash
-# Build + lancer le serveur Rust
-cargo build --release
-
-# Windows PowerShell :
-$env:DATA_PATH = "data"
-.\target\release\light-mock.exe
-
-# Linux / macOS / Git Bash :
-DATA_PATH=./data ./target/release/light-mock
-```
-Le backend ecoute sur `http://localhost:3000`.
-
-**Terminal 2 — Frontend Svelte** (IHM avec hot-reload) :
-```bash
-cd frontend
-npm install    # premiere fois uniquement
-npm run dev
-```
-Le frontend ecoute sur `http://localhost:5173` et proxifie automatiquement les appels `/api/*` vers le backend sur le port 3000.
-
-**Resultat :**
-- IHM avec hot-reload : [http://localhost:5173](http://localhost:5173)
-- API directe (pour Bruno) : [http://localhost:3000/api/services](http://localhost:3000/api/services)
-
----
-
-## Tester l'API avec Bruno
-
-L'API est accessible sur `http://localhost:3000`. Base URL a configurer dans Bruno : `http://localhost:3000`.
-
-### Requetes de base
-
-**Lister les services** — `GET http://localhost:3000/api/services`
-> Reponse : `[]` (vide au demarrage)
-
-**Creer un service mock** — `PUT http://localhost:3000/api/services/demo`
-> Headers : `Content-Type: application/json`
-> Body :
-```json
-{
-  "name": "demo",
-  "listen_path": "/demo/*",
-  "real_target_url": "http://httpbin.org",
-  "is_mocked": true,
-  "rewrite_directory_urls": false,
-  "rules": [
-    {
+curl -X PUT http://localhost:3000/api/services/demo \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "demo",
+    "method": "GET",
+    "listen_path": "/*",
+    "real_target_url": "http://httpbin.org",
+    "is_mocked": true,
+    "rules": [{
       "name": "hello",
       "conditions": { "all_of": [], "any_of": [] },
       "response": {
         "status": 200,
-        "headers": [{ "name": "Content-Type", "value": "application/json" }],
-        "body": [{ "type": "Literal", "value": "{\"message\": \"Hello from lightMock!\"}" }],
+        "headers": [{"name": "Content-Type", "value": "application/json"}],
+        "body": [{"type": "Template", "template": "{{\"message\":\"Hello from lightMock!\"}}"}],
         "chaos": null
       }
-    }
-  ]
-}
+    }]
+  }'
+
+# Tester : GET /demo/anything
+curl http://localhost:3000/demo/anything
 ```
-> Reponse : le service cree (200)
-
-**Tester le mock** — `GET http://localhost:3000/demo/test`
-> Reponse : `{"message": "Hello from lightMock!"}`
-
-**Basculer en mode proxy** — `PUT http://localhost:3000/api/services/demo/toggle`
-> Body : `{"is_mocked": false}`
-> Maintenant `GET /demo/get` est proxifie vers `http://httpbin.org/get`
-
-**Rebasculer en mode mock** — `PUT http://localhost:3000/api/services/demo/toggle`
-> Body : `{"is_mocked": true}`
-
-**Supprimer un service** — `DELETE http://localhost:3000/api/services/demo`
-> Reponse : 204 No Content
-
----
-
-## API REST (reference complete)
-
-| Methode | Endpoint                              | Description                        |
-|---------|---------------------------------------|------------------------------------|
-| GET     | `/api/config`                         | Configuration complete             |
-| PUT     | `/api/config`                         | Remplacer toute la configuration   |
-| GET     | `/api/services`                       | Liste des services                 |
-| GET     | `/api/services/:name`                | Detail d'un service                |
-| PUT     | `/api/services/:name`                | Creer ou modifier un service       |
-| DELETE  | `/api/services/:name`                | Supprimer un service               |
-| PUT     | `/api/services/:name/toggle`         | Basculer mock/proxy                |
-| PUT     | `/api/services/:name/rules/reorder`  | Reordonner les regles              |
 
 ## Variables d'environnement
 
-| Variable     | Defaut              | Description                                      |
-|-------------|---------------------|--------------------------------------------------|
-| `DATA_PATH`  | `./data`            | Repertoire du fichier `mock-config.yaml`          |
-| `STATIC_DIR` | `./frontend/dist`   | Repertoire des assets Svelte compiles             |
-| `PORT`       | `3000`              | Port d'ecoute HTTP                                |
-| `RUST_LOG`   | `light_mock=info`   | Filtre de logs (ex: `light_mock=debug`)           |
+| Variable | Defaut | Description |
+|---|---|---|
+| `DATA_PATH` | `./data` | Repertoire du fichier `mock-config.yaml` |
+| `STATIC_DIR` | `./frontend/dist` | Assets Svelte compiles |
+| `PORT` | `3000` | Port d'ecoute HTTP |
+| `RUST_LOG` | `light_mock=info` | Filtre de logs (ex: `light_mock=debug`) |
 
-## Deploiement Kubernetes
-
-Le deploiement cible le namespace `entreprise-tools` avec exposition via Gloo Edge.
+## Tests
 
 ```bash
-# Build et push de l'image
-docker build -t <registry>/lightmock:latest .
-docker push <registry>/lightmock:latest
+# Rust (90 tests)
+cargo test -- --test-threads=1
 
-# Appliquer les manifests (adapter l'image dans deployment.yaml)
-kubectl apply -k k8s/
+# Frontend unitaires (35 tests Vitest)
+cd frontend && npm test
+
+# E2E navigateur (19 tests Playwright, serveur doit tourner)
+cd frontend && npm run test:e2e
 ```
-
-Voir [k8s/README.md](k8s/README.md) pour le detail des manifests et la configuration Gloo.
 
 ## Architecture
 
 ```
 light-mock/
   src/
-    models/     # Structures de donnees (Route, Rule, Condition, Response)
-    engine/     # Moteur de matching, proxy client, renderer de reponses
-    store/      # Persistance YAML atomique (Arc<RwLock<>>)
-    server/     # Serveur Axum (API REST, interception, middleware)
-    main.rs     # Point d'entree
-  frontend/     # SPA Svelte 5 + Vite 6
-  k8s/          # Manifests Kubernetes + Gloo Edge
-  Dockerfile    # Build multi-stage (Node + Rust + Alpine)
+    models/        # Service, Rule, Condition, BodyFragment, FakeKind, ChaosConfig
+    engine/        # matcher, proxy, renderer, template (expressions + pipes)
+    store/         # Persistance YAML atomique (Arc<RwLock<>>)
+    server/        # Axum : API REST, intercept middleware, request_log
+  frontend/        # SPA Svelte 5 + Vite 6
+  k8s/             # Manifests K8s + Gloo Edge
+  scripts/         # Bootstrap Windows / Linux
+  Dockerfile       # Build multi-stage
 ```
 
-Voir les README dans chaque sous-dossier pour plus de details.
+## Deploiement Kubernetes
 
-## Stack technique
-
-**Backend** : Rust (axum 0.7, tokio, reqwest, serde_yaml, serde_json, quick-xml, regex, fastrand)
-
-**Frontend** : Svelte 5 + Vite 6 (SPA pure, composants maison RGAA AA)
-
-**Infra** : Docker multi-stage, Kubernetes (Deployment replicas:1, PVC, Gloo Edge)
-
-## Tests
+Namespace `entreprise-tools`, exposition via Gloo Edge. Voir [k8s/README.md](k8s/README.md).
 
 ```bash
-# Tests unitaires Rust (58 tests)
-cargo test
-
-# Smoke tests d'integration (necessite le binaire compile + frontend build)
-# Windows PowerShell :
-.\smoke-test.ps1
+docker build -t <registry>/lightmock:latest .
+kubectl apply -k k8s/
 ```
+
+## Troubleshooting
+
+| Probleme | Solution |
+|---|---|
+| `cargo build` echoue avec `link.exe not found` | Installer VS Build Tools : `winget install Microsoft.VisualStudio.2022.BuildTools --override "--quiet --add Microsoft.VisualStudio.Workload.VCTools"` |
+| Port 3000 deja utilise | `$env:PORT = "3001"` ou tuer le processus existant |
+| Frontend ne s'affiche pas | Verifier `STATIC_DIR` pointe vers `frontend/dist` (chemin absolu recommande sur Windows) |
+| Tests Rust flaky sur env var | Utiliser `cargo test -- --test-threads=1` |
+| Requete mock retourne 404 | Verifier l'URL inclut le namespace : `/{service_name}/{path}` |
+| Requete POST sur un service GET | Chaque service a une methode fixe, creer un 2e service pour POST |
+
+## Licence
+
+MIT
