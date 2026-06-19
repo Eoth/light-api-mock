@@ -31,8 +31,8 @@ pub async fn intercept_layer(
     });
 
     match matched {
-        Some((service, path_params, remaining)) => {
-            handle_service(&state, &service, &path, path_params, &remaining, req).await
+        Some((service, path_params, _remaining)) => {
+            handle_service(&state, &service, &path, path_params, req).await
         }
         None => next.run(req).await,
     }
@@ -48,16 +48,17 @@ async fn handle_service(
     service: &Service,
     path: &str,
     path_params: HashMap<String, String>,
-    remaining: &str,
     req: Request<Body>,
 ) -> Response {
     let method_str = req.method().to_string();
 
     if !service.is_mocked {
+        let prefix = format!("/{}", service.name);
+        let proxy_path = path.strip_prefix(&prefix).unwrap_or(path);
         let target = format!(
             "{}/{}",
             service.real_target_url.trim_end_matches('/'),
-            remaining.trim_start_matches('/')
+            proxy_path.trim_start_matches('/')
         );
         tracing::info!(
             service_key = %service.name,
@@ -67,7 +68,7 @@ async fn handle_service(
             target = %target,
             "proxy forwarding"
         );
-        return match state.proxy.forward(&service.real_target_url, remaining, req).await {
+        return match state.proxy.forward(&service.real_target_url, proxy_path, req).await {
             Ok(resp) => {
                 let status = resp.status().as_u16();
                 state.request_log.log_proxy(&service.name, &method_str, path, &target, status);
@@ -302,6 +303,51 @@ mod tests {
         let (params, _) = r.unwrap();
         assert_eq!(params.get("version").unwrap(), "v2");
         assert_eq!(params.get("id").unwrap(), "42");
+    }
+
+    #[test]
+    fn proxy_path_strips_service_prefix_only() {
+        let path = "/insee/v4/sirene/44306184100047";
+        let service_name = "insee";
+        let prefix = format!("/{}", service_name);
+        let proxy_path = path.strip_prefix(&prefix).unwrap_or(path);
+        assert_eq!(proxy_path, "/v4/sirene/44306184100047");
+    }
+
+    #[test]
+    fn proxy_path_wildcard_service() {
+        let path = "/api/users/42";
+        let service_name = "api";
+        let prefix = format!("/{}", service_name);
+        let proxy_path = path.strip_prefix(&prefix).unwrap_or(path);
+        assert_eq!(proxy_path, "/users/42");
+    }
+
+    #[test]
+    fn proxy_path_root_only() {
+        let path = "/svc";
+        let service_name = "svc";
+        let prefix = format!("/{}", service_name);
+        let proxy_path = path.strip_prefix(&prefix).unwrap_or(path);
+        assert_eq!(proxy_path, "");
+    }
+
+    #[test]
+    fn proxy_path_preserves_deep_business_path() {
+        let path = "/myservice/api/v2/resources/123/details";
+        let service_name = "myservice";
+        let prefix = format!("/{}", service_name);
+        let proxy_path = path.strip_prefix(&prefix).unwrap_or(path);
+        assert_eq!(proxy_path, "/api/v2/resources/123/details");
+    }
+
+    #[test]
+    fn non_wildcard_remaining_is_empty() {
+        let pattern = build_effective_pattern("insee", "/v4/sirene/{siret}");
+        let r = match_path(&pattern, "/insee/v4/sirene/44306184100047");
+        assert!(r.is_some());
+        let (_, remaining) = r.unwrap();
+        assert_eq!(remaining, "");
     }
 
     #[test]
