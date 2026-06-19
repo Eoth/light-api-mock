@@ -1,6 +1,7 @@
 use crate::engine::{apply_chaos_and_render, MatchEngine, RequestData, TemplateContext};
-use crate::models::Service;
+use crate::models::{RuleAction, Service};
 use crate::server::AppState;
+use crate::server::validation::is_internal_route;
 use axum::body::Body;
 use axum::extract::{Request, State};
 use axum::http::{HeaderValue, StatusCode};
@@ -16,7 +17,8 @@ pub async fn intercept_layer(
     let path = req.uri().path().to_string();
     let method = req.method().clone();
 
-    if path.starts_with("/api/") || path == "/api" {
+    if is_internal_route(&path) {
+        tracing::trace!(path = %path, "internal route protected, skipping intercept");
         return next.run(req).await;
     }
 
@@ -43,6 +45,43 @@ fn build_effective_pattern(name: &str, listen_path: &str) -> String {
     format!("/{name}/{lp}")
 }
 
+async fn do_proxy(
+    state: &AppState,
+    service: &Service,
+    path: &str,
+    method_str: &str,
+    context: &str,
+    req: Request<Body>,
+) -> Response {
+    let prefix = format!("/{}", service.name);
+    let proxy_path = path.strip_prefix(&prefix).unwrap_or(path);
+    let target = format!(
+        "{}/{}",
+        service.real_target_url.trim_end_matches('/'),
+        proxy_path.trim_start_matches('/')
+    );
+    tracing::info!(
+        service_key = %service.name,
+        method = %method_str,
+        path = %path,
+        mode = "proxy",
+        context = %context,
+        target = %target,
+        "proxy forwarding"
+    );
+    match state.proxy.forward(&service.real_target_url, proxy_path, req).await {
+        Ok(resp) => {
+            let status = resp.status().as_u16();
+            state.request_log.log_proxy(&service.name, method_str, path, &target, status);
+            resp
+        }
+        Err(status) => {
+            state.request_log.log_proxy(&service.name, method_str, path, &target, status.as_u16());
+            status.into_response()
+        }
+    }
+}
+
 async fn handle_service(
     state: &AppState,
     service: &Service,
@@ -53,35 +92,11 @@ async fn handle_service(
     let method_str = req.method().to_string();
 
     if !service.is_mocked {
-        let prefix = format!("/{}", service.name);
-        let proxy_path = path.strip_prefix(&prefix).unwrap_or(path);
-        let target = format!(
-            "{}/{}",
-            service.real_target_url.trim_end_matches('/'),
-            proxy_path.trim_start_matches('/')
-        );
-        tracing::info!(
-            service_key = %service.name,
-            method = %method_str,
-            path = %path,
-            mode = "proxy",
-            target = %target,
-            "proxy forwarding"
-        );
-        return match state.proxy.forward(&service.real_target_url, proxy_path, req).await {
-            Ok(resp) => {
-                let status = resp.status().as_u16();
-                state.request_log.log_proxy(&service.name, &method_str, path, &target, status);
-                resp
-            }
-            Err(status) => {
-                state.request_log.log_proxy(&service.name, &method_str, path, &target, status.as_u16());
-                status.into_response()
-            }
-        };
+        return do_proxy(state, service, path, &method_str, "service-level", req).await;
     }
 
-    let query_params = extract_query_params(req.uri().query());
+    let uri = req.uri().clone();
+    let query_params = extract_query_params(uri.query());
     let headers = extract_headers(req.headers());
     let content_type = headers.get("content-type").cloned();
 
@@ -104,11 +119,23 @@ async fn handle_service(
         tracing::warn!(
             service_key = %service.name, method = %method_str, path = %path,
             mode = "no-rule",
-            "no matching rule"
+            "no matching rule, returning 404"
         );
         state.request_log.log_no_rule(&service.name, &method_str, path);
         return StatusCode::NOT_FOUND.into_response();
     };
+
+    if rule.action == RuleAction::Proxy {
+        tracing::info!(
+            service_key = %service.name, method = %method_str, path = %path,
+            rule = %rule.name, mode = "proxy",
+            "rule matched with action=proxy"
+        );
+        let proxy_req = rebuild_request_for_proxy(
+            &method_str, &uri, &request_data, &body_bytes
+        );
+        return do_proxy(state, service, path, &method_str, &format!("rule:{}", rule.name), proxy_req).await;
+    }
 
     let path_segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
     let seq = state.next_seq(&service.name);
@@ -150,6 +177,25 @@ async fn handle_service(
     }
 }
 
+fn rebuild_request_for_proxy(
+    method: &str,
+    uri: &axum::http::Uri,
+    data: &RequestData,
+    body_bytes: &[u8],
+) -> Request<Body> {
+    let mut builder = axum::http::Request::builder()
+        .method(method)
+        .uri(uri.clone());
+    for (k, v) in &data.headers {
+        if let Ok(hv) = HeaderValue::from_str(v) {
+            builder = builder.header(k.as_str(), hv);
+        }
+    }
+    builder
+        .body(Body::from(body_bytes.to_vec()))
+        .unwrap_or_else(|_| Request::new(Body::empty()))
+}
+
 fn match_path(listen_path: &str, request_path: &str) -> Option<(HashMap<String, String>, String)> {
     let pattern_str = normalize_colon_syntax(listen_path);
 
@@ -157,7 +203,7 @@ fn match_path(listen_path: &str, request_path: &str) -> Option<(HashMap<String, 
     let request_segs: Vec<&str> = request_path.split('/').filter(|s| !s.is_empty()).collect();
 
     if pattern_segs.is_empty() {
-        return Some((HashMap::new(), request_path.to_string()));
+        return None;
     }
 
     let mut params = HashMap::new();
@@ -368,5 +414,60 @@ mod tests {
         map.insert("x-test", HeaderValue::from_static("value"));
         let result = extract_headers(&map);
         assert_eq!(result.get("x-test").unwrap(), "value");
+    }
+
+    // --- Security tests ---
+
+    #[test]
+    fn empty_pattern_never_matches() {
+        assert!(match_path("", "/").is_none());
+        assert!(match_path("", "/foo").is_none());
+        assert!(match_path("/", "/").is_none());
+        assert!(match_path("//", "/any").is_none());
+    }
+
+    #[test]
+    fn empty_listen_path_cannot_hijack_root() {
+        let pattern = build_effective_pattern("hijacker", "");
+        assert!(
+            match_path(&pattern, "/").is_none(),
+            "service with empty listen_path must not capture /"
+        );
+    }
+
+    #[test]
+    fn slash_listen_path_cannot_hijack_root() {
+        let pattern = build_effective_pattern("hijacker", "/");
+        assert!(
+            match_path(&pattern, "/").is_none(),
+            "service with listen_path '/' must not capture /"
+        );
+    }
+
+    #[test]
+    fn service_cannot_match_internal_api_routes() {
+        assert!(is_internal_route("/api/services"));
+        assert!(is_internal_route("/api/config"));
+        assert!(is_internal_route("/api/logs"));
+        assert!(is_internal_route("/"));
+        assert!(is_internal_route("/index.html"));
+        assert!(is_internal_route("/assets/main.js"));
+    }
+
+    #[test]
+    fn user_service_routes_not_internal() {
+        assert!(!is_internal_route("/insee/v4/sirene/123"));
+        assert!(!is_internal_route("/my-svc/foo/bar"));
+        assert!(!is_internal_route("/users/42"));
+    }
+
+    #[test]
+    fn effective_pattern_with_empty_path_only_has_name() {
+        let p = build_effective_pattern("hijacker", "");
+        assert_eq!(p, "/hijacker/");
+        assert!(match_path(&p, "/").is_none(), "must not capture root");
+        // /hijacker matches ["hijacker"] which is valid — but validation prevents creating such a service
+        assert!(match_path(&p, "/hijacker").is_some());
+        assert!(match_path(&p, "/other").is_none());
     }
 }

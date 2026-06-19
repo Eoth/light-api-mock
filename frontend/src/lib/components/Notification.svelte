@@ -46,6 +46,22 @@
     color: #055160;
   }
 
+  :global([data-theme="dark"]) .notification.success {
+    background: #0a3622;
+    border-color: #198754;
+    color: #a3cfbb;
+  }
+  :global([data-theme="dark"]) .notification.error {
+    background: #3b1219;
+    border-color: #dc3545;
+    color: #f1aeb5;
+  }
+  :global([data-theme="dark"]) .notification.info {
+    background: #032830;
+    border-color: #0dcaf0;
+    color: #9eeaf9;
+  }
+
   .notification-icon {
     font-size: 1.125rem;
     flex-shrink: 0;

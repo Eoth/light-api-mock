@@ -9,6 +9,7 @@
 
   const initial = rule ? deepCopy(rule) : null;
   let name = $state(initial?.name ?? '');
+  let ruleAction = $state(initial?.action ?? 'mock');
   let allOf = $state(initial?.conditions?.all_of ?? []);
   let anyOf = $state(initial?.conditions?.any_of ?? []);
   let addingConditionTo = $state(null);
@@ -89,6 +90,7 @@
     const finalBody = buildFragmentsFromMode();
     onSave({
       name: name.trim(),
+      action: ruleAction,
       conditions: { all_of: allOf, any_of: anyOf },
       response: {
         status: finalStatus,
@@ -158,6 +160,23 @@
     <span class="field-hint" id="rn-hint">Identifiant unique de cette regle dans le service</span>
   </div>
 
+  <!-- ACTION -->
+  <fieldset class="section action-section">
+    <legend>Action quand cette regle matche</legend>
+    <div class="action-selector">
+      <label class="action-option" class:selected={ruleAction === 'mock'}>
+        <input type="radio" bind:group={ruleAction} value="mock" />
+        <span class="action-label">Mock</span>
+        <span class="action-desc">Retourner la reponse simulee ci-dessous</span>
+      </label>
+      <label class="action-option" class:selected={ruleAction === 'proxy'}>
+        <input type="radio" bind:group={ruleAction} value="proxy" />
+        <span class="action-label">Proxy</span>
+        <span class="action-desc">Forwarder vers la cible reelle du service</span>
+      </label>
+    </div>
+  </fieldset>
+
   <!-- CONDITIONS -->
   <fieldset class="section">
     <legend>Conditions ET (toutes doivent correspondre)</legend>
@@ -199,6 +218,7 @@
   </fieldset>
 
   <!-- REPONSE -->
+  {#if ruleAction === 'mock'}
   <fieldset class="section section-response">
     <legend>
       <button type="button" class="legend-toggle" onclick={() => responseOpen = !responseOpen} aria-expanded={responseOpen}>
@@ -335,6 +355,7 @@
       </div>
     {/if}
   </fieldset>
+  {/if}
 
   <!-- ACTIONS -->
   <div class="form-actions">
@@ -345,6 +366,14 @@
 
 <style>
   .rule-form { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius); padding: 1.25rem; }
+
+  .action-section { border-color: var(--color-success); }
+  .action-selector { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+  .action-option { display: flex; flex-direction: column; gap: 0.125rem; padding: 0.625rem 1rem; border: 2px solid var(--color-border); border-radius: var(--radius); cursor: pointer; min-width: 10rem; background: var(--color-bg); }
+  .action-option.selected { border-color: var(--color-primary); background: var(--color-surface); }
+  .action-option input { display: none; }
+  .action-label { font-weight: 700; font-size: 0.9375rem; }
+  .action-desc { font-size: 0.8125rem; color: var(--color-text-muted); }
 
   .mode-selector { display: flex; gap: 1rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
   .mode-option { display: flex; align-items: center; gap: 0.375rem; font-size: 0.875rem; font-weight: 500; cursor: pointer; padding: 0.375rem 0.75rem; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-bg); }

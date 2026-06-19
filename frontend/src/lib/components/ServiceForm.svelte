@@ -1,6 +1,7 @@
 <script>
   let {
     service = null,
+    existingNames = [],
     onSave = () => {},
     onCancel = () => {},
   } = $props();
@@ -8,11 +9,12 @@
   const initial = service;
   let name = $state(initial?.name ?? '');
   let method = $state(initial?.method ?? 'GET');
-  let listenPath = $state(initial?.listen_path ?? '/*');
+  let listenPath = $state(initial?.listen_path ?? '/v1/*');
   let realTargetUrl = $state(initial?.real_target_url ?? 'http://');
   let rewriteDirectoryUrls = $state(initial?.rewrite_directory_urls ?? false);
 
   const httpMethods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'];
+  const RESERVED_NAMES = ['api', 'index.html', 'assets', 'favicon.ico'];
 
   let testUrl = $derived(
     `http://localhost:7342/${name.trim() || '...'}${listenPath.trim().startsWith('/') ? listenPath.trim() : '/' + listenPath.trim()}`
@@ -22,12 +24,42 @@
 
   const isEdit = !!initial;
 
+  function validateName(n) {
+    const trimmed = n.trim();
+    if (!trimmed) return 'Le nom du service est requis.';
+    if (RESERVED_NAMES.includes(trimmed.toLowerCase())) {
+      return `Le nom "${trimmed}" est reserve par lightMock (noms interdits : ${RESERVED_NAMES.join(', ')}).`;
+    }
+    if (trimmed.includes('/') || trimmed.includes('\\')) {
+      return 'Le nom du service ne peut pas contenir de separateur de chemin (/ ou \\).';
+    }
+    if (!isEdit && existingNames.includes(trimmed)) {
+      return `Un service avec le nom "${trimmed}" existe deja.`;
+    }
+    return null;
+  }
+
+  function validatePath(p) {
+    const trimmed = p.trim().replace(/^\/+|\/+$/g, '');
+    if (!trimmed) {
+      return "Interdit : un chemin vide ou \"/\" capturerait la racine de lightMock et masquerait l'interface.";
+    }
+    if (trimmed === '*') {
+      return "Interdit : \"/*\" au premier niveau capturerait toutes les routes de lightMock.";
+    }
+    return null;
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     error = '';
 
-    if (!name.trim()) { error = 'Le nom du service est requis.'; return; }
-    if (!listenPath.trim()) { error = "Le chemin d'écoute est requis."; return; }
+    const nameErr = validateName(name);
+    if (nameErr) { error = nameErr; return; }
+
+    const pathErr = validatePath(listenPath);
+    if (pathErr) { error = pathErr; return; }
+
     if (!realTargetUrl.trim()) { error = "L'URL cible est requise."; return; }
 
     saving = true;
@@ -144,6 +176,11 @@
     border-radius: var(--radius);
     margin-bottom: 1rem;
     font-weight: 500;
+  }
+  :global([data-theme="dark"]) .form-error {
+    background: #3b1219;
+    border-color: #dc3545;
+    color: #f1aeb5;
   }
 
   .form-field {

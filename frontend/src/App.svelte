@@ -1,5 +1,5 @@
 <script>
-  import { getServices, getConfig, putConfig, toggleService, putService } from './lib/api.js';
+  import { getServices, getConfig, putConfig, toggleService, createService, updateService, resetConfig } from './lib/api.js';
   import ServiceList from './lib/components/ServiceList.svelte';
   import ServiceDetail from './lib/components/ServiceDetail.svelte';
   import ServiceForm from './lib/components/ServiceForm.svelte';
@@ -11,6 +11,16 @@
   let selectedService = $state(null);
   let view = $state('list');
   let loading = $state(true);
+  let darkMode = $state(
+    typeof localStorage !== 'undefined' && localStorage.getItem('lightmock-theme') !== null
+      ? localStorage.getItem('lightmock-theme') === 'dark'
+      : typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches
+  );
+
+  $effect(() => {
+    document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');
+    localStorage.setItem('lightmock-theme', darkMode ? 'dark' : 'light');
+  });
 
   const demoService = {
     name: 'insee-demo',
@@ -58,7 +68,7 @@
 
   async function handleAddService(svc) {
     try {
-      const result = await putService(svc.name, svc);
+      const result = await createService(svc);
       services = [...services, result];
       view = 'detail';
       selectedService = result.name;
@@ -71,7 +81,7 @@
 
   async function loadDemo() {
     try {
-      const result = await putService(demoService.name, demoService);
+      const result = await createService(demoService);
       services = [...services, result];
       showNotification('Service de demo INSEE charge', 'success');
     } catch (e) {
@@ -125,6 +135,19 @@
     setTimeout(() => { notification = { ...notification, visible: false }; }, 4000);
   }
 
+  async function handleReset() {
+    if (!confirm('Supprimer tous les services et repartir de zero ?')) return;
+    try {
+      await resetConfig();
+      services = [];
+      selectedService = null;
+      view = 'list';
+      showNotification('Configuration reinitialised — tous les services supprimes', 'success');
+    } catch (e) {
+      showNotification(`Erreur reset : ${e.message}`, 'error');
+    }
+  }
+
   $effect(() => { loadServices(); });
 
   let currentService = $derived(services.find(s => s.name === selectedService) ?? null);
@@ -142,6 +165,10 @@
       <button type="button" class="btn btn-sm btn-outline" onclick={() => view = 'logs'} title="Journal des requetes">Logs</button>
       <button type="button" class="btn btn-sm btn-outline" onclick={exportConfig} title="Telecharger la configuration">Export</button>
       <button type="button" class="btn btn-sm btn-outline" onclick={importConfig} title="Charger une configuration">Import</button>
+      <button type="button" class="btn btn-sm btn-outline btn-danger-outline" onclick={handleReset} title="Supprimer tous les services">Reset</button>
+      <button type="button" class="btn btn-sm btn-outline" onclick={() => darkMode = !darkMode} title={darkMode ? 'Mode clair' : 'Mode sombre'} aria-label={darkMode ? 'Activer le mode clair' : 'Activer le mode sombre'}>
+        {darkMode ? 'Clair' : 'Sombre'}
+      </button>
       <input type="file" accept=".json" style="display:none" bind:this={fileInput} onchange={handleFileImport} />
     </div>
   </div>
@@ -155,7 +182,7 @@
   {:else if view === 'logs'}
     <RequestLog />
   {:else if view === 'add'}
-    <ServiceForm onSave={handleAddService} onCancel={handleBack} />
+    <ServiceForm existingNames={services.map(s => s.name)} onSave={handleAddService} onCancel={handleBack} />
   {:else if view === 'detail' && currentService}
     <ServiceDetail service={currentService} onBack={handleBack} onUpdate={handleServiceUpdate} onDelete={handleServiceDelete} onNotify={showNotification} />
   {:else}
@@ -199,4 +226,6 @@
   .btn-primary:hover { background: var(--color-primary-hover); }
   .btn-outline { background: var(--color-surface); color: var(--color-text-muted); border-color: var(--color-border); }
   .btn-outline:hover { background: var(--color-bg); color: var(--color-text); }
+  .btn-danger-outline { color: var(--color-danger); border-color: var(--color-danger); }
+  .btn-danger-outline:hover { background: var(--color-danger); color: #fff; }
 </style>

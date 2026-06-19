@@ -1,6 +1,7 @@
 mod api;
 mod intercept;
 pub mod request_log;
+pub mod validation;
 
 use crate::engine::ProxyClient;
 use crate::store::MockStore;

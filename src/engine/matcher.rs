@@ -152,6 +152,7 @@ mod tests {
     fn simple_rule(name: &str, conditions: ConditionGroup) -> Rule {
         Rule {
             name: name.into(),
+            action: RuleAction::default(),
             conditions,
             response: MockResponse {
                 status: 200,

@@ -10,7 +10,12 @@ async function request(method, path, body) {
   }
   const res = await fetch(`${BASE}${path}`, opts);
   if (!res.ok) {
-    throw new Error(`${res.status} ${res.statusText}`);
+    let msg = `${res.status} ${res.statusText}`;
+    try {
+      const body = await res.json();
+      if (body.error) msg = body.error;
+    } catch {}
+    throw new Error(msg);
   }
   if (res.status === 204) return null;
   return res.json();
@@ -24,7 +29,11 @@ export function getService(name) {
   return request('GET', `/services/${encodeURIComponent(name)}`);
 }
 
-export function putService(name, service) {
+export function createService(service) {
+  return request('POST', '/services', service);
+}
+
+export function updateService(name, service) {
   return request('PUT', `/services/${encodeURIComponent(name)}`, service);
 }
 
@@ -50,4 +59,8 @@ export function putConfig(config) {
 
 export function getLogs(limit = 50) {
   return request('GET', `/logs?limit=${limit}`);
+}
+
+export function resetConfig() {
+  return request('DELETE', '/config/reset');
 }
