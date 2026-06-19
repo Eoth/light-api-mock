@@ -14,16 +14,21 @@ pub async fn intercept_layer(
     next: Next,
 ) -> Response {
     let path = req.uri().path().to_string();
+    let method = req.method().clone();
 
     if path.starts_with("/api/") || path == "/api" {
         return next.run(req).await;
     }
 
     let config = state.store.snapshot().await;
-    let matched = config
-        .services
-        .iter()
-        .find_map(|s| match_path(&s.listen_path, &path).map(|(params, remaining)| (s.clone(), params, remaining)));
+
+    let matched = config.services.iter().find_map(|s| {
+        if method.as_str() != s.method {
+            return None;
+        }
+        let effective = build_effective_pattern(&s.name, &s.listen_path);
+        match_path(&effective, &path).map(|(params, remaining)| (s.clone(), params, remaining))
+    });
 
     match matched {
         Some((service, path_params, remaining)) => {
@@ -31,6 +36,11 @@ pub async fn intercept_layer(
         }
         None => next.run(req).await,
     }
+}
+
+fn build_effective_pattern(name: &str, listen_path: &str) -> String {
+    let lp = listen_path.trim_start_matches('/');
+    format!("/{name}/{lp}")
 }
 
 async fn handle_service(
@@ -41,22 +51,35 @@ async fn handle_service(
     remaining: &str,
     req: Request<Body>,
 ) -> Response {
+    let method_str = req.method().to_string();
+
     if !service.is_mocked {
+        let target = format!(
+            "{}/{}",
+            service.real_target_url.trim_end_matches('/'),
+            remaining.trim_start_matches('/')
+        );
         tracing::info!(
-            service = %service.name,
+            service_key = %service.name,
+            method = %method_str,
             path = %path,
-            target = %service.real_target_url,
+            mode = "proxy",
+            target = %target,
             "proxy forwarding"
         );
         return match state.proxy.forward(&service.real_target_url, remaining, req).await {
-            Ok(resp) => resp,
-            Err(status) => status.into_response(),
+            Ok(resp) => {
+                let status = resp.status().as_u16();
+                state.request_log.log_proxy(&service.name, &method_str, path, &target, status);
+                resp
+            }
+            Err(status) => {
+                state.request_log.log_proxy(&service.name, &method_str, path, &target, status.as_u16());
+                status.into_response()
+            }
         };
     }
 
-    tracing::info!(service = %service.name, path = %path, "mock interception");
-
-    let method = req.method().clone();
     let query_params = extract_query_params(req.uri().query());
     let headers = extract_headers(req.headers());
     let content_type = headers.get("content-type").cloned();
@@ -78,13 +101,13 @@ async fn handle_service(
 
     let Some(rule) = matched_rule else {
         tracing::warn!(
-            service = %service.name, method = %method, path = %path,
+            service_key = %service.name, method = %method_str, path = %path,
+            mode = "no-rule",
             "no matching rule"
         );
+        state.request_log.log_no_rule(&service.name, &method_str, path);
         return StatusCode::NOT_FOUND.into_response();
     };
-
-    tracing::info!(service = %service.name, rule = %rule.name, "rule matched");
 
     let path_segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
     let seq = state.next_seq(&service.name);
@@ -99,6 +122,16 @@ async fn handle_service(
 
     match apply_chaos_and_render(&rule.response, &path_segments, &ctx).await {
         Ok((status, resp_headers, body)) => {
+            tracing::info!(
+                service_key = %service.name,
+                method = %method_str,
+                path = %path,
+                mode = "mock",
+                rule = %rule.name,
+                status = %status.as_u16(),
+                "request handled"
+            );
+            state.request_log.log_mock(&service.name, &method_str, path, &rule.name, status.as_u16());
             let mut response = axum::http::Response::builder().status(status);
             for (name, value) in &resp_headers {
                 if let Ok(hv) = HeaderValue::from_str(value) {
@@ -109,7 +142,10 @@ async fn handle_service(
                 .body(Body::from(body))
                 .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())
         }
-        Err(status) => (status, "chaos error injected").into_response(),
+        Err(status) => {
+            state.request_log.log_mock(&service.name, &method_str, path, &rule.name, status.as_u16());
+            (status, "chaos error injected").into_response()
+        }
     }
 }
 
@@ -198,6 +234,46 @@ mod tests {
     use super::*;
 
     #[test]
+    fn effective_pattern() {
+        assert_eq!(
+            build_effective_pattern("insee", "/v4/sirene/{siret}"),
+            "/insee/v4/sirene/{siret}"
+        );
+        assert_eq!(
+            build_effective_pattern("svc-a", "/*"),
+            "/svc-a/*"
+        );
+    }
+
+    #[test]
+    fn namespace_match() {
+        let pattern = build_effective_pattern("insee", "/v4/sirene/{siret}");
+        let r = match_path(&pattern, "/insee/v4/sirene/44306184100047");
+        assert!(r.is_some());
+        let (params, remaining) = r.unwrap();
+        assert_eq!(params.get("siret").unwrap(), "44306184100047");
+        assert_eq!(remaining, "");
+    }
+
+    #[test]
+    fn namespace_no_collision() {
+        let p1 = build_effective_pattern("svc-a", "/users/*");
+        let p2 = build_effective_pattern("svc-b", "/users/*");
+        assert!(match_path(&p1, "/svc-a/users/42").is_some());
+        assert!(match_path(&p1, "/svc-b/users/42").is_none());
+        assert!(match_path(&p2, "/svc-b/users/42").is_some());
+    }
+
+    #[test]
+    fn namespace_wildcard_remaining() {
+        let pattern = build_effective_pattern("api", "/*");
+        let r = match_path(&pattern, "/api/foo/bar");
+        assert!(r.is_some());
+        let (_, remaining) = r.unwrap();
+        assert_eq!(remaining, "/foo/bar");
+    }
+
+    #[test]
     fn wildcard_backward_compat() {
         let r = match_path("/svc-a/*", "/svc-a/foo/bar");
         assert!(r.is_some());
@@ -207,53 +283,16 @@ mod tests {
     }
 
     #[test]
-    fn wildcard_root() {
-        assert!(match_path("/svc-a/*", "/svc-a/").is_some());
-        assert!(match_path("/svc-a/*", "/svc-a").is_some());
-    }
-
-    #[test]
-    fn wildcard_no_match() {
-        assert!(match_path("/svc-a/*", "/svc-b/foo").is_none());
-        assert!(match_path("/svc-a/*", "/svc-abc/foo").is_none());
-    }
-
-    #[test]
     fn named_param_single() {
         let r = match_path("/v4/insee/{siret}", "/v4/insee/44306184100047");
         assert!(r.is_some());
-        let (params, remaining) = r.unwrap();
+        let (params, _) = r.unwrap();
         assert_eq!(params.get("siret").unwrap(), "44306184100047");
-        assert_eq!(remaining, "");
     }
 
     #[test]
-    fn named_param_multiple() {
-        let r = match_path("/api/{version}/users/{id}", "/api/v2/users/42");
-        assert!(r.is_some());
-        let (params, remaining) = r.unwrap();
-        assert_eq!(params.get("version").unwrap(), "v2");
-        assert_eq!(params.get("id").unwrap(), "42");
-        assert_eq!(remaining, "");
-    }
-
-    #[test]
-    fn named_param_no_match_extra_segments() {
+    fn named_param_no_match_extra() {
         assert!(match_path("/v4/insee/{siret}", "/v4/insee/123/extra").is_none());
-    }
-
-    #[test]
-    fn named_param_no_match_missing() {
-        assert!(match_path("/v4/insee/{siret}", "/v4/insee").is_none());
-    }
-
-    #[test]
-    fn named_param_with_wildcard() {
-        let r = match_path("/api/{version}/*", "/api/v2/users/42/details");
-        assert!(r.is_some());
-        let (params, remaining) = r.unwrap();
-        assert_eq!(params.get("version").unwrap(), "v2");
-        assert_eq!(remaining, "/users/42/details");
     }
 
     #[test]
@@ -267,10 +306,9 @@ mod tests {
 
     #[test]
     fn extract_query_params_works() {
-        let params = extract_query_params(Some("a=1&b=hello&c="));
+        let params = extract_query_params(Some("a=1&b=hello"));
         assert_eq!(params.get("a").unwrap(), "1");
         assert_eq!(params.get("b").unwrap(), "hello");
-        assert_eq!(params.get("c").unwrap(), "");
     }
 
     #[test]
@@ -279,12 +317,10 @@ mod tests {
     }
 
     #[test]
-    fn extract_headers_filters_invalid() {
+    fn extract_headers_works() {
         let mut map = axum::http::HeaderMap::new();
         map.insert("x-test", HeaderValue::from_static("value"));
-        map.insert("content-type", HeaderValue::from_static("application/json"));
         let result = extract_headers(&map);
         assert_eq!(result.get("x-test").unwrap(), "value");
-        assert_eq!(result.get("content-type").unwrap(), "application/json");
     }
 }

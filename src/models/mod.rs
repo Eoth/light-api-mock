@@ -8,6 +8,8 @@ pub struct MockConfig {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Service {
     pub name: String,
+    #[serde(default = "default_method")]
+    pub method: String,
     pub listen_path: String,
     pub real_target_url: String,
     pub is_mocked: bool,
@@ -15,6 +17,10 @@ pub struct Service {
     pub rewrite_directory_urls: bool,
     #[serde(default)]
     pub rules: Vec<Rule>,
+}
+
+fn default_method() -> String {
+    "GET".into()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -144,6 +150,7 @@ mod tests {
         MockConfig {
             services: vec![Service {
                 name: "service-a".into(),
+                method: "GET".into(),
                 listen_path: "/service-a/*".into(),
                 real_target_url: "http://service-a.default.svc:8080".into(),
                 is_mocked: true,

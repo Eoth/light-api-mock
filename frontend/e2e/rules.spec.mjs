@@ -4,6 +4,7 @@ const BASE = 'http://localhost:3000';
 
 const svcPayload = {
   name: 'e2e-svc',
+  method: 'GET',
   listen_path: '/e2e/*',
   real_target_url: 'http://e2e:80',
   is_mocked: true,
@@ -15,17 +16,17 @@ const svcPayload = {
 };
 
 test.beforeEach(async () => {
-  await fetch(`${BASE}/api/services/e2e-svc`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(svcPayload) });
+  await fetch(`${BASE}/api/config`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ services: [svcPayload] }) });
 });
 
 test.afterEach(async () => {
-  await fetch(`${BASE}/api/services/e2e-svc`, { method: 'DELETE' });
+  await fetch(`${BASE}/api/config`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ services: [] }) });
 });
 
 async function goToServiceDetail(page) {
   await page.goto(BASE);
   await page.waitForLoadState('networkidle');
-  await page.getByRole('button', { name: /Configurer/ }).first().click();
+  await page.getByRole('article', { name: /e2e-svc/ }).getByRole('button', { name: /Configurer/ }).click();
   await page.waitForTimeout(300);
 }
 
@@ -63,10 +64,11 @@ test('bouton supprimer retire la regle', async ({ page }) => {
 test('toggle mock/proxy fonctionne', async ({ page }) => {
   await page.goto(BASE);
   await page.waitForLoadState('networkidle');
-  await expect(page.getByRole('status', { name: /mock/i })).toBeVisible();
-  await page.getByRole('switch').click();
+  const card = page.getByRole('article', { name: /e2e-svc/ });
+  await expect(card.getByRole('status')).toHaveText('MOCK');
+  await card.getByRole('switch').click();
   await page.waitForTimeout(500);
-  await expect(page.getByRole('status', { name: /proxy/i })).toBeVisible();
+  await expect(card.getByRole('status')).toHaveText('PROXY');
 });
 
 test('recherche filtre les services', async ({ page }) => {

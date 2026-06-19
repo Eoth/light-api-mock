@@ -4,6 +4,7 @@ const BASE = 'http://localhost:3000';
 
 const inseeSvc = {
   name: 'insee',
+  method: 'GET',
   listen_path: '/v4/insee/sirene/etablissements/{siret}',
   real_target_url: 'https://staging.entreprise.api.gouv.fr',
   is_mocked: true,
@@ -40,7 +41,7 @@ test.afterEach(async () => {
 });
 
 test('named path param extracts siret from URL', async ({ request }) => {
-  const resp = await request.get(`${BASE}/v4/insee/sirene/etablissements/44306184100047`);
+  const resp = await request.get(`${BASE}/insee/v4/insee/sirene/etablissements/44306184100047`);
   expect(resp.status()).toBe(200);
   const json = await resp.json();
   expect(json.siret).toBe('44306184100047');
@@ -51,25 +52,25 @@ test('named path param extracts siret from URL', async ({ request }) => {
 });
 
 test('different siret returns different value', async ({ request }) => {
-  const resp = await request.get(`${BASE}/v4/insee/sirene/etablissements/12345678901234`);
+  const resp = await request.get(`${BASE}/insee/v4/insee/sirene/etablissements/12345678901234`);
   const json = await resp.json();
   expect(json.siret).toBe('12345678901234');
   expect(json.siren).toBe('123456789');
 });
 
 test('path with wrong prefix does not match', async ({ request }) => {
-  const resp = await request.get(`${BASE}/v4/other/sirene/etablissements/44306184100047`);
+  const resp = await request.get(`${BASE}/other/v4/other/sirene/etablissements/44306184100047`);
   expect(resp.status()).toBe(404);
 });
 
 test('path with extra segments does not match', async ({ request }) => {
-  const resp = await request.get(`${BASE}/v4/insee/sirene/etablissements/44306184100047/extra`);
+  const resp = await request.get(`${BASE}/insee/v4/insee/sirene/etablissements/44306184100047/extra`);
   expect(resp.status()).toBe(404);
 });
 
 test('template with seq counter increments', async ({ request }) => {
-  const r1 = await request.get(`${BASE}/v4/insee/sirene/etablissements/11111111111111`);
-  const r2 = await request.get(`${BASE}/v4/insee/sirene/etablissements/22222222222222`);
+  const r1 = await request.get(`${BASE}/insee/v4/insee/sirene/etablissements/11111111111111`);
+  const r2 = await request.get(`${BASE}/insee/v4/insee/sirene/etablissements/22222222222222`);
   const j1 = await r1.json();
   const j2 = await r2.json();
   expect(j1.siret).toBe('11111111111111');
@@ -80,5 +81,5 @@ test('insee service visible in UI', async ({ page }) => {
   await page.goto(BASE);
   await page.waitForLoadState('networkidle');
   await expect(page.getByRole('heading', { name: 'insee' })).toBeVisible();
-  await expect(page.getByText('/v4/insee/sirene/etablissements/{siret}')).toBeVisible();
+  await expect(page.getByText('/insee/v4/insee/sirene/etablissements/{siret}')).toBeVisible();
 });

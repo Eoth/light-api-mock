@@ -1,9 +1,11 @@
 mod api;
 mod intercept;
+pub mod request_log;
 
 use crate::engine::ProxyClient;
 use crate::store::MockStore;
 use axum::Router;
+use request_log::RequestLog;
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::atomic::AtomicU64;
@@ -16,6 +18,7 @@ pub struct AppState {
     pub store: MockStore,
     pub proxy: ProxyClient,
     pub seq_counters: Arc<RwLock<HashMap<String, Arc<AtomicU64>>>>,
+    pub request_log: RequestLog,
 }
 
 impl AppState {
