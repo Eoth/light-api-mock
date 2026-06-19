@@ -2,7 +2,7 @@
   import ServiceForm from './ServiceForm.svelte';
   import RuleList from './RuleList.svelte';
   import RuleForm from './RuleForm.svelte';
-  import { putService, deleteService, reorderRules } from '../api.js';
+  import { updateService, deleteService, reorderRules } from '../api.js';
 
   let {
     service,
@@ -19,7 +19,7 @@
 
   async function handleSaveService(updated) {
     try {
-      const result = await putService(service.name, updated);
+      const result = await updateService(service.name, updated);
       onUpdate(result);
       editing = false;
       onNotify(`Service "${result.name}" mis à jour`, 'success');
@@ -56,7 +56,7 @@
     }
     const updated = { ...service, rules };
     try {
-      const result = await putService(service.name, updated);
+      const result = await updateService(service.name, updated);
       onUpdate(result);
       editingRuleIdx = null;
       addingRule = false;
@@ -70,7 +70,7 @@
     const rules = service.rules.filter((_, i) => i !== idx);
     const updated = { ...service, rules };
     try {
-      const result = await putService(service.name, updated);
+      const result = await updateService(service.name, updated);
       onUpdate(result);
       onNotify('Règle supprimée', 'success');
     } catch (e) {

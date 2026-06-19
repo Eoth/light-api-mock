@@ -27,8 +27,18 @@ fn default_method() -> String {
 pub struct Rule {
     pub name: String,
     #[serde(default)]
+    pub action: RuleAction,
+    #[serde(default)]
     pub conditions: ConditionGroup,
     pub response: MockResponse,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum RuleAction {
+    #[default]
+    Mock,
+    Proxy,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
@@ -157,6 +167,7 @@ mod tests {
                 rewrite_directory_urls: false,
                 rules: vec![Rule {
                     name: "rule-login-ok".into(),
+                    action: RuleAction::default(),
                     conditions: ConditionGroup {
                         all_of: vec![
                             Condition {
@@ -397,5 +408,77 @@ services:
 "#;
         let config: MockConfig = serde_yaml::from_str(yaml).expect("deserialize");
         assert_eq!(config.services[0].rules[0].response.status, 200);
+    }
+
+    #[test]
+    fn rule_action_defaults_to_mock() {
+        let yaml = r#"
+services:
+  - name: s
+    listen_path: /s/*
+    real_target_url: http://s:80
+    is_mocked: true
+    rules:
+      - name: r
+        response:
+          body:
+            - type: Literal
+              value: hi
+"#;
+        let config: MockConfig = serde_yaml::from_str(yaml).expect("deserialize");
+        assert_eq!(config.services[0].rules[0].action, RuleAction::Mock);
+    }
+
+    #[test]
+    fn rule_action_proxy_roundtrip() {
+        let yaml = r#"
+services:
+  - name: s
+    listen_path: /s/*
+    real_target_url: http://s:80
+    is_mocked: true
+    rules:
+      - name: proxy-rule
+        action: proxy
+        response:
+          body:
+            - type: Literal
+              value: unused
+      - name: mock-rule
+        action: mock
+        response:
+          body:
+            - type: Literal
+              value: mocked
+"#;
+        let config: MockConfig = serde_yaml::from_str(yaml).expect("deserialize");
+        assert_eq!(config.services[0].rules[0].action, RuleAction::Proxy);
+        assert_eq!(config.services[0].rules[1].action, RuleAction::Mock);
+
+        let re_yaml = serde_yaml::to_string(&config).expect("serialize");
+        let re_parsed: MockConfig = serde_yaml::from_str(&re_yaml).expect("re-deserialize");
+        assert_eq!(config, re_parsed);
+    }
+
+    #[test]
+    fn backward_compat_no_action_field() {
+        let yaml = r#"
+services:
+  - name: old
+    listen_path: /old/*
+    real_target_url: http://old:80
+    is_mocked: true
+    rules:
+      - name: legacy
+        conditions:
+          all_of: []
+          any_of: []
+        response:
+          body:
+            - type: Literal
+              value: ok
+"#;
+        let config: MockConfig = serde_yaml::from_str(yaml).expect("deserialize");
+        assert_eq!(config.services[0].rules[0].action, RuleAction::Mock);
     }
 }

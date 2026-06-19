@@ -1,17 +1,19 @@
 use crate::models::{MockConfig, Service};
 use crate::server::AppState;
 use crate::server::request_log::LogEntry;
+use crate::server::validation::validate_service;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::{Json, Router};
-use axum::routing::{get, put};
+use axum::routing::{delete as delete_route, get, put};
 
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/config", get(get_config).put(put_config))
-        .route("/services", get(list_services))
-        .route("/services/:name", get(get_service).put(put_service).delete(delete_service))
+        .route("/config/reset", delete_route(reset_config))
+        .route("/services", get(list_services).post(create_service))
+        .route("/services/:name", get(get_service).put(update_service).delete(delete_service))
         .route("/services/:name/toggle", put(toggle_service))
         .route("/services/:name/rules/reorder", put(reorder_rules))
         .route("/logs", get(get_logs))
@@ -36,8 +38,26 @@ async fn put_config(
     State(state): State<AppState>,
     Json(config): Json<MockConfig>,
 ) -> Result<Json<MockConfig>, AppError> {
+    for service in &config.services {
+        if let Err(e) = validate_service(service) {
+            tracing::warn!(service = %service.name, field = %e.field, reason = %e.message, "config rejected: invalid service");
+            return Err(AppError::Validation(e.message));
+        }
+    }
     state.store.replace(config).await.map_err(AppError::Store)?;
     Ok(Json(state.store.snapshot().await))
+}
+
+async fn reset_config(
+    State(state): State<AppState>,
+) -> Result<StatusCode, AppError> {
+    tracing::info!("config reset: all services removed");
+    state
+        .store
+        .replace(MockConfig::empty())
+        .await
+        .map_err(AppError::Store)?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 async fn list_services(State(state): State<AppState>) -> Json<Vec<Service>> {
@@ -57,18 +77,64 @@ async fn get_service(
         .ok_or(StatusCode::NOT_FOUND)
 }
 
-async fn put_service(
+async fn create_service(
+    State(state): State<AppState>,
+    Json(service): Json<Service>,
+) -> Result<(StatusCode, Json<Service>), AppError> {
+    if let Err(e) = validate_service(&service) {
+        tracing::warn!(service = %service.name, field = %e.field, reason = %e.message, "service rejected");
+        return Err(AppError::Validation(e.message));
+    }
+
+    {
+        let config = state.store.snapshot().await;
+        if config.services.iter().any(|s| s.name == service.name) {
+            tracing::warn!(service = %service.name, "service creation refused: name already exists");
+            return Err(AppError::Conflict(format!(
+                "Un service avec le nom \"{}\" existe deja.",
+                service.name
+            )));
+        }
+    }
+
+    let updated = state
+        .store
+        .update(|cfg| {
+            cfg.services.push(service.clone());
+        })
+        .await
+        .map_err(AppError::Store)?;
+
+    updated
+        .services
+        .into_iter()
+        .find(|s| s.name == service.name)
+        .map(|s| (StatusCode::CREATED, Json(s)))
+        .ok_or(AppError::NotFound)
+}
+
+async fn update_service(
     State(state): State<AppState>,
     Path(name): Path<String>,
     Json(service): Json<Service>,
 ) -> Result<Json<Service>, AppError> {
+    if let Err(e) = validate_service(&service) {
+        tracing::warn!(service = %name, field = %e.field, reason = %e.message, "service rejected");
+        return Err(AppError::Validation(e.message));
+    }
+
+    {
+        let config = state.store.snapshot().await;
+        if !config.services.iter().any(|s| s.name == name) {
+            return Err(AppError::NotFound);
+        }
+    }
+
     let updated = state
         .store
         .update(|cfg| {
             if let Some(existing) = cfg.services.iter_mut().find(|s| s.name == name) {
                 *existing = service.clone();
-            } else {
-                cfg.services.push(service.clone());
             }
         })
         .await
@@ -167,6 +233,8 @@ async fn reorder_rules(
 enum AppError {
     Store(crate::store::StoreError),
     NotFound,
+    Validation(String),
+    Conflict(String),
 }
 
 impl IntoResponse for AppError {
@@ -177,6 +245,12 @@ impl IntoResponse for AppError {
                 (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
             }
             AppError::NotFound => StatusCode::NOT_FOUND.into_response(),
+            AppError::Validation(msg) => {
+                (StatusCode::BAD_REQUEST, Json(serde_json::json!({ "error": msg }))).into_response()
+            }
+            AppError::Conflict(msg) => {
+                (StatusCode::CONFLICT, Json(serde_json::json!({ "error": msg }))).into_response()
+            }
         }
     }
 }

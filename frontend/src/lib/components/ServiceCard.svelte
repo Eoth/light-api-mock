@@ -59,7 +59,7 @@
   }
 
   .card-info { display: flex; align-items: center; gap: 0.75rem; }
-  .method-badge { display: inline-block; padding: 0.125rem 0.5rem; border-radius: var(--radius); font-size: 0.75rem; font-weight: 700; background: #e8f0fe; color: var(--color-primary); letter-spacing: 0.03em; }
+  .method-badge { display: inline-block; padding: 0.125rem 0.5rem; border-radius: var(--radius); font-size: 0.75rem; font-weight: 700; background: var(--color-focus); color: var(--color-primary); letter-spacing: 0.03em; }
 
   .card-title { margin: 0; font-size: 1.125rem; font-weight: 600; }
 

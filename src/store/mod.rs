@@ -123,6 +123,7 @@ mod tests {
                 rewrite_directory_urls: false,
                 rules: vec![Rule {
                     name: "default".into(),
+                    action: RuleAction::default(),
                     conditions: ConditionGroup::default(),
                     response: MockResponse {
                         status: 200,
