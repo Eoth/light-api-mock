@@ -4,6 +4,7 @@ pub mod store;
 pub mod server;
 
 use crate::engine::ProxyClient;
+use crate::server::request_log::RequestLog;
 use crate::server::{AppState, build_router};
 use crate::store::MockStore;
 use std::collections::HashMap;
@@ -37,6 +38,7 @@ async fn main() {
         store,
         proxy: ProxyClient::new(),
         seq_counters: Arc::new(RwLock::new(HashMap::new())),
+        request_log: RequestLog::new(),
     };
 
     let app = build_router(state, &static_dir);

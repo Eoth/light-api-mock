@@ -7,9 +7,16 @@
 
   const initial = service;
   let name = $state(initial?.name ?? '');
+  let method = $state(initial?.method ?? 'GET');
   let listenPath = $state(initial?.listen_path ?? '/*');
   let realTargetUrl = $state(initial?.real_target_url ?? 'http://');
   let rewriteDirectoryUrls = $state(initial?.rewrite_directory_urls ?? false);
+
+  const httpMethods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'];
+
+  let testUrl = $derived(
+    `http://localhost:3000/${name.trim() || '...'}${listenPath.trim().startsWith('/') ? listenPath.trim() : '/' + listenPath.trim()}`
+  );
   let saving = $state(false);
   let error = $state('');
 
@@ -27,6 +34,7 @@
     try {
       await onSave({
         name: name.trim(),
+        method,
         listen_path: listenPath.trim(),
         real_target_url: realTargetUrl.trim(),
         is_mocked: initial?.is_mocked ?? false,
@@ -57,11 +65,21 @@
       placeholder="ex: service-users"
       aria-describedby="svc-name-hint"
     />
-    <span class="field-hint" id="svc-name-hint">Identifiant unique du service (non modifiable après création)</span>
+    <span class="field-hint" id="svc-name-hint">Identifiant unique, sert aussi de prefixe URL : /{`{nom}`}/...</span>
   </div>
 
   <div class="form-field">
-    <label for="svc-path">Chemin d'écoute</label>
+    <label for="svc-method">Methode HTTP</label>
+    <select id="svc-method" bind:value={method} aria-describedby="svc-method-hint">
+      {#each httpMethods as m}
+        <option value={m}>{m}</option>
+      {/each}
+    </select>
+    <span class="field-hint" id="svc-method-hint">Un service = une methode. Pour GET + POST sur le meme path, creez 2 services.</span>
+  </div>
+
+  <div class="form-field">
+    <label for="svc-path">Chemin d'ecoute</label>
     <input
       id="svc-path"
       type="text"
@@ -93,6 +111,12 @@
     </label>
     <span class="field-hint">Remplace les URL des backends dans les réponses d'annuaire pour les rediriger via lightMock</span>
   </div>
+
+  {#if name.trim()}
+    <div class="url-preview">
+      <strong>URL de test :</strong> <code>{method} {testUrl}</code>
+    </div>
+  {/if}
 
   <div class="form-actions">
     <button type="submit" class="btn btn-primary" disabled={saving}>
@@ -131,6 +155,25 @@
     font-weight: 600;
     margin-bottom: 0.25rem;
   }
+
+  .form-field select {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    font-size: 1rem;
+    font-family: inherit;
+  }
+
+  .url-preview {
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 0.625rem 0.75rem;
+    margin-bottom: 1rem;
+    font-size: 0.875rem;
+  }
+  .url-preview code { background: none; padding: 0; font-weight: 600; color: var(--color-primary); }
 
   .form-field input[type="text"],
   .form-field input[type="url"] {

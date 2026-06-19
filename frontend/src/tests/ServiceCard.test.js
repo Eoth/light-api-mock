@@ -16,9 +16,9 @@ describe('ServiceCard', () => {
     expect(getByText('svc-users')).toBeInTheDocument();
   });
 
-  it('affiche le chemin d ecoute', () => {
+  it('affiche l URL namespacee', () => {
     const { getByText } = render(ServiceCard, { props: { service: mockService } });
-    expect(getByText('/users/*')).toBeInTheDocument();
+    expect(getByText('/svc-users/users/*')).toBeInTheDocument();
   });
 
   it('affiche l url cible', () => {

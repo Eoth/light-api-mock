@@ -1,5 +1,7 @@
 <script>
   import ConditionForm from './ConditionForm.svelte';
+  import JsonResponseBuilder from './JsonResponseBuilder.svelte';
+  import XmlResponseBuilder from './XmlResponseBuilder.svelte';
 
   let { rule = null, onSave = () => {}, onCancel = () => {} } = $props();
 
@@ -18,6 +20,34 @@
   let chaos = $state(initial?.response?.chaos ?? { delay_ms: 0, delay_min_ms: null, delay_max_ms: null, error_rate: 0, error_status: 500 });
 
   let responseOpen = $state(true);
+
+  function detectMode() {
+    if (!initial?.response?.body?.length) return 'json-guided';
+    if (initial.response.body.length === 1 && initial.response.body[0].type === 'Template') return 'advanced';
+    if (initial.response.status === 204) return 'empty';
+    return 'advanced';
+  }
+  let responseMode = $state(detectMode());
+
+  let jsonFields = $state([]);
+  let jsonBuilderRef = $state(null);
+  let xmlFields = $state([]);
+  let xmlBuilderRef = $state(null);
+  let textContent = $state('');
+
+  function buildFragmentsFromMode() {
+    if (responseMode === 'empty') return [];
+    if (responseMode === 'json-guided' && jsonBuilderRef) {
+      return [{ type: 'Template', template: jsonBuilderRef.toTemplate() }];
+    }
+    if (responseMode === 'xml-guided' && xmlBuilderRef) {
+      return [{ type: 'Template', template: xmlBuilderRef.toTemplate() }];
+    }
+    if (responseMode === 'text') {
+      return [{ type: 'Literal', value: textContent }];
+    }
+    return fragments;
+  }
 
   const fragmentTypes = [
     { value: 'Template', label: 'Template (expressions)' },
@@ -48,13 +78,22 @@
 
   function handleSubmit(e) {
     e.preventDefault();
+    const finalStatus = responseMode === 'empty' ? 204 : status;
+    const finalHeaders = responseMode === 'empty' ? [] : respHeaders.filter(h => h.name.trim());
+    if (responseMode === 'json-guided' && !finalHeaders.some(h => h.name.toLowerCase() === 'content-type')) {
+      finalHeaders.push({ name: 'Content-Type', value: 'application/json' });
+    }
+    if (responseMode === 'xml-guided' && !finalHeaders.some(h => h.name.toLowerCase() === 'content-type')) {
+      finalHeaders.push({ name: 'Content-Type', value: 'application/xml' });
+    }
+    const finalBody = buildFragmentsFromMode();
     onSave({
       name: name.trim(),
       conditions: { all_of: allOf, any_of: anyOf },
       response: {
-        status,
-        headers: respHeaders.filter(h => h.name.trim()),
-        body: fragments,
+        status: finalStatus,
+        headers: finalHeaders,
+        body: finalBody,
         chaos: chaosEnabled ? chaos : null,
       },
     });
@@ -159,7 +198,7 @@
     {/if}
   </fieldset>
 
-  <!-- REPONSE — toujours visible, pas de changement de vue -->
+  <!-- REPONSE -->
   <fieldset class="section section-response">
     <legend>
       <button type="button" class="legend-toggle" onclick={() => responseOpen = !responseOpen} aria-expanded={responseOpen}>
@@ -168,107 +207,111 @@
     </legend>
 
     {#if responseOpen}
-      <div class="form-row">
-        <div class="form-field" style="max-width:8rem">
-          <label for="resp-status">Code HTTP</label>
-          <input id="resp-status" type="number" bind:value={status} min="100" max="599" />
-        </div>
+      <div class="mode-selector">
+        <label class="mode-option"><input type="radio" bind:group={responseMode} value="json-guided" /> JSON guide</label>
+        <label class="mode-option"><input type="radio" bind:group={responseMode} value="xml-guided" /> XML guide</label>
+        <label class="mode-option"><input type="radio" bind:group={responseMode} value="text" /> Texte</label>
+        <label class="mode-option"><input type="radio" bind:group={responseMode} value="advanced" /> Template avance</label>
+        <label class="mode-option"><input type="radio" bind:group={responseMode} value="empty" /> Vide (204)</label>
       </div>
 
-      <!-- HEADERS -->
-      <div class="sub-section">
-        <strong>En-tetes</strong>
-        {#each respHeaders as hdr, idx}
-          <div class="header-row">
-            <input type="text" bind:value={hdr.name} placeholder="Content-Type" aria-label="Nom de l'en-tete {idx + 1}" />
-            <input type="text" bind:value={hdr.value} placeholder="application/json" aria-label="Valeur de l'en-tete {idx + 1}" />
-            <button type="button" class="btn-icon btn-delete" onclick={() => removeHeader(idx)} aria-label="Supprimer l'en-tete">&#10005;</button>
+      {#if responseMode !== 'empty'}
+        <div class="form-row">
+          <div class="form-field" style="max-width:8rem">
+            <label for="resp-status">Code HTTP</label>
+            <input id="resp-status" type="number" bind:value={status} min="100" max="599" />
           </div>
-        {/each}
-        <button type="button" class="btn btn-sm btn-outline" onclick={addHeader}>+ En-tete</button>
-      </div>
+        </div>
 
-      <!-- FRAGMENTS DU BODY -->
-      <div class="sub-section">
-        <strong>Corps de la reponse</strong>
-        <p class="section-help">Composez la reponse en ajoutant des blocs. Ils sont concatenes dans l'ordre.</p>
-
-        {#each fragments as frag, idx}
-          <div class="fragment-card">
-            <div class="fragment-header">
-              <span class="frag-index">{idx + 1}</span>
-              <select value={frag.type} onchange={(e) => updateFragmentType(idx, e.target.value)} aria-label="Type du fragment {idx + 1}">
-                {#each fragmentTypes as ft}
-                  <option value={ft.value}>{ft.label}</option>
-                {/each}
-              </select>
-              <div class="fragment-actions">
-                <button type="button" class="btn-icon" onclick={() => moveFragment(idx, -1)} disabled={idx === 0} aria-label="Monter" title="Monter">&#9650;</button>
-                <button type="button" class="btn-icon" onclick={() => moveFragment(idx, 1)} disabled={idx === fragments.length - 1} aria-label="Descendre" title="Descendre">&#9660;</button>
-                <button type="button" class="btn-icon btn-delete" onclick={() => removeFragment(idx)} aria-label="Supprimer" title="Supprimer">&#10005;</button>
-              </div>
+        <div class="sub-section">
+          <strong>En-tetes</strong>
+          {#each respHeaders as hdr, idx}
+            <div class="header-row">
+              <input type="text" bind:value={hdr.name} placeholder="Content-Type" aria-label="Nom de l'en-tete {idx + 1}" />
+              <input type="text" bind:value={hdr.value} placeholder="application/json" aria-label="Valeur de l'en-tete {idx + 1}" />
+              <button type="button" class="btn-icon btn-delete" onclick={() => removeHeader(idx)} aria-label="Supprimer l'en-tete">&#10005;</button>
             </div>
+          {/each}
+          <button type="button" class="btn btn-sm btn-outline" onclick={addHeader}>+ En-tete</button>
+          {#if responseMode === 'json-guided'}
+            <span class="field-hint">Content-Type: application/json sera ajoute automatiquement.</span>
+          {/if}
+        </div>
+      {/if}
 
-            <div class="fragment-body">
-              {#if frag.type === 'Literal'}
-                <textarea bind:value={frag.value} rows="2" placeholder='ex: {`{"siret":"`}' aria-label="Contenu texte du fragment {idx + 1}"></textarea>
-                <span class="field-hint">Texte injecte tel quel. Pour du JSON, ecrivez un morceau puis ajoutez d'autres fragments pour les valeurs dynamiques.</span>
+      {#if responseMode === 'json-guided'}
+        <div class="sub-section">
+          <JsonResponseBuilder bind:this={jsonBuilderRef} fields={jsonFields} onUpdate={(f) => jsonFields = f} />
+        </div>
 
-              {:else if frag.type === 'Uuid'}
-                <p class="frag-info">UUID v4 genere a chaque requete. Ex: <code>3f2504e0-4f89-11d3-9a0c-0305e82c3301</code></p>
+      {:else if responseMode === 'xml-guided'}
+        <div class="sub-section">
+          <XmlResponseBuilder bind:this={xmlBuilderRef} fields={xmlFields} onUpdate={(f) => xmlFields = f} />
+        </div>
 
-              {:else if frag.type === 'PickFrom'}
-                <span class="field-hint">Une valeur sera choisie au hasard parmi la liste.</span>
-                {#each frag.values as val, vi}
-                  <div class="pick-row">
-                    <input type="text" bind:value={frag.values[vi]} placeholder="Valeur {vi + 1}" aria-label="Valeur {vi + 1}" />
-                    <button type="button" class="btn-icon btn-delete" onclick={() => removePickValue(idx, vi)} aria-label="Supprimer">&#10005;</button>
-                  </div>
-                {/each}
-                <button type="button" class="btn btn-sm btn-outline" onclick={() => addPickValue(idx)}>+ Valeur</button>
+      {:else if responseMode === 'text'}
+        <div class="sub-section">
+          <strong>Contenu texte</strong>
+          <textarea bind:value={textContent} rows="5" placeholder="Contenu de la reponse en texte brut" aria-label="Contenu texte de la reponse" class="text-area"></textarea>
+        </div>
 
-              {:else if frag.type === 'FakeData'}
-                <select value={frag.kind?.type ?? 'FirstName'} onchange={(e) => updateFakeKind(idx, e.target.value)} aria-label="Type de donnee fictive">
-                  {#each fakeKinds as fk}
-                    <option value={fk.value}>{fk.label}</option>
+      {:else if responseMode === 'advanced'}
+        <div class="sub-section">
+          <strong>Corps de la reponse (fragments)</strong>
+          <p class="section-help">Composez la reponse en ajoutant des blocs concatenes dans l'ordre.</p>
+
+          {#each fragments as frag, idx}
+            <div class="fragment-card">
+              <div class="fragment-header">
+                <span class="frag-index">{idx + 1}</span>
+                <select value={frag.type} onchange={(e) => updateFragmentType(idx, e.target.value)} aria-label="Type du fragment {idx + 1}">
+                  {#each fragmentTypes as ft}
+                    <option value={ft.value}>{ft.label}</option>
                   {/each}
                 </select>
-                {#if frag.kind?.type === 'Integer'}
-                  <div class="int-range">
-                    <label>Min <input type="number" bind:value={frag.kind.min} /></label>
-                    <label>Max <input type="number" bind:value={frag.kind.max} /></label>
+                <div class="fragment-actions">
+                  <button type="button" class="btn-icon" onclick={() => moveFragment(idx, -1)} disabled={idx === 0} aria-label="Monter" title="Monter">&#9650;</button>
+                  <button type="button" class="btn-icon" onclick={() => moveFragment(idx, 1)} disabled={idx === fragments.length - 1} aria-label="Descendre" title="Descendre">&#9660;</button>
+                  <button type="button" class="btn-icon btn-delete" onclick={() => removeFragment(idx)} aria-label="Supprimer" title="Supprimer">&#10005;</button>
+                </div>
+              </div>
+              <div class="fragment-body">
+                {#if frag.type === 'Literal'}
+                  <textarea bind:value={frag.value} rows="2" placeholder='ex: {`{"siret":"`}' aria-label="Contenu texte"></textarea>
+                {:else if frag.type === 'Uuid'}
+                  <p class="frag-info">UUID v4 genere a chaque requete.</p>
+                {:else if frag.type === 'PickFrom'}
+                  {#each frag.values as val, vi}
+                    <div class="pick-row">
+                      <input type="text" bind:value={frag.values[vi]} placeholder="Valeur {vi + 1}" aria-label="Valeur {vi + 1}" />
+                      <button type="button" class="btn-icon btn-delete" onclick={() => removePickValue(idx, vi)} aria-label="Supprimer">&#10005;</button>
+                    </div>
+                  {/each}
+                  <button type="button" class="btn btn-sm btn-outline" onclick={() => addPickValue(idx)}>+ Valeur</button>
+                {:else if frag.type === 'FakeData'}
+                  <select value={frag.kind?.type ?? 'FirstName'} onchange={(e) => updateFakeKind(idx, e.target.value)} aria-label="Type fictif">
+                    {#each fakeKinds as fk}<option value={fk.value}>{fk.label}</option>{/each}
+                  </select>
+                {:else if frag.type === 'PathSegment'}
+                  <label class="inline-label">Position <input type="number" bind:value={frag.index} min="0" style="width:5rem" /></label>
+                {:else if frag.type === 'Template'}
+                  <textarea bind:value={frag.template} rows="5" class="template-textarea"
+                    placeholder={`Ex: {{"siret":"{path.siret}","siren":"{path.siret | first(9)}"}}`}
+                    aria-label="Template"></textarea>
+                  <div class="template-help">
+                    <span class="field-hint"><strong>Variables :</strong> <code>{`{path.nom}`}</code>, <code>{`{query.id}`}</code>, <code>{`{uuid}`}</code>, <code>{`{now_ms}`}</code>, <code>{`{fake.CompanyName}`}</code>, <code>{`{seq}`}</code></span>
+                    <span class="field-hint"><strong>Pipes :</strong> <code>| lower</code>, <code>| upper</code>, <code>| first(N)</code>, <code>| default("val")</code>. JSON : <code>{`{{`}</code> / <code>{`}}`}</code></span>
                   </div>
                 {/if}
-
-              {:else if frag.type === 'PathSegment'}
-                <label class="inline-label">
-                  Position du segment (a partir de 0)
-                  <input type="number" bind:value={frag.index} min="0" style="width:5rem" />
-                </label>
-                <div class="path-help">
-                  <table class="path-example">
-                    <thead><tr><th>Position</th><th>0</th><th>1</th><th>2</th><th>3</th></tr></thead>
-                    <tbody><tr><td>URL</td><td>v4</td><td>api</td><td>insee</td><td class="hl">12345678</td></tr></tbody>
-                  </table>
-                  <span class="field-hint">Pour <code>/v4/api/insee/12345678</code>, position <strong>3</strong> = <strong>12345678</strong></span>
-                </div>
-
-              {:else if frag.type === 'Template'}
-                <textarea bind:value={frag.template} rows="5" class="template-textarea"
-                  placeholder={`Ex: {{"siret":"{path.siret}","siren":"{path.siret | first(9)}","nom":"{fake.CompanyName}","ts":{now_ms}}}`}
-                  aria-label="Template du fragment {idx + 1}"></textarea>
-                <div class="template-help">
-                  <span class="field-hint"><strong>Variables :</strong> <code>{`{path.nom}`}</code>, <code>{`{query.id}`}</code>, <code>{`{header.x-env}`}</code>, <code>{`{body./user/name}`}</code>, <code>{`{uuid}`}</code>, <code>{`{now_ms}`}</code>, <code>{`{now_iso}`}</code>, <code>{`{seq}`}</code>, <code>{`{fake.CompanyName}`}</code></span>
-                  <span class="field-hint"><strong>Pipes :</strong> <code>| lower</code>, <code>| upper</code>, <code>| trim</code>, <code>| first(N)</code>, <code>| default("val")</code></span>
-                  <span class="field-hint"><strong>JSON :</strong> Utilisez <code>{`{{`}</code> et <code>{`}}`}</code> pour les accolades JSON litterales.</span>
-                </div>
-              {/if}
+              </div>
             </div>
-          </div>
-        {/each}
+          {/each}
+          <button type="button" class="btn btn-sm btn-outline" onclick={addFragment}>+ Ajouter un fragment</button>
+        </div>
 
-        <button type="button" class="btn btn-sm btn-outline" onclick={addFragment}>+ Ajouter un fragment</button>
-      </div>
+      {:else if responseMode === 'empty'}
+        <p class="section-help" style="margin-top:0.5rem">La reponse sera 204 No Content, sans body.</p>
+      {/if}
 
       <!-- CHAOS -->
       <div class="sub-section chaos-section">
@@ -302,6 +345,11 @@
 
 <style>
   .rule-form { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius); padding: 1.25rem; }
+
+  .mode-selector { display: flex; gap: 1rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
+  .mode-option { display: flex; align-items: center; gap: 0.375rem; font-size: 0.875rem; font-weight: 500; cursor: pointer; padding: 0.375rem 0.75rem; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-bg); }
+  .mode-option:has(input:checked) { border-color: var(--color-primary); background: #e8f0fe; }
+  .mode-option input { margin: 0; }
   .form-field { margin-bottom: 1rem; }
   .form-field label { display: block; font-weight: 600; margin-bottom: 0.25rem; }
   .form-field input, .form-field select { width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--color-border); border-radius: var(--radius); font-size: 1rem; font-family: inherit; }
@@ -333,6 +381,7 @@
   .frag-index { display: inline-flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; border-radius: 50%; background: var(--color-primary); color: #fff; font-size: 0.75rem; font-weight: 700; flex-shrink: 0; }
   .frag-info { font-size: 0.8125rem; color: var(--color-text-muted); font-style: italic; margin: 0; }
 
+  .text-area { width: 100%; padding: 0.5rem; border: 1px solid var(--color-border); border-radius: var(--radius); font-size: 0.875rem; font-family: inherit; resize: vertical; }
   .template-textarea { min-height: 5rem; }
   .template-help { margin-top: 0.375rem; display: flex; flex-direction: column; gap: 0.125rem; }
   .template-help code { background: var(--color-bg); padding: 0.1rem 0.25rem; border-radius: 2px; font-size: 0.8rem; }

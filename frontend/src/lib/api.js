@@ -47,3 +47,7 @@ export function getConfig() {
 export function putConfig(config) {
   return request('PUT', '/config', config);
 }
+
+export function getLogs(limit = 50) {
+  return request('GET', `/logs?limit=${limit}`);
+}

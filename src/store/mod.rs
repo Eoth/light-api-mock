@@ -116,6 +116,7 @@ mod tests {
         MockConfig {
             services: vec![Service {
                 name: "svc-a".into(),
+                method: "GET".into(),
                 listen_path: "/svc-a/*".into(),
                 real_target_url: "http://svc-a:8080".into(),
                 is_mocked: true,
@@ -191,6 +192,7 @@ mod tests {
                 cfg.services[0].is_mocked = false;
                 cfg.services.push(Service {
                     name: "svc-b".into(),
+                    method: "GET".into(),
                     listen_path: "/svc-b/*".into(),
                     real_target_url: "http://svc-b:9090".into(),
                     is_mocked: false,

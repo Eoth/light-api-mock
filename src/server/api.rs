@@ -1,6 +1,7 @@
 use crate::models::{MockConfig, Service};
 use crate::server::AppState;
-use axum::extract::{Path, State};
+use crate::server::request_log::LogEntry;
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::{Json, Router};
@@ -13,6 +14,18 @@ pub fn routes() -> Router<AppState> {
         .route("/services/:name", get(get_service).put(put_service).delete(delete_service))
         .route("/services/:name/toggle", put(toggle_service))
         .route("/services/:name/rules/reorder", put(reorder_rules))
+        .route("/logs", get(get_logs))
+}
+
+#[derive(serde::Deserialize)]
+struct LogsQuery {
+    #[serde(default = "default_log_limit")]
+    limit: usize,
+}
+fn default_log_limit() -> usize { 50 }
+
+async fn get_logs(State(state): State<AppState>, Query(q): Query<LogsQuery>) -> Json<Vec<LogEntry>> {
+    Json(state.request_log.recent(q.limit))
 }
 
 async fn get_config(State(state): State<AppState>) -> Json<MockConfig> {
