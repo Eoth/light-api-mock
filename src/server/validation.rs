@@ -93,6 +93,25 @@ pub fn validate_service(service: &Service) -> Result<(), ValidationError> {
         });
     }
 
+    let mut seen_rules = std::collections::HashSet::new();
+    for rule in &service.rules {
+        let rn = rule.name.trim();
+        if rn.is_empty() {
+            return Err(ValidationError {
+                field: "rules",
+                message: "Le nom de la regle est requis.".into(),
+            });
+        }
+        if !seen_rules.insert(rn.to_lowercase()) {
+            return Err(ValidationError {
+                field: "rules",
+                message: format!(
+                    "Le nom de regle \"{rn}\" est utilise plusieurs fois dans ce service. Chaque regle doit avoir un nom unique."
+                ),
+            });
+        }
+    }
+
     Ok(())
 }
 
@@ -100,6 +119,8 @@ pub fn validate_service(service: &Service) -> Result<(), ValidationError> {
 mod tests {
     use super::*;
     use crate::models::Service;
+
+    use crate::models::{Rule, RuleAction, MockResponse, BodyFragment};
 
     fn svc(name: &str, listen_path: &str) -> Service {
         Service {
@@ -111,6 +132,22 @@ mod tests {
             rewrite_directory_urls: false,
             rules: vec![],
         }
+    }
+
+    fn svc_with_rules(name: &str, rule_names: &[&str]) -> Service {
+        let mut s = svc(name, "/v1/*");
+        s.rules = rule_names.iter().map(|rn| Rule {
+            name: rn.to_string(),
+            action: RuleAction::default(),
+            conditions: Default::default(),
+            response: MockResponse {
+                status: 200,
+                headers: vec![],
+                body: vec![BodyFragment::Literal { value: "ok".into() }],
+                chaos: None,
+            },
+        }).collect();
+        s
     }
 
     #[test]
@@ -175,5 +212,31 @@ mod tests {
         assert!(is_internal_route("/assets/main.js"));
         assert!(!is_internal_route("/my-svc/foo"));
         assert!(!is_internal_route("/insee/v4/sirene/123"));
+    }
+
+    #[test]
+    fn reject_duplicate_rule_names() {
+        assert!(validate_service(&svc_with_rules("svc", &["r1", "r1"])).is_err());
+    }
+
+    #[test]
+    fn reject_duplicate_rule_names_case_insensitive() {
+        assert!(validate_service(&svc_with_rules("svc", &["Rule-A", "rule-a"])).is_err());
+    }
+
+    #[test]
+    fn accept_unique_rule_names() {
+        assert!(validate_service(&svc_with_rules("svc", &["r1", "r2", "r3"])).is_ok());
+    }
+
+    #[test]
+    fn reject_empty_rule_name() {
+        assert!(validate_service(&svc_with_rules("svc", &[""])).is_err());
+    }
+
+    #[test]
+    fn accept_same_rule_name_across_services() {
+        assert!(validate_service(&svc_with_rules("svc-a", &["shared-rule"])).is_ok());
+        assert!(validate_service(&svc_with_rules("svc-b", &["shared-rule"])).is_ok());
     }
 }

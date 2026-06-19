@@ -120,6 +120,10 @@ fn resolve_fake(kind: &str) -> String {
         "DatePast" => FakeKind::DatePast,
         "DateFuture" => FakeKind::DateFuture,
         "TimestampMs" => FakeKind::TimestampMs,
+        "BoolRandom" => FakeKind::BoolRandom,
+        "LoremSentence" => FakeKind::LoremSentence,
+        "CountryFR" => FakeKind::CountryFR,
+        "IbanFR" => FakeKind::IbanFR,
         _ => return String::new(),
     };
     TemplateRenderer::fake_data(&fk)
@@ -178,6 +182,14 @@ fn apply_single_pipe(value: &str, pipe: &str, _ctx: &TemplateContext) -> String 
         "lower" => value.to_ascii_lowercase(),
         "upper" => value.to_ascii_uppercase(),
         "trim" => value.trim().to_string(),
+        "capitalize" => {
+            let mut chars = value.chars();
+            match chars.next() {
+                None => String::new(),
+                Some(c) => c.to_uppercase().to_string() + &chars.as_str().to_ascii_lowercase(),
+            }
+        }
+        "length" => value.chars().count().to_string(),
         _ => {
             if let Some(arg) = extract_fn_arg(pipe, "first") {
                 let n: usize = arg.parse().unwrap_or(0);
@@ -189,16 +201,49 @@ fn apply_single_pipe(value: &str, pipe: &str, _ctx: &TemplateContext) -> String 
                 chars.into_iter().skip(skip).collect()
             } else if let Some(arg) = extract_fn_arg(pipe, "default") {
                 let fallback = arg.trim_matches('"').trim_matches('\'');
-                if value.is_empty() {
-                    fallback.to_string()
-                } else {
-                    value.to_string()
-                }
+                if value.is_empty() { fallback.to_string() } else { value.to_string() }
+            } else if let Some(arg) = extract_fn_arg(pipe, "substr") {
+                let parts: Vec<&str> = arg.split(',').map(|s| s.trim()).collect();
+                let start: usize = parts.first().and_then(|s| s.parse().ok()).unwrap_or(0);
+                let len: usize = parts.get(1).and_then(|s| s.parse().ok()).unwrap_or(usize::MAX);
+                value.chars().skip(start).take(len).collect()
+            } else if let Some(arg) = extract_fn_arg(pipe, "replace") {
+                let (from, to) = parse_two_string_args(arg);
+                value.replace(&from, &to)
+            } else if let Some(arg) = extract_fn_arg(pipe, "prepend") {
+                let prefix = arg.trim_matches('"').trim_matches('\'');
+                format!("{prefix}{value}")
+            } else if let Some(arg) = extract_fn_arg(pipe, "append") {
+                let suffix = arg.trim_matches('"').trim_matches('\'');
+                format!("{value}{suffix}")
             } else {
                 value.to_string()
             }
         }
     }
+}
+
+fn parse_two_string_args(arg: &str) -> (String, String) {
+    let mut parts = Vec::new();
+    let mut current = String::new();
+    let mut in_quotes = false;
+    let mut quote_char = '"';
+    let mut escaped = false;
+    for ch in arg.chars() {
+        if escaped { current.push(ch); escaped = false; continue; }
+        if ch == '\\' { escaped = true; continue; }
+        if !in_quotes && (ch == '"' || ch == '\'') { in_quotes = true; quote_char = ch; continue; }
+        if in_quotes && ch == quote_char { in_quotes = false; continue; }
+        if !in_quotes && ch == ',' {
+            parts.push(std::mem::take(&mut current));
+            continue;
+        }
+        current.push(ch);
+    }
+    parts.push(current);
+    let a = parts.first().map(|s| s.to_string()).unwrap_or_default();
+    let b = parts.get(1).map(|s| s.trim().to_string()).unwrap_or_default();
+    (a, b)
 }
 
 fn extract_fn_arg<'a>(pipe: &'a str, name: &str) -> Option<&'a str> {
@@ -478,5 +523,92 @@ mod tests {
     #[test]
     fn epoch_to_iso_known_date() {
         assert_eq!(epoch_to_iso(0), "1970-01-01T00:00:00Z");
+    }
+
+    #[test]
+    fn pipe_capitalize() {
+        let mut p = HashMap::new();
+        p.insert("v".into(), "hELLO".into());
+        let (q, h) = (HashMap::new(), HashMap::new());
+        let ctx = make_ctx(&p, &q, &h, b"", 0);
+        assert_eq!(render_template("{path.v | capitalize}", &ctx), "Hello");
+    }
+
+    #[test]
+    fn pipe_length() {
+        let mut p = HashMap::new();
+        p.insert("v".into(), "abcde".into());
+        let (q, h) = (HashMap::new(), HashMap::new());
+        let ctx = make_ctx(&p, &q, &h, b"", 0);
+        assert_eq!(render_template("{path.v | length}", &ctx), "5");
+    }
+
+    #[test]
+    fn pipe_substr() {
+        let mut p = HashMap::new();
+        p.insert("v".into(), "abcdefgh".into());
+        let (q, h) = (HashMap::new(), HashMap::new());
+        let ctx = make_ctx(&p, &q, &h, b"", 0);
+        assert_eq!(render_template("{path.v | substr(2, 3)}", &ctx), "cde");
+    }
+
+    #[test]
+    fn pipe_replace() {
+        let mut p = HashMap::new();
+        p.insert("v".into(), "hello world".into());
+        let (q, h) = (HashMap::new(), HashMap::new());
+        let ctx = make_ctx(&p, &q, &h, b"", 0);
+        assert_eq!(render_template(r#"{path.v | replace("world", "rust")}"#, &ctx), "hello rust");
+    }
+
+    #[test]
+    fn pipe_prepend() {
+        let mut p = HashMap::new();
+        p.insert("v".into(), "world".into());
+        let (q, h) = (HashMap::new(), HashMap::new());
+        let ctx = make_ctx(&p, &q, &h, b"", 0);
+        assert_eq!(render_template(r#"{path.v | prepend("hello ")}"#, &ctx), "hello world");
+    }
+
+    #[test]
+    fn pipe_append() {
+        let mut p = HashMap::new();
+        p.insert("v".into(), "hello".into());
+        let (q, h) = (HashMap::new(), HashMap::new());
+        let ctx = make_ctx(&p, &q, &h, b"", 0);
+        assert_eq!(render_template(r#"{path.v | append(" world")}"#, &ctx), "hello world");
+    }
+
+    #[test]
+    fn fake_bool_random() {
+        let (p, q, h) = empty_ctx();
+        let ctx = make_ctx(&p, &q, &h, b"", 0);
+        let out = render_template("{fake.BoolRandom}", &ctx);
+        assert!(out == "true" || out == "false");
+    }
+
+    #[test]
+    fn fake_lorem_sentence() {
+        let (p, q, h) = empty_ctx();
+        let ctx = make_ctx(&p, &q, &h, b"", 0);
+        let out = render_template("{fake.LoremSentence}", &ctx);
+        assert!(out.len() > 10 && out.ends_with('.'));
+    }
+
+    #[test]
+    fn fake_country_fr() {
+        let (p, q, h) = empty_ctx();
+        let ctx = make_ctx(&p, &q, &h, b"", 0);
+        let out = render_template("{fake.CountryFR}", &ctx);
+        assert!(!out.is_empty());
+    }
+
+    #[test]
+    fn fake_iban_fr() {
+        let (p, q, h) = empty_ctx();
+        let ctx = make_ctx(&p, &q, &h, b"", 0);
+        let out = render_template("{fake.IbanFR}", &ctx);
+        assert!(out.starts_with("FR76"));
+        assert!(out.len() >= 20);
     }
 }

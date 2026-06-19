@@ -153,3 +153,36 @@ test.describe('Uniqueness: service_key collision', () => {
     expect(svc.listen_path).toBe('/v1/original/*');
   });
 });
+
+test.describe('Rule name uniqueness', () => {
+  test.beforeEach(async ({ request }) => {
+    await request.delete(`${API}/config/reset`);
+  });
+
+  test('rejects duplicate rule names in the same service', async ({ request }) => {
+    const svc = validService('rule-test', {
+      rules: [
+        { name: 'dup', action: 'mock', conditions: { all_of: [], any_of: [] }, response: { status: 200, headers: [], body: [{ type: 'Literal', value: 'a' }], chaos: null } },
+        { name: 'dup', action: 'mock', conditions: { all_of: [], any_of: [] }, response: { status: 200, headers: [], body: [{ type: 'Literal', value: 'b' }], chaos: null } },
+      ],
+    });
+    const res = await request.post(`${API}/services`, { data: svc });
+    expect(res.status()).toBe(400);
+    const body = await res.json();
+    expect(body.error).toContain('nom de regle');
+  });
+
+  test('accepts same rule name across different services', async ({ request }) => {
+    const svc1 = validService('svc-a', {
+      rules: [{ name: 'shared', action: 'mock', conditions: { all_of: [], any_of: [] }, response: { status: 200, headers: [], body: [{ type: 'Literal', value: 'a' }], chaos: null } }],
+    });
+    const svc2 = validService('svc-b', {
+      listen_path: '/v2/*',
+      rules: [{ name: 'shared', action: 'mock', conditions: { all_of: [], any_of: [] }, response: { status: 200, headers: [], body: [{ type: 'Literal', value: 'b' }], chaos: null } }],
+    });
+    const r1 = await request.post(`${API}/services`, { data: svc1 });
+    expect(r1.status()).toBe(201);
+    const r2 = await request.post(`${API}/services`, { data: svc2 });
+    expect(r2.status()).toBe(201);
+  });
+});
