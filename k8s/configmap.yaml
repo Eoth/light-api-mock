@@ -9,5 +9,5 @@ metadata:
 data:
   DATA_PATH: /data
   STATIC_DIR: /app/static
-  PORT: "3000"
+  PORT: "7342"
   RUST_LOG: light_mock=info

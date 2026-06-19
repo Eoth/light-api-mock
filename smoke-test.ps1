@@ -1,5 +1,5 @@
 $ErrorActionPreference = "Stop"
-$base = "http://localhost:3000"
+$base = "http://localhost:7342"
 $pass = 0
 $fail = 0
 
@@ -44,7 +44,7 @@ Write-Host "`n[2] Creer un service mock"
 $svc = @'
 {
   "name": "demo-api",
-  "listen_path": "/demo-api/*",
+  "listen_path": "/*",
   "real_target_url": "http://httpbin.org",
   "is_mocked": true,
   "rewrite_directory_urls": false,

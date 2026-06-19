@@ -15,7 +15,7 @@
   const httpMethods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'];
 
   let testUrl = $derived(
-    `http://localhost:3000/${name.trim() || '...'}${listenPath.trim().startsWith('/') ? listenPath.trim() : '/' + listenPath.trim()}`
+    `http://localhost:7342/${name.trim() || '...'}${listenPath.trim().startsWith('/') ? listenPath.trim() : '/' + listenPath.trim()}`
   );
   let saving = $state(false);
   let error = $state('');

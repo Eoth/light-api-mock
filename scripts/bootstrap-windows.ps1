@@ -67,6 +67,10 @@ Write-Ok "Frontend compile dans dist/"
 
 Write-Step "6/6 - Build backend"
 Set-Location "$PSScriptRoot\.."
+# Contournement : sur certains environnements Windows, la verification de
+# revocation SSL (CRL) echoue lors du telechargement des crates.
+# Cette variable desactive uniquement la verification CRL cote Cargo.
+$env:CARGO_HTTP_CHECK_REVOKE = "false"
 $vcvars = "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvarsall.bat"
 if (Test-Path $vcvars) {
     cmd /c "`"$vcvars`" x64 >nul 2>&1 && cargo build --release 2>&1"
@@ -81,5 +85,5 @@ Write-Host "  lightMock pret ! Lancez avec :" -ForegroundColor Green
 Write-Host '  $env:STATIC_DIR = "frontend/dist"' -ForegroundColor White
 Write-Host '  $env:DATA_PATH = "data"' -ForegroundColor White
 Write-Host '  .\target\release\light-mock.exe' -ForegroundColor White
-Write-Host "  Puis ouvrez http://localhost:3000" -ForegroundColor Green
+Write-Host "  Puis ouvrez http://localhost:7342" -ForegroundColor Green
 Write-Host "================================================================" -ForegroundColor Green
