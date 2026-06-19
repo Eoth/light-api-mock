@@ -1,4 +1,6 @@
 <script>
+  import { buildExpr as sharedBuildExpr, templateToPreview, xmlFieldsToTemplate } from '../tpl-utils.js';
+
   let { fields = [], rootTag = 'response', onUpdate = () => {} } = $props();
 
   const nodeTypes = [
@@ -41,8 +43,24 @@
     emit();
   }
 
+  const pipeOptions = [
+    { value: '', label: '(aucun)' },
+    { value: 'lower', label: 'lower' },
+    { value: 'upper', label: 'upper' },
+    { value: 'capitalize', label: 'capitalize' },
+    { value: 'first(N)', label: 'first(N)' },
+    { value: 'last(N)', label: 'last(N)' },
+    { value: 'substr(start,len)', label: 'substr(start,len)' },
+    { value: 'default("val")', label: 'default("val")' },
+    { value: 'replace("a","b")', label: 'replace("a","b")' },
+    { value: 'prepend("prefix")', label: 'prepend("prefix")' },
+    { value: 'append("suffix")', label: 'append("suffix")' },
+    { value: 'length', label: 'length' },
+    { value: 'trim', label: 'trim' },
+  ];
+
   function newNode() {
-    return { tag: '', nodeType: 'value', source: 'fixed', value: '' };
+    return { tag: '', nodeType: 'value', source: 'fixed', value: '', pipe: '' };
   }
 
   function addNodeAt(path) {
@@ -87,36 +105,8 @@
 
   function needsValueInput(src) { return ['fixed','path','query','header','body'].includes(src); }
 
-  function buildExpr(f) {
-    switch (f.source) {
-      case 'fixed': return f.value;
-      case 'path': return `{path.${f.value}}`;
-      case 'query': return `{query.${f.value}}`;
-      case 'header': return `{header.${f.value}}`;
-      case 'body': return `{body.${f.value}}`;
-      case 'fake': return `{fake.${f.value}}`;
-      case 'uuid': return '{uuid}';
-      case 'now_ms': return '{now_ms}';
-      case 'now_iso': return '{now_iso}';
-      case 'seq': return '{seq}';
-      default: return f.value;
-    }
-  }
-
-  function nodeToXml(field) {
-    const t = field.tag?.trim();
-    if (!t) return '';
-    const nt = field.nodeType || 'value';
-    if (nt === 'parent') {
-      const inner = (field.children || []).filter(c => c.tag?.trim()).map(c => nodeToXml(c)).join('');
-      return `<${t}>${inner}</${t}>`;
-    }
-    return `<${t}>${buildExpr(field)}</${t}>`;
-  }
-
   export function toTemplate() {
-    const inner = fields.filter(f => f.tag?.trim()).map(f => nodeToXml(f)).join('');
-    return `<${rootTag}>${inner}</${rootTag}>`;
+    return xmlFieldsToTemplate(fields, rootTag);
   }
 </script>
 
@@ -136,6 +126,9 @@
       </select>
     {:else if needsValueInput(field.source)}
       <input type="text" class="value-input" value={field.value} oninput={(e) => updateProp(path, idx, 'value', e.target.value)} placeholder="valeur" aria-label="Valeur" />
+    {/if}
+    {#if field.source !== 'fixed'}
+      <input type="text" class="pipe-input" value={field.pipe || ''} oninput={(e) => updateProp(path, idx, 'pipe', e.target.value)} placeholder="ex: lower | first(5)" aria-label="Pipe" list="dl-xml-pipes" autocomplete="off" />
     {/if}
   {/snippet}
 
@@ -169,12 +162,20 @@
 
   {@render renderNodes(fields, [], 0)}
 
+  <datalist id="dl-xml-pipes">
+    {#each pipeOptions.filter(p => p.value) as p}<option value={p.value}>{p.label}</option>{/each}
+  </datalist>
+
   <button type="button" class="btn btn-sm btn-outline" onclick={() => addNodeAt([])}>+ Ajouter un noeud</button>
 
   {#if fields.length > 0}
     <details class="preview-section">
-      <summary>Apercu XML</summary>
+      <summary>Apercu template</summary>
       <code class="preview-code">{toTemplate()}</code>
+    </details>
+    <details class="preview-section">
+      <summary>Apercu XML lisible</summary>
+      <code class="preview-code preview-readable">{templateToPreview(toTemplate())}</code>
     </details>
   {/if}
 </div>
@@ -209,4 +210,6 @@
   .preview-section { margin-top: 0.5rem; }
   .preview-section summary { font-size: 0.8125rem; cursor: pointer; color: var(--color-text-muted); }
   .preview-code { display: block; margin-top: 0.25rem; padding: 0.5rem; background: var(--color-bg); border-radius: var(--radius); font-size: 0.75rem; word-break: break-all; white-space: pre-wrap; }
+  .preview-readable { color: var(--color-primary); }
+  .pipe-input { min-width: 8rem; max-width: 14rem; padding: 0.3rem 0.5rem; border: 1px solid var(--color-border); border-radius: var(--radius); font-size: 0.75rem; font-family: 'Cascadia Code', 'Fira Code', monospace; color: var(--color-primary); }
 </style>
