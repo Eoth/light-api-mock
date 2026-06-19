@@ -1,0 +1,19 @@
+apiVersion: gateway.solo.io/v1
+kind: RouteTable
+metadata:
+  name: lightmock
+  namespace: entreprise-tools
+  labels:
+    app.kubernetes.io/name: lightmock
+    app.kubernetes.io/component: gloo
+spec:
+  routes:
+    - matchers:
+        - prefix: /lightmock
+      options:
+        prefixRewrite: /
+      routeAction:
+        single:
+          upstream:
+            name: lightmock
+            namespace: entreprise-tools

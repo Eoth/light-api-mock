@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lightmock-config
+  namespace: entreprise-tools
+  labels:
+    app.kubernetes.io/name: lightmock
+    app.kubernetes.io/component: config
+data:
+  DATA_PATH: /data
+  STATIC_DIR: /app/static
+  PORT: "3000"
+  RUST_LOG: light_mock=info

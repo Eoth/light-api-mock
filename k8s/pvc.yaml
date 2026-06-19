@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: lightmock-data
+  namespace: entreprise-tools
+  labels:
+    app.kubernetes.io/name: lightmock
+    app.kubernetes.io/component: storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 64Mi
+  storageClassName: standard

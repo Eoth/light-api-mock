@@ -1,0 +1,49 @@
+[package]
+name = "light-mock"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# Web framework async
+axum = { version = "0.7", features = ["macros"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal"] }
+
+# HTTP client for proxy forwarding
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_yaml = "0.9"
+serde_json = "1"
+
+# XML/SOAP parsing
+quick-xml = "0.37"
+
+# Regex (NFA, compiled once)
+regex = "1"
+
+# Fast random (no getrandom dependency)
+fastrand = "2"
+
+# Tower middleware (CORS, static files)
+tower-http = { version = "0.5", features = ["cors", "fs"] }
+tower = "0.4"
+
+# Structured logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# UUID v4 generation
+uuid = { version = "1", features = ["v4", "fast-rng"] }
+
+# HTTP types
+http = "1"
+http-body-util = "0.1"
+
+# URL parsing (form_urlencoded for condition extraction)
+url = "2"
+
+[profile.release]
+opt-level = 3
+lto = true
+strip = true

@@ -1,0 +1,13 @@
+apiVersion: gloo.solo.io/v1
+kind: Upstream
+metadata:
+  name: lightmock
+  namespace: entreprise-tools
+  labels:
+    app.kubernetes.io/name: lightmock
+    app.kubernetes.io/component: gloo
+spec:
+  kube:
+    serviceName: lightmock
+    serviceNamespace: entreprise-tools
+    servicePort: 80
