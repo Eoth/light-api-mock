@@ -10,10 +10,12 @@ Un seul binaire Rust qui intercepte les requetes HTTP, les mock ou les proxifie 
 - **Methode HTTP explicite** : un service = une methode (GET, POST, PUT, etc.)
 - **Bascule Mock / Proxy** : toggle ON/OFF depuis l'IHM, sans redemarrage
 - **Moteur de regles** : conditions combinables (ET/OU) sur path params, query, headers, body JSON/XML/form
-- **Templates dynamiques** : expressions `{path.siret}`, `{fake.CompanyName}`, `{now_ms}`, pipes `| first(9)`, `| upper`
+- **Templates dynamiques** : expressions `{path.siret}`, `{fake.CompanyName}`, `{now_ms}`, pipes `| first(9)`, `| upper`, `| replace("a","b")`, `| capitalize`, `| substr(0,5)`, `| length`, `| prepend("x")`, `| append("x")`
+- **Action par regle** : chaque regle decide independamment de mocker ou proxyfier (mock partiel)
 - **Mode Chaos** : injection de latence (fixe ou plage) et d'erreurs HTTP
-- **Journal des requetes** : historique consultable dans l'IHM (service, methode, path, mode, status)
-- **Import / Export** : sauvegarde et restauration de la configuration en JSON
+- **Journal des requetes** : historique consultable dans l'IHM avec filtre par service
+- **Import / Export / Reset** : sauvegarde, restauration et reinitialisation de la configuration
+- **Mode sombre** : theme clair/sombre (preference navigateur ou toggle manuel)
 - **Zero dependance externe** : pas de base de donnees, persistance fichier YAML atomique
 - **Interface accessible** : conformite RGAA niveau AA
 
@@ -83,9 +85,11 @@ En mode proxy, le prefixe `/{name}` est strippe avant forward vers le vrai backe
 |---|---|---|
 | GET | `/api/config` | Configuration complete |
 | PUT | `/api/config` | Remplacer toute la config |
+| DELETE | `/api/config/reset` | Reinitialiser (supprime tous les services) |
 | GET | `/api/services` | Liste des services |
+| POST | `/api/services` | Creer un service (409 si le nom existe deja) |
 | GET | `/api/services/:name` | Detail d'un service |
-| PUT | `/api/services/:name` | Creer / modifier un service |
+| PUT | `/api/services/:name` | Modifier un service existant |
 | DELETE | `/api/services/:name` | Supprimer un service |
 | PUT | `/api/services/:name/toggle` | Basculer mock/proxy |
 | PUT | `/api/services/:name/rules/reorder` | Reordonner les regles |
@@ -94,16 +98,17 @@ En mode proxy, le prefixe `/{name}` est strippe avant forward vers le vrai backe
 ### Exemple : creer un service
 
 ```bash
-curl -X PUT http://localhost:7342/api/services/demo \
+curl -X POST http://localhost:7342/api/services \
   -H "Content-Type: application/json" \
   -d '{
     "name": "demo",
     "method": "GET",
-    "listen_path": "/*",
+    "listen_path": "/v1/*",
     "real_target_url": "http://httpbin.org",
     "is_mocked": true,
     "rules": [{
       "name": "hello",
+      "action": "mock",
       "conditions": { "all_of": [], "any_of": [] },
       "response": {
         "status": 200,
@@ -114,8 +119,8 @@ curl -X PUT http://localhost:7342/api/services/demo \
     }]
   }'
 
-# Tester : GET /demo/anything
-curl http://localhost:7342/demo/anything
+# Tester : GET /demo/v1/anything
+curl http://localhost:7342/demo/v1/anything
 ```
 
 ## Variables d'environnement
@@ -130,13 +135,13 @@ curl http://localhost:7342/demo/anything
 ## Tests
 
 ```bash
-# Rust (90 tests)
+# Rust (132 tests)
 cargo test -- --test-threads=1
 
-# Frontend unitaires (35 tests Vitest)
+# Frontend unitaires (91+ tests Vitest)
 cd frontend && npm test
 
-# E2E navigateur (19 tests Playwright, serveur doit tourner)
+# E2E navigateur (17 tests Playwright, serveur doit tourner)
 cd frontend && npm run test:e2e
 ```
 
@@ -145,15 +150,37 @@ cd frontend && npm run test:e2e
 ```
 light-mock/
   src/
-    models/        # Service, Rule, Condition, BodyFragment, FakeKind, ChaosConfig
-    engine/        # matcher, proxy, renderer, template (expressions + pipes)
+    models/        # Service, Rule, RuleAction, Condition, BodyFragment, FakeKind, ChaosConfig
+    engine/        # matcher, proxy, renderer, template (expressions + 12 pipes)
     store/         # Persistance YAML atomique (Arc<RwLock<>>)
-    server/        # Axum : API REST, intercept middleware, request_log
-  frontend/        # SPA Svelte 5 + Vite 6
+    server/        # Axum : API REST, intercept middleware, request_log, validation
+  frontend/
+    src/lib/
+      tpl-utils.js   # Module partage : serialisation/validation/conversion templates
+      api.js         # Client API REST
+      components/    # Composants Svelte 5 (13 composants)
+    src/tests/       # Tests unitaires Vitest
+    e2e/             # Tests Playwright
   k8s/             # Manifests K8s + Gloo Edge
   scripts/         # Bootstrap Windows / Linux
   Dockerfile       # Build multi-stage
 ```
+
+### Format template
+
+Le moteur de templates lightMock utilise une syntaxe propre pour generer des reponses dynamiques :
+
+| Syntaxe | Signification | Exemple |
+|---|---|---|
+| `{{` / `}}` | Accolades JSON litterales | `{{"key":"value"}}` → `{"key":"value"}` |
+| `{variable}` | Expression evaluee au runtime | `{path.siret}` → `44306184100047` |
+| `{var \| pipe}` | Variable avec transformation | `{path.siret \| first(9)}` → `443061841` |
+
+**Variables disponibles** : `path.X`, `query.X`, `header.X`, `body.X` (JSON pointer), `fake.Kind`, `uuid`, `now_ms`, `now_iso`, `now_epoch`, `seq`
+
+**Pipes** : `lower`, `upper`, `trim`, `capitalize`, `first(N)`, `last(N)`, `substr(start,len)`, `default("val")`, `replace("a","b")`, `prepend("x")`, `append("x")`, `length`
+
+**Fake data** : `FirstName`, `LastName`, `Email`, `PhoneNumberFR`, `Integer{min,max}`, `CompanyName`, `StreetName`, `CityFR`, `PostcodeFR`, `Siren`, `Siret`, `FullAddressFR`, `DatePast`, `DateFuture`, `TimestampMs`, `BoolRandom`, `LoremSentence`, `CountryFR`, `IbanFR`
 
 ## Deploiement Kubernetes
 
