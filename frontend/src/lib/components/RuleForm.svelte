@@ -2,6 +2,7 @@
   import ConditionForm from './ConditionForm.svelte';
   import JsonResponseBuilder from './JsonResponseBuilder.svelte';
   import XmlResponseBuilder from './XmlResponseBuilder.svelte';
+  import { templateToTestJson, templateToFields, validateTemplateAsJson, validateTemplateAsXml, fieldsToTemplate, varNameToSource } from '../tpl-utils.js';
 
   let { rule = null, existingRuleNames = [], onSave = () => {}, onCancel = () => {} } = $props();
 
@@ -202,29 +203,6 @@
     }).join('');
   }
 
-  function templateToTestJson(tpl) {
-    let out = '';
-    const chars = tpl;
-    let i = 0;
-    while (i < chars.length) {
-      if (chars[i] === '{' && i + 1 < chars.length && chars[i + 1] === '{') {
-        out += '{';
-        i += 2;
-      } else if (chars[i] === '}' && i + 1 < chars.length && chars[i + 1] === '}') {
-        out += '}';
-        i += 2;
-      } else if (chars[i] === '{') {
-        const end = chars.indexOf('}', i + 1);
-        if (end === -1) { out += chars[i]; i++; }
-        else { out += '"__var__"'; i = end + 1; }
-      } else {
-        out += chars[i];
-        i++;
-      }
-    }
-    return out;
-  }
-
   function tryConvert(from, to) {
     if (from === 'advanced' && to === 'text') {
       return { ok: true, textContent: getAdvancedTemplate() };
@@ -262,218 +240,24 @@
   function tryAdvancedToJsonGuided() {
     const tpl = getAdvancedTemplate();
     if (!tpl.trim()) return { ok: true, jsonFields: [] };
-    const testStr = templateToTestJson(tpl);
-    let parsed;
-    try { parsed = JSON.parse(testStr); } catch {
-      return { ok: false, reason: 'Le template actuel n\'est pas un JSON valide et ne peut pas etre converti vers la vue guidee. Verifiez les accolades ({{ pour JSON literal, { pour variable).' };
-    }
-    if (typeof parsed !== 'object' || Array.isArray(parsed)) {
-      return { ok: false, reason: 'Le JSON doit etre un objet (pas un tableau ou une valeur scalaire) pour etre converti en vue guidee.' };
+    const jsonErr = validateTemplateAsJson(tpl);
+    if (jsonErr) {
+      return { ok: false, reason: `Conversion impossible : ${jsonErr}. Verifiez les accolades ({{ pour JSON literal, { pour variable).` };
     }
     try {
-      const fields = tplObjectToFields(tpl);
+      const fields = templateToFields(tpl);
       return { ok: true, jsonFields: fields };
     } catch (e) {
-      return { ok: false, reason: `Conversion partielle impossible : ${e.message}` };
+      return { ok: false, reason: `Conversion impossible : ${e.message}` };
     }
-  }
-
-  function tplObjectToFields(tpl) {
-    const entries = parseTplJsonEntries(tpl);
-    return entries.map(([key, rawValue]) => {
-      const trimmed = rawValue.trim();
-      if (trimmed.startsWith('{{') && !trimmed.startsWith('{{{')) {
-        try {
-          const children = tplObjectToFields(trimmed);
-          return { key, fieldType: 'object', children };
-        } catch { /* fall through to value */ }
-      }
-      if (trimmed.startsWith('[')) {
-        return parseTplArrayField(key, trimmed);
-      }
-      return parseTplValueField(key, trimmed);
-    });
-  }
-
-  function parseTplValueField(key, raw) {
-    const trimmed = raw.trim();
-    const isQuoted = trimmed.startsWith('"') && trimmed.endsWith('"');
-    const inner = isQuoted ? trimmed.slice(1, -1) : trimmed;
-    const varMatch = inner.match(/^\{([^}]+)\}$/);
-    if (varMatch) {
-      const expr = varMatch[1];
-      const parts = expr.split('|').map(s => s.trim());
-      const varName = parts[0];
-      const pipes = parts.slice(1).join(' | ');
-      const { source, value } = varNameToSource(varName);
-      return { key, fieldType: 'value', source, value, pipe: pipes, asNumber: !isQuoted };
-    }
-    return { key, fieldType: 'value', source: 'fixed', value: inner, pipe: '', asNumber: !isQuoted };
-  }
-
-  function parseTplArrayField(key, raw) {
-    const inner = raw.trim().slice(1, -1).trim();
-    if (!inner) return { key, fieldType: 'array-values', items: [] };
-    if (inner.startsWith('{{') && !inner.startsWith('{{{')) {
-      try {
-        const template = tplObjectToFields(inner);
-        return { key, fieldType: 'array-objects', template };
-      } catch { /* fall through */ }
-    }
-    const items = splitTplJsonArray(inner).map(item => {
-      const t = item.trim();
-      const f = parseTplValueField('', t);
-      return { source: f.source, value: f.value, pipe: f.pipe || '', asNumber: f.asNumber };
-    });
-    return { key, fieldType: 'array-values', items };
-  }
-
-  function varNameToSource(varName) {
-    if (varName.startsWith('path.')) return { source: 'path', value: varName.slice(5) };
-    if (varName.startsWith('query.')) return { source: 'query', value: varName.slice(6) };
-    if (varName.startsWith('header.')) return { source: 'header', value: varName.slice(7) };
-    if (varName.startsWith('body.')) return { source: 'body', value: varName.slice(5) };
-    if (varName.startsWith('fake.')) return { source: 'fake', value: varName.slice(5) };
-    if (varName === 'uuid') return { source: 'uuid', value: '' };
-    if (varName === 'now_ms') return { source: 'now_ms', value: '' };
-    if (varName === 'now_iso') return { source: 'now_iso', value: '' };
-    if (varName === 'seq') return { source: 'seq', value: '' };
-    return { source: 'fixed', value: varName };
-  }
-
-  function isTplDoubleOpen(str, i) {
-    return str[i] === '{' && i + 1 < str.length && str[i + 1] === '{';
-  }
-  function isTplDoubleClose(str, i) {
-    return str[i] === '}' && i + 1 < str.length && str[i + 1] === '}';
-  }
-  function isTplVar(str, i) {
-    return str[i] === '{' && (i + 1 >= str.length || str[i + 1] !== '{');
-  }
-
-  function parseTplJsonEntries(objStr) {
-    const trimmed = objStr.trim();
-    let inner;
-    if (isTplDoubleOpen(trimmed, 0)) {
-      inner = trimmed.slice(2, -2);
-    } else if (trimmed.startsWith('{')) {
-      inner = trimmed.slice(1, -1);
-    } else {
-      inner = trimmed;
-    }
-    const entries = [];
-    let i = 0, len = inner.length;
-    while (i < len) {
-      while (i < len && /\s/.test(inner[i])) i++;
-      if (i >= len) break;
-      if (inner[i] === ',') { i++; continue; }
-      if (inner[i] !== '"') break;
-      const keyEnd = inner.indexOf('"', i + 1);
-      if (keyEnd === -1) break;
-      const key = inner.slice(i + 1, keyEnd);
-      i = keyEnd + 1;
-      while (i < len && /[\s:]/.test(inner[i])) i++;
-      const [value, consumed] = readTplValue(inner, i);
-      entries.push([key, value]);
-      i += consumed;
-    }
-    return entries;
-  }
-
-  function readTplValue(str, start) {
-    let i = start;
-    if (i >= str.length) return ['', 0];
-    if (str[i] === '"') {
-      let j = i + 1;
-      while (j < str.length) {
-        if (str[j] === '\\') { j += 2; continue; }
-        if (str[j] === '"') return [str.slice(i, j + 1), j + 1 - i];
-        j++;
-      }
-      return [str.slice(i), str.length - i];
-    }
-    if (isTplDoubleOpen(str, i)) {
-      return readTplBalanced(str, i);
-    }
-    if (isTplVar(str, i)) {
-      const end = str.indexOf('}', i + 1);
-      if (end !== -1) return [str.slice(i, end + 1), end + 1 - i];
-    }
-    if (str[i] === '[') {
-      return readTplBracket(str, i);
-    }
-    let j = i;
-    while (j < str.length && str[j] !== ',' && !isTplDoubleClose(str, j)) j++;
-    return [str.slice(i, j).trim(), j - i];
-  }
-
-  function readTplBalanced(str, start) {
-    let depth = 0, i = start, inStr = false;
-    while (i < str.length) {
-      if (str[i] === '\\' && inStr) { i += 2; continue; }
-      if (str[i] === '"') { inStr = !inStr; i++; continue; }
-      if (!inStr) {
-        if (isTplDoubleOpen(str, i)) { depth++; i += 2; continue; }
-        if (isTplDoubleClose(str, i)) { depth--; if (depth === 0) return [str.slice(start, i + 2), i + 2 - start]; i += 2; continue; }
-        if (isTplVar(str, i)) {
-          const end = str.indexOf('}', i + 1);
-          if (end !== -1) { i = end + 1; continue; }
-        }
-      }
-      i++;
-    }
-    return [str.slice(start), str.length - start];
-  }
-
-  function readTplBracket(str, start) {
-    let depth = 0, i = start, inStr = false;
-    while (i < str.length) {
-      if (str[i] === '\\' && inStr) { i += 2; continue; }
-      if (str[i] === '"') { inStr = !inStr; i++; continue; }
-      if (!inStr) {
-        if (str[i] === '[') { depth++; i++; continue; }
-        if (str[i] === ']') { depth--; if (depth === 0) return [str.slice(start, i + 1), i + 1 - start]; i++; continue; }
-        if (isTplDoubleOpen(str, i)) {
-          const [, c] = readTplBalanced(str, i);
-          i += c; continue;
-        }
-        if (isTplVar(str, i)) {
-          const end = str.indexOf('}', i + 1);
-          if (end !== -1) { i = end + 1; continue; }
-        }
-      }
-      i++;
-    }
-    return [str.slice(start), str.length - start];
-  }
-
-  function splitTplJsonArray(inner) {
-    const items = [];
-    let i = 0, start = 0;
-    while (i < inner.length) {
-      if (inner[i] === '"') { const [, c] = readTplValue(inner, i); i += c; continue; }
-      if (isTplDoubleOpen(inner, i)) { const [, c] = readTplBalanced(inner, i); i += c; continue; }
-      if (isTplVar(inner, i)) { const end = inner.indexOf('}', i + 1); if (end !== -1) { i = end + 1; continue; } }
-      if (inner[i] === '[') { const [, c] = readTplBracket(inner, i); i += c; continue; }
-      if (inner[i] === ',') { items.push(inner.slice(start, i)); start = i + 1; }
-      i++;
-    }
-    if (start < inner.length) items.push(inner.slice(start));
-    return items;
   }
 
   function tryAdvancedToXmlGuided() {
     const tpl = getAdvancedTemplate();
     if (!tpl.trim()) return { ok: true, xmlFields: [] };
-    const testXml = tpl.replace(/\{[^}]*\}/g, 'x');
-    try {
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(testXml, 'application/xml');
-      if (doc.querySelector('parsererror')) {
-        return { ok: false, reason: 'Le template actuel n\'est pas un XML valide et ne peut pas etre converti vers la vue guidee.' };
-      }
-    } catch {
-      return { ok: false, reason: 'Le template XML est malformed.' };
+    const xmlErr = validateTemplateAsXml(tpl);
+    if (xmlErr) {
+      return { ok: false, reason: `Conversion impossible : ${xmlErr}` };
     }
     return { ok: false, reason: 'La conversion automatique XML template vers XML guide n\'est pas encore supportee. Utilisez la vue guidee pour reconstruire la structure.' };
   }
@@ -504,49 +288,23 @@
 
   function validateResponseContent() {
     if (responseMode === 'json-guided' && jsonBuilderRef) {
-      try {
-        const tpl = jsonBuilderRef.toTemplate();
-        const testJson = templateToTestJson(tpl);
-        JSON.parse(testJson);
-      } catch {
-        return 'Le JSON genere est invalide. Verifiez la structure (cles manquantes, virgules, imbrication).';
-      }
+      const err = validateTemplateAsJson(jsonBuilderRef.toTemplate());
+      if (err) return `JSON guide invalide : ${err}`;
     }
     if (responseMode === 'xml-guided' && xmlBuilderRef) {
-      try {
-        const tpl = xmlBuilderRef.toTemplate();
-        const testXml = tpl.replace(/\{[^}]*\}/g, 'x');
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(testXml, 'application/xml');
-        if (doc.querySelector('parsererror')) {
-          return 'Le XML genere est invalide. Verifiez les tags (noms vides, imbrication incorrecte).';
-        }
-      } catch {
-        return 'Le XML genere est invalide.';
-      }
+      const err = validateTemplateAsXml(xmlBuilderRef.toTemplate());
+      if (err) return err;
     }
     if (responseMode === 'advanced') {
       const tpl = getAdvancedTemplate();
       const ct = respHeaders.find(h => h.name?.toLowerCase() === 'content-type')?.value?.toLowerCase() || '';
       if (ct.includes('json') && tpl.trim()) {
-        try {
-          const testJson = templateToTestJson(tpl);
-          JSON.parse(testJson);
-        } catch {
-          return 'Le Content-Type indique JSON mais le template n\'est pas un JSON valide. Verifiez les accolades, virgules et guillemets.';
-        }
+        const err = validateTemplateAsJson(tpl);
+        if (err) return `Content-Type JSON mais template invalide : ${err}`;
       }
       if (ct.includes('xml') && tpl.trim()) {
-        try {
-          const testXml = tpl.replace(/\{[^}]*\}/g, 'x');
-          const parser = new DOMParser();
-          const doc = parser.parseFromString(testXml, 'application/xml');
-          if (doc.querySelector('parsererror')) {
-            return 'Le Content-Type indique XML mais le template n\'est pas un XML valide.';
-          }
-        } catch {
-          return 'Le Content-Type indique XML mais le template est malformed.';
-        }
+        const xmlErr = validateTemplateAsXml(tpl);
+        if (xmlErr) return `Content-Type XML mais template invalide : ${xmlErr}`;
       }
     }
     return null;

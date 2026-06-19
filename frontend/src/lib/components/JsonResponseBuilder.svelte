@@ -1,4 +1,6 @@
 <script>
+  import { fieldsToTemplate, buildExpr as sharedBuildExpr, templateToPreview } from '../tpl-utils.js';
+
   let { fields = [], onUpdate = () => {} } = $props();
 
   const fieldTypes = [
@@ -129,65 +131,15 @@
     }
   }
 
-  function buildExpr(f) {
-    if (f.source === 'fixed') return f.value;
-    let varPart;
-    switch (f.source) {
-      case 'path': varPart = `path.${f.value}`; break;
-      case 'query': varPart = `query.${f.value}`; break;
-      case 'header': varPart = `header.${f.value}`; break;
-      case 'body': varPart = `body.${f.value}`; break;
-      case 'fake': varPart = `fake.${f.value}`; break;
-      case 'uuid': varPart = 'uuid'; break;
-      case 'now_ms': varPart = 'now_ms'; break;
-      case 'now_iso': varPart = 'now_iso'; break;
-      case 'seq': varPart = 'seq'; break;
-      default: return f.value;
-    }
-    const pipe = f.pipe?.trim();
-    return pipe ? `{${varPart} | ${pipe}}` : `{${varPart}}`;
-  }
-
-  function nodeToJson(field) {
-    const k = field.key?.trim();
-    if (!k) return '';
-    const ft = field.fieldType || 'value';
-
-    if (ft === 'value') {
-      const expr = buildExpr(field);
-      if (field.asNumber) return `"${k}":${expr}`;
-      return `"${k}":"${expr}"`;
-    }
-    if (ft === 'object') {
-      const inner = (field.children || []).filter(c => c.key?.trim()).map(c => nodeToJson(c)).join(',');
-      return `"${k}":{{${inner}}}`;
-    }
-    if (ft === 'array-values') {
-      const items = (field.items || []).map(item => {
-        const expr = buildExpr(item);
-        if (item.asNumber) return expr;
-        return `"${expr}"`;
-      }).join(',');
-      return `"${k}":[${items}]`;
-    }
-    if (ft === 'array-objects') {
-      const inner = (field.template || []).filter(c => c.key?.trim()).map(c => nodeToJson(c)).join(',');
-      return `"${k}":[{{${inner}}}]`;
-    }
-    return '';
-  }
+  function buildExpr(f) { return sharedBuildExpr(f); }
 
   export function toTemplate() {
-    if (fields.length === 0) return '{{}}';
-    const parts = fields.filter(f => f.key?.trim()).map(f => nodeToJson(f));
-    return `{{${parts.join(',')}}}`;
+    return fieldsToTemplate(fields);
   }
 
   function previewJson() {
-    try {
-      const tpl = toTemplate();
-      return tpl.replace(/\{\{/g, '{').replace(/\}\}/g, '}').replace(/\{[^}]+\}/g, (m) => `«${m}»`);
-    } catch { return '(erreur)'; }
+    try { return templateToPreview(toTemplate()); }
+    catch { return '(erreur)'; }
   }
 </script>
 

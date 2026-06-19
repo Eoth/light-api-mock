@@ -611,4 +611,58 @@ mod tests {
         assert!(out.starts_with("FR76"));
         assert!(out.len() >= 20);
     }
+
+    #[test]
+    fn guided_json_roundtrip_simple() {
+        let tpl = r#"{{"name":"Alice","age":30}}"#;
+        let (p, q, h) = empty_ctx();
+        let ctx = make_ctx(&p, &q, &h, b"", 0);
+        let out = render_template(tpl, &ctx);
+        let parsed: serde_json::Value = serde_json::from_str(&out).unwrap();
+        assert_eq!(parsed["name"], "Alice");
+        assert_eq!(parsed["age"], 30);
+    }
+
+    #[test]
+    fn guided_json_nested_with_vars() {
+        let mut p = HashMap::new();
+        p.insert("siret".into(), "12345678901234".into());
+        let (q, h) = (HashMap::new(), HashMap::new());
+        let ctx = make_ctx(&p, &q, &h, b"", 7);
+        let tpl = r#"{{"data":{{"siret":"{path.siret}","siren":"{path.siret | first(9)}","seq":{seq}}}}}"#;
+        let out = render_template(tpl, &ctx);
+        let parsed: serde_json::Value = serde_json::from_str(&out).unwrap();
+        assert_eq!(parsed["data"]["siret"], "12345678901234");
+        assert_eq!(parsed["data"]["siren"], "123456789");
+        assert_eq!(parsed["data"]["seq"], 7);
+    }
+
+    #[test]
+    fn guided_json_array_of_objects() {
+        let (p, q, h) = empty_ctx();
+        let ctx = make_ctx(&p, &q, &h, b"", 0);
+        let tpl = r#"{{"items":[{{"id":"{uuid}","status":"active"}}]}}"#;
+        let out = render_template(tpl, &ctx);
+        let parsed: serde_json::Value = serde_json::from_str(&out).unwrap();
+        assert!(parsed["items"][0]["id"].as_str().unwrap().len() == 36);
+        assert_eq!(parsed["items"][0]["status"], "active");
+    }
+
+    #[test]
+    fn template_with_all_pipe_types() {
+        let mut p = HashMap::new();
+        p.insert("v".into(), "Hello World".into());
+        let (q, h) = (HashMap::new(), HashMap::new());
+        let ctx = make_ctx(&p, &q, &h, b"", 0);
+        assert_eq!(render_template("{path.v | lower}", &ctx), "hello world");
+        assert_eq!(render_template("{path.v | upper}", &ctx), "HELLO WORLD");
+        assert_eq!(render_template("{path.v | capitalize}", &ctx), "Hello world");
+        assert_eq!(render_template("{path.v | first(5)}", &ctx), "Hello");
+        assert_eq!(render_template("{path.v | last(5)}", &ctx), "World");
+        assert_eq!(render_template("{path.v | length}", &ctx), "11");
+        assert_eq!(render_template("{path.v | substr(6, 5)}", &ctx), "World");
+        assert_eq!(render_template(r#"{path.v | replace("World", "Rust")}"#, &ctx), "Hello Rust");
+        assert_eq!(render_template(r#"{path.v | prepend(">> ")}"#, &ctx), ">> Hello World");
+        assert_eq!(render_template(r#"{path.v | append(" <<")}"#, &ctx), "Hello World <<");
+    }
 }
