@@ -1,48 +1,51 @@
-# frontend/ - Interface Web Svelte 5
+# frontend/ — Interface Web Svelte 5
 
-SPA pure (sans SvelteKit ni router tiers) servie en statique par le backend Rust.
+SPA pure (sans SvelteKit) servie en statique par le backend Rust.
 
-## Demarrage en dev
+## Dev
 
 ```bash
-cd frontend
 npm install
-npm run dev
+npm run dev       # http://localhost:5173, proxy /api/* vers :3000
 ```
 
-Le serveur Vite demarre sur `http://localhost:5173` et proxifie `/api/*` vers `http://localhost:3000` (le backend Rust doit tourner en parallele).
-
-## Build production
+## Build / Tests
 
 ```bash
-npm run build
+npm run build     # -> dist/
+npm test          # Vitest (35 tests unitaires)
+npm run test:e2e  # Playwright (19 tests, serveur doit tourner)
 ```
-
-Les fichiers compiles sont dans `dist/` et seront servis par le binaire Rust via `STATIC_DIR`.
 
 ## Composants
 
-| Composant           | Role                                                         |
-|---------------------|--------------------------------------------------------------|
-| `App.svelte`        | Layout principal, navigation liste/detail/ajout, notifications |
-| `ServiceList`       | Liste des services avec etat vide                            |
-| `ServiceCard`       | Carte d'un service (nom, chemin, toggle, badge MOCK/PROXY)   |
-| `ServiceDetail`     | Vue detail avec edition, suppression, gestion des regles     |
-| `ServiceForm`       | Formulaire ajout/edition de service                          |
-| `RuleList`          | Liste ordonnee des regles (drag-and-drop + boutons clavier)  |
-| `RuleForm`          | Formulaire de regle (conditions ET/OU + reponse)             |
-| `ConditionForm`     | Formulaire inline de condition (6 sources x 4 operateurs)    |
-| `ResponseEditor`    | Editeur visuel de reponse (fragments, headers, chaos mode)   |
-| `ToggleSwitch`      | Interrupteur ON/OFF accessible (role="switch", aria-checked) |
-| `StatusBadge`       | Badge MOCK/PROXY                                             |
-| `Notification`      | Bandeau de feedback (role="alert", aria-live)                |
+| Composant | Role |
+|---|---|
+| `App.svelte` | Layout, navigation, import/export, demo, vue logs |
+| `ServiceList` | Liste filtrable des services (recherche) |
+| `ServiceCard` | Carte service (badge methode, URL namespace, toggle, configurer) |
+| `ServiceDetail` | Vue detail : edition, suppression, gestion des regles |
+| `ServiceForm` | Formulaire service (name, method, listen_path, URL preview) |
+| `RuleList` | Liste ordonnee des regles (drag-and-drop + clavier) |
+| `RuleForm` | Formulaire regle : conditions + reponse (5 modes) |
+| `ConditionForm` | Condition inline (7 sources x 4 operateurs) |
+| `JsonResponseBuilder` | Editeur visuel JSON cle/valeur avec source dynamique |
+| `XmlResponseBuilder` | Editeur visuel XML tag/valeur |
+| `RequestLog` | Tableau des dernieres requetes (service, method, mode, status) |
+| `ToggleSwitch` | Interrupteur ON/OFF (role="switch", aria-checked) |
+| `StatusBadge` | Badge MOCK/PROXY |
+| `Notification` | Bandeau feedback (role="alert") |
 
-## Accessibilite (RGAA AA)
+## Modes de reponse (RuleForm)
 
-- Skip link vers le contenu principal
-- Tous les controles ont des labels visibles et `aria-describedby`
-- Interrupteurs avec `role="switch"` et `aria-checked`
-- Feedbacks avec `role="alert"` et `aria-live="assertive"`
-- Ordre de tabulation logique, `focus-visible` sur tous les elements interactifs
-- Contrastes >= 4.5:1
-- Drag-and-drop avec boutons alternatifs "Monter / Descendre" pour le clavier
+| Mode | Description |
+|---|---|
+| JSON guide | Editeur cle/valeur, genere un Template |
+| XML guide | Editeur tag/valeur, genere un Template |
+| Texte | Textarea libre, genere un Literal |
+| Template avance | Syntaxe `{path.siret \| first(9)}` brute |
+| Vide (204) | Pas de body |
+
+## Accessibilite RGAA AA
+
+Skip link, labels visibles, aria-describedby, role="switch", role="alert", focus-visible, contrastes >= 4.5:1, drag-and-drop avec boutons alternatifs.
