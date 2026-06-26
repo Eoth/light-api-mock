@@ -1,6 +1,6 @@
 use crate::models::Service;
 
-const RESERVED_NAMES: &[&str] = &["api", "index.html", "assets", "favicon.ico"];
+const RESERVED_NAMES: &[&str] = &["api", "auth", "index.html", "assets", "favicon.ico"];
 
 const RESERVED_PATH_PREFIXES: &[&str] = &[
     "/api/", "/api", "/index.html", "/assets/", "/favicon.ico",
@@ -130,6 +130,7 @@ mod tests {
             real_target_url: "http://example.com".into(),
             is_mocked: false,
             rewrite_directory_urls: false,
+            group_name: None,
             rules: vec![],
         }
     }

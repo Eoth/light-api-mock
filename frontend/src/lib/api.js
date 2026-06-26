@@ -1,3 +1,5 @@
+import { auth, logout } from './auth.svelte.js';
+
 const BASE = '/api';
 
 async function request(method, path, body) {
@@ -5,10 +7,17 @@ async function request(method, path, body) {
     method,
     headers: { 'Content-Type': 'application/json' },
   };
+  if (auth.token) {
+    opts.headers['Authorization'] = `Bearer ${auth.token}`;
+  }
   if (body !== undefined) {
     opts.body = JSON.stringify(body);
   }
   const res = await fetch(`${BASE}${path}`, opts);
+  if (res.status === 401 && auth.enabled) {
+    logout();
+    throw new Error('Session expiree, veuillez vous reconnecter');
+  }
   if (!res.ok) {
     let msg = `${res.status} ${res.statusText}`;
     try {
@@ -21,6 +30,24 @@ async function request(method, path, body) {
   return res.json();
 }
 
+// Auth
+export function getAuthStatus() {
+  return request('GET', '/auth/status');
+}
+
+export function login(username, password) {
+  return request('POST', '/auth/login', { username, password });
+}
+
+export function validateToken(token) {
+  return request('POST', '/auth/validate', { token });
+}
+
+export function getMe() {
+  return request('GET', '/auth/me');
+}
+
+// Services
 export function getServices() {
   return request('GET', '/services');
 }
@@ -49,6 +76,7 @@ export function reorderRules(serviceName, order) {
   return request('PUT', `/services/${encodeURIComponent(serviceName)}/rules/reorder`, { order });
 }
 
+// Config
 export function getConfig() {
   return request('GET', '/config');
 }
@@ -63,4 +91,25 @@ export function getLogs(limit = 50) {
 
 export function resetConfig() {
   return request('DELETE', '/config/reset');
+}
+
+// Groups
+export function getGroups() {
+  return request('GET', '/groups');
+}
+
+export function createGroup(group) {
+  return request('POST', '/groups', group);
+}
+
+export function updateGroup(name, group) {
+  return request('PUT', `/groups/${encodeURIComponent(name)}`, group);
+}
+
+export function deleteGroup(name) {
+  return request('DELETE', `/groups/${encodeURIComponent(name)}`);
+}
+
+export function updateGroupMembers(name, members) {
+  return request('PUT', `/groups/${encodeURIComponent(name)}/members`, members);
 }

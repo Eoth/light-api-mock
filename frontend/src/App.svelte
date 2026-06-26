@@ -1,12 +1,16 @@
 <script>
-  import { getServices, getConfig, putConfig, toggleService, createService, updateService, resetConfig } from './lib/api.js';
+  import { getServices, getConfig, putConfig, toggleService, createService, updateService, resetConfig, getAuthStatus, validateToken, getGroups } from './lib/api.js';
+  import { auth, isLoggedIn, setAuth, logout, restoreAuth } from './lib/auth.svelte.js';
   import ServiceList from './lib/components/ServiceList.svelte';
   import ServiceDetail from './lib/components/ServiceDetail.svelte';
   import ServiceForm from './lib/components/ServiceForm.svelte';
   import Notification from './lib/components/Notification.svelte';
   import RequestLog from './lib/components/RequestLog.svelte';
+  import LoginForm from './lib/components/LoginForm.svelte';
+  import GroupManager from './lib/components/GroupManager.svelte';
 
   let services = $state([]);
+  let groups = $state([]);
   let notification = $state({ message: '', type: 'info', visible: false });
   let selectedService = $state(null);
   let view = $state('list');
@@ -41,14 +45,55 @@
     }],
   };
 
-  async function loadServices() {
+  async function init() {
+    restoreAuth();
+
+    try {
+      const status = await getAuthStatus();
+      auth.enabled = status.enabled;
+    } catch {
+      auth.enabled = false;
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    const silentToken = params.get('token');
+    if (silentToken && auth.enabled) {
+      window.history.replaceState({}, '', window.location.pathname);
+      try {
+        const result = await validateToken(silentToken);
+        setAuth(result);
+      } catch {
+        showNotification('Token invalide', 'error');
+      }
+    }
+
+    if (isLoggedIn()) {
+      await loadData();
+    }
+    loading = false;
+  }
+
+  async function loadData() {
     try {
       services = await getServices();
+      if (auth.enabled && auth.isSuperAdmin) {
+        groups = await getGroups();
+      }
     } catch (e) {
       showNotification(`Erreur de chargement : ${e.message}`, 'error');
-    } finally {
-      loading = false;
     }
+  }
+
+  async function handleLogin() {
+    await loadData();
+  }
+
+  function handleLogout() {
+    logout();
+    services = [];
+    groups = [];
+    view = 'list';
+    selectedService = null;
   }
 
   async function handleToggle(name, isMocked) {
@@ -148,66 +193,86 @@
     }
   }
 
-  $effect(() => { loadServices(); });
+  $effect(() => { init(); });
 
   let currentService = $derived(services.find(s => s.name === selectedService) ?? null);
+  let groupNames = $derived(groups.map(g => g.name));
 </script>
 
 <a href="#main-content" class="sr-only skip-link">Aller au contenu principal</a>
 
-<header class="app-header">
-  <div class="header-content">
-    <button type="button" class="app-title-btn" onclick={handleBack}>
-      <h1 class="app-title">lightMock</h1>
-    </button>
-    <p class="app-subtitle">Mock &amp; Proxy Intelligent</p>
-    <div class="header-actions">
-      <button type="button" class="btn btn-sm btn-outline" onclick={() => view = 'logs'} title="Journal des requetes">Logs</button>
-      <button type="button" class="btn btn-sm btn-outline" onclick={exportConfig} title="Telecharger la configuration">Export</button>
-      <button type="button" class="btn btn-sm btn-outline" onclick={importConfig} title="Charger une configuration">Import</button>
-      <button type="button" class="btn btn-sm btn-outline btn-danger-outline" onclick={handleReset} title="Supprimer tous les services">Reset</button>
-      <button type="button" class="btn btn-sm btn-outline" onclick={() => darkMode = !darkMode} title={darkMode ? 'Mode clair' : 'Mode sombre'} aria-label={darkMode ? 'Activer le mode clair' : 'Activer le mode sombre'}>
-        {darkMode ? 'Clair' : 'Sombre'}
+{#if loading}
+  <div class="loading" role="status"><p>Chargement...</p></div>
+{:else if auth.enabled && !isLoggedIn()}
+  <LoginForm onLogin={handleLogin} />
+{:else}
+  <header class="app-header">
+    <div class="header-content">
+      <button type="button" class="app-title-btn" onclick={handleBack}>
+        <h1 class="app-title">lightMock</h1>
       </button>
-      <input type="file" accept=".json" style="display:none" bind:this={fileInput} onchange={handleFileImport} />
-    </div>
-  </div>
-</header>
-
-<main id="main-content" class="app-main">
-  <Notification message={notification.message} type={notification.type} visible={notification.visible} />
-
-  {#if loading}
-    <div class="loading" role="status"><p>Chargement des services...</p></div>
-  {:else if view === 'logs'}
-    <RequestLog />
-  {:else if view === 'add'}
-    <ServiceForm existingNames={services.map(s => s.name)} onSave={handleAddService} onCancel={handleBack} />
-  {:else if view === 'detail' && currentService}
-    <ServiceDetail service={currentService} onBack={handleBack} onUpdate={handleServiceUpdate} onDelete={handleServiceDelete} onNotify={showNotification} />
-  {:else}
-    <div class="list-header">
-      <h2>Services</h2>
-      <button type="button" class="btn btn-primary" onclick={() => view = 'add'}>+ Ajouter un service</button>
-    </div>
-    <ServiceList {services} onToggle={handleToggle} onSelect={handleSelect} />
-    {#if services.length === 0}
-      <div class="demo-section">
-        <button type="button" class="btn btn-outline btn-demo" onclick={loadDemo}>
-          Charger un exemple (service INSEE)
+      <p class="app-subtitle">Mock &amp; Proxy Intelligent</p>
+      <div class="header-actions">
+        <button type="button" class="btn btn-sm btn-outline" onclick={() => view = 'logs'} title="Journal des requetes">Logs</button>
+        {#if auth.enabled && auth.isSuperAdmin}
+          <button type="button" class="btn btn-sm btn-outline" onclick={() => view = 'groups'} title="Gestion des groupes">Groupes</button>
+        {/if}
+        <button type="button" class="btn btn-sm btn-outline" onclick={exportConfig} title="Telecharger la configuration">Export</button>
+        <button type="button" class="btn btn-sm btn-outline" onclick={importConfig} title="Charger une configuration">Import</button>
+        <button type="button" class="btn btn-sm btn-outline btn-danger-outline" onclick={handleReset} title="Supprimer tous les services">Reset</button>
+        <button type="button" class="btn btn-sm btn-outline" onclick={() => darkMode = !darkMode} title={darkMode ? 'Mode clair' : 'Mode sombre'} aria-label={darkMode ? 'Activer le mode clair' : 'Activer le mode sombre'}>
+          {darkMode ? 'Clair' : 'Sombre'}
         </button>
-        <span class="field-hint">Cree un service de demo avec path params, template et fake data.</span>
+        {#if auth.enabled}
+          <span class="user-badge" title={auth.isSuperAdmin ? 'Super-admin' : 'Utilisateur'}>{auth.username}</span>
+          <button type="button" class="btn btn-sm btn-outline" onclick={handleLogout}>Deconnexion</button>
+        {/if}
+        <input type="file" accept=".json" style="display:none" bind:this={fileInput} onchange={handleFileImport} />
       </div>
+    </div>
+  </header>
+
+  <main id="main-content" class="app-main">
+    <Notification message={notification.message} type={notification.type} visible={notification.visible} />
+
+    {#if view === 'logs'}
+      <RequestLog />
+    {:else if view === 'groups'}
+      <GroupManager onNotify={showNotification} onBack={handleBack} />
+    {:else if view === 'add'}
+      <ServiceForm
+        existingNames={services.map(s => s.name)}
+        availableGroups={groupNames}
+        authEnabled={auth.enabled}
+        onSave={handleAddService}
+        onCancel={handleBack}
+      />
+    {:else if view === 'detail' && currentService}
+      <ServiceDetail service={currentService} onBack={handleBack} onUpdate={handleServiceUpdate} onDelete={handleServiceDelete} onNotify={showNotification} />
+    {:else}
+      <div class="list-header">
+        <h2>Services</h2>
+        <button type="button" class="btn btn-primary" onclick={() => view = 'add'}>+ Ajouter un service</button>
+      </div>
+      <ServiceList {services} onToggle={handleToggle} onSelect={handleSelect} />
+      {#if services.length === 0}
+        <div class="demo-section">
+          <button type="button" class="btn btn-outline btn-demo" onclick={loadDemo}>
+            Charger un exemple (service INSEE)
+          </button>
+          <span class="field-hint">Cree un service de demo avec path params, template et fake data.</span>
+        </div>
+      {/if}
     {/if}
-  {/if}
-</main>
+  </main>
+{/if}
 
 <style>
   :global(.skip-link:focus) { position: fixed; top: 0; left: 0; z-index: 1000; width: auto; height: auto; clip: auto; padding: 0.75rem 1.5rem; background: var(--color-primary); color: #fff; font-weight: 600; text-decoration: none; }
 
   .app-header { background: var(--color-surface); border-bottom: 1px solid var(--color-border); padding: 1rem 1.5rem; box-shadow: var(--shadow); }
-  .header-content { max-width: 60rem; margin: 0 auto; display: flex; align-items: baseline; gap: 1rem; }
-  .header-actions { margin-left: auto; display: flex; gap: 0.5rem; }
+  .header-content { max-width: 60rem; margin: 0 auto; display: flex; align-items: baseline; gap: 1rem; flex-wrap: wrap; }
+  .header-actions { margin-left: auto; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
   .app-title-btn { background: none; border: none; padding: 0; cursor: pointer; }
   .app-title { font-size: 1.5rem; margin: 0; color: var(--color-primary); }
   .app-subtitle { margin: 0; color: var(--color-text-muted); font-size: 0.875rem; }
@@ -219,6 +284,16 @@
   .demo-section { text-align: center; margin-top: 1rem; }
   .btn-demo { font-size: 1rem; padding: 0.75rem 1.5rem; }
   .field-hint { display: block; font-size: 0.8125rem; color: var(--color-text-muted); margin-top: 0.375rem; }
+
+  .user-badge {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--color-primary);
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 0.2rem 0.625rem;
+  }
 
   .btn { padding: 0.5rem 1.25rem; border-radius: var(--radius); border: 1px solid transparent; font-weight: 600; font-size: 0.9375rem; cursor: pointer; }
   .btn-sm { padding: 0.25rem 0.75rem; font-size: 0.8125rem; }

@@ -9,7 +9,10 @@ axum = { version = "0.7", features = ["macros"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal"] }
 
 # HTTP client for proxy forwarding
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "stream"] }
+
+# JWT validation (Keycloak auth)
+jsonwebtoken = "9"
 
 # Serialization
 serde = { version = "1", features = ["derive"] }

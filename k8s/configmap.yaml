@@ -11,3 +11,8 @@ data:
   STATIC_DIR: /app/static
   PORT: "7342"
   RUST_LOG: light_mock=info
+  AUTH_ENABLED: "false"
+  # KEYCLOAK_URL: "https://keycloak.example.com"
+  # KEYCLOAK_REALM: "entreprise"
+  # KEYCLOAK_CLIENT_ID: "lightmock"
+  # SUPER_ADMINS: "c95tnak"

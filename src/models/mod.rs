@@ -3,6 +3,17 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct MockConfig {
     pub services: Vec<Service>,
+    #[serde(default)]
+    pub groups: Vec<Group>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Group {
+    pub name: String,
+    #[serde(default)]
+    pub admins: Vec<String>,
+    #[serde(default)]
+    pub members: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -15,6 +26,8 @@ pub struct Service {
     pub is_mocked: bool,
     #[serde(default)]
     pub rewrite_directory_urls: bool,
+    #[serde(default)]
+    pub group_name: Option<String>,
     #[serde(default)]
     pub rules: Vec<Rule>,
 }
@@ -152,7 +165,10 @@ fn default_chaos_status() -> u16 {
 
 impl MockConfig {
     pub fn empty() -> Self {
-        Self { services: vec![] }
+        Self {
+            services: vec![],
+            groups: vec![],
+        }
     }
 }
 
@@ -169,6 +185,7 @@ mod tests {
                 real_target_url: "http://service-a.default.svc:8080".into(),
                 is_mocked: true,
                 rewrite_directory_urls: false,
+                group_name: None,
                 rules: vec![Rule {
                     name: "rule-login-ok".into(),
                     action: RuleAction::default(),
@@ -225,6 +242,7 @@ mod tests {
                     },
                 }],
             }],
+            groups: vec![],
         }
     }
 
@@ -484,5 +502,59 @@ services:
 "#;
         let config: MockConfig = serde_yaml::from_str(yaml).expect("deserialize");
         assert_eq!(config.services[0].rules[0].action, RuleAction::Mock);
+    }
+
+    #[test]
+    fn backward_compat_no_groups_field() {
+        let yaml = r#"
+services:
+  - name: svc
+    listen_path: /svc/*
+    real_target_url: http://svc:80
+    is_mocked: false
+"#;
+        let config: MockConfig = serde_yaml::from_str(yaml).expect("deserialize");
+        assert!(config.groups.is_empty());
+        assert!(config.services[0].group_name.is_none());
+    }
+
+    #[test]
+    fn deserialize_config_with_groups() {
+        let yaml = r#"
+services:
+  - name: svc
+    listen_path: /svc/*
+    real_target_url: http://svc:80
+    is_mocked: true
+    group_name: team-a
+groups:
+  - name: team-a
+    admins:
+      - lead
+    members:
+      - dev1
+      - dev2
+"#;
+        let config: MockConfig = serde_yaml::from_str(yaml).expect("deserialize");
+        assert_eq!(config.groups.len(), 1);
+        assert_eq!(config.groups[0].name, "team-a");
+        assert_eq!(config.groups[0].admins, vec!["lead"]);
+        assert_eq!(config.groups[0].members, vec!["dev1", "dev2"]);
+        assert_eq!(config.services[0].group_name.as_deref(), Some("team-a"));
+    }
+
+    #[test]
+    fn groups_roundtrip_serialization() {
+        let config = MockConfig {
+            services: vec![],
+            groups: vec![Group {
+                name: "team-x".into(),
+                admins: vec!["admin1".into()],
+                members: vec!["user1".into(), "user2".into()],
+            }],
+        };
+        let yaml = serde_yaml::to_string(&config).expect("serialize");
+        let parsed: MockConfig = serde_yaml::from_str(&yaml).expect("deserialize");
+        assert_eq!(config, parsed);
     }
 }
