@@ -121,6 +121,7 @@ mod tests {
                 real_target_url: "http://svc-a:8080".into(),
                 is_mocked: true,
                 rewrite_directory_urls: false,
+                group_name: None,
                 rules: vec![Rule {
                     name: "default".into(),
                     action: RuleAction::default(),
@@ -135,6 +136,7 @@ mod tests {
                     },
                 }],
             }],
+            groups: vec![],
         }
     }
 
@@ -198,6 +200,7 @@ mod tests {
                     real_target_url: "http://svc-b:9090".into(),
                     is_mocked: false,
                     rewrite_directory_urls: false,
+                    group_name: None,
                     rules: vec![],
                 });
             })

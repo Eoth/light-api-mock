@@ -1,8 +1,11 @@
+pub mod auth;
 pub mod models;
 pub mod engine;
 pub mod store;
 pub mod server;
 
+use crate::auth::AuthConfig;
+use crate::auth::keycloak::KeycloakClient;
 use crate::engine::ProxyClient;
 use crate::server::request_log::RequestLog;
 use crate::server::{AppState, build_router};
@@ -34,11 +37,26 @@ async fn main() {
         .and_then(|p| p.parse().ok())
         .unwrap_or(7342);
 
+    let auth_config = AuthConfig::from_env();
+    let keycloak = if auth_config.enabled {
+        tracing::info!(
+            keycloak_url = %auth_config.keycloak_url,
+            realm = %auth_config.realm,
+            "auth enabled, connecting to Keycloak"
+        );
+        Some(KeycloakClient::new(auth_config.clone()))
+    } else {
+        tracing::info!("auth disabled");
+        None
+    };
+
     let state = AppState {
         store,
         proxy: ProxyClient::new(),
         seq_counters: Arc::new(RwLock::new(HashMap::new())),
         request_log: RequestLog::new(),
+        auth_config,
+        keycloak,
     };
 
     let app = build_router(state, &static_dir);

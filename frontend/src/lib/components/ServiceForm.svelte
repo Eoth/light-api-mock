@@ -2,6 +2,8 @@
   let {
     service = null,
     existingNames = [],
+    availableGroups = [],
+    authEnabled = false,
     onSave = () => {},
     onCancel = () => {},
   } = $props();
@@ -12,9 +14,10 @@
   let listenPath = $state(initial?.listen_path ?? '/v1/*');
   let realTargetUrl = $state(initial?.real_target_url ?? 'http://');
   let rewriteDirectoryUrls = $state(initial?.rewrite_directory_urls ?? false);
+  let groupName = $state(initial?.group_name ?? '');
 
   const httpMethods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'];
-  const RESERVED_NAMES = ['api', 'index.html', 'assets', 'favicon.ico'];
+  const RESERVED_NAMES = ['api', 'auth', 'index.html', 'assets', 'favicon.ico'];
 
   let testUrl = $derived(
     `http://localhost:7342/${name.trim() || '...'}${listenPath.trim().startsWith('/') ? listenPath.trim() : '/' + listenPath.trim()}`
@@ -64,7 +67,7 @@
 
     saving = true;
     try {
-      await onSave({
+      const payload = {
         name: name.trim(),
         method,
         listen_path: listenPath.trim(),
@@ -72,7 +75,9 @@
         is_mocked: initial?.is_mocked ?? false,
         rewrite_directory_urls: rewriteDirectoryUrls,
         rules: initial?.rules ?? [],
-      });
+      };
+      if (groupName) payload.group_name = groupName;
+      await onSave(payload);
     } catch (e) {
       error = e.message;
     } finally {
@@ -143,6 +148,19 @@
     </label>
     <span class="field-hint">Remplace les URL des backends dans les réponses d'annuaire pour les rediriger via lightMock</span>
   </div>
+
+  {#if authEnabled && availableGroups.length > 0}
+    <div class="form-field">
+      <label for="svc-group">Groupe</label>
+      <select id="svc-group" bind:value={groupName} aria-describedby="svc-group-hint">
+        <option value="">-- Aucun groupe --</option>
+        {#each availableGroups as g}
+          <option value={g}>{g}</option>
+        {/each}
+      </select>
+      <span class="field-hint" id="svc-group-hint">Associe le service a un groupe pour gerer les droits d'acces</span>
+    </div>
+  {/if}
 
   {#if name.trim()}
     <div class="url-preview">

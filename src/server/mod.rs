@@ -3,6 +3,8 @@ mod intercept;
 pub mod request_log;
 pub mod validation;
 
+use crate::auth::AuthConfig;
+use crate::auth::keycloak::KeycloakClient;
 use crate::engine::ProxyClient;
 use crate::store::MockStore;
 use axum::Router;
@@ -20,6 +22,8 @@ pub struct AppState {
     pub proxy: ProxyClient,
     pub seq_counters: Arc<RwLock<HashMap<String, Arc<AtomicU64>>>>,
     pub request_log: RequestLog,
+    pub auth_config: AuthConfig,
+    pub keycloak: Option<KeycloakClient>,
 }
 
 impl AppState {
@@ -46,6 +50,9 @@ pub fn build_router(state: AppState, static_dir: &Path) -> Router {
 
     let api_routes = api::routes();
 
+    let auth_config = state.auth_config.clone();
+    let keycloak = state.keycloak.clone();
+
     Router::new()
         .nest("/api", api_routes)
         .fallback_service(ServeDir::new(static_dir).append_index_html_on_directories(true))
@@ -53,6 +60,14 @@ pub fn build_router(state: AppState, static_dir: &Path) -> Router {
             state.clone(),
             intercept::intercept_layer,
         ))
+        .layer(axum::middleware::from_fn(move |req, next| {
+            crate::auth::middleware::auth_middleware(
+                auth_config.clone(),
+                keycloak.clone(),
+                req,
+                next,
+            )
+        }))
         .with_state(state)
         .layer(cors)
 }
