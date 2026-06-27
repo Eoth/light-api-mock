@@ -111,7 +111,7 @@
 
           <div class="rule-content">
             <span class="rule-index" aria-hidden="true">{idx + 1}</span>
-            <span class="rule-method-badge">{rule.method ?? 'ANY'}</span>
+            <span class="rule-method-badge">{rule.method}</span>
             <span class="rule-action-badge" class:proxy={rule.action === 'proxy'}>{(rule.action ?? 'mock').toUpperCase()}</span>
             <span class="rule-name">{rule.name}</span>
             <span class="rule-meta">

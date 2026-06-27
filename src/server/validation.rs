@@ -1,7 +1,7 @@
 use crate::models::Service;
 
 const RESERVED_NAMES: &[&str] = &["api", "auth", "index.html", "assets", "favicon.ico"];
-const VALID_METHODS: &[&str] = &["ANY", "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"];
+const VALID_METHODS: &[&str] = &["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"];
 
 const RESERVED_PATH_PREFIXES: &[&str] = &[
     "/api/", "/api", "/index.html", "/assets/", "/favicon.ico",
@@ -144,7 +144,7 @@ mod tests {
         let mut s = svc(name, "/v1/*");
         s.rules = rule_names.iter().map(|rn| Rule {
             name: rn.to_string(),
-            method: "ANY".into(),
+            method: "GET".into(),
             sub_path: None,
             action: RuleAction::default(),
             script: None,

@@ -14,6 +14,7 @@ pub struct MockConfig {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Group {
     pub name: String,
+    pub code: String,
     #[serde(default)]
     pub admins: Vec<String>,
     #[serde(default)]
@@ -195,7 +196,7 @@ mod tests {
                 wsdl_mode: WsdlMode::default(),
                 rules: vec![Rule {
                     name: "rule-login-ok".into(),
-                    method: "ANY".into(),
+                    method: "GET".into(),
                     sub_path: None,
                     action: RuleAction::default(),
                     script: None,
@@ -535,6 +536,7 @@ services:
     rules: []
 groups:
   - name: team-a
+    code: tma
     admins:
       - lead
     members:
@@ -555,6 +557,7 @@ groups:
             services: vec![],
             groups: vec![Group {
                 name: "team-x".into(),
+                code: "tmx".into(),
                 admins: vec!["admin1".into()],
                 members: vec!["user1".into(), "user2".into()],
             }],
