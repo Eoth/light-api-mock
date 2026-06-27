@@ -598,12 +598,13 @@
               <details class="script-examples">
                 <summary class="field-hint">Exemples et syntaxe Rhai</summary>
                 <div class="script-examples-content">
-                  <p><strong>Variables et types :</strong> <code>let x = 42;</code> <code>let s = "hello";</code> <code>let b = true;</code></p>
+                  <p><strong>Variables :</strong> <code>let x = 42;</code> <code>let s = "hello";</code></p>
                   <p><strong>Conditions :</strong> <code>if x &gt; 10 {"{"} "grand" {"}"} else {"{"} "petit" {"}"}</code></p>
-                  <p><strong>Strings :</strong> <code>s.to_upper()</code> <code>s.len()</code> <code>s.contains("el")</code> <code>s.replace("a", "b")</code> <code>s.trim()</code></p>
-                  <p><strong>Concatenation :</strong> <code>`Bonjour ${"{"} request.path.nom {"}"}`</code> (backticks pour interpolation)</p>
-                  <p><strong>Objet retour :</strong> <code>#{"{"} cle1: "val1", cle2: request.query.param {"}"}</code></p>
-                  <p class="field-hint">Rhai est sandboxe : pas d'acces fichier/reseau, 10 000 operations max. <a href="https://rhai.rs/book/" target="_blank" rel="noopener">Documentation Rhai</a></p>
+                  <p><strong>Strings :</strong> <code>s.to_upper()</code> <code>s.len()</code> <code>s.contains("el")</code> <code>s.replace("a", "b")</code></p>
+                  <p><strong>Fonctions lightMock :</strong> <code>random_int(1, 5)</code> (entier aleatoire), <code>now_ms()</code> (timestamp ms)</p>
+                  <p><strong>Objet retour :</strong> <code>#{"{"} cle: "val", n: random_int(1,100) {"}"}</code> → accessible via <code>{"{{script.cle}}"}</code></p>
+                  <p><strong>Ratio 4/5 :</strong> <code>if random_int(1,5) &lt;= 4 {"{"} #{"{"} status: "ok" {"}"} {"}"} else {"{"} #{"{"} status: "ko" {"}"} {"}"}</code></p>
+                  <p class="field-hint">Sandbox : pas d'acces fichier/reseau, 10K ops max. <a href="https://rhai.rs/book/" target="_blank" rel="noopener">Doc Rhai</a></p>
                 </div>
               </details>
             </div>

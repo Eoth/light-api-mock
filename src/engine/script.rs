@@ -31,6 +31,19 @@ impl ScriptEngine {
         engine.set_max_string_size(1_048_576);
         engine.set_max_array_size(1_000);
         engine.set_max_map_size(500);
+
+        engine.register_fn("random_int", |min: i64, max: i64| -> i64 {
+            if min >= max { return min; }
+            min + (fastrand::i64(..) % (max - min + 1)).abs()
+        });
+
+        engine.register_fn("now_ms", || -> i64 {
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis() as i64
+        });
+
         Self {
             engine: Arc::new(engine),
         }
@@ -160,5 +173,39 @@ mod tests {
         };
         let result = engine.execute("request.query.page", &ctx).unwrap();
         assert_eq!(result.value, "5");
+    }
+
+    #[test]
+    fn random_int_in_range() {
+        let engine = ScriptEngine::new();
+        for _ in 0..20 {
+            let result = engine.execute("random_int(1, 5)", &empty_ctx()).unwrap();
+            let val: i64 = result.value.parse().unwrap();
+            assert!((1..=5).contains(&val), "random_int(1,5) returned {val}");
+        }
+    }
+
+    #[test]
+    fn now_ms_returns_timestamp() {
+        let engine = ScriptEngine::new();
+        let result = engine.execute("now_ms()", &empty_ctx()).unwrap();
+        let val: i64 = result.value.parse().unwrap();
+        assert!(val > 1_700_000_000_000, "now_ms too small: {val}");
+    }
+
+    #[test]
+    fn ratio_script_returns_map() {
+        let engine = ScriptEngine::new();
+        let script = r#"
+            let roll = random_int(1, 5);
+            if roll <= 4 {
+                #{ status: "actif", code: "200" }
+            } else {
+                #{ status: "suspendu", code: "403" }
+            }
+        "#;
+        let result = engine.execute(script, &empty_ctx()).unwrap();
+        let status = result.fields.get("status").unwrap();
+        assert!(status == "actif" || status == "suspendu");
     }
 }
