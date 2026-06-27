@@ -663,22 +663,14 @@ async fn delete_group(
         }
     }
 
-    {
-        let config = state.store.snapshot().await;
-        if config
-            .services
-            .iter()
-            .any(|s| s.group_name.as_deref() == Some(&name))
-        {
-            return Err(AppError::Conflict(format!(
-                "Impossible de supprimer le groupe \"{name}\" : des services y sont encore associes."
-            )));
-        }
-    }
-
     state
         .store
         .update(|cfg| {
+            for svc in cfg.services.iter_mut() {
+                if svc.group_name.as_deref() == Some(&name) {
+                    svc.group_name = None;
+                }
+            }
             cfg.groups.retain(|g| g.name != name);
         })
         .await

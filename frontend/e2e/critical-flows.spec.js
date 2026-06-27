@@ -1,0 +1,314 @@
+import { test, expect } from '@playwright/test';
+
+const API = 'http://localhost:7342/api';
+
+function validService(name, overrides = {}) {
+  return {
+    name,
+    listen_path: '',
+    real_target_url: 'http://backend:8080',
+    is_mocked: true,
+    rewrite_directory_urls: false,
+    group_name: null,
+    wsdl_mode: 'auto',
+    rules: [],
+    ...overrides,
+  };
+}
+
+function validRule(name, overrides = {}) {
+  return {
+    name,
+    method: 'GET',
+    sub_path: null,
+    action: 'mock',
+    script: null,
+    conditions: { all_of: [], any_of: [] },
+    response: {
+      status: 200,
+      headers: [{ name: 'Content-Type', value: 'application/json' }],
+      body: [{ type: 'Template', template: '{"ok":true}' }],
+      chaos: null,
+    },
+    ...overrides,
+  };
+}
+
+test.describe('Service CRUD', () => {
+  test.beforeEach(async ({ request }) => {
+    await request.delete(`${API}/config/reset`);
+  });
+
+  test('create, read, update, delete a service', async ({ request }) => {
+    const svc = validService('test-svc', { listen_path: '/v1/*' });
+    const create = await request.post(`${API}/services`, { data: svc });
+    expect(create.status()).toBe(201);
+
+    const get = await request.get(`${API}/services/test-svc`);
+    expect(get.status()).toBe(200);
+    const body = await get.json();
+    expect(body.name).toBe('test-svc');
+
+    svc.real_target_url = 'http://new-backend:9090';
+    const update = await request.put(`${API}/services/test-svc`, { data: svc });
+    expect(update.status()).toBe(200);
+
+    const del = await request.delete(`${API}/services/test-svc`);
+    expect(del.status()).toBe(204);
+
+    const get2 = await request.get(`${API}/services/test-svc`);
+    expect(get2.status()).toBe(404);
+  });
+
+  test('create service with rule and verify mock response', async ({ request }) => {
+    const svc = validService('mock-svc', {
+      listen_path: '/hello',
+      rules: [validRule('hello-rule', {
+        response: {
+          status: 200,
+          headers: [{ name: 'Content-Type', value: 'application/json' }],
+          body: [{ type: 'Template', template: '{"message":"hello"}' }],
+          chaos: null,
+        },
+      })],
+    });
+    await request.post(`${API}/services`, { data: svc });
+
+    const mock = await request.get('http://localhost:7342/mock-svc/hello');
+    expect(mock.status()).toBe(200);
+    const body = await mock.json();
+    expect(body.message).toBe('hello');
+  });
+
+  test('duplicate service name returns 409', async ({ request }) => {
+    await request.post(`${API}/services`, { data: validService('dup-svc') });
+    const dup = await request.post(`${API}/services`, { data: validService('dup-svc') });
+    expect(dup.status()).toBe(409);
+  });
+
+  test('empty listen_path creates catch-all', async ({ request }) => {
+    const svc = validService('catchall', {
+      listen_path: '',
+      rules: [validRule('catch')],
+    });
+    await request.post(`${API}/services`, { data: svc });
+
+    const resp = await request.get('http://localhost:7342/catchall/anything/here');
+    expect(resp.status()).toBe(200);
+  });
+});
+
+test.describe('Groups', () => {
+  test.beforeEach(async ({ request }) => {
+    await request.delete(`${API}/config/reset`);
+  });
+
+  test('create group, assign service, verify URL prefix', async ({ request }) => {
+    const grp = await request.post(`${API}/groups`, {
+      data: { name: 'team-test', code: '', admins: [], members: [] },
+    });
+    expect(grp.status()).toBe(201);
+    const group = await grp.json();
+    expect(group.code.length).toBe(5);
+
+    const svc = validService('grp-svc', {
+      group_name: 'team-test',
+      rules: [validRule('grp-rule')],
+    });
+    await request.post(`${API}/services`, { data: svc });
+
+    const prefixed = await request.get(`http://localhost:7342/${group.code}/grp-svc/anything`);
+    expect(prefixed.status()).toBe(200);
+
+    const unprefixed = await request.get('http://localhost:7342/grp-svc/anything');
+    expect(unprefixed.status()).not.toBe(200);
+  });
+
+  test('delete group dissociates services', async ({ request }) => {
+    await request.post(`${API}/groups`, {
+      data: { name: 'del-grp', code: '', admins: [], members: [] },
+    });
+    await request.post(`${API}/services`, {
+      data: validService('orphan-svc', { group_name: 'del-grp' }),
+    });
+
+    const del = await request.delete(`${API}/groups/del-grp`);
+    expect(del.status()).toBe(204);
+
+    const svc = await request.get(`${API}/services/orphan-svc`);
+    const body = await svc.json();
+    expect(body.group_name).toBeNull();
+  });
+
+  test('group code uniqueness', async ({ request }) => {
+    await request.post(`${API}/groups`, {
+      data: { name: 'grp1', code: 'abc12', admins: [], members: [] },
+    });
+    const dup = await request.post(`${API}/groups`, {
+      data: { name: 'grp2', code: 'abc12', admins: [], members: [] },
+    });
+    expect(dup.status()).toBe(409);
+  });
+});
+
+test.describe('Import/Export', () => {
+  test.beforeEach(async ({ request }) => {
+    await request.delete(`${API}/config/reset`);
+  });
+
+  test('import config with groups generates codes', async ({ request }) => {
+    const config = {
+      services: [validService('imp-svc', { group_name: 'imp-grp' })],
+      groups: [{ name: 'imp-grp', code: '', admins: [], members: [] }],
+    };
+    const put = await request.put(`${API}/config`, { data: config });
+    expect(put.status()).toBe(200);
+
+    const groups = await (await request.get(`${API}/groups`)).json();
+    expect(groups.length).toBe(1);
+    expect(groups[0].code.length).toBe(5);
+    expect(groups[0].code).not.toBe('');
+  });
+});
+
+test.describe('Rules with method and sub_path', () => {
+  test.beforeEach(async ({ request }) => {
+    await request.delete(`${API}/config/reset`);
+  });
+
+  test('rule method filters requests', async ({ request }) => {
+    const svc = validService('method-svc', {
+      rules: [
+        validRule('get-only', { method: 'GET' }),
+        validRule('post-only', {
+          method: 'POST',
+          response: {
+            status: 201,
+            headers: [],
+            body: [{ type: 'Template', template: '{"created":true}' }],
+            chaos: null,
+          },
+        }),
+      ],
+    });
+    await request.post(`${API}/services`, { data: svc });
+
+    const get = await request.get('http://localhost:7342/method-svc/test');
+    expect(get.status()).toBe(200);
+
+    const post = await request.post('http://localhost:7342/method-svc/test');
+    expect(post.status()).toBe(201);
+  });
+
+  test('sub_path narrows matching', async ({ request }) => {
+    const svc = validService('subpath-svc', {
+      rules: [
+        validRule('users', {
+          sub_path: '/users/{id}',
+          response: {
+            status: 200,
+            headers: [],
+            body: [{ type: 'Template', template: '{"user":"{{path.id}}"}' }],
+            chaos: null,
+          },
+        }),
+      ],
+    });
+    await request.post(`${API}/services`, { data: svc });
+
+    const ok = await request.get('http://localhost:7342/subpath-svc/users/42');
+    expect(ok.status()).toBe(200);
+    expect((await ok.json()).user).toBe('42');
+
+    const miss = await request.get('http://localhost:7342/subpath-svc/orders/1');
+    expect(miss.status()).toBe(404);
+  });
+});
+
+test.describe('Script execution', () => {
+  test.beforeEach(async ({ request }) => {
+    await request.delete(`${API}/config/reset`);
+  });
+
+  test('script result available in template', async ({ request }) => {
+    const svc = validService('script-svc', {
+      rules: [validRule('scripted', {
+        script: '#{ greeting: "hello" }',
+        response: {
+          status: 200,
+          headers: [],
+          body: [{ type: 'Template', template: '{"msg":"{{script.greeting}}"}' }],
+          chaos: null,
+        },
+      })],
+    });
+    await request.post(`${API}/services`, { data: svc });
+
+    const resp = await request.get('http://localhost:7342/script-svc/test');
+    expect(resp.status()).toBe(200);
+    expect((await resp.json()).msg).toBe('hello');
+  });
+
+  test('script validation endpoint', async ({ request }) => {
+    const valid = await request.post(`${API}/script/validate`, {
+      data: { script: 'let x = 42; x' },
+    });
+    expect((await valid.json()).valid).toBe(true);
+
+    const invalid = await request.post(`${API}/script/validate`, {
+      data: { script: 'let x =' },
+    });
+    expect((await invalid.json()).valid).toBe(false);
+  });
+});
+
+test.describe('WSDL bypass', () => {
+  test.beforeEach(async ({ request }) => {
+    await request.delete(`${API}/config/reset`);
+  });
+
+  test('wsdl_mode mock applies rules even for ?wsdl', async ({ request }) => {
+    const svc = validService('wsdl-svc', {
+      wsdl_mode: 'mock',
+      rules: [validRule('wsdl-rule')],
+    });
+    await request.post(`${API}/services`, { data: svc });
+
+    const resp = await request.get('http://localhost:7342/wsdl-svc/test?wsdl');
+    expect(resp.status()).toBe(200);
+  });
+});
+
+test.describe('UI critical paths', () => {
+  test.beforeEach(async ({ request }) => {
+    await request.delete(`${API}/config/reset`);
+  });
+
+  test('homepage loads with breadcrumb navigation', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('h1')).toContainText('lightMock');
+  });
+
+  test('create and delete service via UI', async ({ page, request }) => {
+    await request.post(`${API}/services`, { data: validService('ui-del-svc') });
+    await page.goto('/');
+    await page.getByText('ui-del-svc').click();
+    await page.getByText('Supprimer le service').click();
+    page.on('dialog', d => d.accept());
+    await page.getByRole('button', { name: /Oui/ }).click();
+    await expect(page.getByText('ui-del-svc')).not.toBeVisible();
+  });
+
+  test('groups page is accessible to all', async ({ page }) => {
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Groupes' }).click();
+    await expect(page.getByText('Groupes de services')).toBeVisible();
+  });
+});
+
+test.describe('Health endpoint', () => {
+  test('GET /api/health returns 200', async ({ request }) => {
+    const resp = await request.get(`${API}/health`);
+    expect(resp.status()).toBe(200);
+  });
+});
