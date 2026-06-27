@@ -15,22 +15,22 @@ import {
 
 describe('fieldsToTemplate', () => {
   it('empty fields produce empty object', () => {
-    expect(fieldsToTemplate([])).toBe('{{}}');
+    expect(fieldsToTemplate([])).toBe('{}');
   });
 
   it('single fixed string field', () => {
     const fields = [{ key: 'name', fieldType: 'value', source: 'fixed', value: 'Alice', pipe: '', asNumber: false }];
-    expect(fieldsToTemplate(fields)).toBe('{{"name":"Alice"}}');
+    expect(fieldsToTemplate(fields)).toBe('{"name":"Alice"}');
   });
 
   it('single numeric field', () => {
     const fields = [{ key: 'count', fieldType: 'value', source: 'fixed', value: '42', pipe: '', asNumber: true }];
-    expect(fieldsToTemplate(fields)).toBe('{{"count":42}}');
+    expect(fieldsToTemplate(fields)).toBe('{"count":42}');
   });
 
   it('variable with pipe', () => {
     const fields = [{ key: 'siren', fieldType: 'value', source: 'path', value: 'siret', pipe: 'first(9)', asNumber: false }];
-    expect(fieldsToTemplate(fields)).toBe('{{"siren":"{path.siret | first(9)}"}}');
+    expect(fieldsToTemplate(fields)).toBe('{"siren":"{{path.siret | first(9)}}"}');
   });
 
   it('nested object', () => {
@@ -40,7 +40,7 @@ describe('fieldsToTemplate', () => {
       children: [{ key: 'id', fieldType: 'value', source: 'uuid', value: '', pipe: '', asNumber: false }],
     }];
     const tpl = fieldsToTemplate(fields);
-    expect(tpl).toBe('{{"data":{{"id":"{uuid}"}}}}');
+    expect(tpl).toBe('{"data":{"id":"{{uuid}}"}}');
   });
 
   it('array of values', () => {
@@ -52,7 +52,7 @@ describe('fieldsToTemplate', () => {
         { source: 'fixed', value: 'b', pipe: '', asNumber: false },
       ],
     }];
-    expect(fieldsToTemplate(fields)).toBe('{{"tags":["a","b"]}}');
+    expect(fieldsToTemplate(fields)).toBe('{"tags":["a","b"]}');
   });
 
   it('array of objects', () => {
@@ -61,38 +61,38 @@ describe('fieldsToTemplate', () => {
       fieldType: 'array-objects',
       template: [{ key: 'id', fieldType: 'value', source: 'seq', value: '', pipe: '', asNumber: true }],
     }];
-    expect(fieldsToTemplate(fields)).toBe('{{"items":[{{"id":{seq}}}]}}');
+    expect(fieldsToTemplate(fields)).toBe('{"items":[{"id":{{seq}}}]}');
   });
 });
 
 // ── templateToTestJson ───────────────────────────────────────────────
 
 describe('templateToTestJson', () => {
-  it('converts {{ to { and }} to }', () => {
-    expect(templateToTestJson('{{"a":"b"}}')).toBe('{"a":"b"}');
+  it('passes normal JSON through', () => {
+    expect(templateToTestJson('{"a":"b"}')).toBe('{"a":"b"}');
   });
 
-  it('replaces {var} with placeholder', () => {
-    expect(templateToTestJson('{{"k":"{path.x}"}}')).toBe('{"k":"__var__"}');
+  it('replaces {{var}} with placeholder', () => {
+    expect(templateToTestJson('{"k":"{{path.x}}"}')).toBe('{"k":"__var__"}');
   });
 
   it('handles pipe inside variable', () => {
-    expect(templateToTestJson('{{"k":"{path.x | first(9)}"}}')).toBe('{"k":"__var__"}');
+    expect(templateToTestJson('{"k":"{{path.x | first(9)}}"}')).toBe('{"k":"__var__"}');
   });
 
   it('handles nested objects', () => {
-    const tpl = '{{"a":{{"b":"{uuid}"}}}}';
+    const tpl = '{"a":{"b":"{{uuid}}"}}';
     const test = templateToTestJson(tpl);
     expect(test).toBe('{"a":{"b":"__var__"}}');
     expect(() => JSON.parse(test)).not.toThrow();
   });
 
   it('handles numbers without quotes', () => {
-    expect(templateToTestJson('{{"n":{seq}}}')).toBe('{"n":"__var__"}');
+    expect(templateToTestJson('{"n":{{seq}}}')).toBe('{"n":"__var__"}');
   });
 
   it('preserves arrays', () => {
-    const tpl = '{{"a":["x","{uuid}"]}}';
+    const tpl = '{"a":["x","{{uuid}}"]}';
     const test = templateToTestJson(tpl);
     expect(test).toBe('{"a":["x","__var__"]}');
     expect(() => JSON.parse(test)).not.toThrow();
@@ -103,7 +103,7 @@ describe('templateToTestJson', () => {
 
 describe('validateTemplateAsJson', () => {
   it('accepts valid template', () => {
-    expect(validateTemplateAsJson('{{"name":"{path.siret}"}}')).toBeNull();
+    expect(validateTemplateAsJson('{"name":"{{path.siret}}"}')).toBeNull();
   });
 
   it('accepts empty template', () => {
@@ -112,17 +112,17 @@ describe('validateTemplateAsJson', () => {
   });
 
   it('accepts nested objects with pipes', () => {
-    expect(validateTemplateAsJson('{{"data":{{"siren":"{path.siret | first(9)}"}}}}')).toBeNull();
+    expect(validateTemplateAsJson('{"data":{"siren":"{{path.siret | first(9)}}"}}')).toBeNull();
   });
 
   it('rejects malformed JSON', () => {
-    const err = validateTemplateAsJson('{{"name":}');
+    const err = validateTemplateAsJson('{"name":}');
     expect(err).not.toBeNull();
     expect(err).toContain('JSON invalide');
   });
 
   it('rejects unbalanced braces', () => {
-    const err = validateTemplateAsJson('{{"name":"val"');
+    const err = validateTemplateAsJson('{"name":"val"');
     expect(err).not.toBeNull();
   });
 
@@ -231,11 +231,11 @@ describe('templateToFields error cases', () => {
   });
 
   it('throws on malformed JSON', () => {
-    expect(() => templateToFields('{{"a":}}')).toThrow();
+    expect(() => templateToFields('{"a":}')).toThrow();
   });
 
   it('returns empty for empty object', () => {
-    expect(templateToFields('{{}}')).toEqual([]);
+    expect(templateToFields('{}')).toEqual([]);
   });
 });
 
@@ -243,12 +243,12 @@ describe('templateToFields error cases', () => {
 
 describe('templateToPreview', () => {
   it('renders variables with angle brackets', () => {
-    const result = templateToPreview('{{"name":"{path.x}"}}');
-    expect(result).toBe('{"name":"«{path.x}»"}');
+    const result = templateToPreview('{"name":"{{path.x}}"}');
+    expect(result).toBe('{"name":"«{{path.x}}»"}');
   });
 
   it('renders nested objects correctly', () => {
-    const result = templateToPreview('{{"a":{{"b":"v"}}}}');
+    const result = templateToPreview('{"a":{"b":"v"}}');
     expect(result).toBe('{"a":{"b":"v"}}');
   });
 });
@@ -257,7 +257,7 @@ describe('templateToPreview', () => {
 
 describe('validateTemplateAsXml', () => {
   it('accepts valid XML template', () => {
-    expect(validateTemplateAsXml('<root><id>{uuid}</id></root>')).toBeNull();
+    expect(validateTemplateAsXml('<root><id>{{uuid}}</id></root>')).toBeNull();
   });
 
   it('rejects invalid XML', () => {
@@ -278,15 +278,23 @@ describe('buildExpr', () => {
   });
 
   it('path without pipe', () => {
-    expect(buildExpr({ source: 'path', value: 'id', pipe: '' })).toBe('{path.id}');
+    expect(buildExpr({ source: 'path', value: 'id', pipe: '' })).toBe('{{path.id}}');
   });
 
   it('path with pipe', () => {
-    expect(buildExpr({ source: 'path', value: 'siret', pipe: 'first(9)' })).toBe('{path.siret | first(9)}');
+    expect(buildExpr({ source: 'path', value: 'siret', pipe: 'first(9)' })).toBe('{{path.siret | first(9)}}');
   });
 
   it('uuid', () => {
-    expect(buildExpr({ source: 'uuid', value: '', pipe: '' })).toBe('{uuid}');
+    expect(buildExpr({ source: 'uuid', value: '', pipe: '' })).toBe('{{uuid}}');
+  });
+
+  it('script', () => {
+    expect(buildExpr({ source: 'script', value: '', pipe: '' })).toBe('{{script}}');
+  });
+
+  it('script with field', () => {
+    expect(buildExpr({ source: 'script', value: 'result', pipe: '' })).toBe('{{script.result}}');
   });
 });
 
@@ -301,6 +309,12 @@ describe('varNameToSource', () => {
   });
   it('parses fake', () => {
     expect(varNameToSource('fake.Email')).toEqual({ source: 'fake', value: 'Email' });
+  });
+  it('parses script', () => {
+    expect(varNameToSource('script')).toEqual({ source: 'script', value: '' });
+  });
+  it('parses script.field', () => {
+    expect(varNameToSource('script.result')).toEqual({ source: 'script', value: 'result' });
   });
   it('unknown falls back to fixed', () => {
     expect(varNameToSource('unknown')).toEqual({ source: 'fixed', value: 'unknown' });
@@ -325,7 +339,7 @@ describe('xmlFieldsToTemplate', () => {
 
   it('variable with pipe', () => {
     const fields = [{ tag: 'siren', nodeType: 'value', source: 'path', value: 'siret', pipe: 'first(9)' }];
-    expect(xmlFieldsToTemplate(fields)).toBe('<response><siren>{path.siret | first(9)}</siren></response>');
+    expect(xmlFieldsToTemplate(fields)).toBe('<response><siren>{{path.siret | first(9)}}</siren></response>');
   });
 
   it('nested parent node', () => {
@@ -338,7 +352,7 @@ describe('xmlFieldsToTemplate', () => {
       ],
     }];
     const tpl = xmlFieldsToTemplate(fields, 'root');
-    expect(tpl).toBe('<root><data><id>{uuid}</id><name>{fake.FirstName}</name></data></root>');
+    expect(tpl).toBe('<root><data><id>{{uuid}}</id><name>{{fake.FirstName}}</name></data></root>');
   });
 
   it('what xmlFieldsToTemplate produces is valid XML', () => {
@@ -357,11 +371,11 @@ describe('xmlFieldsToTemplate', () => {
 
 describe('validateTemplateAsXml edge cases', () => {
   it('accepts variables with pipes inside tags', () => {
-    expect(validateTemplateAsXml('<r><v>{path.x | upper}</v></r>')).toBeNull();
+    expect(validateTemplateAsXml('<r><v>{{path.x | upper}}</v></r>')).toBeNull();
   });
 
   it('accepts multiple variables in same tag', () => {
-    expect(validateTemplateAsXml('<r>{fake.FirstName} {fake.LastName}</r>')).toBeNull();
+    expect(validateTemplateAsXml('<r>{{fake.FirstName}} {{fake.LastName}}</r>')).toBeNull();
   });
 
   it('rejects mismatched tags', () => {

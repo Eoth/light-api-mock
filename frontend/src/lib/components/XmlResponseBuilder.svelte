@@ -19,6 +19,7 @@
     { value: 'now_ms', label: 'Timestamp (ms)' },
     { value: 'now_iso', label: 'Date ISO' },
     { value: 'seq', label: 'Compteur' },
+    { value: 'script', label: 'Resultat script' },
   ];
 
   const fakeOptions = [
@@ -202,10 +203,7 @@
 
   .nested-block { margin-top: 0.375rem; padding-left: 0.75rem; border-left: 2px solid var(--color-primary); }
 
-  .btn { cursor: pointer; } .btn-sm { padding: 0.25rem 0.75rem; font-size: 0.8125rem; border-radius: var(--radius); border: 1px solid transparent; font-weight: 600; }
   .btn-xs { padding: 0.15rem 0.5rem; font-size: 0.75rem; border-radius: var(--radius); border: 1px solid transparent; font-weight: 600; }
-  .btn-outline { background: var(--color-surface); color: var(--color-text-muted); border-color: var(--color-border); }
-  .btn-outline:hover { background: var(--color-bg); color: var(--color-text); }
 
   .preview-section { margin-top: 0.5rem; }
   .preview-section summary { font-size: 0.8125rem; cursor: pointer; color: var(--color-text-muted); }

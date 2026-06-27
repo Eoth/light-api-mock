@@ -2,10 +2,9 @@
  * Template utilities for lightMock's template format.
  *
  * Template format (consumed by Rust backend):
- *   {{ = literal {    (JSON object brace)
- *   }} = literal }    (JSON object brace)
- *   {expr} = template variable (evaluated at runtime)
- *   {expr | pipe} = variable with transformation
+ *   { and } = literal braces (normal JSON/XML)
+ *   {{expr}} = template variable (evaluated at runtime)
+ *   {{expr | pipe}} = variable with transformation
  *
  * This module is the SINGLE source of truth for parsing and validating
  * this format on the frontend side.
@@ -14,9 +13,9 @@
 // ── Serialization: Fields → Template string ──────────────────────────
 
 export function fieldsToTemplate(fields) {
-  if (fields.length === 0) return '{{}}';
+  if (fields.length === 0) return '{}';
   const parts = fields.filter(f => f.key?.trim()).map(f => fieldToTpl(f));
-  return `{{${parts.join(',')}}}`;
+  return `{${parts.join(',')}}`;
 }
 
 function fieldToTpl(field) {
@@ -30,7 +29,7 @@ function fieldToTpl(field) {
   }
   if (ft === 'object') {
     const inner = (field.children || []).filter(c => c.key?.trim()).map(c => fieldToTpl(c)).join(',');
-    return `"${k}":{{${inner}}}`;
+    return `"${k}":{${inner}}`;
   }
   if (ft === 'array-values') {
     const items = (field.items || []).map(item => {
@@ -41,7 +40,7 @@ function fieldToTpl(field) {
   }
   if (ft === 'array-objects') {
     const inner = (field.template || []).filter(c => c.key?.trim()).map(c => fieldToTpl(c)).join(',');
-    return `"${k}":[{{${inner}}}]`;
+    return `"${k}":[{${inner}}]`;
   }
   return '';
 }
@@ -55,6 +54,7 @@ export function buildExpr(f) {
     case 'header': varPart = `header.${f.value}`; break;
     case 'body': varPart = `body.${f.value}`; break;
     case 'fake': varPart = `fake.${f.value}`; break;
+    case 'script': varPart = f.value ? `script.${f.value}` : 'script'; break;
     case 'uuid': varPart = 'uuid'; break;
     case 'now_ms': varPart = 'now_ms'; break;
     case 'now_iso': varPart = 'now_iso'; break;
@@ -62,7 +62,7 @@ export function buildExpr(f) {
     default: return f.value ?? '';
   }
   const pipe = f.pipe?.trim();
-  return pipe ? `{${varPart} | ${pipe}}` : `{${varPart}}`;
+  return pipe ? `{{${varPart} | ${pipe}}}` : `{{${varPart}}}`;
 }
 
 // ── Validation: Template string → test JSON ──────────────────────────
@@ -75,20 +75,13 @@ export function templateToTestJson(tpl) {
     if (tpl[i] === '\\' && inString) {
       out += tpl[i] + tpl[i + 1]; i += 2; continue;
     }
-    if (tpl[i] === '{' && tpl[i + 1] === '{') {
-      out += '{'; i += 2; continue;
-    }
-    if (tpl[i] === '}' && tpl[i + 1] === '}') {
-      out += '}'; i += 2; continue;
-    }
-    if (tpl[i] === '{') {
-      const end = findSingleClose(tpl, i + 1);
-      if (end === -1) { out += tpl[i]; i++; }
-      else {
+    if (tpl[i] === '{' && i + 1 < tpl.length && tpl[i + 1] === '{') {
+      const end = findDoubleClose(tpl, i + 2);
+      if (end !== -1) {
         out += inString ? '__var__' : '"__var__"';
-        i = end + 1;
+        i = end + 2;
+        continue;
       }
-      continue;
     }
     if (tpl[i] === '"') inString = !inString;
     out += tpl[i]; i++;
@@ -96,11 +89,14 @@ export function templateToTestJson(tpl) {
   return out;
 }
 
-function findSingleClose(str, start) {
+function findDoubleClose(str, start) {
   let inQuotes = false;
+  let parenDepth = 0;
   for (let i = start; i < str.length; i++) {
-    if (str[i] === '"') inQuotes = !inQuotes;
-    if (!inQuotes && str[i] === '}') return i;
+    if (str[i] === '"' && parenDepth === 0) inQuotes = !inQuotes;
+    if (str[i] === '(' && !inQuotes) parenDepth++;
+    if (str[i] === ')' && !inQuotes) parenDepth = Math.max(0, parenDepth - 1);
+    if (!inQuotes && parenDepth === 0 && str[i] === '}' && i + 1 < str.length && str[i + 1] === '}') return i;
   }
   return -1;
 }
@@ -136,16 +132,10 @@ function stripTemplateVars(tpl) {
   let i = 0;
   while (i < tpl.length) {
     if (tpl[i] === '{' && i + 1 < tpl.length && tpl[i + 1] === '{') {
-      out += '{{'; i += 2;
-    } else if (tpl[i] === '}' && i + 1 < tpl.length && tpl[i + 1] === '}') {
-      out += '}}'; i += 2;
-    } else if (tpl[i] === '{') {
-      const end = findSingleClose(tpl, i + 1);
-      if (end === -1) { out += tpl[i]; i++; }
-      else { out += 'x'; i = end + 1; }
-    } else {
-      out += tpl[i]; i++;
+      const end = findDoubleClose(tpl, i + 2);
+      if (end !== -1) { out += 'x'; i = end + 2; continue; }
     }
+    out += tpl[i]; i++;
   }
   return out;
 }
@@ -156,17 +146,15 @@ export function templateToPreview(tpl) {
   let out = '';
   let i = 0;
   while (i < tpl.length) {
-    if (tpl[i] === '{' && tpl[i + 1] === '{') {
-      out += '{'; i += 2;
-    } else if (tpl[i] === '}' && tpl[i + 1] === '}') {
-      out += '}'; i += 2;
-    } else if (tpl[i] === '{') {
-      const end = findSingleClose(tpl, i + 1);
-      if (end === -1) { out += tpl[i]; i++; }
-      else { out += `«${tpl.slice(i, end + 1)}»`; i = end + 1; }
-    } else {
-      out += tpl[i]; i++;
+    if (tpl[i] === '{' && i + 1 < tpl.length && tpl[i + 1] === '{') {
+      const end = findDoubleClose(tpl, i + 2);
+      if (end !== -1) {
+        out += `«${tpl.slice(i, end + 2)}»`;
+        i = end + 2;
+        continue;
+      }
     }
+    out += tpl[i]; i++;
   }
   return out;
 }
@@ -175,7 +163,7 @@ export function templateToPreview(tpl) {
 
 export function templateToFields(tpl) {
   const trimmed = tpl.trim();
-  if (!trimmed || trimmed === '{{}}') return [];
+  if (!trimmed || trimmed === '{}') return [];
   const testStr = templateToTestJson(trimmed);
   const parsed = JSON.parse(testStr);
   if (typeof parsed !== 'object' || Array.isArray(parsed)) {
@@ -188,12 +176,10 @@ function parseTplObject(tpl) {
   const entries = extractTplEntries(tpl);
   return entries.map(([key, rawValue]) => {
     const trimmed = rawValue.trim();
-    if (trimmed.startsWith('{{') && !(trimmed.length >= 3 && trimmed[2] !== '{' ? false : trimmed[2] === '{')) {
-      if (trimmed.startsWith('{{') && !looksLikeVar(trimmed)) {
-        try {
-          return { key, fieldType: 'object', children: parseTplObject(trimmed) };
-        } catch { /* fall through */ }
-      }
+    if (trimmed.startsWith('{') && !isVarOpen(trimmed, 0)) {
+      try {
+        return { key, fieldType: 'object', children: parseTplObject(trimmed) };
+      } catch { /* fall through */ }
     }
     if (trimmed.startsWith('[')) {
       return parseTplArray(key, trimmed);
@@ -202,8 +188,8 @@ function parseTplObject(tpl) {
   });
 }
 
-function looksLikeVar(s) {
-  return s.length >= 3 && s[0] === '{' && s[1] !== '{';
+function isVarOpen(str, i) {
+  return str[i] === '{' && i + 1 < str.length && str[i + 1] === '{';
 }
 
 function parseTplValue(key, raw) {
@@ -211,7 +197,7 @@ function parseTplValue(key, raw) {
   const isQuoted = trimmed.startsWith('"') && trimmed.endsWith('"');
   const inner = isQuoted ? trimmed.slice(1, -1) : trimmed;
 
-  const varMatch = inner.match(/^\{([^}]+)\}$/);
+  const varMatch = inner.match(/^\{\{([^}].*?)\}\}$/);
   if (varMatch) {
     const expr = varMatch[1];
     const pipeIdx = findPipeSeparator(expr);
@@ -242,7 +228,7 @@ function findPipeSeparator(expr) {
 function parseTplArray(key, raw) {
   const inner = raw.trim().slice(1, -1).trim();
   if (!inner) return { key, fieldType: 'array-values', items: [] };
-  if (inner.startsWith('{{') && !looksLikeVar(inner)) {
+  if (inner.startsWith('{') && !isVarOpen(inner, 0)) {
     try {
       const template = parseTplObject(inner);
       return { key, fieldType: 'array-objects', template };
@@ -261,6 +247,8 @@ export function varNameToSource(varName) {
   if (varName.startsWith('header.')) return { source: 'header', value: varName.slice(7) };
   if (varName.startsWith('body.')) return { source: 'body', value: varName.slice(5) };
   if (varName.startsWith('fake.')) return { source: 'fake', value: varName.slice(5) };
+  if (varName === 'script') return { source: 'script', value: '' };
+  if (varName.startsWith('script.')) return { source: 'script', value: varName.slice(7) };
   if (varName === 'uuid') return { source: 'uuid', value: '' };
   if (varName === 'now_ms') return { source: 'now_ms', value: '' };
   if (varName === 'now_iso') return { source: 'now_iso', value: '' };
@@ -268,20 +256,13 @@ export function varNameToSource(varName) {
   return { source: 'fixed', value: varName };
 }
 
-// ── Low-level template-aware parser ──────────────────────────────────
-
-function isDblOpen(str, i) { return i + 1 < str.length && str[i] === '{' && str[i + 1] === '{'; }
-function isDblClose(str, i) { return i + 1 < str.length && str[i] === '}' && str[i + 1] === '}'; }
-function isVarOpen(str, i) { return str[i] === '{' && (i + 1 >= str.length || str[i + 1] !== '{'); }
+// ── Low-level JSON-aware parser ─────────────────────────────────────
 
 function extractTplEntries(objStr) {
   const trimmed = objStr.trim();
-  let inner;
-  if (isDblOpen(trimmed, 0)) {
-    const [, content] = unwrapTplBraces(trimmed);
-    inner = content;
-  } else {
-    inner = trimmed;
+  let inner = trimmed;
+  if (trimmed.startsWith('{') && !isVarOpen(trimmed, 0)) {
+    inner = trimmed.slice(1, -1);
   }
 
   const entries = [];
@@ -301,42 +282,6 @@ function extractTplEntries(objStr) {
   return entries;
 }
 
-function unwrapTplBraces(str) {
-  let depth = 0, i = 0, inStr = false;
-  while (i < str.length) {
-    if (str[i] === '\\' && inStr) { i += 2; continue; }
-    if (str[i] === '"') { inStr = !inStr; i++; continue; }
-    if (!inStr) {
-      if (isDblOpen(str, i)) {
-        if (depth === 0) {
-          const start = i + 2;
-          depth++; i += 2;
-          while (i < str.length) {
-            if (str[i] === '\\' && inStr) { i += 2; continue; }
-            if (str[i] === '"') { inStr = !inStr; i++; continue; }
-            if (!inStr) {
-              if (isDblOpen(str, i)) { depth++; i += 2; continue; }
-              if (isDblClose(str, i)) {
-                depth--;
-                if (depth === 0) return [str.slice(0, i + 2), str.slice(start, i)];
-                i += 2; continue;
-              }
-              if (isVarOpen(str, i)) {
-                const end = findSingleClose(str, i + 1);
-                if (end !== -1) { i = end + 1; continue; }
-              }
-            }
-            i++;
-          }
-        }
-        depth++; i += 2; continue;
-      }
-    }
-    i++;
-  }
-  return [str, str];
-}
-
 function readTplToken(str, start) {
   let i = start;
   if (i >= str.length) return ['', 0];
@@ -351,31 +296,31 @@ function readTplToken(str, start) {
     return [str.slice(i), str.length - i];
   }
 
-  if (isDblOpen(str, i)) {
+  if (isVarOpen(str, i)) {
+    const end = findDoubleClose(str, i + 2);
+    if (end !== -1) return [str.slice(i, end + 2), end + 2 - i];
+  }
+
+  if (str[i] === '{') {
     let depth = 0, j = i, inStr = false;
     while (j < str.length) {
       if (str[j] === '\\' && inStr) { j += 2; continue; }
       if (str[j] === '"') { inStr = !inStr; j++; continue; }
       if (!inStr) {
-        if (isDblOpen(str, j)) { depth++; j += 2; continue; }
-        if (isDblClose(str, j)) {
-          depth--;
-          if (depth === 0) return [str.slice(i, j + 2), j + 2 - i];
-          j += 2; continue;
+        if (str[j] === '{' && j + 1 < str.length && str[j + 1] === '{') {
+          const end = findDoubleClose(str, j + 2);
+          if (end !== -1) { j = end + 2; continue; }
         }
-        if (isVarOpen(str, j)) {
-          const end = findSingleClose(str, j + 1);
-          if (end !== -1) { j = end + 1; continue; }
+        if (str[j] === '{') { depth++; j++; continue; }
+        if (str[j] === '}') {
+          depth--;
+          if (depth === 0) return [str.slice(i, j + 1), j + 1 - i];
+          j++; continue;
         }
       }
       j++;
     }
     return [str.slice(i), str.length - i];
-  }
-
-  if (isVarOpen(str, i)) {
-    const end = findSingleClose(str, i + 1);
-    if (end !== -1) return [str.slice(i, end + 1), end + 1 - i];
   }
 
   if (str[i] === '[') {
@@ -390,11 +335,6 @@ function readTplToken(str, start) {
           if (depth === 0) return [str.slice(i, j + 1), j + 1 - i];
           j++; continue;
         }
-        if (isDblOpen(str, j)) { const [, c] = readTplToken(str, j); j += c; continue; }
-        if (isVarOpen(str, j)) {
-          const end = findSingleClose(str, j + 1);
-          if (end !== -1) { j = end + 1; continue; }
-        }
       }
       j++;
     }
@@ -402,7 +342,7 @@ function readTplToken(str, start) {
   }
 
   let j = i;
-  while (j < str.length && str[j] !== ',' && !isDblClose(str, j)) j++;
+  while (j < str.length && str[j] !== ',' && str[j] !== '}' && str[j] !== ']') j++;
   return [str.slice(i, j).trim(), j - i];
 }
 
@@ -411,8 +351,8 @@ function splitTplArray(inner) {
   let i = 0, start = 0;
   while (i < inner.length) {
     if (inner[i] === '"') { const [, c] = readTplToken(inner, i); i += c; continue; }
-    if (isDblOpen(inner, i)) { const [, c] = readTplToken(inner, i); i += c; continue; }
-    if (isVarOpen(inner, i)) { const end = findSingleClose(inner, i + 1); if (end !== -1) { i = end + 1; continue; } }
+    if (isVarOpen(inner, i)) { const end = findDoubleClose(inner, i + 2); if (end !== -1) { i = end + 2; continue; } }
+    if (inner[i] === '{') { const [, c] = readTplToken(inner, i); i += c; continue; }
     if (inner[i] === '[') { const [, c] = readTplToken(inner, i); i += c; continue; }
     if (inner[i] === ',') { items.push(inner.slice(start, i)); start = i + 1; }
     i++;

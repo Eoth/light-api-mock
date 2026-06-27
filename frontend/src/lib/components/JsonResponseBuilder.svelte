@@ -21,6 +21,7 @@
     { value: 'now_ms', label: 'Timestamp (ms)' },
     { value: 'now_iso', label: 'Date ISO' },
     { value: 'seq', label: 'Compteur sequentiel' },
+    { value: 'script', label: 'Resultat du script' },
   ];
 
   const fakeOptions = [
@@ -317,14 +318,10 @@
   .array-item { display: flex; gap: 0.375rem; align-items: center; flex-wrap: wrap; padding: 0.25rem 0; }
   .item-index { display: inline-flex; align-items: center; justify-content: center; width: 1.25rem; height: 1.25rem; border-radius: 50%; background: var(--color-text-muted); color: #fff; font-size: 0.65rem; font-weight: 700; flex-shrink: 0; }
 
-  .btn { cursor: pointer; } .btn-sm { padding: 0.25rem 0.75rem; font-size: 0.8125rem; border-radius: var(--radius); border: 1px solid transparent; font-weight: 600; }
   .btn-xs { padding: 0.15rem 0.5rem; font-size: 0.75rem; border-radius: var(--radius); border: 1px solid transparent; font-weight: 600; }
-  .btn-outline { background: var(--color-surface); color: var(--color-text-muted); border-color: var(--color-border); }
-  .btn-outline:hover { background: var(--color-bg); color: var(--color-text); }
 
   .preview-section { margin-top: 0.375rem; }
   .preview-section summary { font-size: 0.8125rem; cursor: pointer; color: var(--color-text-muted); }
   .preview-code { display: block; margin-top: 0.25rem; padding: 0.5rem; background: var(--color-bg); border-radius: var(--radius); font-size: 0.75rem; word-break: break-all; white-space: pre-wrap; }
   .preview-readable { color: var(--color-primary); }
-  .field-hint { display: block; font-size: 0.75rem; color: var(--color-text-muted); }
 </style>
