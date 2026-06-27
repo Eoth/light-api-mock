@@ -1,6 +1,7 @@
-mod matcher;
+pub(crate) mod matcher;
 mod proxy;
 mod renderer;
+pub mod script;
 pub mod template;
 
 pub use matcher::{MatchEngine, RequestData};

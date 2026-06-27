@@ -2,6 +2,7 @@ use crate::auth::middleware::AuthUser;
 use crate::auth::{can_access_service, can_manage_group, visible_services};
 use crate::models::{Group, MockConfig, Service};
 use crate::server::AppState;
+use std::sync::Arc;
 use crate::server::request_log::LogEntry;
 use crate::server::validation::validate_service;
 use axum::Extension;
@@ -186,7 +187,7 @@ async fn get_me(
 async fn get_config(
     State(state): State<AppState>,
     Extension(_user): Extension<AuthUser>,
-) -> Json<MockConfig> {
+) -> Json<Arc<MockConfig>> {
     Json(state.store.snapshot().await)
 }
 
@@ -194,7 +195,7 @@ async fn put_config(
     State(state): State<AppState>,
     Extension(user): Extension<AuthUser>,
     Json(config): Json<MockConfig>,
-) -> Result<Json<MockConfig>, AppError> {
+) -> Result<Json<Arc<MockConfig>>, AppError> {
     require_super_admin(&user)?;
 
     for service in &config.services {
@@ -323,8 +324,9 @@ async fn create_service(
 
     updated
         .services
-        .into_iter()
+        .iter()
         .find(|s| s.name == service.name)
+        .cloned()
         .map(|s| (StatusCode::CREATED, Json(s)))
         .ok_or(AppError::NotFound)
 }
@@ -372,8 +374,9 @@ async fn update_service(
 
     updated
         .services
-        .into_iter()
+        .iter()
         .find(|s| s.name == service.name)
+        .cloned()
         .map(Json)
         .ok_or(AppError::NotFound)
 }
@@ -440,8 +443,9 @@ async fn toggle_service(
 
     updated
         .services
-        .into_iter()
+        .iter()
         .find(|s| s.name == name)
+        .cloned()
         .map(Json)
         .ok_or(AppError::NotFound)
 }
@@ -491,8 +495,9 @@ async fn reorder_rules(
 
     updated
         .services
-        .into_iter()
+        .iter()
         .find(|s| s.name == name)
+        .cloned()
         .map(Json)
         .ok_or(AppError::NotFound)
 }
@@ -505,14 +510,15 @@ async fn list_groups(
 ) -> Json<Vec<Group>> {
     let config = state.store.snapshot().await;
     if user.is_super_admin {
-        return Json(config.groups);
+        return Json(config.groups.clone());
     }
     let visible: Vec<Group> = config
         .groups
-        .into_iter()
+        .iter()
         .filter(|g| {
             g.admins.contains(&user.username) || g.members.contains(&user.username)
         })
+        .cloned()
         .collect();
     Json(visible)
 }
@@ -543,24 +549,32 @@ async fn get_group(
 async fn create_group(
     State(state): State<AppState>,
     Extension(user): Extension<AuthUser>,
-    Json(group): Json<Group>,
+    Json(mut group): Json<Group>,
 ) -> Result<(StatusCode, Json<Group>), AppError> {
-    require_super_admin(&user)?;
-
-    if group.name.trim().is_empty() {
+    let name = group.name.trim().to_string();
+    if name.is_empty() {
         return Err(AppError::Validation(
             "Le nom du groupe est requis.".into(),
         ));
     }
+    group.name = name;
 
     {
         let config = state.store.snapshot().await;
-        if config.groups.iter().any(|g| g.name == group.name) {
+        if config
+            .groups
+            .iter()
+            .any(|g| g.name.eq_ignore_ascii_case(&group.name))
+        {
             return Err(AppError::Conflict(format!(
                 "Un groupe avec le nom \"{}\" existe deja.",
                 group.name
             )));
         }
+    }
+
+    if !group.admins.contains(&user.username) {
+        group.admins.push(user.username.clone());
     }
 
     let updated = state
@@ -573,8 +587,9 @@ async fn create_group(
 
     updated
         .groups
-        .into_iter()
+        .iter()
         .find(|g| g.name == group.name)
+        .cloned()
         .map(|g| (StatusCode::CREATED, Json(g)))
         .ok_or(AppError::NotFound)
 }
@@ -585,7 +600,13 @@ async fn update_group(
     Path(name): Path<String>,
     Json(group): Json<Group>,
 ) -> Result<Json<Group>, AppError> {
-    require_super_admin(&user)?;
+    {
+        let config = state.store.snapshot().await;
+        let existing = config.groups.iter().find(|g| g.name == name).ok_or(AppError::NotFound)?;
+        if state.auth_config.enabled && !can_manage_group(&user.username, user.is_super_admin, existing) {
+            return Err(AppError::Forbidden);
+        }
+    }
 
     let updated = state
         .store
@@ -599,8 +620,9 @@ async fn update_group(
 
     updated
         .groups
-        .into_iter()
+        .iter()
         .find(|g| g.name == group.name)
+        .cloned()
         .map(Json)
         .ok_or(AppError::NotFound)
 }
@@ -610,7 +632,13 @@ async fn delete_group(
     Extension(user): Extension<AuthUser>,
     Path(name): Path<String>,
 ) -> Result<StatusCode, AppError> {
-    require_super_admin(&user)?;
+    {
+        let config = state.store.snapshot().await;
+        let existing = config.groups.iter().find(|g| g.name == name).ok_or(AppError::NotFound)?;
+        if state.auth_config.enabled && !can_manage_group(&user.username, user.is_super_admin, existing) {
+            return Err(AppError::Forbidden);
+        }
+    }
 
     {
         let config = state.store.snapshot().await;
@@ -678,8 +706,9 @@ async fn update_group_members(
 
     updated
         .groups
-        .into_iter()
+        .iter()
         .find(|g| g.name == name)
+        .cloned()
         .map(Json)
         .ok_or(AppError::NotFound)
 }

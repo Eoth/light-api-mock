@@ -1,5 +1,6 @@
 use axum::body::Body;
 use axum::http::{Request, Response, StatusCode};
+use futures_util::StreamExt;
 use reqwest::Client;
 
 #[derive(Clone)]
@@ -23,7 +24,13 @@ impl ProxyClient {
         remaining_path: &str,
         req: Request<Body>,
     ) -> Result<Response<Body>, StatusCode> {
-        let query = req.uri().query().map(|q| format!("?{q}")).unwrap_or_default();
+        let (parts, body) = req.into_parts();
+
+        let query = parts
+            .uri
+            .query()
+            .map(|q| format!("?{q}"))
+            .unwrap_or_default();
         let url = format!(
             "{}/{}{}",
             target_base.trim_end_matches('/'),
@@ -31,20 +38,18 @@ impl ProxyClient {
             query,
         );
 
-        let method = req.method().clone();
-        let mut builder = self.client.request(
-            reqwest::Method::from_bytes(method.as_str().as_bytes()).unwrap(),
-            &url,
-        );
+        let method =
+            reqwest::Method::from_bytes(parts.method.as_str().as_bytes()).unwrap_or(reqwest::Method::GET);
+        let mut builder = self.client.request(method, &url);
 
-        let original_host = req
-            .headers()
+        let original_host = parts
+            .headers
             .get("host")
             .and_then(|v| v.to_str().ok())
             .unwrap_or("")
             .to_string();
 
-        for (name, value) in req.headers() {
+        for (name, value) in &parts.headers {
             let name_str = name.as_str();
             if is_hop_by_hop(name_str) {
                 continue;
@@ -59,13 +64,13 @@ impl ProxyClient {
         }
         builder = builder.header("X-Forwarded-Proto", "http");
 
-        let body_bytes = axum::body::to_bytes(req.into_body(), 10 * 1024 * 1024)
-            .await
-            .map_err(|_| StatusCode::BAD_REQUEST)?;
-
-        if !body_bytes.is_empty() {
-            builder = builder.body(body_bytes.to_vec());
-        }
+        let req_stream = http_body_util::BodyStream::new(body).filter_map(|result| async move {
+            match result {
+                Ok(frame) => frame.into_data().ok().map(Ok),
+                Err(e) => Some(Err(std::io::Error::new(std::io::ErrorKind::Other, e))),
+            }
+        });
+        builder = builder.body(reqwest::Body::wrap_stream(req_stream));
 
         let upstream_resp = builder.send().await.map_err(|e| {
             tracing::error!(error = %e, url = %url, "proxy forward failed");
@@ -86,13 +91,9 @@ impl ProxyClient {
             }
         }
 
-        let resp_bytes = upstream_resp.bytes().await.map_err(|e| {
-            tracing::error!(error = %e, "proxy read body failed");
-            StatusCode::BAD_GATEWAY
-        })?;
-
+        let resp_stream = upstream_resp.bytes_stream();
         response
-            .body(Body::from(resp_bytes))
+            .body(Body::from_stream(resp_stream))
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
     }
 }
@@ -130,9 +131,7 @@ mod tests {
             .body(Body::empty())
             .unwrap();
 
-        let result = client
-            .forward("http://127.0.0.1:1", "/test", req)
-            .await;
+        let result = client.forward("http://127.0.0.1:1", "/test", req).await;
         assert_eq!(result.unwrap_err(), StatusCode::BAD_GATEWAY);
     }
 
