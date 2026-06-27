@@ -1,17 +1,22 @@
 import { test, expect } from '@playwright/test';
 
-const BASE = 'http://localhost:3000';
+const API = 'http://localhost:7342/api';
 
-const inseeSvc = {
-  name: 'insee',
-  method: 'GET',
-  listen_path: '/v4/insee/sirene/etablissements/{siret}',
-  real_target_url: 'https://staging.entreprise.api.gouv.fr',
+const templateSvc = {
+  name: 'tpl-test',
+  listen_path: '/items/{id}',
+  real_target_url: 'http://backend:8080',
   is_mocked: true,
   rewrite_directory_urls: false,
+  group_name: null,
+  wsdl_mode: 'auto',
   rules: [
     {
-      name: 'insee-template',
+      name: 'tpl-rule',
+      method: 'GET',
+      sub_path: null,
+      action: 'mock',
+      script: null,
       conditions: { all_of: [], any_of: [] },
       response: {
         status: 200,
@@ -19,7 +24,7 @@ const inseeSvc = {
         body: [
           {
             type: 'Template',
-            template: '{{"siret":"{path.siret}","siren":"{path.siret | first(9)}","entreprise":"{fake.CompanyName}","ts":{now_ms}}}',
+            template: '{"id":"{{path.id}}","short":"{{path.id | first(3)}}","company":"{{fake.CompanyName}}","ts":{{now_ms}},"seq":{{seq}}}',
           },
         ],
         chaos: null,
@@ -28,58 +33,52 @@ const inseeSvc = {
   ],
 };
 
-test.beforeEach(async () => {
-  await fetch(`${BASE}/api/services/insee`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(inseeSvc),
-  });
+test.beforeEach(async ({ request }) => {
+  await request.delete(`${API}/config/reset`);
+  await request.post(`${API}/services`, { data: templateSvc });
 });
 
-test.afterEach(async () => {
-  await fetch(`${BASE}/api/services/insee`, { method: 'DELETE' });
-});
-
-test('named path param extracts siret from URL', async ({ request }) => {
-  const resp = await request.get(`${BASE}/insee/v4/insee/sirene/etablissements/44306184100047`);
+test('path param extracts id from URL', async ({ request }) => {
+  const resp = await request.get('http://localhost:7342/tpl-test/items/44306184100047');
   expect(resp.status()).toBe(200);
   const json = await resp.json();
-  expect(json.siret).toBe('44306184100047');
-  expect(json.siren).toBe('443061841');
-  expect(json.entreprise).toBeTruthy();
-  expect(typeof json.ts).toBe('number');
+  expect(json.id).toBe('44306184100047');
+  expect(json.short).toBe('443');
+  expect(json.company).toBeTruthy();
   expect(json.ts).toBeGreaterThan(1700000000000);
 });
 
-test('different siret returns different value', async ({ request }) => {
-  const resp = await request.get(`${BASE}/insee/v4/insee/sirene/etablissements/12345678901234`);
+test('different id returns different value', async ({ request }) => {
+  const resp = await request.get('http://localhost:7342/tpl-test/items/12345678901234');
   const json = await resp.json();
-  expect(json.siret).toBe('12345678901234');
-  expect(json.siren).toBe('123456789');
+  expect(json.id).toBe('12345678901234');
+  expect(json.short).toBe('123');
 });
 
 test('path with wrong prefix does not match', async ({ request }) => {
-  const resp = await request.get(`${BASE}/other/v4/other/sirene/etablissements/44306184100047`);
+  const resp = await request.get('http://localhost:7342/other/items/12345');
   expect(resp.status()).toBe(404);
 });
 
 test('path with extra segments does not match', async ({ request }) => {
-  const resp = await request.get(`${BASE}/insee/v4/insee/sirene/etablissements/44306184100047/extra`);
+  const resp = await request.get('http://localhost:7342/tpl-test/items/123/extra');
   expect(resp.status()).toBe(404);
 });
 
-test('template with seq counter increments', async ({ request }) => {
-  const r1 = await request.get(`${BASE}/insee/v4/insee/sirene/etablissements/11111111111111`);
-  const r2 = await request.get(`${BASE}/insee/v4/insee/sirene/etablissements/22222222222222`);
+test('seq counter increments', async ({ request }) => {
+  const r1 = await request.get('http://localhost:7342/tpl-test/items/aaa');
+  const r2 = await request.get('http://localhost:7342/tpl-test/items/bbb');
   const j1 = await r1.json();
   const j2 = await r2.json();
-  expect(j1.siret).toBe('11111111111111');
-  expect(j2.siret).toBe('22222222222222');
+  expect(j2.seq).toBeGreaterThan(j1.seq);
 });
 
-test('insee service visible in UI', async ({ page }) => {
-  await page.goto(BASE);
+test('service visible in UI', async ({ page }) => {
+  await page.goto('/');
   await page.waitForLoadState('networkidle');
-  await expect(page.getByRole('heading', { name: 'insee' })).toBeVisible();
-  await expect(page.getByText('/insee/v4/insee/sirene/etablissements/{siret}')).toBeVisible();
+  const group = page.locator('button[aria-expanded]').first();
+  if (await group.getAttribute('aria-expanded') === 'false') {
+    await group.click();
+  }
+  await expect(page.getByText('tpl-test').first()).toBeVisible();
 });

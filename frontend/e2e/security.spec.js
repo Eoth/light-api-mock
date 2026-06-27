@@ -83,10 +83,11 @@ test.describe('Security: route protection', () => {
     expect(afterData.length).toBe(0);
   });
 
-  test('put_config rejects config with invalid service', async ({ request }) => {
+  test('put_config rejects config with reserved name', async ({ request }) => {
     const res = await request.put(`${API}/config`, {
       data: {
-        services: [validService('hijacker', { listen_path: '/' })],
+        services: [validService('api')],
+        groups: [],
       },
     });
     expect(res.status()).toBe(400);
@@ -152,13 +153,12 @@ test.describe('Rule name uniqueness', () => {
     await request.delete(`${API}/config/reset`);
   });
 
+  function rule(name) {
+    return { name, method: 'GET', sub_path: null, action: 'mock', script: null, conditions: { all_of: [], any_of: [] }, response: { status: 200, headers: [], body: [{ type: 'Literal', value: 'ok' }], chaos: null } };
+  }
+
   test('rejects duplicate rule names in the same service', async ({ request }) => {
-    const svc = validService('rule-test', {
-      rules: [
-        { name: 'dup', action: 'mock', conditions: { all_of: [], any_of: [] }, response: { status: 200, headers: [], body: [{ type: 'Literal', value: 'a' }], chaos: null } },
-        { name: 'dup', action: 'mock', conditions: { all_of: [], any_of: [] }, response: { status: 200, headers: [], body: [{ type: 'Literal', value: 'b' }], chaos: null } },
-      ],
-    });
+    const svc = validService('rule-test', { rules: [rule('dup'), rule('dup')] });
     const res = await request.post(`${API}/services`, { data: svc });
     expect(res.status()).toBe(400);
     const body = await res.json();
@@ -166,13 +166,8 @@ test.describe('Rule name uniqueness', () => {
   });
 
   test('accepts same rule name across different services', async ({ request }) => {
-    const svc1 = validService('svc-a', {
-      rules: [{ name: 'shared', action: 'mock', conditions: { all_of: [], any_of: [] }, response: { status: 200, headers: [], body: [{ type: 'Literal', value: 'a' }], chaos: null } }],
-    });
-    const svc2 = validService('svc-b', {
-      listen_path: '/v2/*',
-      rules: [{ name: 'shared', action: 'mock', conditions: { all_of: [], any_of: [] }, response: { status: 200, headers: [], body: [{ type: 'Literal', value: 'b' }], chaos: null } }],
-    });
+    const svc1 = validService('svc-a', { rules: [rule('shared')] });
+    const svc2 = validService('svc-b', { rules: [rule('shared')] });
     const r1 = await request.post(`${API}/services`, { data: svc1 });
     expect(r1.status()).toBe(201);
     const r2 = await request.post(`${API}/services`, { data: svc2 });
