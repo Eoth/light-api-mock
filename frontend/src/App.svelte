@@ -150,7 +150,7 @@
 
   async function exportConfig() {
     try {
-      const config = await getConfig();
+      const config = { services, groups };
       const yaml = JSON.stringify(config, null, 2);
       const blob = new Blob([yaml], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -166,9 +166,9 @@
   }
 
   let fileInput = $state(null);
-  async function importConfig() {
-    fileInput?.click();
-  }
+  let importPending = $state(null);
+  async function importConfig() { fileInput?.click(); }
+
   async function handleFileImport(e) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -178,15 +178,48 @@
       if (!config.services || !Array.isArray(config.services)) {
         throw new Error('Format invalide : "services" attendu');
       }
-      await putConfig(config);
-      services = config.services;
-      showNotification(`Configuration importee (${config.services.length} services)`, 'success');
-      view = 'list';
-      selectedService = null;
+      if (!config.groups) config.groups = [];
+      const canReplace = !auth.enabled || auth.isSuperAdmin;
+      if (canReplace) {
+        importPending = config;
+      } else {
+        await doImportMerge(config);
+      }
     } catch (e) {
       showNotification(`Erreur import : ${e.message}`, 'error');
     }
     e.target.value = '';
+  }
+
+  async function doImportReplace(config) {
+    importPending = null;
+    try {
+      await putConfig(config);
+      services = config.services;
+      groups = config.groups || [];
+      showNotification(`Configuration remplacee (${config.services.length} services)`, 'success');
+      view = 'list'; selectedService = null;
+    } catch (e) {
+      showNotification(`Erreur import : ${e.message}`, 'error');
+    }
+  }
+
+  async function doImportMerge(config) {
+    importPending = null;
+    try {
+      let added = 0;
+      for (const svc of config.services) {
+        if (!services.some(s => s.name === svc.name)) {
+          const result = await createService(svc);
+          services = [...services, result];
+          added++;
+        }
+      }
+      showNotification(`${added} service(s) ajoute(s), ${config.services.length - added} doublon(s) ignore(s)`, 'success');
+      view = 'list'; selectedService = null;
+    } catch (e) {
+      showNotification(`Erreur import : ${e.message}`, 'error');
+    }
   }
 
   function showNotification(message, type) {
@@ -259,6 +292,29 @@
     </nav>
   {/if}
 
+  {#if importPending}
+    <div class="modal-overlay" role="dialog" aria-modal="true" aria-label="Mode d'import">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Importer la configuration</h3>
+          <button type="button" class="btn-close" onclick={() => importPending = null} aria-label="Fermer">&#10005;</button>
+        </div>
+        <p>{importPending.services.length} service(s) et {importPending.groups?.length ?? 0} groupe(s) trouves dans le fichier.</p>
+        <div class="import-actions">
+          <button type="button" class="btn btn-primary" onclick={() => doImportReplace(importPending)}>
+            Remplacer tout
+          </button>
+          <button type="button" class="btn btn-outline" onclick={() => doImportMerge(importPending)}>
+            Fusionner (ajouter les manquants)
+          </button>
+          <button type="button" class="btn btn-secondary" onclick={() => importPending = null}>
+            Annuler
+          </button>
+        </div>
+      </div>
+    </div>
+  {/if}
+
   <main id="main-content" class="app-main">
     <Notification message={notification.message} type={notification.type} visible={notification.visible} />
 
@@ -312,6 +368,8 @@
   .breadcrumb li[aria-current="page"] { color: var(--color-text); font-weight: 600; }
   .breadcrumb-link { background: none; border: none; padding: 0; color: var(--color-primary); cursor: pointer; font: inherit; text-decoration: underline; text-underline-offset: 2px; }
   .breadcrumb-link:hover { color: var(--color-primary-hover); }
+
+  .import-actions { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 1rem; }
   .loading { text-align: center; padding: 3rem; color: var(--color-text-muted); }
   .list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
   .list-header h2 { margin: 0; }
