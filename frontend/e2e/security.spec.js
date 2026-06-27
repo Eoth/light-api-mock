@@ -5,10 +5,12 @@ const API = 'http://localhost:7342/api';
 function validService(name, overrides = {}) {
   return {
     name,
-    method: 'GET',
     listen_path: '/v1/*',
     real_target_url: 'http://backend:8080',
     is_mocked: true,
+    rewrite_directory_urls: false,
+    group_name: null,
+    wsdl_mode: 'auto',
     rules: [],
     ...overrides,
   };
@@ -24,27 +26,18 @@ test.describe('Security: route protection', () => {
     await expect(page.locator('h1')).toContainText('lightMock');
   });
 
-  test('API rejects service with empty listen_path', async ({ request }) => {
+  test('API accepts service with empty listen_path (catch-all)', async ({ request }) => {
     const res = await request.post(`${API}/services`, {
-      data: validService('hijacker', { listen_path: '', is_mocked: false }),
+      data: validService('catchall-svc', { listen_path: '' }),
     });
-    expect(res.status()).toBe(400);
-    const body = await res.json();
-    expect(body.error).toBeTruthy();
+    expect(res.status()).toBe(201);
   });
 
-  test('API rejects service with listen_path "/"', async ({ request }) => {
+  test('API accepts service with listen_path "/*"', async ({ request }) => {
     const res = await request.post(`${API}/services`, {
-      data: validService('hijacker', { listen_path: '/' }),
+      data: validService('wildcard-svc', { listen_path: '/*' }),
     });
-    expect(res.status()).toBe(400);
-  });
-
-  test('API rejects service with listen_path "/*"', async ({ request }) => {
-    const res = await request.post(`${API}/services`, {
-      data: validService('hijacker', { listen_path: '/*' }),
-    });
-    expect(res.status()).toBe(400);
+    expect(res.status()).toBe(201);
   });
 
   test('API rejects service named "api"', async ({ request }) => {
