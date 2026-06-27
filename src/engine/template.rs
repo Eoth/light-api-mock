@@ -1,5 +1,12 @@
+// Moteur de template : remplace les expressions {{var}} ou {{var | pipe}} dans le texte.
+// Syntaxe : { et } sont des caracteres normaux (JSON/XML), {{ et }} delimitent les variables.
+// Variables disponibles : path.*, query.*, header.*, body.*, fake.*, uuid, now_ms, seq, script.*
+// Pipes disponibles : lower, upper, trim, capitalize, length, first(N), last(N),
+//   substr(s,l), default("v"), replace("a","b"), prepend("p"), append("s")
 use crate::engine::renderer::TemplateRenderer;
 use std::collections::HashMap;
+
+use crate::engine::script::ScriptResult;
 
 pub struct TemplateContext<'a> {
     pub path_params: &'a HashMap<String, String>,
@@ -7,6 +14,7 @@ pub struct TemplateContext<'a> {
     pub headers: &'a HashMap<String, String>,
     pub request_body: &'a [u8],
     pub seq_counter: u64,
+    pub script_result: Option<&'a ScriptResult>,
 }
 
 pub fn render_template(template: &str, ctx: &TemplateContext) -> String {
@@ -16,23 +24,13 @@ pub fn render_template(template: &str, ctx: &TemplateContext) -> String {
     let mut i = 0;
 
     while i < len {
-        if chars[i] == '{' {
-            if i + 1 < len && chars[i + 1] == '{' {
-                out.push('{');
-                i += 2;
-                continue;
-            }
-            if let Some(end) = find_closing_brace(&chars, i + 1) {
-                let expr: String = chars[i + 1..end].iter().collect();
+        if chars[i] == '{' && i + 1 < len && chars[i + 1] == '{' {
+            if let Some(end) = find_closing_double_brace(&chars, i + 2) {
+                let expr: String = chars[i + 2..end].iter().collect();
                 out.push_str(&eval_expression(expr.trim(), ctx));
-                i = end + 1;
+                i = end + 2;
                 continue;
             }
-        }
-        if chars[i] == '}' && i + 1 < len && chars[i + 1] == '}' {
-            out.push('}');
-            i += 2;
-            continue;
         }
         out.push(chars[i]);
         i += 1;
@@ -40,19 +38,17 @@ pub fn render_template(template: &str, ctx: &TemplateContext) -> String {
     out
 }
 
-fn find_closing_brace(chars: &[char], start: usize) -> Option<usize> {
-    let mut depth = 1;
+fn find_closing_double_brace(chars: &[char], start: usize) -> Option<usize> {
     let mut i = start;
     let mut in_quotes = false;
+    let mut paren_depth: u32 = 0;
     while i < chars.len() {
         match chars[i] {
-            '"' => in_quotes = !in_quotes,
-            '{' if !in_quotes => depth += 1,
-            '}' if !in_quotes => {
-                depth -= 1;
-                if depth == 0 {
-                    return Some(i);
-                }
+            '"' if paren_depth == 0 => in_quotes = !in_quotes,
+            '(' if !in_quotes => paren_depth += 1,
+            ')' if !in_quotes => paren_depth = paren_depth.saturating_sub(1),
+            '}' if !in_quotes && i + 1 < chars.len() && chars[i + 1] == '}' && paren_depth == 0 => {
+                return Some(i);
             }
             _ => {}
         }
@@ -92,6 +88,18 @@ fn resolve_variable(name: &str, ctx: &TemplateContext) -> String {
     }
     if let Some(kind_str) = name.strip_prefix("fake.") {
         return resolve_fake(kind_str);
+    }
+    if name == "script" {
+        return ctx
+            .script_result
+            .map(|r| r.value.clone())
+            .unwrap_or_default();
+    }
+    if let Some(field) = name.strip_prefix("script.") {
+        return ctx
+            .script_result
+            .and_then(|r| r.fields.get(field).cloned())
+            .unwrap_or_default();
     }
     match name {
         "uuid" => TemplateRenderer::gen_uuid(),
@@ -186,7 +194,7 @@ fn apply_single_pipe(value: &str, pipe: &str, _ctx: &TemplateContext) -> String 
             let mut chars = value.chars();
             match chars.next() {
                 None => String::new(),
-                Some(c) => c.to_uppercase().to_string() + &chars.as_str().to_ascii_lowercase(),
+                Some(c) => format!("{}{}", c.to_uppercase(), chars.as_str().to_ascii_lowercase()),
             }
         }
         "length" => value.chars().count().to_string(),
@@ -314,6 +322,7 @@ mod tests {
             headers,
             request_body: body,
             seq_counter: seq,
+            script_result: None,
         }
     }
 
@@ -334,7 +343,7 @@ mod tests {
         p.insert("siret".into(), "44306184100047".into());
         let (q, h) = (HashMap::new(), HashMap::new());
         let ctx = make_ctx(&p, &q, &h, b"", 0);
-        assert_eq!(render_template("{path.siret}", &ctx), "44306184100047");
+        assert_eq!(render_template("{{path.siret}}", &ctx), "44306184100047");
     }
 
     #[test]
@@ -343,7 +352,7 @@ mod tests {
         let mut q = HashMap::new();
         q.insert("page".into(), "3".into());
         let ctx = make_ctx(&p, &q, &h, b"", 0);
-        assert_eq!(render_template("page={query.page}", &ctx), "page=3");
+        assert_eq!(render_template("page={{query.page}}", &ctx), "page=3");
     }
 
     #[test]
@@ -352,14 +361,14 @@ mod tests {
         let mut h = HashMap::new();
         h.insert("x-request-id".into(), "abc123".into());
         let ctx = make_ctx(&p, &q, &h, b"", 0);
-        assert_eq!(render_template("{header.X-Request-Id}", &ctx), "abc123");
+        assert_eq!(render_template("{{header.X-Request-Id}}", &ctx), "abc123");
     }
 
     #[test]
     fn uuid_variable() {
         let (p, q, h) = empty_ctx();
         let ctx = make_ctx(&p, &q, &h, b"", 0);
-        let out = render_template("{uuid}", &ctx);
+        let out = render_template("{{uuid}}", &ctx);
         assert_eq!(out.len(), 36);
         assert_eq!(out.chars().filter(|c| *c == '-').count(), 4);
     }
@@ -368,7 +377,7 @@ mod tests {
     fn now_ms_is_numeric() {
         let (p, q, h) = empty_ctx();
         let ctx = make_ctx(&p, &q, &h, b"", 0);
-        let out = render_template("{now_ms}", &ctx);
+        let out = render_template("{{now_ms}}", &ctx);
         assert!(out.parse::<u128>().is_ok());
         assert!(out.len() >= 13);
     }
@@ -377,7 +386,7 @@ mod tests {
     fn now_iso_format() {
         let (p, q, h) = empty_ctx();
         let ctx = make_ctx(&p, &q, &h, b"", 0);
-        let out = render_template("{now_iso}", &ctx);
+        let out = render_template("{{now_iso}}", &ctx);
         assert!(out.ends_with('Z'));
         assert!(out.contains('T'));
         assert_eq!(out.len(), 20);
@@ -387,7 +396,7 @@ mod tests {
     fn now_epoch_numeric() {
         let (p, q, h) = empty_ctx();
         let ctx = make_ctx(&p, &q, &h, b"", 0);
-        let out = render_template("{now_epoch}", &ctx);
+        let out = render_template("{{now_epoch}}", &ctx);
         assert!(out.parse::<u64>().is_ok());
     }
 
@@ -395,14 +404,14 @@ mod tests {
     fn seq_counter() {
         let (p, q, h) = empty_ctx();
         let ctx = make_ctx(&p, &q, &h, b"", 42);
-        assert_eq!(render_template("{seq}", &ctx), "42");
+        assert_eq!(render_template("{{seq}}", &ctx), "42");
     }
 
     #[test]
     fn fake_variable() {
         let (p, q, h) = empty_ctx();
         let ctx = make_ctx(&p, &q, &h, b"", 0);
-        let out = render_template("{fake.FirstName}", &ctx);
+        let out = render_template("{{fake.FirstName}}", &ctx);
         assert!(!out.is_empty());
     }
 
@@ -411,7 +420,7 @@ mod tests {
         let (p, q, h) = empty_ctx();
         let body = br#"{"user":{"name":"Alice"}}"#;
         let ctx = make_ctx(&p, &q, &h, body, 0);
-        assert_eq!(render_template("{body./user/name}", &ctx), "Alice");
+        assert_eq!(render_template("{{body./user/name}}", &ctx), "Alice");
     }
 
     #[test]
@@ -419,7 +428,7 @@ mod tests {
         let (p, q, h) = empty_ctx();
         let body = br#"{"id":99}"#;
         let ctx = make_ctx(&p, &q, &h, body, 0);
-        assert_eq!(render_template("{body.id}", &ctx), "99");
+        assert_eq!(render_template("{{body.id}}", &ctx), "99");
     }
 
     #[test]
@@ -428,7 +437,7 @@ mod tests {
         p.insert("name".into(), "ALICE".into());
         let (q, h) = (HashMap::new(), HashMap::new());
         let ctx = make_ctx(&p, &q, &h, b"", 0);
-        assert_eq!(render_template("{path.name | lower}", &ctx), "alice");
+        assert_eq!(render_template("{{path.name | lower}}", &ctx), "alice");
     }
 
     #[test]
@@ -437,7 +446,7 @@ mod tests {
         p.insert("name".into(), "alice".into());
         let (q, h) = (HashMap::new(), HashMap::new());
         let ctx = make_ctx(&p, &q, &h, b"", 0);
-        assert_eq!(render_template("{path.name | upper}", &ctx), "ALICE");
+        assert_eq!(render_template("{{path.name | upper}}", &ctx), "ALICE");
     }
 
     #[test]
@@ -446,7 +455,7 @@ mod tests {
         p.insert("v".into(), "  hello  ".into());
         let (q, h) = (HashMap::new(), HashMap::new());
         let ctx = make_ctx(&p, &q, &h, b"", 0);
-        assert_eq!(render_template("{path.v | trim}", &ctx), "hello");
+        assert_eq!(render_template("{{path.v | trim}}", &ctx), "hello");
     }
 
     #[test]
@@ -455,7 +464,7 @@ mod tests {
         p.insert("siret".into(), "44306184100047".into());
         let (q, h) = (HashMap::new(), HashMap::new());
         let ctx = make_ctx(&p, &q, &h, b"", 0);
-        assert_eq!(render_template("{path.siret | first(9)}", &ctx), "443061841");
+        assert_eq!(render_template("{{path.siret | first(9)}}", &ctx), "443061841");
     }
 
     #[test]
@@ -463,7 +472,7 @@ mod tests {
         let (p, q, h) = empty_ctx();
         let ctx = make_ctx(&p, &q, &h, b"", 0);
         assert_eq!(
-            render_template("{path.missing | default(\"N/A\")}", &ctx),
+            render_template(r#"{{path.missing | default("N/A")}}"#, &ctx),
             "N/A"
         );
     }
@@ -475,7 +484,7 @@ mod tests {
         let (q, h) = (HashMap::new(), HashMap::new());
         let ctx = make_ctx(&p, &q, &h, b"", 0);
         assert_eq!(
-            render_template("{path.x | default(\"fallback\")}", &ctx),
+            render_template(r#"{{path.x | default("fallback")}}"#, &ctx),
             "real"
         );
     }
@@ -487,23 +496,23 @@ mod tests {
         let (q, h) = (HashMap::new(), HashMap::new());
         let ctx = make_ctx(&p, &q, &h, b"", 0);
         assert_eq!(
-            render_template("{path.siret | first(9) | upper}", &ctx),
+            render_template("{{path.siret | first(9) | upper}}", &ctx),
             "443061841"
         );
     }
 
     #[test]
-    fn escape_braces() {
+    fn literal_braces_passthrough() {
         let (p, q, h) = empty_ctx();
         let ctx = make_ctx(&p, &q, &h, b"", 0);
-        assert_eq!(render_template("{{literal}}", &ctx), "{literal}");
+        assert_eq!(render_template("{literal}", &ctx), "{literal}");
     }
 
     #[test]
     fn unknown_variable_empty() {
         let (p, q, h) = empty_ctx();
         let ctx = make_ctx(&p, &q, &h, b"", 0);
-        assert_eq!(render_template("{unknown.foo}", &ctx), "");
+        assert_eq!(render_template("{{unknown.foo}}", &ctx), "");
     }
 
     #[test]
@@ -512,7 +521,7 @@ mod tests {
         p.insert("siret".into(), "44306184100047".into());
         let (q, h) = (HashMap::new(), HashMap::new());
         let ctx = make_ctx(&p, &q, &h, b"", 5);
-        let tpl = r#"{{"siret":"{path.siret}","siren":"{path.siret | first(9)}","seq":"{seq}"}}"#;
+        let tpl = r#"{"siret":"{{path.siret}}","siren":"{{path.siret | first(9)}}","seq":"{{seq}}"}"#;
         let out = render_template(tpl, &ctx);
         let parsed: serde_json::Value = serde_json::from_str(&out).unwrap();
         assert_eq!(parsed["siret"], "44306184100047");
@@ -531,7 +540,7 @@ mod tests {
         p.insert("v".into(), "hELLO".into());
         let (q, h) = (HashMap::new(), HashMap::new());
         let ctx = make_ctx(&p, &q, &h, b"", 0);
-        assert_eq!(render_template("{path.v | capitalize}", &ctx), "Hello");
+        assert_eq!(render_template("{{path.v | capitalize}}", &ctx), "Hello");
     }
 
     #[test]
@@ -540,7 +549,7 @@ mod tests {
         p.insert("v".into(), "abcde".into());
         let (q, h) = (HashMap::new(), HashMap::new());
         let ctx = make_ctx(&p, &q, &h, b"", 0);
-        assert_eq!(render_template("{path.v | length}", &ctx), "5");
+        assert_eq!(render_template("{{path.v | length}}", &ctx), "5");
     }
 
     #[test]
@@ -549,7 +558,7 @@ mod tests {
         p.insert("v".into(), "abcdefgh".into());
         let (q, h) = (HashMap::new(), HashMap::new());
         let ctx = make_ctx(&p, &q, &h, b"", 0);
-        assert_eq!(render_template("{path.v | substr(2, 3)}", &ctx), "cde");
+        assert_eq!(render_template("{{path.v | substr(2, 3)}}", &ctx), "cde");
     }
 
     #[test]
@@ -558,7 +567,7 @@ mod tests {
         p.insert("v".into(), "hello world".into());
         let (q, h) = (HashMap::new(), HashMap::new());
         let ctx = make_ctx(&p, &q, &h, b"", 0);
-        assert_eq!(render_template(r#"{path.v | replace("world", "rust")}"#, &ctx), "hello rust");
+        assert_eq!(render_template(r#"{{path.v | replace("world", "rust")}}"#, &ctx), "hello rust");
     }
 
     #[test]
@@ -567,7 +576,7 @@ mod tests {
         p.insert("v".into(), "world".into());
         let (q, h) = (HashMap::new(), HashMap::new());
         let ctx = make_ctx(&p, &q, &h, b"", 0);
-        assert_eq!(render_template(r#"{path.v | prepend("hello ")}"#, &ctx), "hello world");
+        assert_eq!(render_template(r#"{{path.v | prepend("hello ")}}"#, &ctx), "hello world");
     }
 
     #[test]
@@ -576,14 +585,14 @@ mod tests {
         p.insert("v".into(), "hello".into());
         let (q, h) = (HashMap::new(), HashMap::new());
         let ctx = make_ctx(&p, &q, &h, b"", 0);
-        assert_eq!(render_template(r#"{path.v | append(" world")}"#, &ctx), "hello world");
+        assert_eq!(render_template(r#"{{path.v | append(" world")}}"#, &ctx), "hello world");
     }
 
     #[test]
     fn fake_bool_random() {
         let (p, q, h) = empty_ctx();
         let ctx = make_ctx(&p, &q, &h, b"", 0);
-        let out = render_template("{fake.BoolRandom}", &ctx);
+        let out = render_template("{{fake.BoolRandom}}", &ctx);
         assert!(out == "true" || out == "false");
     }
 
@@ -591,7 +600,7 @@ mod tests {
     fn fake_lorem_sentence() {
         let (p, q, h) = empty_ctx();
         let ctx = make_ctx(&p, &q, &h, b"", 0);
-        let out = render_template("{fake.LoremSentence}", &ctx);
+        let out = render_template("{{fake.LoremSentence}}", &ctx);
         assert!(out.len() > 10 && out.ends_with('.'));
     }
 
@@ -599,7 +608,7 @@ mod tests {
     fn fake_country_fr() {
         let (p, q, h) = empty_ctx();
         let ctx = make_ctx(&p, &q, &h, b"", 0);
-        let out = render_template("{fake.CountryFR}", &ctx);
+        let out = render_template("{{fake.CountryFR}}", &ctx);
         assert!(!out.is_empty());
     }
 
@@ -607,14 +616,14 @@ mod tests {
     fn fake_iban_fr() {
         let (p, q, h) = empty_ctx();
         let ctx = make_ctx(&p, &q, &h, b"", 0);
-        let out = render_template("{fake.IbanFR}", &ctx);
+        let out = render_template("{{fake.IbanFR}}", &ctx);
         assert!(out.starts_with("FR76"));
         assert!(out.len() >= 20);
     }
 
     #[test]
-    fn guided_json_roundtrip_simple() {
-        let tpl = r#"{{"name":"Alice","age":30}}"#;
+    fn json_roundtrip_simple() {
+        let tpl = r#"{"name":"Alice","age":30}"#;
         let (p, q, h) = empty_ctx();
         let ctx = make_ctx(&p, &q, &h, b"", 0);
         let out = render_template(tpl, &ctx);
@@ -624,12 +633,12 @@ mod tests {
     }
 
     #[test]
-    fn guided_json_nested_with_vars() {
+    fn json_nested_with_vars() {
         let mut p = HashMap::new();
         p.insert("siret".into(), "12345678901234".into());
         let (q, h) = (HashMap::new(), HashMap::new());
         let ctx = make_ctx(&p, &q, &h, b"", 7);
-        let tpl = r#"{{"data":{{"siret":"{path.siret}","siren":"{path.siret | first(9)}","seq":{seq}}}}}"#;
+        let tpl = r#"{"data":{"siret":"{{path.siret}}","siren":"{{path.siret | first(9)}}","seq":{{seq}}}}"#;
         let out = render_template(tpl, &ctx);
         let parsed: serde_json::Value = serde_json::from_str(&out).unwrap();
         assert_eq!(parsed["data"]["siret"], "12345678901234");
@@ -638,10 +647,10 @@ mod tests {
     }
 
     #[test]
-    fn guided_json_array_of_objects() {
+    fn json_array_of_objects() {
         let (p, q, h) = empty_ctx();
         let ctx = make_ctx(&p, &q, &h, b"", 0);
-        let tpl = r#"{{"items":[{{"id":"{uuid}","status":"active"}}]}}"#;
+        let tpl = r#"{"items":[{"id":"{{uuid}}","status":"active"}]}"#;
         let out = render_template(tpl, &ctx);
         let parsed: serde_json::Value = serde_json::from_str(&out).unwrap();
         assert!(parsed["items"][0]["id"].as_str().unwrap().len() == 36);
@@ -654,15 +663,15 @@ mod tests {
         p.insert("v".into(), "Hello World".into());
         let (q, h) = (HashMap::new(), HashMap::new());
         let ctx = make_ctx(&p, &q, &h, b"", 0);
-        assert_eq!(render_template("{path.v | lower}", &ctx), "hello world");
-        assert_eq!(render_template("{path.v | upper}", &ctx), "HELLO WORLD");
-        assert_eq!(render_template("{path.v | capitalize}", &ctx), "Hello world");
-        assert_eq!(render_template("{path.v | first(5)}", &ctx), "Hello");
-        assert_eq!(render_template("{path.v | last(5)}", &ctx), "World");
-        assert_eq!(render_template("{path.v | length}", &ctx), "11");
-        assert_eq!(render_template("{path.v | substr(6, 5)}", &ctx), "World");
-        assert_eq!(render_template(r#"{path.v | replace("World", "Rust")}"#, &ctx), "Hello Rust");
-        assert_eq!(render_template(r#"{path.v | prepend(">> ")}"#, &ctx), ">> Hello World");
-        assert_eq!(render_template(r#"{path.v | append(" <<")}"#, &ctx), "Hello World <<");
+        assert_eq!(render_template("{{path.v | lower}}", &ctx), "hello world");
+        assert_eq!(render_template("{{path.v | upper}}", &ctx), "HELLO WORLD");
+        assert_eq!(render_template("{{path.v | capitalize}}", &ctx), "Hello world");
+        assert_eq!(render_template("{{path.v | first(5)}}", &ctx), "Hello");
+        assert_eq!(render_template("{{path.v | last(5)}}", &ctx), "World");
+        assert_eq!(render_template("{{path.v | length}}", &ctx), "11");
+        assert_eq!(render_template("{{path.v | substr(6, 5)}}", &ctx), "World");
+        assert_eq!(render_template(r#"{{path.v | replace("World", "Rust")}}"#, &ctx), "Hello Rust");
+        assert_eq!(render_template(r#"{{path.v | prepend(">> ")}}"#, &ctx), ">> Hello World");
+        assert_eq!(render_template(r#"{{path.v | append(" <<")}}"#, &ctx), "Hello World <<");
     }
 }
