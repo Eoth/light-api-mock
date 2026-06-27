@@ -4,6 +4,7 @@
 //   validation.rs → validation des noms de services, methodes HTTP, etc.
 //   request_log.rs → journal en memoire des 200 dernieres requetes interceptees
 mod api;
+pub(crate) mod codegen;
 mod intercept;
 pub mod request_log;
 pub mod validation;

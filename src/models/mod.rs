@@ -536,7 +536,7 @@ services:
     rules: []
 groups:
   - name: team-a
-    code: tma
+    code: tma01
     admins:
       - lead
     members:
@@ -557,7 +557,7 @@ groups:
             services: vec![],
             groups: vec![Group {
                 name: "team-x".into(),
-                code: "tmx".into(),
+                code: "tmx01".into(),
                 admins: vec!["admin1".into()],
                 members: vec!["user1".into(), "user2".into()],
             }],

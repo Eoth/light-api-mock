@@ -194,7 +194,7 @@
   $effect(() => { init(); });
 
   let currentService = $derived(services.find(s => s.name === selectedService) ?? null);
-  let groupNames = $derived(groups.map(g => g.name));
+  let availableGroupsList = $derived(groups.map(g => ({ name: g.name, code: g.code })));
 </script>
 
 <a href="#main-content" class="sr-only skip-link">Aller au contenu principal</a>
@@ -253,7 +253,7 @@
     {:else if view === 'add'}
       <ServiceForm
         existingNames={services.map(s => s.name)}
-        availableGroups={groupNames}
+        availableGroups={availableGroupsList}
         authEnabled={auth.enabled}
         onSave={handleAddService}
         onCancel={handleBack}

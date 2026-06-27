@@ -175,10 +175,10 @@
       {/if}
       <div class="inline-form">
         <input type="text" bind:value={newGroupName} placeholder="Nom du groupe (ex: API Internes)" required />
-        <input type="text" bind:value={newGroupCode} placeholder="Code 3 chars (auto si vide)" maxlength="3" class="code-input" />
+        <input type="text" bind:value={newGroupCode} placeholder="Code 5 chars (auto si vide)" maxlength="5" class="code-input" />
         <button type="submit" class="btn btn-primary btn-sm">Creer</button>
       </div>
-      <span class="field-hint">Le code (3 caracteres) sert de prefixe URL : /{'{code}'}/{'{service}'}/...</span>
+      <span class="field-hint">Le code (5 caracteres) sert de prefixe URL : /{'{code}'}/{'{service}'}/...</span>
     </form>
   {/if}
 

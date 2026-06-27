@@ -105,7 +105,7 @@ mod tests {
     fn test_groups() -> Vec<Group> {
         vec![Group {
             name: "team-a".into(),
-            code: "tma".into(),
+            code: "tma01".into(),
             admins: vec!["lead-a".into()],
             members: vec!["dev-a1".into(), "dev-a2".into()],
         }]
