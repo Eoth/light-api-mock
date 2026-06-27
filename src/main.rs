@@ -1,3 +1,10 @@
+// Modules du projet — chaque dossier src/<module>/ contient un mod.rs
+// Pour modifier un comportement, trouver le module correspondant :
+//   auth/     → authentification Keycloak, permissions groupes
+//   models/   → structures de donnees (Service, Rule, Group, etc.)
+//   engine/   → moteur de matching, proxy HTTP, template, scripts rhai
+//   store/    → persistance YAML sur disque
+//   server/   → API REST (routes /api/*), middleware d'interception HTTP
 pub mod auth;
 pub mod models;
 pub mod engine;
@@ -7,6 +14,7 @@ pub mod server;
 use crate::auth::AuthConfig;
 use crate::auth::keycloak::KeycloakClient;
 use crate::engine::ProxyClient;
+use crate::engine::script::ScriptEngine;
 use crate::server::request_log::RequestLog;
 use crate::server::{AppState, build_router};
 use crate::store::MockStore;
@@ -14,6 +22,9 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
+// Point d'entree — lit la config depuis les variables d'environnement,
+// initialise le store YAML, le proxy HTTP, l'auth Keycloak (si active),
+// le moteur de scripts rhai, puis demarre le serveur Axum.
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt()
@@ -57,6 +68,7 @@ async fn main() {
         request_log: RequestLog::new(),
         auth_config,
         keycloak,
+        script_engine: ScriptEngine::new(),
     };
 
     let app = build_router(state, &static_dir);

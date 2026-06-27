@@ -1,3 +1,7 @@
+// Etat d'authentification global (Svelte 5 $state).
+// Quand auth.enabled=false, pas de login requis — tout est accessible.
+// Quand auth.enabled=true, le token Keycloak est stocke ici et envoye
+// automatiquement dans les headers HTTP par api.js.
 export const auth = $state({
   enabled: false,
   token: null,
