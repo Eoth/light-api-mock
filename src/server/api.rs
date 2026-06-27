@@ -571,6 +571,24 @@ async fn create_group(
                 group.name
             )));
         }
+
+        let code = if group.code.trim().is_empty() {
+            generate_group_code(&config.groups)
+        } else {
+            let c = group.code.trim().to_lowercase();
+            if c.len() != 3 || !c.chars().all(|ch| ch.is_ascii_alphanumeric()) {
+                return Err(AppError::Validation(
+                    "Le code groupe doit faire exactement 3 caracteres alphanumeriques.".into(),
+                ));
+            }
+            if config.groups.iter().any(|g| g.code.eq_ignore_ascii_case(&c)) {
+                return Err(AppError::Conflict(format!(
+                    "Le code \"{c}\" est deja utilise par un autre groupe."
+                )));
+            }
+            c
+        };
+        group.code = code;
     }
 
     if !group.admins.contains(&user.username) {
@@ -714,6 +732,22 @@ async fn update_group_members(
 }
 
 // --------------- Helpers & Errors ---------------
+
+fn generate_group_code(existing_groups: &[Group]) -> String {
+    let existing_codes: Vec<String> = existing_groups.iter().map(|g| g.code.to_lowercase()).collect();
+    for _ in 0..1000 {
+        let code: String = (0..3)
+            .map(|_| {
+                let chars = b"abcdefghijklmnopqrstuvwxyz0123456789";
+                chars[fastrand::usize(..chars.len())] as char
+            })
+            .collect();
+        if !existing_codes.contains(&code) {
+            return code;
+        }
+    }
+    format!("{:03x}", existing_groups.len())
+}
 
 fn require_super_admin(user: &AuthUser) -> Result<(), AppError> {
     if !user.is_super_admin {

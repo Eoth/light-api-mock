@@ -265,7 +265,7 @@
         <h2>Services</h2>
         <button type="button" class="btn btn-primary" onclick={() => view = 'add'}>+ Ajouter un service</button>
       </div>
-      <ServiceList {services} onToggle={handleToggle} onSelect={handleSelect} />
+      <ServiceList {services} {groups} onToggle={handleToggle} onSelect={handleSelect} />
       {#if services.length === 0}
         <div class="demo-section">
           <button type="button" class="btn btn-outline btn-demo" onclick={loadDemo}>

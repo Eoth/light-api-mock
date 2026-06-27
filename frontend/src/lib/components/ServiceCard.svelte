@@ -2,7 +2,7 @@
   import ToggleSwitch from './ToggleSwitch.svelte';
   import StatusBadge from './StatusBadge.svelte';
 
-  let { service, onToggle = () => {}, onSelect = () => {} } = $props();
+  let { service, groupCode = '', onToggle = () => {}, onSelect = () => {} } = $props();
 </script>
 
 <article class="service-card" aria-label="Service {service.name}">
@@ -21,7 +21,7 @@
     <dl>
       <div class="detail-row">
         <dt>URL test</dt>
-        <dd><code>/{service.name}{service.listen_path || '/*'}</code></dd>
+        <dd><code>{groupCode ? `/${groupCode}` : ''}/{service.name}{service.listen_path || '/*'}</code></dd>
       </div>
       <div class="detail-row">
         <dt>Cible</dt>
