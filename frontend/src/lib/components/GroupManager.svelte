@@ -1,7 +1,13 @@
 <script>
-  import { getGroups, createGroup, deleteGroup, updateGroupMembers } from '../api.js';
+  import { getGroups, createGroup, deleteGroup, updateGroupMembers, updateService } from '../api.js';
 
-  let { onNotify = () => {}, onBack = () => {} } = $props();
+  let {
+    services = [],
+    authEnabled = false,
+    onNotify = () => {},
+    onBack = () => {},
+    onServiceUpdate = () => {},
+  } = $props();
 
   let groups = $state([]);
   let loading = $state(true);
@@ -11,6 +17,13 @@
   let newMember = $state('');
   let newAdmin = $state('');
   let formError = $state('');
+
+  let servicesOfGroup = $derived((groupName) =>
+    services.filter(s => s.group_name === groupName)
+  );
+  let ungroupedServices = $derived(
+    services.filter(s => !s.group_name)
+  );
 
   async function loadGroups() {
     try {
@@ -40,7 +53,7 @@
   }
 
   async function handleDeleteGroup(name) {
-    if (!confirm(`Supprimer le groupe "${name}" ?`)) return;
+    if (!confirm(`Supprimer le groupe "${name}" ? Les services seront dissocies mais pas supprimes.`)) return;
     try {
       await deleteGroup(name);
       groups = groups.filter(g => g.name !== name);
@@ -55,6 +68,32 @@
     editingGroup = editingGroup === name ? null : name;
     newMember = '';
     newAdmin = '';
+  }
+
+  async function assignServiceToGroup(serviceName, groupName) {
+    const svc = services.find(s => s.name === serviceName);
+    if (!svc) return;
+    try {
+      const updated = await updateService(serviceName, { ...svc, group_name: groupName || null });
+      onServiceUpdate(updated);
+      onNotify(`Service "${serviceName}" associe au groupe "${groupName}"`, 'success');
+    } catch (e) {
+      onNotify(`Erreur : ${e.message}`, 'error');
+    }
+  }
+
+  async function removeServiceFromGroup(serviceName) {
+    const svc = services.find(s => s.name === serviceName);
+    if (!svc) return;
+    try {
+      const payload = { ...svc };
+      delete payload.group_name;
+      const updated = await updateService(serviceName, payload);
+      onServiceUpdate(updated);
+      onNotify(`Service "${serviceName}" retire du groupe`, 'success');
+    } catch (e) {
+      onNotify(`Erreur : ${e.message}`, 'error');
+    }
   }
 
   async function addMember(groupName) {
@@ -118,7 +157,7 @@
 
 <div class="group-manager">
   <div class="list-header">
-    <h2>Groupes</h2>
+    <h2>Groupes de services</h2>
     <div class="header-actions">
       <button type="button" class="btn btn-primary btn-sm" onclick={() => { showForm = !showForm; formError = ''; }}>
         {showForm ? 'Annuler' : '+ Nouveau groupe'}
@@ -133,7 +172,7 @@
         <div class="form-error" role="alert">{formError}</div>
       {/if}
       <div class="inline-form">
-        <input type="text" bind:value={newGroupName} placeholder="Nom du groupe" required />
+        <input type="text" bind:value={newGroupName} placeholder="Nom du groupe (ex: API Internes)" required />
         <button type="submit" class="btn btn-primary btn-sm">Creer</button>
       </div>
     </form>
@@ -142,14 +181,15 @@
   {#if loading}
     <p class="loading-text">Chargement des groupes...</p>
   {:else if groups.length === 0}
-    <p class="empty-text">Aucun groupe. Creez-en un pour organiser les services.</p>
+    <p class="empty-text">Aucun groupe. Creez-en un pour organiser vos services par domaine.</p>
   {:else}
     <div class="group-list">
       {#each groups as group}
+        {@const groupServices = servicesOfGroup(group.name)}
         <div class="group-card">
-          <div class="group-header">
+          <div class="group-header-row">
             <h3>{group.name}</h3>
-            <span class="group-count">{group.admins.length + group.members.length} utilisateur(s)</span>
+            <span class="group-count">{groupServices.length} service{groupServices.length !== 1 ? 's' : ''}</span>
             <div class="group-actions">
               <button type="button" class="btn btn-outline btn-sm" onclick={() => startEdit(group.name)}>
                 {editingGroup === group.name ? 'Fermer' : 'Gerer'}
@@ -160,45 +200,77 @@
             </div>
           </div>
 
+          {#if groupServices.length > 0}
+            <ul class="service-chips">
+              {#each groupServices as svc}
+                <li>
+                  <span class="service-chip">
+                    {svc.name}
+                    <button type="button" class="chip-remove" onclick={() => removeServiceFromGroup(svc.name)} title="Retirer du groupe" aria-label="Retirer {svc.name} du groupe">x</button>
+                  </span>
+                </li>
+              {/each}
+            </ul>
+          {:else}
+            <p class="empty-hint">Aucun service dans ce groupe. Utilisez le menu ci-dessous pour en ajouter.</p>
+          {/if}
+
           {#if editingGroup === group.name}
             <div class="group-edit">
-              <div class="people-section">
-                <h4>Administrateurs</h4>
-                {#if group.admins.length === 0}
-                  <p class="empty-text">Aucun administrateur</p>
+              <div class="edit-section">
+                <h4>Ajouter un service</h4>
+                {#if ungroupedServices.length === 0}
+                  <p class="empty-hint">Tous les services sont deja dans un groupe.</p>
+                {:else}
+                  <div class="service-assign-list">
+                    {#each ungroupedServices as svc}
+                      <button type="button" class="btn btn-outline btn-sm" onclick={() => assignServiceToGroup(svc.name, group.name)}>
+                        + {svc.name}
+                      </button>
+                    {/each}
+                  </div>
                 {/if}
-                <ul class="people-list">
-                  {#each group.admins as admin}
-                    <li>
-                      <span>{admin}</span>
-                      <button type="button" class="btn-remove" onclick={() => removePerson(group.name, admin, 'admin')} title="Retirer">x</button>
-                    </li>
-                  {/each}
-                </ul>
-                <div class="inline-form">
-                  <input type="text" bind:value={newAdmin} placeholder="Ajouter un admin" />
-                  <button type="button" class="btn btn-outline btn-sm" onclick={() => addAdmin(group.name)}>+</button>
-                </div>
               </div>
 
-              <div class="people-section">
-                <h4>Membres</h4>
-                {#if group.members.length === 0}
-                  <p class="empty-text">Aucun membre</p>
-                {/if}
-                <ul class="people-list">
-                  {#each group.members as member}
-                    <li>
-                      <span>{member}</span>
-                      <button type="button" class="btn-remove" onclick={() => removePerson(group.name, member, 'member')} title="Retirer">x</button>
-                    </li>
-                  {/each}
-                </ul>
-                <div class="inline-form">
-                  <input type="text" bind:value={newMember} placeholder="Ajouter un membre" />
-                  <button type="button" class="btn btn-outline btn-sm" onclick={() => addMember(group.name)}>+</button>
+              {#if authEnabled}
+                <div class="edit-section">
+                  <h4>Administrateurs</h4>
+                  {#if group.admins.length === 0}
+                    <p class="empty-hint">Aucun administrateur</p>
+                  {/if}
+                  <ul class="people-list">
+                    {#each group.admins as admin}
+                      <li>
+                        <span>{admin}</span>
+                        <button type="button" class="chip-remove" onclick={() => removePerson(group.name, admin, 'admin')} title="Retirer">x</button>
+                      </li>
+                    {/each}
+                  </ul>
+                  <div class="inline-form">
+                    <input type="text" bind:value={newAdmin} placeholder="Ajouter un admin" />
+                    <button type="button" class="btn btn-outline btn-sm" onclick={() => addAdmin(group.name)}>+</button>
+                  </div>
                 </div>
-              </div>
+
+                <div class="edit-section">
+                  <h4>Membres</h4>
+                  {#if group.members.length === 0}
+                    <p class="empty-hint">Aucun membre</p>
+                  {/if}
+                  <ul class="people-list">
+                    {#each group.members as member}
+                      <li>
+                        <span>{member}</span>
+                        <button type="button" class="chip-remove" onclick={() => removePerson(group.name, member, 'member')} title="Retirer">x</button>
+                      </li>
+                    {/each}
+                  </ul>
+                  <div class="inline-form">
+                    <input type="text" bind:value={newMember} placeholder="Ajouter un membre" />
+                    <button type="button" class="btn btn-outline btn-sm" onclick={() => addMember(group.name)}>+</button>
+                  </div>
+                </div>
+              {/if}
             </div>
           {/if}
         </div>
@@ -214,38 +286,40 @@
   .header-actions { display: flex; gap: 0.5rem; }
 
   .group-create-form { margin-bottom: 1rem; }
-
   .inline-form { display: flex; gap: 0.5rem; align-items: center; }
   .inline-form input { flex: 1; padding: 0.375rem 0.75rem; border: 1px solid var(--color-border); border-radius: var(--radius); font-size: 0.875rem; background: var(--color-bg); color: var(--color-text); }
 
   .group-list { display: flex; flex-direction: column; gap: 0.75rem; }
-
   .group-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius); padding: 1rem 1.25rem; }
-  .group-header { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
-  .group-header h3 { margin: 0; font-size: 1rem; }
+
+  .group-header-row { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+  .group-header-row h3 { margin: 0; font-size: 1rem; }
   .group-count { color: var(--color-text-muted); font-size: 0.8125rem; }
   .group-actions { margin-left: auto; display: flex; gap: 0.375rem; }
 
+  .service-chips { list-style: none; padding: 0; margin: 0.75rem 0 0; display: flex; flex-wrap: wrap; gap: 0.375rem; }
+  .service-chip {
+    display: inline-flex; align-items: center; gap: 0.375rem;
+    padding: 0.25rem 0.625rem; border-radius: 1rem;
+    background: var(--color-focus); color: var(--color-primary);
+    font-size: 0.8125rem; font-weight: 600;
+  }
+  .chip-remove {
+    background: none; border: none; color: inherit; cursor: pointer;
+    font-weight: bold; font-size: 0.75rem; padding: 0; opacity: 0.7;
+  }
+  .chip-remove:hover { opacity: 1; }
+
+  .empty-hint { color: var(--color-text-muted); font-size: 0.8125rem; margin: 0.5rem 0; font-style: italic; }
+
   .group-edit { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--color-border); display: flex; gap: 2rem; flex-wrap: wrap; }
-  .people-section { flex: 1; min-width: 14rem; }
-  .people-section h4 { margin: 0 0 0.5rem; font-size: 0.875rem; color: var(--color-text-muted); }
+  .edit-section { flex: 1; min-width: 14rem; }
+  .edit-section h4 { margin: 0 0 0.5rem; font-size: 0.875rem; color: var(--color-text-muted); }
+
+  .service-assign-list { display: flex; flex-wrap: wrap; gap: 0.375rem; }
 
   .people-list { list-style: none; padding: 0; margin: 0 0 0.5rem; }
   .people-list li { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; font-size: 0.875rem; }
-  .btn-remove { background: none; border: none; color: var(--color-danger); cursor: pointer; font-weight: bold; font-size: 0.875rem; padding: 0 0.25rem; }
-  .btn-remove:hover { text-decoration: underline; }
-
-  .form-error { background: #fef2f2; color: var(--color-danger); padding: 0.5rem 0.75rem; border-radius: var(--radius); font-size: 0.875rem; border: 1px solid #fecaca; margin-bottom: 0.5rem; }
-  :global([data-theme="dark"]) .form-error { background: #451a1a; border-color: #7f1d1d; }
 
   .loading-text, .empty-text { color: var(--color-text-muted); font-size: 0.875rem; text-align: center; padding: 1rem; }
-
-  .btn { padding: 0.5rem 1.25rem; border-radius: var(--radius); border: 1px solid transparent; font-weight: 600; font-size: 0.9375rem; cursor: pointer; }
-  .btn-sm { padding: 0.25rem 0.75rem; font-size: 0.8125rem; }
-  .btn-primary { background: var(--color-primary); color: #fff; }
-  .btn-primary:hover { background: var(--color-primary-hover); }
-  .btn-outline { background: var(--color-surface); color: var(--color-text-muted); border-color: var(--color-border); }
-  .btn-outline:hover { background: var(--color-bg); color: var(--color-text); }
-  .btn-danger-outline { color: var(--color-danger); border-color: var(--color-danger); }
-  .btn-danger-outline:hover { background: var(--color-danger); color: #fff; }
 </style>
