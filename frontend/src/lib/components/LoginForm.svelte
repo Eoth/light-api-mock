@@ -109,55 +109,10 @@
     gap: 1rem;
   }
 
-  .form-field {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-  }
-
-  .form-field label {
-    font-weight: 600;
-    font-size: 0.875rem;
-    color: var(--color-text);
-  }
-
-  .form-field input {
-    padding: 0.5rem 0.75rem;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
-    font-size: 0.9375rem;
-    background: var(--color-bg);
-    color: var(--color-text);
-  }
-
-  .form-field input:focus {
-    outline: 2px solid var(--color-primary);
-    outline-offset: 1px;
-  }
-
-  .form-error {
-    background: #fef2f2;
-    color: var(--color-danger);
-    padding: 0.5rem 0.75rem;
-    border-radius: var(--radius);
-    font-size: 0.875rem;
-    border: 1px solid #fecaca;
-  }
-
-  :global([data-theme="dark"]) .form-error {
-    background: #451a1a;
-    border-color: #7f1d1d;
-  }
-
   .btn-login {
     width: 100%;
     padding: 0.625rem;
     font-size: 1rem;
     margin-top: 0.5rem;
   }
-
-  .btn { padding: 0.5rem 1.25rem; border-radius: var(--radius); border: 1px solid transparent; font-weight: 600; font-size: 0.9375rem; cursor: pointer; }
-  .btn-primary { background: var(--color-primary); color: #fff; }
-  .btn-primary:hover { background: var(--color-primary-hover); }
-  .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
 </style>

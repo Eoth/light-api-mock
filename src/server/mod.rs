@@ -1,3 +1,8 @@
+// Serveur HTTP Axum — contient le routeur, les handlers API, et le middleware d'interception.
+//   api.rs       → handlers REST (/api/services, /api/groups, /api/auth, etc.)
+//   intercept.rs → middleware qui intercepte les requetes et les route vers mock ou proxy
+//   validation.rs → validation des noms de services, methodes HTTP, etc.
+//   request_log.rs → journal en memoire des 200 dernieres requetes interceptees
 mod api;
 mod intercept;
 pub mod request_log;
@@ -6,6 +11,7 @@ pub mod validation;
 use crate::auth::AuthConfig;
 use crate::auth::keycloak::KeycloakClient;
 use crate::engine::ProxyClient;
+use crate::engine::script::ScriptEngine;
 use crate::store::MockStore;
 use axum::Router;
 use request_log::RequestLog;
@@ -24,6 +30,7 @@ pub struct AppState {
     pub request_log: RequestLog,
     pub auth_config: AuthConfig,
     pub keycloak: Option<KeycloakClient>,
+    pub script_engine: ScriptEngine,
 }
 
 impl AppState {

@@ -1,3 +1,7 @@
+// Client REST pour l'API backend lightMock.
+// Toutes les fonctions exportees appellent le backend via fetch().
+// Le token Keycloak (si auth activee) est injecte automatiquement.
+// En dev, le proxy Vite redirige /api vers http://localhost:7342.
 import { auth, logout } from './auth.svelte.js';
 
 const BASE = '/api';

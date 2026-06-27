@@ -1,7 +1,8 @@
 <script>
+  import { untrack } from 'svelte';
+
   let { condition = null, onSave = () => {}, onCancel = () => {} } = $props();
 
-  const initial = condition;
   const sourceTypes = [
     { value: 'QueryParam', label: 'Parametre de requete' },
     { value: 'Header', label: 'En-tete HTTP' },
@@ -19,10 +20,10 @@
     { value: 'Exists', label: 'Existe (peu importe la valeur)' },
   ];
 
-  let sourceType = $state(initial?.source?.type ?? 'QueryParam');
-  let sourceKey = $state(initial?.source?.key ?? '');
-  let operatorType = $state(initial?.operator?.type ?? 'Eq');
-  let operatorValue = $state(initial?.operator?.value ?? '');
+  let sourceType = $state(untrack(() => condition?.source?.type ?? 'QueryParam'));
+  let sourceKey = $state(untrack(() => condition?.source?.key ?? ''));
+  let operatorType = $state(untrack(() => condition?.operator?.type ?? 'Eq'));
+  let operatorValue = $state(untrack(() => condition?.operator?.value ?? ''));
 
   let needsKey = $derived(sourceType !== 'BodyRaw');
   let needsValue = $derived(operatorType !== 'Exists');
@@ -139,21 +140,8 @@
     font-family: inherit;
   }
 
-  .field-hint {
-    display: block;
-    font-size: 0.75rem;
-    color: var(--color-text-muted);
-    margin-top: 0.125rem;
-  }
-
   .form-actions {
     display: flex;
     gap: 0.5rem;
   }
-
-  .btn { padding: 0.25rem 0.75rem; border-radius: var(--radius); border: 1px solid transparent; font-weight: 600; font-size: 0.8125rem; }
-  .btn-primary { background: var(--color-primary); color: #fff; }
-  .btn-primary:hover { background: var(--color-primary-hover); }
-  .btn-secondary { background: var(--color-surface); color: var(--color-text); border-color: var(--color-border); }
-  .btn-secondary:hover { background: var(--color-bg); }
 </style>
