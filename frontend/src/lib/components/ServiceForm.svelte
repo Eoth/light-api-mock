@@ -19,11 +19,15 @@
 
   const RESERVED_NAMES = ['api', 'auth', 'index.html', 'assets', 'favicon.ico'];
 
+  const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+
   let testUrl = $derived(() => {
     const n = name.trim() || '...';
     const p = listenPath.trim();
-    if (!p) return `http://localhost:7342/${n}/*`;
-    return `http://localhost:7342/${n}${p.startsWith('/') ? p : '/' + p}`;
+    const g = availableGroups.find(gr => gr.name === groupName);
+    const prefix = g ? `/${g.code}/${n}` : `/${n}`;
+    const path = p ? (p.startsWith('/') ? p : '/' + p) : '/*';
+    return `${baseUrl}${prefix}${path}`;
   });
   let saving = $state(false);
   let error = $state('');
@@ -149,7 +153,7 @@
       <select id="svc-group" bind:value={groupName} aria-describedby="svc-group-hint">
         <option value="">-- Aucun groupe --</option>
         {#each availableGroups as g}
-          <option value={g}>{g}</option>
+          <option value={g.name}>{g.name} (/{g.code})</option>
         {/each}
       </select>
       <span class="field-hint" id="svc-group-hint">Associe le service a un groupe pour gerer les droits d'acces</span>

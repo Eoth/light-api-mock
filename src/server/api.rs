@@ -572,13 +572,14 @@ async fn create_group(
             )));
         }
 
+        let existing_codes: Vec<String> = config.groups.iter().map(|g| g.code.clone()).collect();
         let code = if group.code.trim().is_empty() {
-            generate_group_code(&config.groups)
+            crate::server::codegen::generate_code(&group.name, &existing_codes)
         } else {
             let c = group.code.trim().to_lowercase();
-            if c.len() != 3 || !c.chars().all(|ch| ch.is_ascii_alphanumeric()) {
+            if c.len() != 5 || !c.chars().all(|ch| ch.is_ascii_alphanumeric()) {
                 return Err(AppError::Validation(
-                    "Le code groupe doit faire exactement 3 caracteres alphanumeriques.".into(),
+                    "Le code groupe doit faire exactement 5 caracteres alphanumeriques.".into(),
                 ));
             }
             if config.groups.iter().any(|g| g.code.eq_ignore_ascii_case(&c)) {
@@ -733,21 +734,6 @@ async fn update_group_members(
 
 // --------------- Helpers & Errors ---------------
 
-fn generate_group_code(existing_groups: &[Group]) -> String {
-    let existing_codes: Vec<String> = existing_groups.iter().map(|g| g.code.to_lowercase()).collect();
-    for _ in 0..1000 {
-        let code: String = (0..3)
-            .map(|_| {
-                let chars = b"abcdefghijklmnopqrstuvwxyz0123456789";
-                chars[fastrand::usize(..chars.len())] as char
-            })
-            .collect();
-        if !existing_codes.contains(&code) {
-            return code;
-        }
-    }
-    format!("{:03x}", existing_groups.len())
-}
 
 fn require_super_admin(user: &AuthUser) -> Result<(), AppError> {
     if !user.is_super_admin {

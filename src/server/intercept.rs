@@ -498,17 +498,17 @@ mod tests {
 
     #[test]
     fn group_code_prefixes_url() {
-        let pattern = build_effective_pattern(Some("qtr"), "insee", "/v4/*");
-        assert_eq!(pattern, "/qtr/insee/v4/*");
-        assert!(match_path(&pattern, "/qtr/insee/v4/sirene").is_some());
+        let pattern = build_effective_pattern(Some("qtr01"), "insee", "/v4/*");
+        assert_eq!(pattern, "/qtr01/insee/v4/*");
+        assert!(match_path(&pattern, "/qtr01/insee/v4/sirene").is_some());
         assert!(match_path(&pattern, "/insee/v4/sirene").is_none());
     }
 
     #[test]
     fn group_code_catchall() {
-        let pattern = build_effective_pattern(Some("abc"), "svc", "");
-        assert_eq!(pattern, "/abc/svc/*");
-        assert!(match_path(&pattern, "/abc/svc/foo").is_some());
+        let pattern = build_effective_pattern(Some("abc01"), "svc", "");
+        assert_eq!(pattern, "/abc01/svc/*");
+        assert!(match_path(&pattern, "/abc01/svc/foo").is_some());
         assert!(match_path(&pattern, "/svc/foo").is_none());
     }
 
