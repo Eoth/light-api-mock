@@ -1,6 +1,7 @@
 <script>
   import ConditionForm from './ConditionForm.svelte';
   import JsonResponseBuilder from './JsonResponseBuilder.svelte';
+  import JsonPasteBuilder from './JsonPasteBuilder.svelte';
   import XmlResponseBuilder from './XmlResponseBuilder.svelte';
   import ToggleSwitch from './ToggleSwitch.svelte';
   import { templateToTestJson, templateToFields, validateTemplateAsJson, validateTemplateAsXml, fieldsToTemplate, varNameToSource } from '../tpl-utils.js';
@@ -50,7 +51,7 @@
   let formError = $state('');
 
   function detectMode() {
-    if (!init?.response?.body?.length) return 'json-guided';
+    if (!init?.response?.body?.length) return 'json-paste';
     if (init.response.body.length === 1 && init.response.body[0].type === 'Template') return 'advanced';
     if (init.response.status === 204) return 'empty';
     return 'advanced';
@@ -59,6 +60,8 @@
 
   let jsonFields = $state([]);
   let jsonBuilderRef = $state(null);
+  let jsonPasteFields = $state([]);
+  let jsonPasteRef = $state(null);
   let xmlFields = $state([]);
   let xmlBuilderRef = $state(null);
   let textContent = $state('');
@@ -67,6 +70,9 @@
     if (responseMode === 'empty') return [];
     if (responseMode === 'json-guided' && jsonBuilderRef) {
       return [{ type: 'Template', template: jsonBuilderRef.toTemplate() }];
+    }
+    if (responseMode === 'json-paste' && jsonPasteRef) {
+      return [{ type: 'Template', template: jsonPasteRef.toTemplate() }];
     }
     if (responseMode === 'xml-guided' && xmlBuilderRef) {
       return [{ type: 'Template', template: xmlBuilderRef.toTemplate() }];
@@ -126,7 +132,7 @@
 
     const finalStatus = responseMode === 'empty' ? 204 : status;
     const finalHeaders = responseMode === 'empty' ? [] : respHeaders.filter(h => h.name.trim());
-    if (responseMode === 'json-guided' && !finalHeaders.some(h => h.name.toLowerCase() === 'content-type')) {
+    if ((responseMode === 'json-guided' || responseMode === 'json-paste') && !finalHeaders.some(h => h.name.toLowerCase() === 'content-type')) {
       finalHeaders.push({ name: 'Content-Type', value: 'application/json' });
     }
     if (responseMode === 'xml-guided' && !finalHeaders.some(h => h.name.toLowerCase() === 'content-type')) {
@@ -212,6 +218,7 @@
   }
 
   function currentModeHasContent() {
+    if (responseMode === 'json-paste') return jsonPasteFields.length > 0;
     if (responseMode === 'json-guided') return jsonFields.length > 0;
     if (responseMode === 'xml-guided') return xmlFields.length > 0;
     if (responseMode === 'text') return textContent.trim().length > 0;
@@ -315,6 +322,10 @@
   }
 
   function validateResponseContent() {
+    if (responseMode === 'json-paste' && jsonPasteRef) {
+      const err = validateTemplateAsJson(jsonPasteRef.toTemplate());
+      if (err) return `JSON par exemple invalide : ${err}`;
+    }
     if (responseMode === 'json-guided' && jsonBuilderRef) {
       const err = validateTemplateAsJson(jsonBuilderRef.toTemplate());
       if (err) return `JSON guide invalide : ${err}`;
@@ -483,7 +494,7 @@
     {#if responseOpen}
       {#key modeKey}
       <div class="mode-selector" role="radiogroup" aria-label="Mode de reponse">
-        {#each [['json-guided','JSON guide'],['xml-guided','XML guide'],['text','Texte'],['advanced','Template avance'],['empty','Vide (204)']] as [val, label]}
+        {#each [['json-paste','JSON par exemple'],['json-guided','JSON guide'],['xml-guided','XML guide'],['text','Texte'],['advanced','Template avance'],['empty','Vide (204)']] as [val, label]}
           <button type="button" class="mode-btn" class:mode-active={responseMode === val} onclick={() => requestModeSwitch(val)} role="radio" aria-checked={responseMode === val}>{label}</button>
         {/each}
       </div>
@@ -523,13 +534,18 @@
             {#each commonContentTypes as ct}<option value={ct}></option>{/each}
           </datalist>
           <button type="button" class="btn btn-sm btn-outline" onclick={addHeader}>+ En-tete</button>
-          {#if responseMode === 'json-guided'}
+          {#if responseMode === 'json-guided' || responseMode === 'json-paste'}
             <span class="field-hint">Content-Type: application/json sera ajoute automatiquement.</span>
           {/if}
         </div>
       {/if}
 
-      {#if responseMode === 'json-guided'}
+      {#if responseMode === 'json-paste'}
+        <div class="sub-section">
+          <JsonPasteBuilder bind:this={jsonPasteRef} fields={jsonPasteFields} onUpdate={(f) => jsonPasteFields = f} />
+        </div>
+
+      {:else if responseMode === 'json-guided'}
         <div class="sub-section">
           <JsonResponseBuilder bind:this={jsonBuilderRef} fields={jsonFields} onUpdate={(f) => jsonFields = f} />
         </div>
