@@ -32,8 +32,7 @@ impl MatchEngine {
     }
 
     fn matches_method(rule_method: &str, request_method: &str) -> bool {
-        rule_method.eq_ignore_ascii_case("ANY")
-            || rule_method.eq_ignore_ascii_case(request_method)
+        rule_method.eq_ignore_ascii_case(request_method)
     }
 
     fn matches_sub_path(
@@ -250,7 +249,7 @@ mod tests {
     fn simple_rule(name: &str, conditions: ConditionGroup) -> Rule {
         Rule {
             name: name.into(),
-            method: "ANY".into(),
+            method: "GET".into(),
             sub_path: None,
             action: RuleAction::default(),
             script: None,
@@ -529,16 +528,14 @@ mod tests {
     }
 
     #[test]
-    fn rule_method_any_matches_all() {
-        let rules = vec![simple_rule("any", ConditionGroup::default())];
-        for m in ["GET", "POST", "PUT", "DELETE", "PATCH"] {
-            let mut req = make_req(&[], &[], b"", None);
-            req.method = m.into();
-            assert!(
-                MatchEngine::first_match(&rules, &req).is_some(),
-                "ANY should match {m}"
-            );
-        }
+    fn rule_method_must_match_exactly() {
+        let mut rule = simple_rule("get-only", ConditionGroup::default());
+        rule.method = "GET".into();
+        let rules = vec![rule];
+
+        let mut req_post = make_req(&[], &[], b"", None);
+        req_post.method = "POST".into();
+        assert!(MatchEngine::first_match(&rules, &req_post).is_none());
     }
 
     #[test]

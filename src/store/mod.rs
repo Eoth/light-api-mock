@@ -132,7 +132,7 @@ mod tests {
                 wsdl_mode: WsdlMode::default(),
                 rules: vec![Rule {
                     name: "default".into(),
-                    method: "ANY".into(),
+                    method: "GET".into(),
                     sub_path: None,
                     action: RuleAction::default(),
                     script: None,
