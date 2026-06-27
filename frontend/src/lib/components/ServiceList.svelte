@@ -1,7 +1,7 @@
 <script>
   import ServiceGroup from './ServiceGroup.svelte';
 
-  let { services = [], onToggle = () => {}, onSelect = () => {} } = $props();
+  let { services = [], groups = [], onToggle = () => {}, onSelect = () => {} } = $props();
 
   let search = $state('');
   let expandedGroups = $state(new Set());
@@ -66,6 +66,12 @@
   function groupId(key) {
     return key === '__ungrouped__' ? 'ungrouped' : key.replace(/[^a-zA-Z0-9-]/g, '_');
   }
+
+  function groupCodeFor(key) {
+    if (key === '__ungrouped__') return '';
+    const g = groups.find(gr => gr.name === key);
+    return g?.code ?? '';
+  }
 </script>
 
 <section aria-label="Liste des services">
@@ -101,6 +107,7 @@
           <ServiceGroup
             groupName={groupDisplayName(key)}
             groupId={groupId(key)}
+            groupCode={groupCodeFor(key)}
             services={groupServices}
             expanded={effectiveExpanded.has(key)}
             onToggleGroup={() => toggleGroup(key)}

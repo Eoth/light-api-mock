@@ -13,6 +13,7 @@
   let loading = $state(true);
   let showForm = $state(false);
   let newGroupName = $state('');
+  let newGroupCode = $state('');
   let editingGroup = $state(null);
   let newMember = $state('');
   let newAdmin = $state('');
@@ -42,9 +43,10 @@
     if (!name) { formError = 'Le nom du groupe est requis.'; return; }
 
     try {
-      const created = await createGroup({ name, admins: [], members: [] });
+      const created = await createGroup({ name, code: newGroupCode.trim(), admins: [], members: [] });
       groups = [...groups, created];
       newGroupName = '';
+      newGroupCode = '';
       showForm = false;
       onNotify(`Groupe "${name}" cree`, 'success');
     } catch (e) {
@@ -173,8 +175,10 @@
       {/if}
       <div class="inline-form">
         <input type="text" bind:value={newGroupName} placeholder="Nom du groupe (ex: API Internes)" required />
+        <input type="text" bind:value={newGroupCode} placeholder="Code 3 chars (auto si vide)" maxlength="3" class="code-input" />
         <button type="submit" class="btn btn-primary btn-sm">Creer</button>
       </div>
+      <span class="field-hint">Le code (3 caracteres) sert de prefixe URL : /{'{code}'}/{'{service}'}/...</span>
     </form>
   {/if}
 
@@ -189,6 +193,7 @@
         <div class="group-card">
           <div class="group-header-row">
             <h3>{group.name}</h3>
+            <span class="group-code-badge">/{group.code}</span>
             <span class="group-count">{groupServices.length} service{groupServices.length !== 1 ? 's' : ''}</span>
             <div class="group-actions">
               <button type="button" class="btn btn-outline btn-sm" onclick={() => startEdit(group.name)}>
@@ -294,7 +299,9 @@
 
   .group-header-row { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
   .group-header-row h3 { margin: 0; font-size: 1rem; }
+  .group-code-badge { font-family: monospace; font-size: 0.8125rem; font-weight: 700; color: var(--color-primary); background: var(--color-focus); padding: 0.1rem 0.375rem; border-radius: 3px; }
   .group-count { color: var(--color-text-muted); font-size: 0.8125rem; }
+  .code-input { max-width: 8rem; text-transform: lowercase; font-family: monospace; }
   .group-actions { margin-left: auto; display: flex; gap: 0.375rem; }
 
   .service-chips { list-style: none; padding: 0; margin: 0.75rem 0 0; display: flex; flex-wrap: wrap; gap: 0.375rem; }
