@@ -195,7 +195,7 @@ async fn get_config(
 async fn put_config(
     State(state): State<AppState>,
     Extension(user): Extension<AuthUser>,
-    Json(config): Json<MockConfig>,
+    Json(mut config): Json<MockConfig>,
 ) -> Result<Json<Arc<MockConfig>>, AppError> {
     require_super_admin(&user)?;
 
@@ -205,6 +205,9 @@ async fn put_config(
             return Err(AppError::Validation(e.message));
         }
     }
+
+    ensure_group_codes(&mut config.groups);
+
     state.store.replace(config).await.map_err(AppError::Store)?;
     Ok(Json(state.store.snapshot().await))
 }
@@ -756,6 +759,21 @@ async fn validate_script(
     match state.script_engine.validate(&req.script) {
         Ok(()) => Json(ValidateScriptResponse { valid: true, error: None }),
         Err(e) => Json(ValidateScriptResponse { valid: false, error: Some(e) }),
+    }
+}
+
+fn ensure_group_codes(groups: &mut Vec<Group>) {
+    let mut existing_codes: Vec<String> = groups
+        .iter()
+        .filter(|g| !g.code.trim().is_empty())
+        .map(|g| g.code.clone())
+        .collect();
+    for group in groups.iter_mut() {
+        if group.code.trim().is_empty() {
+            let code = crate::server::codegen::generate_code(&group.name, &existing_codes);
+            group.code = code.clone();
+            existing_codes.push(code);
+        }
     }
 }
 
