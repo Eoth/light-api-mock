@@ -3,10 +3,12 @@ import { describe, it, expect, vi } from 'vitest';
 import ServiceList from '../lib/components/ServiceList.svelte';
 
 const mockServices = [
-  { name: 'svc-users', listen_path: '/users/*', real_target_url: 'http://users:80', is_mocked: true, rules: [{ name: 'r1' }] },
-  { name: 'svc-orders', listen_path: '/orders/*', real_target_url: 'http://orders:80', is_mocked: false, rules: [] },
-  { name: 'insee-api', listen_path: '/v4/api/insee/*', real_target_url: 'http://insee:80', is_mocked: true, rules: [{ name: 'siret' }] },
+  { name: 'svc-users', listen_path: '/users/*', real_target_url: 'http://users:80', is_mocked: true, group_name: null, rules: [{ name: 'r1' }] },
+  { name: 'svc-orders', listen_path: '/orders/*', real_target_url: 'http://orders:80', is_mocked: false, group_name: null, rules: [] },
+  { name: 'insee-api', listen_path: '/v4/api/insee/*', real_target_url: 'http://insee:80', is_mocked: true, group_name: 'team-a', rules: [{ name: 'siret' }] },
 ];
+
+const searchPlaceholder = /Rechercher par nom, chemin, URL ou groupe/;
 
 describe('ServiceList', () => {
   it('affiche un etat vide quand pas de services', () => {
@@ -14,21 +16,27 @@ describe('ServiceList', () => {
     expect(getByText('Aucun service configure')).toBeInTheDocument();
   });
 
-  it('affiche tous les services', () => {
+  it('affiche tous les services dans des groupes', () => {
     const { getByText } = render(ServiceList, { props: { services: mockServices } });
     expect(getByText('svc-users')).toBeInTheDocument();
     expect(getByText('svc-orders')).toBeInTheDocument();
     expect(getByText('insee-api')).toBeInTheDocument();
   });
 
+  it('affiche les noms de groupes', () => {
+    const { getByText } = render(ServiceList, { props: { services: mockServices } });
+    expect(getByText('team-a')).toBeInTheDocument();
+    expect(getByText('Sans groupe')).toBeInTheDocument();
+  });
+
   it('affiche la barre de recherche quand il y a des services', () => {
     const { getByPlaceholderText } = render(ServiceList, { props: { services: mockServices } });
-    expect(getByPlaceholderText('Rechercher par nom, chemin ou URL...')).toBeInTheDocument();
+    expect(getByPlaceholderText(searchPlaceholder)).toBeInTheDocument();
   });
 
   it('filtre par nom de service', async () => {
     const { getByPlaceholderText, queryByText } = render(ServiceList, { props: { services: mockServices } });
-    const search = getByPlaceholderText('Rechercher par nom, chemin ou URL...');
+    const search = getByPlaceholderText(searchPlaceholder);
     await fireEvent.input(search, { target: { value: 'insee' } });
     expect(queryByText('insee-api')).toBeInTheDocument();
     expect(queryByText('svc-users')).not.toBeInTheDocument();
@@ -37,7 +45,7 @@ describe('ServiceList', () => {
 
   it('filtre par chemin d ecoute', async () => {
     const { getByPlaceholderText, queryByText } = render(ServiceList, { props: { services: mockServices } });
-    const search = getByPlaceholderText('Rechercher par nom, chemin ou URL...');
+    const search = getByPlaceholderText(searchPlaceholder);
     await fireEvent.input(search, { target: { value: '/orders' } });
     expect(queryByText('svc-orders')).toBeInTheDocument();
     expect(queryByText('svc-users')).not.toBeInTheDocument();
@@ -45,15 +53,23 @@ describe('ServiceList', () => {
 
   it('affiche un message quand la recherche ne matche rien', async () => {
     const { getByPlaceholderText, getByText } = render(ServiceList, { props: { services: mockServices } });
-    const search = getByPlaceholderText('Rechercher par nom, chemin ou URL...');
+    const search = getByPlaceholderText(searchPlaceholder);
     await fireEvent.input(search, { target: { value: 'zzzzz' } });
     expect(getByText(/Aucun service ne correspond/)).toBeInTheDocument();
   });
 
   it('affiche le compteur de resultats pendant la recherche', async () => {
     const { getByPlaceholderText, getByText } = render(ServiceList, { props: { services: mockServices } });
-    const search = getByPlaceholderText('Rechercher par nom, chemin ou URL...');
+    const search = getByPlaceholderText(searchPlaceholder);
     await fireEvent.input(search, { target: { value: 'svc' } });
     expect(getByText('2 / 3 services')).toBeInTheDocument();
+  });
+
+  it('filtre par nom de groupe', async () => {
+    const { getByPlaceholderText, queryByText } = render(ServiceList, { props: { services: mockServices } });
+    const search = getByPlaceholderText(searchPlaceholder);
+    await fireEvent.input(search, { target: { value: 'team-a' } });
+    expect(queryByText('insee-api')).toBeInTheDocument();
+    expect(queryByText('svc-users')).not.toBeInTheDocument();
   });
 });

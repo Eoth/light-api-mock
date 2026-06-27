@@ -1,19 +1,71 @@
 <script>
-  import ServiceCard from './ServiceCard.svelte';
+  import ServiceGroup from './ServiceGroup.svelte';
 
   let { services = [], onToggle = () => {}, onSelect = () => {} } = $props();
 
   let search = $state('');
+  let expandedGroups = $state(new Set());
+  let initialized = $state(false);
 
   let filtered = $derived(
     search.trim() === ''
       ? services
       : services.filter(s =>
           s.name.toLowerCase().includes(search.toLowerCase()) ||
-          s.listen_path.toLowerCase().includes(search.toLowerCase()) ||
-          s.real_target_url.toLowerCase().includes(search.toLowerCase())
+          (s.listen_path || '').toLowerCase().includes(search.toLowerCase()) ||
+          s.real_target_url.toLowerCase().includes(search.toLowerCase()) ||
+          (s.group_name || '').toLowerCase().includes(search.toLowerCase())
         )
   );
+
+  let grouped = $derived(() => {
+    const map = new Map();
+    for (const s of filtered) {
+      const key = s.group_name || '__ungrouped__';
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(s);
+    }
+    const entries = [...map.entries()].sort((a, b) => {
+      if (a[0] === '__ungrouped__') return 1;
+      if (b[0] === '__ungrouped__') return -1;
+      return a[0].localeCompare(b[0]);
+    });
+    return entries;
+  });
+
+  $effect(() => {
+    if (!initialized && services.length > 0) {
+      const groups = grouped();
+      if (groups.length <= 3) {
+        expandedGroups = new Set(groups.map(([key]) => key));
+      }
+      initialized = true;
+    }
+  });
+
+  let effectiveExpanded = $derived(
+    search.trim()
+      ? new Set(grouped().map(([key]) => key))
+      : expandedGroups
+  );
+
+  function toggleGroup(key) {
+    const next = new Set(expandedGroups);
+    if (next.has(key)) {
+      next.delete(key);
+    } else {
+      next.add(key);
+    }
+    expandedGroups = next;
+  }
+
+  function groupDisplayName(key) {
+    return key === '__ungrouped__' ? 'Sans groupe' : key;
+  }
+
+  function groupId(key) {
+    return key === '__ungrouped__' ? 'ungrouped' : key.replace(/[^a-zA-Z0-9-]/g, '_');
+  }
 </script>
 
 <section aria-label="Liste des services">
@@ -29,7 +81,7 @@
         id="service-search"
         type="search"
         bind:value={search}
-        placeholder="Rechercher par nom, chemin ou URL..."
+        placeholder="Rechercher par nom, chemin, URL ou groupe..."
         aria-label="Rechercher un service"
       />
       {#if search.trim()}
@@ -41,25 +93,28 @@
 
     {#if filtered.length === 0}
       <div class="no-results" role="status">
-        <p>Aucun service ne correspond a « {search} »</p>
+        <p>Aucun service ne correspond a &laquo; {search} &raquo;</p>
       </div>
     {:else}
-      <ul class="service-list" role="list">
-        {#each filtered as service (service.name)}
-          <li>
-            <ServiceCard {service} {onToggle} {onSelect} />
-          </li>
+      <div class="groups-container">
+        {#each grouped() as [key, groupServices] (key)}
+          <ServiceGroup
+            groupName={groupDisplayName(key)}
+            groupId={groupId(key)}
+            services={groupServices}
+            expanded={effectiveExpanded.has(key)}
+            onToggleGroup={() => toggleGroup(key)}
+            {onToggle}
+            {onSelect}
+          />
         {/each}
-      </ul>
+      </div>
     {/if}
   {/if}
 </section>
 
 <style>
-  .service-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
+  .groups-container {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
@@ -80,6 +135,7 @@
     font-size: 1rem;
     font-family: inherit;
     background: var(--color-surface);
+    color: var(--color-text);
   }
 
   .search-bar input:focus-visible {
@@ -121,4 +177,6 @@
   }
 
   .no-results p { margin: 0; }
+
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 </style>
