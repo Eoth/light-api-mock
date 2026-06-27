@@ -28,6 +28,7 @@ pub fn routes() -> Router<AppState> {
         )
         .route("/services/:name/toggle", put(toggle_service))
         .route("/services/:name/rules/reorder", put(reorder_rules))
+        .route("/script/validate", post(validate_script))
         .route("/logs", get(get_logs))
         .route("/groups", get(list_groups).post(create_group))
         .route(
@@ -734,6 +735,29 @@ async fn update_group_members(
 
 // --------------- Helpers & Errors ---------------
 
+
+// --------------- Script validation ---------------
+
+#[derive(serde::Deserialize)]
+struct ValidateScriptRequest {
+    script: String,
+}
+
+#[derive(serde::Serialize)]
+struct ValidateScriptResponse {
+    valid: bool,
+    error: Option<String>,
+}
+
+async fn validate_script(
+    State(state): State<AppState>,
+    Json(req): Json<ValidateScriptRequest>,
+) -> Json<ValidateScriptResponse> {
+    match state.script_engine.validate(&req.script) {
+        Ok(()) => Json(ValidateScriptResponse { valid: true, error: None }),
+        Err(e) => Json(ValidateScriptResponse { valid: false, error: Some(e) }),
+    }
+}
 
 fn require_super_admin(user: &AuthUser) -> Result<(), AppError> {
     if !user.is_super_admin {

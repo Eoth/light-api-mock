@@ -4,6 +4,7 @@
   import XmlResponseBuilder from './XmlResponseBuilder.svelte';
   import ToggleSwitch from './ToggleSwitch.svelte';
   import { templateToTestJson, templateToFields, validateTemplateAsJson, validateTemplateAsXml, fieldsToTemplate, varNameToSource } from '../tpl-utils.js';
+  import { validateScript as apiValidateScript } from '../api.js';
 
   import { untrack } from 'svelte';
 
@@ -16,6 +17,23 @@
   let ruleAction = $state(init?.action ?? 'mock');
   let scriptEnabled = $state(!!init?.script);
   let scriptCode = $state(init?.script ?? '');
+  let scriptValidation = $state({ status: '', message: '' });
+
+  async function handleValidateScript() {
+    if (!scriptCode.trim()) {
+      scriptValidation = { status: 'error', message: 'Le script est vide.' };
+      return;
+    }
+    scriptValidation = { status: 'pending', message: 'Validation...' };
+    try {
+      const result = await apiValidateScript(scriptCode);
+      scriptValidation = result.valid
+        ? { status: 'ok', message: 'Script valide.' }
+        : { status: 'error', message: result.error };
+    } catch (e) {
+      scriptValidation = { status: 'error', message: e.message };
+    }
+  }
 
   const httpMethods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'];
   let allOf = $state(init?.conditions?.all_of ?? []);
@@ -592,6 +610,16 @@
           <div class="script-editor">
             <label for="rule-script">Code Rhai</label>
             <textarea id="rule-script" bind:value={scriptCode} rows="8" class="script-textarea" placeholder={'// Exemples Rhai :\n// Retourner une valeur simple :\nlet id = request.path.id;\n`user_${id}`\n\n// Retourner un objet (accessible via {{script.champ}}) :\n#{ nom: "Alice", age: "30" }'} aria-describedby="script-hint"></textarea>
+            <div class="script-actions">
+              <button type="button" class="btn btn-outline btn-sm" onclick={handleValidateScript} disabled={scriptValidation.status === 'pending'}>
+                {scriptValidation.status === 'pending' ? 'Validation...' : 'Valider le script'}
+              </button>
+              {#if scriptValidation.status === 'ok'}
+                <span class="script-valid" role="status">&#10003; {scriptValidation.message}</span>
+              {:else if scriptValidation.status === 'error'}
+                <span class="script-invalid" role="alert">{scriptValidation.message}</span>
+              {/if}
+            </div>
             <div class="script-help" id="script-hint">
               <p class="field-hint"><strong>Contexte disponible :</strong> <code>request.body</code> (texte), <code>request.headers</code>, <code>request.query</code>, <code>request.path</code> (maps cle/valeur)</p>
               <p class="field-hint"><strong>Resultat :</strong> La derniere expression est le retour. String → <code>{"{{script}}"}</code>. Objet <code>#{"{cle: val}"}</code> → <code>{"{{script.cle}}"}</code></p>
@@ -698,7 +726,10 @@
   .script-section { border-top-color: var(--color-primary); }
   .script-editor { margin-top: 0.75rem; }
   .script-editor label { display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 0.25rem; }
-  .script-textarea { width: 100%; font-family: 'Cascadia Code', 'Fira Code', monospace; font-size: 0.8125rem; padding: 0.5rem; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-bg); color: var(--color-text); resize: vertical; }
+  .script-textarea { width: 100%; font-family: 'Cascadia Code', 'Fira Code', monospace; font-size: 0.8125rem; padding: 0.5rem; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-bg); color: var(--color-text); resize: vertical; font-variant-ligatures: none; }
+  .script-actions { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.375rem; }
+  .script-valid { font-size: 0.8125rem; color: var(--color-success); font-weight: 600; }
+  .script-invalid { font-size: 0.8125rem; color: var(--color-danger); }
   .script-help { margin-top: 0.375rem; }
   .script-help p { margin: 0.25rem 0; }
   .script-help code { font-size: 0.8125rem; background: var(--color-bg); padding: 0.1rem 0.25rem; border-radius: 2px; }

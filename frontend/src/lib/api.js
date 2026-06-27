@@ -93,6 +93,10 @@ export function getLogs(limit = 50) {
   return request('GET', `/logs?limit=${limit}`);
 }
 
+export function validateScript(script) {
+  return request('POST', '/script/validate', { script });
+}
+
 export function resetConfig() {
   return request('DELETE', '/config/reset');
 }
