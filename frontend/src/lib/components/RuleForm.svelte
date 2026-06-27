@@ -11,13 +11,13 @@
 
   const init = untrack(() => rule ? JSON.parse(JSON.stringify(rule)) : null);
   let name = $state(init?.name ?? '');
-  let ruleMethod = $state(init?.method ?? 'ANY');
+  let ruleMethod = $state(init?.method ?? 'GET');
   let subPath = $state(init?.sub_path ?? '');
   let ruleAction = $state(init?.action ?? 'mock');
   let scriptEnabled = $state(!!init?.script);
   let scriptCode = $state(init?.script ?? '');
 
-  const httpMethods = ['ANY', 'GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'];
+  const httpMethods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'];
   let allOf = $state(init?.conditions?.all_of ?? []);
   let anyOf = $state(init?.conditions?.any_of ?? []);
   let addingConditionTo = $state(null);
@@ -386,7 +386,7 @@
           <option value={m}>{m}</option>
         {/each}
       </select>
-      <span class="field-hint" id="rule-method-hint">ANY matche toutes les methodes HTTP</span>
+      <span class="field-hint" id="rule-method-hint">Methode HTTP que cette regle intercepte</span>
     </div>
 
     <div class="form-field">
