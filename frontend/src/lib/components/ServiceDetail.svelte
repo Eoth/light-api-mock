@@ -79,6 +79,9 @@
   }
 </script>
 
+{#if !service}
+  <p>Chargement...</p>
+{:else}
 <div class="service-detail">
   <nav class="detail-nav" aria-label="Navigation du service">
     <button type="button" class="btn btn-secondary btn-back" onclick={onBack}>
@@ -147,6 +150,7 @@
     />
   {/if}
 </div>
+{/if}
 
 <style>
   .service-detail { display: flex; flex-direction: column; gap: 1rem; }
