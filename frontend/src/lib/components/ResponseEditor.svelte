@@ -295,7 +295,6 @@
   }
   .form-field input[type="number"] { max-width: 10rem; }
   .form-field textarea { resize: vertical; font-family: 'Cascadia Code', 'Fira Code', monospace; }
-  .field-hint { display: block; font-size: 0.75rem; color: var(--color-text-muted); margin-top: 0.125rem; }
 
   .header-row {
     display: flex;
@@ -411,15 +410,6 @@
     gap: 0.75rem;
   }
   .chaos-fields .form-field { flex: 1; min-width: 10rem; }
-
-  .form-actions { display: flex; gap: 0.75rem; margin-top: 1rem; }
-
-  .btn { padding: 0.5rem 1.25rem; border-radius: var(--radius); border: 1px solid transparent; font-weight: 600; font-size: 0.9375rem; cursor: pointer; }
-  .btn-sm { padding: 0.25rem 0.75rem; font-size: 0.8125rem; }
-  .btn-primary { background: var(--color-primary); color: #fff; }
-  .btn-primary:hover { background: var(--color-primary-hover); }
-  .btn-secondary { background: var(--color-surface); color: var(--color-text); border-color: var(--color-border); }
-  .btn-secondary:hover { background: var(--color-bg); }
 
   .btn-icon { width: 1.75rem; height: 1.75rem; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface); color: var(--color-text-muted); font-size: 0.75rem; cursor: pointer; }
   .btn-icon:hover:not(:disabled) { background: var(--color-bg); color: var(--color-text); }

@@ -183,13 +183,5 @@
 
   .confirm-msg { display: flex; align-items: center; gap: 0.5rem; font-weight: 500; }
 
-  .btn { padding: 0.5rem 1.25rem; border-radius: var(--radius); border: 1px solid transparent; font-weight: 600; font-size: 0.9375rem; }
-  .btn-sm { padding: 0.25rem 0.75rem; font-size: 0.8125rem; }
-  .btn-primary { background: var(--color-primary); color: #fff; }
-  .btn-primary:hover { background: var(--color-primary-hover); }
-  .btn-secondary { background: var(--color-surface); color: var(--color-text); border-color: var(--color-border); }
-  .btn-secondary:hover { background: var(--color-bg); }
-  .btn-danger { background: var(--color-danger); color: #fff; }
-  .btn-danger:hover { background: #b02a37; }
   .btn-back { padding: 0.375rem 0.75rem; font-size: 0.875rem; }
 </style>

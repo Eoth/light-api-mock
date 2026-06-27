@@ -1,18 +1,28 @@
+/* ============================================================
+ * lightMock — CSS global
+ *
+ * Variables mappees vers les tokens du design system Aurora/ZAC.
+ * Ce fichier centralise les classes dupliquees (.btn, .form-field, etc.)
+ * pour que les composants Svelte n'aient plus a les redefinir.
+ * ============================================================ */
+
+/* ── Design tokens (mappes vers Aurora/ZAC) ──────────────────── */
+
 :root,
 [data-theme="light"] {
-  --color-bg: #f8f9fa;
-  --color-surface: #ffffff;
-  --color-border: #dee2e6;
-  --color-text: #212529;
-  --color-text-muted: #6c757d;
-  --color-primary: #0d6efd;
-  --color-primary-hover: #0a58ca;
-  --color-success: #198754;
-  --color-danger: #dc3545;
-  --color-warning: #ffc107;
-  --color-focus: #0d6efd40;
-  --radius: 6px;
-  --shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  --color-bg: var(--zac-color-neutral-100, #f7f7f7);
+  --color-surface: var(--zac-color-neutral-0, #fff);
+  --color-border: var(--zac-color-neutral-300, #cdcdcd);
+  --color-text: var(--zac-color-neutral-800, #202020);
+  --color-text-muted: var(--zac-color-neutral-500, #646464);
+  --color-primary: var(--zac-color-primary-500, #244ad1);
+  --color-primary-hover: var(--zac-color-primary-700, #0a1a88);
+  --color-success: var(--zac-color-success-600, #186c38);
+  --color-danger: var(--zac-color-error-600, #bf241a);
+  --color-warning: var(--zac-color-warning-500, #ea510c);
+  --color-focus: var(--zac-color-primary-200, #c9d2f4);
+  --radius: var(--zac-size-radius-xs, 4px);
+  --shadow: 0px 3px 4px 0px rgba(0, 0, 0, 0.19);
 }
 
 [data-theme="dark"] {
@@ -30,6 +40,8 @@
   --shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
 }
 
+/* ── Reset ──────────────────────────────────────────────────── */
+
 *,
 *::before,
 *::after {
@@ -38,43 +50,145 @@
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-family: "Lato", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 1rem;
   line-height: 1.5;
   color: var(--color-text);
   background: var(--color-bg);
 }
 
-h1, h2, h3 {
-  margin: 0 0 0.5rem;
-  line-height: 1.2;
-}
+h1, h2, h3 { margin: 0 0 0.5rem; line-height: 1.2; }
+button { cursor: pointer; font-family: inherit; font-size: inherit; }
+input, select, textarea { background: var(--color-surface); color: var(--color-text); border-color: var(--color-border); }
+:focus-visible { outline: 2px dashed var(--color-text); outline-offset: 2px; }
 
-button {
-  cursor: pointer;
-  font-family: inherit;
-  font-size: inherit;
-}
-
-input, select, textarea {
-  background: var(--color-surface);
-  color: var(--color-text);
-  border-color: var(--color-border);
-}
-
-:focus-visible {
-  outline: 3px solid var(--color-primary);
-  outline-offset: 2px;
-}
+/* ── Accessibilite ──────────────────────────────────────────── */
 
 .sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
 }
+
+/* ── Boutons (centralises — ne plus redefinir dans les composants) ── */
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+  padding: 0.5rem 1.25rem; border-radius: var(--radius);
+  border: 1px solid transparent; font-weight: 600; font-size: 0.9375rem;
+  cursor: pointer; text-decoration: none; min-height: 40px;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.btn-sm { padding: 0.25rem 0.75rem; font-size: 0.8125rem; min-height: 32px; }
+.btn-primary { background: var(--color-primary); color: #fff; border-color: transparent; }
+.btn-primary:hover { background: var(--color-primary-hover); }
+.btn-primary:disabled:hover { background: var(--color-primary); }
+
+.btn-secondary { background: var(--color-surface); color: var(--color-text); border-color: var(--color-border); }
+.btn-secondary:hover { background: var(--color-bg); }
+
+.btn-outline { background: var(--color-surface); color: var(--color-text-muted); border-color: var(--color-border); }
+.btn-outline:hover { background: var(--color-bg); color: var(--color-text); }
+
+.btn-danger { background: var(--color-danger); color: #fff; border-color: transparent; }
+.btn-danger:hover { opacity: 0.9; }
+
+.btn-danger-outline { background: var(--color-surface); color: var(--color-danger); border-color: var(--color-danger); }
+.btn-danger-outline:hover { background: var(--color-danger); color: #fff; }
+
+/* ── Formulaires (centralises) ──────────────────────────────── */
+
+.form-field {
+  display: flex; flex-direction: column; gap: 0.25rem; margin-bottom: 1rem;
+}
+.form-field label {
+  font-weight: 600; font-size: 0.875rem; color: var(--color-text);
+}
+.form-field input,
+.form-field select,
+.form-field textarea {
+  padding: 0.5rem 0.75rem; border: 1px solid var(--color-border);
+  border-radius: var(--radius); font-size: 0.9375rem;
+  background: var(--color-surface); color: var(--color-text);
+  width: 100%; max-width: 100%;
+}
+.form-field input:hover,
+.form-field select:hover,
+.form-field textarea:hover {
+  border-color: var(--color-primary);
+}
+.form-field input:focus,
+.form-field select:focus,
+.form-field textarea:focus {
+  outline: 2px solid var(--color-primary); outline-offset: 1px;
+}
+.form-field input:disabled,
+.form-field select:disabled,
+.form-field textarea:disabled {
+  background: var(--color-bg); cursor: not-allowed; opacity: 0.6;
+}
+
+.form-field-check { flex-direction: row; align-items: center; gap: 0.5rem; }
+.form-field-check label { font-weight: 400; }
+
+.form-row { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+.form-row > .form-field { flex: 1; min-width: 10rem; }
+
+.field-hint {
+  font-size: 0.8125rem; color: var(--color-text-muted); margin-top: 0.125rem;
+}
+
+.form-error {
+  background: var(--zac-color-error-50, #f9e9e8);
+  color: var(--zac-color-error-600, #bf241a);
+  padding: 0.5rem 0.75rem; border-radius: var(--radius);
+  font-size: 0.875rem; border: 1px solid var(--zac-color-error-200, #ebb8b5);
+}
+[data-theme="dark"] .form-error {
+  background: #451a1a; border-color: #7f1d1d; color: #e55565;
+}
+
+.form-actions {
+  display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1rem;
+}
+
+/* ── Badges ─────────────────────────────────────────────────── */
+
+.badge {
+  display: inline-block; padding: 0.1rem 0.375rem; border-radius: 3px;
+  font-size: 0.7rem; font-weight: 700;
+}
+.badge-mock { background: var(--zac-color-success-50, #d7e6d7); color: var(--zac-color-success-800, #0c361c); }
+.badge-proxy { background: var(--zac-color-primary-100, #e4e9fa); color: var(--zac-color-primary-700, #0a1a88); }
+.badge-error { background: var(--zac-color-error-50, #f9e9e8); color: var(--zac-color-error-700, #901b14); }
+
+.method-badge {
+  display: inline-block; padding: 0.1rem 0.375rem; border-radius: 3px;
+  font-size: 0.7rem; font-weight: 700;
+  background: var(--color-focus); color: var(--color-primary);
+}
+
+/* ── Modale ─────────────────────────────────────────────────── */
+
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000; padding: 1rem;
+}
+.modal-content {
+  background: var(--color-surface); border: 1px solid var(--color-border);
+  border-radius: var(--radius); padding: 1.25rem;
+  max-width: 36rem; width: 100%; max-height: 80vh; overflow-y: auto;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.15);
+}
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+.modal-header h3 { margin: 0; font-size: 1.05rem; }
+.modal-footer { margin-top: 1rem; display: flex; justify-content: flex-end; }
+
+.btn-close {
+  background: none; border: 1px solid var(--color-border); border-radius: var(--radius);
+  width: 2rem; height: 2rem; display: inline-flex; align-items: center; justify-content: center;
+  font-size: 0.9rem; cursor: pointer; color: var(--color-text-muted);
+}
+.btn-close:hover { background: var(--color-bg); color: var(--color-danger); border-color: var(--color-danger); }
