@@ -1,3 +1,8 @@
+// Persistance de la config (services + groupes) en YAML sur disque.
+// Architecture : Arc<RwLock<Arc<MockConfig>>> pour lectures O(1) sans clone.
+// snapshot() retourne un Arc (clone du pointeur, pas des donnees).
+// Les ecritures (update/replace) clonent les donnees, les modifient,
+// puis font un atomic write (ecriture tmp + rename) pour eviter la corruption.
 use crate::models::MockConfig;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -5,14 +10,14 @@ use tokio::sync::RwLock;
 
 #[derive(Clone)]
 pub struct MockStore {
-    config: Arc<RwLock<MockConfig>>,
+    config: Arc<RwLock<Arc<MockConfig>>>,
     path: PathBuf,
 }
 
 impl MockStore {
     pub fn new(path: PathBuf) -> Self {
         Self {
-            config: Arc::new(RwLock::new(MockConfig::empty())),
+            config: Arc::new(RwLock::new(Arc::new(MockConfig::empty()))),
             path,
         }
     }
@@ -44,28 +49,30 @@ impl MockStore {
         tracing::info!(path = %file.display(), services = config.services.len(), "config loaded");
 
         Ok(Self {
-            config: Arc::new(RwLock::new(config)),
+            config: Arc::new(RwLock::new(Arc::new(config))),
             path: file,
         })
     }
 
-    pub async fn snapshot(&self) -> MockConfig {
+    pub async fn snapshot(&self) -> Arc<MockConfig> {
         self.config.read().await.clone()
     }
 
     pub async fn replace(&self, config: MockConfig) -> Result<(), StoreError> {
         Self::atomic_write(&self.path, &config)?;
-        *self.config.write().await = config;
+        *self.config.write().await = Arc::new(config);
         Ok(())
     }
 
-    pub async fn update<F>(&self, f: F) -> Result<MockConfig, StoreError>
+    pub async fn update<F>(&self, f: F) -> Result<Arc<MockConfig>, StoreError>
     where
         F: FnOnce(&mut MockConfig),
     {
         let mut guard = self.config.write().await;
-        f(&mut guard);
-        Self::atomic_write(&self.path, &guard)?;
+        let mut cfg = (**guard).clone();
+        f(&mut cfg);
+        Self::atomic_write(&self.path, &cfg)?;
+        *guard = Arc::new(cfg);
         Ok(guard.clone())
     }
 
@@ -104,7 +111,7 @@ impl std::error::Error for StoreError {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::*;
+    use crate::models::{*, WsdlMode};
 
     fn temp_dir() -> PathBuf {
         let dir = std::env::temp_dir().join(format!("lightmock-test-{}", fastrand::u64(..)));
@@ -116,15 +123,19 @@ mod tests {
         MockConfig {
             services: vec![Service {
                 name: "svc-a".into(),
-                method: "GET".into(),
+
                 listen_path: "/svc-a/*".into(),
                 real_target_url: "http://svc-a:8080".into(),
                 is_mocked: true,
                 rewrite_directory_urls: false,
                 group_name: None,
+                wsdl_mode: WsdlMode::default(),
                 rules: vec![Rule {
                     name: "default".into(),
+                    method: "ANY".into(),
+                    sub_path: None,
                     action: RuleAction::default(),
+                    script: None,
                     conditions: ConditionGroup::default(),
                     response: MockResponse {
                         status: 200,
@@ -180,7 +191,7 @@ mod tests {
         assert_eq!(on_disk.services.len(), 1);
 
         let in_mem = store.snapshot().await;
-        assert_eq!(in_mem, on_disk);
+        assert_eq!(*in_mem, on_disk);
         std::fs::remove_dir_all(&dir).ok();
     }
 
@@ -195,12 +206,13 @@ mod tests {
                 cfg.services[0].is_mocked = false;
                 cfg.services.push(Service {
                     name: "svc-b".into(),
-                    method: "GET".into(),
+    
                     listen_path: "/svc-b/*".into(),
                     real_target_url: "http://svc-b:9090".into(),
                     is_mocked: false,
                     rewrite_directory_urls: false,
                     group_name: None,
+                    wsdl_mode: WsdlMode::default(),
                     rules: vec![],
                 });
             })
@@ -215,7 +227,7 @@ mod tests {
             &std::fs::read_to_string(MockStore::config_file(&dir)).unwrap(),
         )
         .unwrap();
-        assert_eq!(on_disk, updated);
+        assert_eq!(on_disk, *updated);
         std::fs::remove_dir_all(&dir).ok();
     }
 
