@@ -27,22 +27,38 @@
   });
 
   const demoService = {
-    name: 'insee-demo',
-    listen_path: '/v4/insee/sirene/etablissements/{siret}',
-    real_target_url: 'https://staging.entreprise.api.gouv.fr',
+    name: 'users-api',
+    listen_path: '/users/{id}',
+    real_target_url: 'https://jsonplaceholder.typicode.com',
     is_mocked: true,
     rewrite_directory_urls: false,
-    rules: [{
-      name: 'etablissement-mock',
-      method: 'GET',
-      conditions: { all_of: [], any_of: [] },
-      response: {
-        status: 200,
-        headers: [{ name: 'Content-Type', value: 'application/json' }],
-        body: [{ type: 'Template', template: '{"siret":"{{path.siret}}","siren":"{{path.siret | first(9)}}","unite_legale":{"denomination":"{{fake.CompanyName}}","date_creation":"{{fake.DatePast}}","adresse":{"voie":"{{fake.StreetName}}","code_postal":"{{fake.PostcodeFR}}","ville":"{{fake.CityFR}}"}},"meta":{"timestamp":{{now_ms}},"seq":{{seq}}}}' }],
-        chaos: null,
+    group_name: null,
+    wsdl_mode: 'auto',
+    rules: [
+      {
+        name: 'get-user-mock',
+        method: 'GET',
+        sub_path: null,
+        action: 'mock',
+        script: 'let role = if random_int(1,5) <= 4 { "user" } else { "admin" };\n#{ role: role, since: date_past() }',
+        conditions: { all_of: [], any_of: [] },
+        response: {
+          status: 200,
+          headers: [{ name: 'Content-Type', value: 'application/json' }],
+          body: [{ type: 'Template', template: '{"id":{{path.id}},"name":"{{fake.FirstName}} {{fake.LastName}}","email":"{{fake.Email}}","phone":"{{fake.PhoneNumberFR}}","company":"{{fake.CompanyName}}","role":"{{script.role}}","member_since":"{{script.since}}","address":{"street":"{{fake.StreetName}}","city":"{{fake.CityFR}}","zipcode":"{{fake.PostcodeFR}}"},"meta":{"request_id":"{{uuid}}","timestamp":{{now_ms}},"seq":{{seq}}}}' }],
+          chaos: null,
+        },
       },
-    }],
+      {
+        name: 'get-user-proxy',
+        method: 'GET',
+        sub_path: null,
+        action: 'proxy',
+        script: null,
+        conditions: { all_of: [{ source: { type: 'Header', key: 'x-real-backend' }, operator: { type: 'Eq', value: 'true' } }], any_of: [] },
+        response: { status: 200, headers: [], body: [{ type: 'Literal', value: '' }], chaos: null },
+      },
+    ],
   };
 
   async function init() {
@@ -126,7 +142,7 @@
     try {
       const result = await createService(demoService);
       services = [...services, result];
-      showNotification('Service de demo INSEE charge', 'success');
+      showNotification('Service de demo charge (users-api avec mock, proxy, script rhai)', 'success');
     } catch (e) {
       showNotification(`Erreur : ${e.message}`, 'error');
     }
@@ -249,7 +265,7 @@
     {#if view === 'logs'}
       <RequestLog />
     {:else if view === 'groups'}
-      <GroupManager {services} authEnabled={auth.enabled} onNotify={showNotification} onBack={handleBack} onServiceUpdate={handleServiceUpdate} />
+      <GroupManager {services} authEnabled={auth.enabled} onNotify={showNotification} onBack={handleBack} onServiceUpdate={handleServiceUpdate} onGroupsChange={(g) => groups = g} />
     {:else if view === 'add'}
       <ServiceForm
         existingNames={services.map(s => s.name)}
@@ -269,9 +285,9 @@
       {#if services.length === 0}
         <div class="demo-section">
           <button type="button" class="btn btn-outline btn-demo" onclick={loadDemo}>
-            Charger un exemple (service INSEE)
+            Charger un exemple
           </button>
-          <span class="field-hint">Cree un service de demo avec path params, template et fake data.</span>
+          <span class="field-hint">Service users-api avec mock (fake data, script rhai ratio 4/5) et proxy conditionnel.</span>
         </div>
       {/if}
     {/if}

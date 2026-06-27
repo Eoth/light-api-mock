@@ -7,6 +7,7 @@
     onNotify = () => {},
     onBack = () => {},
     onServiceUpdate = () => {},
+    onGroupsChange = () => {},
   } = $props();
 
   let groups = $state([]);
@@ -26,9 +27,15 @@
     services.filter(s => !s.group_name)
   );
 
+  function setGroups(newGroups) {
+    groups = newGroups;
+    onGroupsChange(newGroups);
+  }
+
   async function loadGroups() {
     try {
-      groups = await getGroups();
+      const loaded = await getGroups();
+      setGroups(loaded);
     } catch (e) {
       onNotify(`Erreur chargement groupes : ${e.message}`, 'error');
     } finally {
@@ -44,7 +51,7 @@
 
     try {
       const created = await createGroup({ name, code: newGroupCode.trim(), admins: [], members: [] });
-      groups = [...groups, created];
+      setGroups([...groups, created]);
       newGroupName = '';
       newGroupCode = '';
       showForm = false;
@@ -58,7 +65,7 @@
     if (!confirm(`Supprimer le groupe "${name}" ? Les services seront dissocies mais pas supprimes.`)) return;
     try {
       await deleteGroup(name);
-      groups = groups.filter(g => g.name !== name);
+      setGroups(groups.filter(g => g.name !== name));
       if (editingGroup === name) editingGroup = null;
       onNotify(`Groupe "${name}" supprime`, 'success');
     } catch (e) {
@@ -112,7 +119,7 @@
         admins: group.admins,
         members: [...group.members, username],
       });
-      groups = groups.map(g => g.name === groupName ? updated : g);
+      setGroups(groups.map(g => g.name === groupName ? updated : g));
       newMember = '';
     } catch (e) {
       onNotify(`Erreur : ${e.message}`, 'error');
@@ -134,7 +141,7 @@
         admins: [...group.admins, username],
         members,
       });
-      groups = groups.map(g => g.name === groupName ? updated : g);
+      setGroups(groups.map(g => g.name === groupName ? updated : g));
       newAdmin = '';
     } catch (e) {
       onNotify(`Erreur : ${e.message}`, 'error');
@@ -148,7 +155,7 @@
       const admins = role === 'admin' ? group.admins.filter(a => a !== username) : group.admins;
       const members = role === 'member' ? group.members.filter(m => m !== username) : group.members;
       const updated = await updateGroupMembers(groupName, { admins, members });
-      groups = groups.map(g => g.name === groupName ? updated : g);
+      setGroups(groups.map(g => g.name === groupName ? updated : g));
     } catch (e) {
       onNotify(`Erreur : ${e.message}`, 'error');
     }
