@@ -44,9 +44,73 @@ impl ScriptEngine {
                 .as_millis() as i64
         });
 
+        engine.register_fn("now_iso", || -> String {
+            crate::engine::template::epoch_to_iso(
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs(),
+            )
+        });
+
+        engine.register_fn("year", || -> i64 {
+            let secs = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
+            let iso = crate::engine::template::epoch_to_iso(secs);
+            iso[..4].parse().unwrap_or(2026)
+        });
+
+        engine.register_fn("date", || -> String {
+            let secs = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
+            let iso = crate::engine::template::epoch_to_iso(secs);
+            iso[..10].to_string()
+        });
+
+        engine.register_fn("date_past", || -> String {
+            let days_back = fastrand::i64(1..=1825);
+            let secs = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs()
+                - (days_back as u64 * 86400);
+            let iso = crate::engine::template::epoch_to_iso(secs);
+            iso[..10].to_string()
+        });
+
+        engine.register_fn("date_future", || -> String {
+            let days_fwd = fastrand::i64(1..=1825);
+            let secs = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs()
+                + (days_fwd as u64 * 86400);
+            let iso = crate::engine::template::epoch_to_iso(secs);
+            iso[..10].to_string()
+        });
+
+        engine.register_fn("uuid", || -> String {
+            uuid::Uuid::new_v4().to_string()
+        });
+
+        engine.register_fn("fake", |kind: &str| -> String {
+            crate::engine::template::resolve_fake_public(kind)
+        });
+
         Self {
             engine: Arc::new(engine),
         }
+    }
+
+    pub fn validate(&self, script: &str) -> Result<(), String> {
+        self.engine
+            .compile(script)
+            .map(|_| ())
+            .map_err(|e| e.to_string())
     }
 
     pub fn execute(&self, script: &str, context: &ScriptContext) -> Result<ScriptResult, String> {
@@ -207,5 +271,52 @@ mod tests {
         let result = engine.execute(script, &empty_ctx()).unwrap();
         let status = result.fields.get("status").unwrap();
         assert!(status == "actif" || status == "suspendu");
+    }
+
+    #[test]
+    fn year_returns_4_digits() {
+        let engine = ScriptEngine::new();
+        let result = engine.execute("year()", &empty_ctx()).unwrap();
+        let y: i64 = result.value.parse().unwrap();
+        assert!(y >= 2025 && y <= 2100);
+    }
+
+    #[test]
+    fn date_returns_iso_date() {
+        let engine = ScriptEngine::new();
+        let result = engine.execute("date()", &empty_ctx()).unwrap();
+        assert_eq!(result.value.len(), 10);
+        assert!(result.value.contains('-'));
+    }
+
+    #[test]
+    fn date_past_is_before_today() {
+        let engine = ScriptEngine::new();
+        let today = engine.execute("date()", &empty_ctx()).unwrap().value;
+        let past = engine.execute("date_past()", &empty_ctx()).unwrap().value;
+        assert!(past < today);
+    }
+
+    #[test]
+    fn uuid_format() {
+        let engine = ScriptEngine::new();
+        let result = engine.execute("uuid()", &empty_ctx()).unwrap();
+        assert_eq!(result.value.len(), 36);
+        assert_eq!(result.value.chars().filter(|c| *c == '-').count(), 4);
+    }
+
+    #[test]
+    fn fake_returns_data() {
+        let engine = ScriptEngine::new();
+        let result = engine.execute(r#"fake("FirstName")"#, &empty_ctx()).unwrap();
+        assert!(!result.value.is_empty());
+    }
+
+    #[test]
+    fn compose_date_with_string() {
+        let engine = ScriptEngine::new();
+        let result = engine.execute(r#"`${year()}-05-10`"#, &empty_ctx()).unwrap();
+        assert!(result.value.ends_with("-05-10"));
+        assert_eq!(result.value.len(), 10);
     }
 }
