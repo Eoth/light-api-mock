@@ -8,7 +8,6 @@
 <article class="service-card" aria-label="Service {service.name}">
   <div class="card-header">
     <div class="card-info">
-      <span class="method-badge">{service.method || 'GET'}</span>
       <h3 class="card-title">{service.name}</h3>
       <StatusBadge active={service.is_mocked} />
     </div>
@@ -22,7 +21,7 @@
     <dl>
       <div class="detail-row">
         <dt>URL test</dt>
-        <dd><code>/{service.name}{service.listen_path}</code></dd>
+        <dd><code>/{service.name}{service.listen_path || '/*'}</code></dd>
       </div>
       <div class="detail-row">
         <dt>Cible</dt>
@@ -59,7 +58,6 @@
   }
 
   .card-info { display: flex; align-items: center; gap: 0.75rem; }
-  .method-badge { display: inline-block; padding: 0.125rem 0.5rem; border-radius: var(--radius); font-size: 0.75rem; font-weight: 700; background: var(--color-focus); color: var(--color-primary); letter-spacing: 0.03em; }
 
   .card-title { margin: 0; font-size: 1.125rem; font-weight: 600; }
 
@@ -83,9 +81,4 @@
     padding-top: 0.75rem;
     border-top: 1px solid var(--color-border);
   }
-
-  .btn { padding: 0.5rem 1.25rem; border-radius: var(--radius); border: 1px solid transparent; font-weight: 600; cursor: pointer; }
-  .btn-sm { padding: 0.375rem 1rem; font-size: 0.875rem; }
-  .btn-primary { background: var(--color-primary); color: #fff; }
-  .btn-primary:hover { background: var(--color-primary-hover); }
 </style>

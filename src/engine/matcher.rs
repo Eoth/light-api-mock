@@ -10,11 +10,40 @@ pub struct RequestData {
     pub body: Vec<u8>,
     pub content_type: Option<String>,
     pub path_params: HashMap<String, String>,
+    pub method: String,
+    pub remaining_path: String,
 }
 
 impl MatchEngine {
-    pub fn first_match<'a>(rules: &'a [Rule], req: &RequestData) -> Option<&'a Rule> {
-        rules.iter().find(|rule| Self::matches_group(&rule.conditions, req))
+    pub fn first_match<'a>(
+        rules: &'a [Rule],
+        req: &RequestData,
+    ) -> Option<(&'a Rule, HashMap<String, String>)> {
+        rules.iter().find_map(|rule| {
+            if !Self::matches_method(&rule.method, &req.method) {
+                return None;
+            }
+            let sub_params = Self::matches_sub_path(&rule.sub_path, &req.remaining_path)?;
+            if !Self::matches_group(&rule.conditions, req) {
+                return None;
+            }
+            Some((rule, sub_params))
+        })
+    }
+
+    fn matches_method(rule_method: &str, request_method: &str) -> bool {
+        rule_method.eq_ignore_ascii_case("ANY")
+            || rule_method.eq_ignore_ascii_case(request_method)
+    }
+
+    fn matches_sub_path(
+        sub_path: &Option<String>,
+        remaining: &str,
+    ) -> Option<HashMap<String, String>> {
+        match sub_path {
+            None => Some(HashMap::new()),
+            Some(pattern) => match_path(pattern, remaining).map(|(params, _)| params),
+        }
     }
 
     fn matches_group(group: &ConditionGroup, req: &RequestData) -> bool {
@@ -129,6 +158,67 @@ impl MatchEngine {
     }
 }
 
+pub(crate) fn match_path(
+    listen_path: &str,
+    request_path: &str,
+) -> Option<(HashMap<String, String>, String)> {
+    let pattern_str = normalize_colon_syntax(listen_path);
+
+    let pattern_segs: Vec<&str> = pattern_str.split('/').filter(|s| !s.is_empty()).collect();
+    let request_segs: Vec<&str> = request_path.split('/').filter(|s| !s.is_empty()).collect();
+
+    if pattern_segs.is_empty() {
+        return None;
+    }
+
+    let mut params = HashMap::new();
+    let mut has_wildcard = false;
+    let mut matched_count = 0;
+
+    for (i, pat) in pattern_segs.iter().enumerate() {
+        if *pat == "*" {
+            has_wildcard = true;
+            matched_count = i;
+            break;
+        }
+        if i >= request_segs.len() {
+            return None;
+        }
+        if pat.starts_with('{') && pat.ends_with('}') {
+            let name = &pat[1..pat.len() - 1];
+            params.insert(name.to_string(), request_segs[i].to_string());
+        } else if *pat != request_segs[i] {
+            return None;
+        }
+        matched_count = i + 1;
+    }
+
+    if !has_wildcard && request_segs.len() != pattern_segs.len() {
+        return None;
+    }
+
+    let remaining = if matched_count < request_segs.len() {
+        format!("/{}", request_segs[matched_count..].join("/"))
+    } else {
+        String::new()
+    };
+
+    Some((params, remaining))
+}
+
+fn normalize_colon_syntax(s: &str) -> String {
+    s.split('/')
+        .map(|seg| {
+            if let Some(name) = seg.strip_prefix(':') {
+                format!("{{{name}}}")
+            } else {
+                seg.to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("/")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -141,23 +231,36 @@ mod tests {
         ct: Option<&str>,
     ) -> RequestData {
         RequestData {
-            query_params: query.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
-            headers: headers.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
+            query_params: query
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
+            headers: headers
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
             body: body.to_vec(),
             content_type: ct.map(String::from),
             path_params: HashMap::new(),
+            method: "GET".into(),
+            remaining_path: String::new(),
         }
     }
 
     fn simple_rule(name: &str, conditions: ConditionGroup) -> Rule {
         Rule {
             name: name.into(),
+            method: "ANY".into(),
+            sub_path: None,
             action: RuleAction::default(),
+            script: None,
             conditions,
             response: MockResponse {
                 status: 200,
                 headers: vec![],
-                body: vec![BodyFragment::Literal { value: name.into() }],
+                body: vec![BodyFragment::Literal {
+                    value: name.into(),
+                }],
                 chaos: None,
             },
         }
@@ -166,35 +269,44 @@ mod tests {
     #[test]
     fn first_match_returns_first_matching_rule() {
         let rules = vec![
-            simple_rule("r1", ConditionGroup {
+            simple_rule(
+                "r1",
+                ConditionGroup {
+                    all_of: vec![Condition {
+                        source: ConditionSource::Header("x-env".into()),
+                        operator: Operator::Eq("prod".into()),
+                    }],
+                    any_of: vec![],
+                },
+            ),
+            simple_rule(
+                "r2",
+                ConditionGroup {
+                    all_of: vec![Condition {
+                        source: ConditionSource::Header("x-env".into()),
+                        operator: Operator::Eq("staging".into()),
+                    }],
+                    any_of: vec![],
+                },
+            ),
+        ];
+        let req = make_req(&[], &[("x-env", "staging")], b"", None);
+        let (matched, _) = MatchEngine::first_match(&rules, &req).unwrap();
+        assert_eq!(matched.name, "r2");
+    }
+
+    #[test]
+    fn no_match_returns_none() {
+        let rules = vec![simple_rule(
+            "r1",
+            ConditionGroup {
                 all_of: vec![Condition {
                     source: ConditionSource::Header("x-env".into()),
                     operator: Operator::Eq("prod".into()),
                 }],
                 any_of: vec![],
-            }),
-            simple_rule("r2", ConditionGroup {
-                all_of: vec![Condition {
-                    source: ConditionSource::Header("x-env".into()),
-                    operator: Operator::Eq("staging".into()),
-                }],
-                any_of: vec![],
-            }),
-        ];
-        let req = make_req(&[], &[("x-env", "staging")], b"", None);
-        let matched = MatchEngine::first_match(&rules, &req);
-        assert_eq!(matched.unwrap().name, "r2");
-    }
-
-    #[test]
-    fn no_match_returns_none() {
-        let rules = vec![simple_rule("r1", ConditionGroup {
-            all_of: vec![Condition {
-                source: ConditionSource::Header("x-env".into()),
-                operator: Operator::Eq("prod".into()),
-            }],
-            any_of: vec![],
-        })];
+            },
+        )];
         let req = make_req(&[], &[("x-env", "dev")], b"", None);
         assert!(MatchEngine::first_match(&rules, &req).is_none());
     }
@@ -203,31 +315,38 @@ mod tests {
     fn empty_conditions_always_match() {
         let rules = vec![simple_rule("catch-all", ConditionGroup::default())];
         let req = make_req(&[], &[], b"", None);
-        assert_eq!(MatchEngine::first_match(&rules, &req).unwrap().name, "catch-all");
+        let (matched, _) = MatchEngine::first_match(&rules, &req).unwrap();
+        assert_eq!(matched.name, "catch-all");
     }
 
     #[test]
     fn query_param_eq() {
-        let rules = vec![simple_rule("qp", ConditionGroup {
-            all_of: vec![Condition {
-                source: ConditionSource::QueryParam("id".into()),
-                operator: Operator::Eq("42".into()),
-            }],
-            any_of: vec![],
-        })];
+        let rules = vec![simple_rule(
+            "qp",
+            ConditionGroup {
+                all_of: vec![Condition {
+                    source: ConditionSource::QueryParam("id".into()),
+                    operator: Operator::Eq("42".into()),
+                }],
+                any_of: vec![],
+            },
+        )];
         let req = make_req(&[("id", "42")], &[], b"", None);
         assert!(MatchEngine::first_match(&rules, &req).is_some());
     }
 
     #[test]
     fn header_case_insensitive() {
-        let rules = vec![simple_rule("hdr", ConditionGroup {
-            all_of: vec![Condition {
-                source: ConditionSource::Header("Content-Type".into()),
-                operator: Operator::Contains("json".into()),
-            }],
-            any_of: vec![],
-        })];
+        let rules = vec![simple_rule(
+            "hdr",
+            ConditionGroup {
+                all_of: vec![Condition {
+                    source: ConditionSource::Header("Content-Type".into()),
+                    operator: Operator::Contains("json".into()),
+                }],
+                any_of: vec![],
+            },
+        )];
         let req = make_req(&[], &[("content-type", "application/json")], b"", None);
         assert!(MatchEngine::first_match(&rules, &req).is_some());
     }
@@ -235,19 +354,22 @@ mod tests {
     #[test]
     fn json_pointer_extraction() {
         let body = br#"{"user":{"role":"admin","id":5}}"#;
-        let rules = vec![simple_rule("jp", ConditionGroup {
-            all_of: vec![
-                Condition {
-                    source: ConditionSource::JsonPointer("/user/role".into()),
-                    operator: Operator::Eq("admin".into()),
-                },
-                Condition {
-                    source: ConditionSource::JsonPointer("/user/id".into()),
-                    operator: Operator::Eq("5".into()),
-                },
-            ],
-            any_of: vec![],
-        })];
+        let rules = vec![simple_rule(
+            "jp",
+            ConditionGroup {
+                all_of: vec![
+                    Condition {
+                        source: ConditionSource::JsonPointer("/user/role".into()),
+                        operator: Operator::Eq("admin".into()),
+                    },
+                    Condition {
+                        source: ConditionSource::JsonPointer("/user/id".into()),
+                        operator: Operator::Eq("5".into()),
+                    },
+                ],
+                any_of: vec![],
+            },
+        )];
         let req = make_req(&[], &[], body, Some("application/json"));
         assert!(MatchEngine::first_match(&rules, &req).is_some());
     }
@@ -255,13 +377,16 @@ mod tests {
     #[test]
     fn xpath_extraction() {
         let body = br#"<Envelope><Body><id>123</id></Body></Envelope>"#;
-        let rules = vec![simple_rule("xp", ConditionGroup {
-            all_of: vec![Condition {
-                source: ConditionSource::XPath("Envelope/Body/id".into()),
-                operator: Operator::Eq("123".into()),
-            }],
-            any_of: vec![],
-        })];
+        let rules = vec![simple_rule(
+            "xp",
+            ConditionGroup {
+                all_of: vec![Condition {
+                    source: ConditionSource::XPath("Envelope/Body/id".into()),
+                    operator: Operator::Eq("123".into()),
+                }],
+                any_of: vec![],
+            },
+        )];
         let req = make_req(&[], &[], body, Some("text/xml"));
         assert!(MatchEngine::first_match(&rules, &req).is_some());
     }
@@ -269,13 +394,16 @@ mod tests {
     #[test]
     fn xpath_with_namespace() {
         let body = br#"<soap:Envelope><soap:Body><ns:id>abc</ns:id></soap:Body></soap:Envelope>"#;
-        let rules = vec![simple_rule("xpns", ConditionGroup {
-            all_of: vec![Condition {
-                source: ConditionSource::XPath("Envelope/Body/id".into()),
-                operator: Operator::Eq("abc".into()),
-            }],
-            any_of: vec![],
-        })];
+        let rules = vec![simple_rule(
+            "xpns",
+            ConditionGroup {
+                all_of: vec![Condition {
+                    source: ConditionSource::XPath("Envelope/Body/id".into()),
+                    operator: Operator::Eq("abc".into()),
+                }],
+                any_of: vec![],
+            },
+        )];
         let req = make_req(&[], &[], body, Some("text/xml"));
         assert!(MatchEngine::first_match(&rules, &req).is_some());
     }
@@ -283,13 +411,16 @@ mod tests {
     #[test]
     fn form_field_extraction() {
         let body = b"username=admin&password=secret";
-        let rules = vec![simple_rule("form", ConditionGroup {
-            all_of: vec![Condition {
-                source: ConditionSource::FormField("username".into()),
-                operator: Operator::Eq("admin".into()),
-            }],
-            any_of: vec![],
-        })];
+        let rules = vec![simple_rule(
+            "form",
+            ConditionGroup {
+                all_of: vec![Condition {
+                    source: ConditionSource::FormField("username".into()),
+                    operator: Operator::Eq("admin".into()),
+                }],
+                any_of: vec![],
+            },
+        )];
         let req = make_req(&[], &[], body, Some("application/x-www-form-urlencoded"));
         assert!(MatchEngine::first_match(&rules, &req).is_some());
     }
@@ -297,26 +428,32 @@ mod tests {
     #[test]
     fn body_raw_contains() {
         let body = b"Hello World test payload";
-        let rules = vec![simple_rule("raw", ConditionGroup {
-            all_of: vec![Condition {
-                source: ConditionSource::BodyRaw,
-                operator: Operator::Contains("World".into()),
-            }],
-            any_of: vec![],
-        })];
+        let rules = vec![simple_rule(
+            "raw",
+            ConditionGroup {
+                all_of: vec![Condition {
+                    source: ConditionSource::BodyRaw,
+                    operator: Operator::Contains("World".into()),
+                }],
+                any_of: vec![],
+            },
+        )];
         let req = make_req(&[], &[], body, None);
         assert!(MatchEngine::first_match(&rules, &req).is_some());
     }
 
     #[test]
     fn regex_operator() {
-        let rules = vec![simple_rule("rgx", ConditionGroup {
-            all_of: vec![Condition {
-                source: ConditionSource::QueryParam("code".into()),
-                operator: Operator::Regex(r"^\d{3}$".into()),
-            }],
-            any_of: vec![],
-        })];
+        let rules = vec![simple_rule(
+            "rgx",
+            ConditionGroup {
+                all_of: vec![Condition {
+                    source: ConditionSource::QueryParam("code".into()),
+                    operator: Operator::Regex(r"^\d{3}$".into()),
+                }],
+                any_of: vec![],
+            },
+        )];
         let yes = make_req(&[("code", "200")], &[], b"", None);
         let no = make_req(&[("code", "abcd")], &[], b"", None);
         assert!(MatchEngine::first_match(&rules, &yes).is_some());
@@ -325,13 +462,16 @@ mod tests {
 
     #[test]
     fn exists_operator() {
-        let rules = vec![simple_rule("ex", ConditionGroup {
-            all_of: vec![Condition {
-                source: ConditionSource::Header("x-debug".into()),
-                operator: Operator::Exists,
-            }],
-            any_of: vec![],
-        })];
+        let rules = vec![simple_rule(
+            "ex",
+            ConditionGroup {
+                all_of: vec![Condition {
+                    source: ConditionSource::Header("x-debug".into()),
+                    operator: Operator::Exists,
+                }],
+                any_of: vec![],
+            },
+        )];
         let yes = make_req(&[], &[("x-debug", "")], b"", None);
         let no = make_req(&[], &[], b"", None);
         assert!(MatchEngine::first_match(&rules, &yes).is_some());
@@ -340,22 +480,25 @@ mod tests {
 
     #[test]
     fn all_of_and_any_of_combined() {
-        let rules = vec![simple_rule("combo", ConditionGroup {
-            all_of: vec![Condition {
-                source: ConditionSource::Header("x-env".into()),
-                operator: Operator::Eq("staging".into()),
-            }],
-            any_of: vec![
-                Condition {
-                    source: ConditionSource::QueryParam("debug".into()),
-                    operator: Operator::Exists,
-                },
-                Condition {
-                    source: ConditionSource::QueryParam("trace".into()),
-                    operator: Operator::Exists,
-                },
-            ],
-        })];
+        let rules = vec![simple_rule(
+            "combo",
+            ConditionGroup {
+                all_of: vec![Condition {
+                    source: ConditionSource::Header("x-env".into()),
+                    operator: Operator::Eq("staging".into()),
+                }],
+                any_of: vec![
+                    Condition {
+                        source: ConditionSource::QueryParam("debug".into()),
+                        operator: Operator::Exists,
+                    },
+                    Condition {
+                        source: ConditionSource::QueryParam("trace".into()),
+                        operator: Operator::Exists,
+                    },
+                ],
+            },
+        )];
 
         let ok1 = make_req(&[("debug", "1")], &[("x-env", "staging")], b"", None);
         let ok2 = make_req(&[("trace", "1")], &[("x-env", "staging")], b"", None);
@@ -366,5 +509,109 @@ mod tests {
         assert!(MatchEngine::first_match(&rules, &ok2).is_some());
         assert!(MatchEngine::first_match(&rules, &fail_header).is_none());
         assert!(MatchEngine::first_match(&rules, &fail_any).is_none());
+    }
+
+    // --- Method matching tests ---
+
+    #[test]
+    fn rule_method_get_matches_get_only() {
+        let mut rule = simple_rule("get-only", ConditionGroup::default());
+        rule.method = "GET".into();
+        let rules = vec![rule];
+
+        let mut req_get = make_req(&[], &[], b"", None);
+        req_get.method = "GET".into();
+        assert!(MatchEngine::first_match(&rules, &req_get).is_some());
+
+        let mut req_post = make_req(&[], &[], b"", None);
+        req_post.method = "POST".into();
+        assert!(MatchEngine::first_match(&rules, &req_post).is_none());
+    }
+
+    #[test]
+    fn rule_method_any_matches_all() {
+        let rules = vec![simple_rule("any", ConditionGroup::default())];
+        for m in ["GET", "POST", "PUT", "DELETE", "PATCH"] {
+            let mut req = make_req(&[], &[], b"", None);
+            req.method = m.into();
+            assert!(
+                MatchEngine::first_match(&rules, &req).is_some(),
+                "ANY should match {m}"
+            );
+        }
+    }
+
+    #[test]
+    fn sub_path_matches_remaining() {
+        let mut rule = simple_rule("sub", ConditionGroup::default());
+        rule.sub_path = Some("/users/{id}".into());
+        let rules = vec![rule];
+
+        let mut req = make_req(&[], &[], b"", None);
+        req.remaining_path = "/users/42".into();
+        let (matched, sub_params) = MatchEngine::first_match(&rules, &req).unwrap();
+        assert_eq!(matched.name, "sub");
+        assert_eq!(sub_params.get("id").unwrap(), "42");
+    }
+
+    #[test]
+    fn sub_path_no_match() {
+        let mut rule = simple_rule("sub", ConditionGroup::default());
+        rule.sub_path = Some("/users/{id}".into());
+        let rules = vec![rule];
+
+        let mut req = make_req(&[], &[], b"", None);
+        req.remaining_path = "/orders/1".into();
+        assert!(MatchEngine::first_match(&rules, &req).is_none());
+    }
+
+    #[test]
+    fn method_and_sub_path_combined() {
+        let mut get_rule = simple_rule("get-users", ConditionGroup::default());
+        get_rule.method = "GET".into();
+        get_rule.sub_path = Some("/users/{id}".into());
+
+        let mut post_rule = simple_rule("post-users", ConditionGroup::default());
+        post_rule.method = "POST".into();
+        post_rule.sub_path = Some("/users".into());
+
+        let rules = vec![get_rule, post_rule];
+
+        let mut req_get = make_req(&[], &[], b"", None);
+        req_get.method = "GET".into();
+        req_get.remaining_path = "/users/42".into();
+        let (matched, params) = MatchEngine::first_match(&rules, &req_get).unwrap();
+        assert_eq!(matched.name, "get-users");
+        assert_eq!(params.get("id").unwrap(), "42");
+
+        let mut req_post = make_req(&[], &[], b"", None);
+        req_post.method = "POST".into();
+        req_post.remaining_path = "/users".into();
+        let (matched, _) = MatchEngine::first_match(&rules, &req_post).unwrap();
+        assert_eq!(matched.name, "post-users");
+    }
+
+    // --- match_path tests ---
+
+    #[test]
+    fn match_path_wildcard() {
+        let r = match_path("/svc-a/*", "/svc-a/foo/bar");
+        assert!(r.is_some());
+        let (_, remaining) = r.unwrap();
+        assert_eq!(remaining, "/foo/bar");
+    }
+
+    #[test]
+    fn match_path_named_param() {
+        let r = match_path("/v4/insee/{siret}", "/v4/insee/44306184100047");
+        assert!(r.is_some());
+        let (params, _) = r.unwrap();
+        assert_eq!(params.get("siret").unwrap(), "44306184100047");
+    }
+
+    #[test]
+    fn match_path_empty_never_matches() {
+        assert!(match_path("", "/").is_none());
+        assert!(match_path("/", "/").is_none());
     }
 }

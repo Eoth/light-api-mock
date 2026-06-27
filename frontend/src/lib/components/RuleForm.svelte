@@ -2,32 +2,39 @@
   import ConditionForm from './ConditionForm.svelte';
   import JsonResponseBuilder from './JsonResponseBuilder.svelte';
   import XmlResponseBuilder from './XmlResponseBuilder.svelte';
+  import ToggleSwitch from './ToggleSwitch.svelte';
   import { templateToTestJson, templateToFields, validateTemplateAsJson, validateTemplateAsXml, fieldsToTemplate, varNameToSource } from '../tpl-utils.js';
+
+  import { untrack } from 'svelte';
 
   let { rule = null, existingRuleNames = [], onSave = () => {}, onCancel = () => {} } = $props();
 
-  function deepCopy(obj) { return JSON.parse(JSON.stringify(obj)); }
+  const init = untrack(() => rule ? JSON.parse(JSON.stringify(rule)) : null);
+  let name = $state(init?.name ?? '');
+  let ruleMethod = $state(init?.method ?? 'ANY');
+  let subPath = $state(init?.sub_path ?? '');
+  let ruleAction = $state(init?.action ?? 'mock');
+  let scriptEnabled = $state(!!init?.script);
+  let scriptCode = $state(init?.script ?? '');
 
-  const initial = rule ? deepCopy(rule) : null;
-  let name = $state(initial?.name ?? '');
-  let ruleAction = $state(initial?.action ?? 'mock');
-  let allOf = $state(initial?.conditions?.all_of ?? []);
-  let anyOf = $state(initial?.conditions?.any_of ?? []);
+  const httpMethods = ['ANY', 'GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'];
+  let allOf = $state(init?.conditions?.all_of ?? []);
+  let anyOf = $state(init?.conditions?.any_of ?? []);
   let addingConditionTo = $state(null);
 
-  let status = $state(initial?.response?.status ?? 200);
-  let respHeaders = $state(initial?.response?.headers ?? []);
-  let fragments = $state(initial?.response?.body ?? [{ type: 'Literal', value: '' }]);
-  let chaosEnabled = $state(!!initial?.response?.chaos);
-  let chaos = $state(initial?.response?.chaos ?? { delay_ms: 0, delay_min_ms: null, delay_max_ms: null, error_rate: 0, error_status: 500 });
+  let status = $state(init?.response?.status ?? 200);
+  let respHeaders = $state(init?.response?.headers ?? []);
+  let fragments = $state(init?.response?.body ?? [{ type: 'Literal', value: '' }]);
+  let chaosEnabled = $state(!!init?.response?.chaos);
+  let chaos = $state(init?.response?.chaos ?? { delay_ms: 0, delay_min_ms: null, delay_max_ms: null, error_rate: 0, error_status: 500 });
 
   let responseOpen = $state(true);
   let formError = $state('');
 
   function detectMode() {
-    if (!initial?.response?.body?.length) return 'json-guided';
-    if (initial.response.body.length === 1 && initial.response.body[0].type === 'Template') return 'advanced';
-    if (initial.response.status === 204) return 'empty';
+    if (!init?.response?.body?.length) return 'json-guided';
+    if (init.response.body.length === 1 && init.response.body[0].type === 'Template') return 'advanced';
+    if (init.response.status === 204) return 'empty';
     return 'advanced';
   }
   let responseMode = $state(detectMode());
@@ -110,7 +117,10 @@
     const finalBody = buildFragmentsFromMode();
     onSave({
       name: name.trim(),
+      method: ruleMethod,
+      sub_path: subPath.trim() || null,
       action: ruleAction,
+      script: scriptEnabled && scriptCode.trim() ? scriptCode.trim() : null,
       conditions: { all_of: allOf, any_of: anyOf },
       response: {
         status: finalStatus,
@@ -356,7 +366,7 @@
   function removeHeader(idx) { respHeaders = respHeaders.filter((_, i) => i !== idx); }
 </script>
 
-<form class="rule-form" onsubmit={handleSubmit} aria-label={initial ? `Modifier la regle ${initial.name}` : 'Nouvelle regle'}>
+<form class="rule-form" onsubmit={handleSubmit} aria-label={init ? `Modifier la regle ${init.name}` : 'Nouvelle regle'}>
 
   {#if formError}
     <div class="form-error" role="alert" aria-live="assertive">{formError}</div>
@@ -366,6 +376,24 @@
     <label for="rule-name">Nom de la regle</label>
     <input id="rule-name" type="text" bind:value={name} required placeholder="ex: get-siret" aria-describedby="rn-hint" />
     <span class="field-hint" id="rn-hint">Identifiant unique de cette regle dans le service</span>
+  </div>
+
+  <div class="form-row">
+    <div class="form-field">
+      <label for="rule-method">Methode HTTP</label>
+      <select id="rule-method" bind:value={ruleMethod} aria-describedby="rule-method-hint">
+        {#each httpMethods as m}
+          <option value={m}>{m}</option>
+        {/each}
+      </select>
+      <span class="field-hint" id="rule-method-hint">ANY matche toutes les methodes HTTP</span>
+    </div>
+
+    <div class="form-field">
+      <label for="rule-subpath">Sous-chemin (optionnel)</label>
+      <input id="rule-subpath" type="text" bind:value={subPath} placeholder="ex: /users/{'{id}'}" aria-describedby="rule-subpath-hint" />
+      <span class="field-hint" id="rule-subpath-hint">Affine le matching au sein du service</span>
+    </div>
   </div>
 
   <!-- ACTION -->
@@ -558,14 +586,33 @@
       {/if}
 
       <!-- CHAOS -->
+      <div class="sub-section script-section">
+        <ToggleSwitch label="Script personnalise" checked={scriptEnabled} onchange={(v) => scriptEnabled = v} />
+        {#if scriptEnabled}
+          <div class="script-editor">
+            <label for="rule-script">Code Rhai</label>
+            <textarea id="rule-script" bind:value={scriptCode} rows="8" class="script-textarea" placeholder={'// Exemples Rhai :\n// Retourner une valeur simple :\nlet id = request.path.id;\n`user_${id}`\n\n// Retourner un objet (accessible via {{script.champ}}) :\n#{ nom: "Alice", age: "30" }'} aria-describedby="script-hint"></textarea>
+            <div class="script-help" id="script-hint">
+              <p class="field-hint"><strong>Contexte disponible :</strong> <code>request.body</code> (texte), <code>request.headers</code>, <code>request.query</code>, <code>request.path</code> (maps cle/valeur)</p>
+              <p class="field-hint"><strong>Resultat :</strong> La derniere expression est le retour. String → <code>{"{{script}}"}</code>. Objet <code>#{"{cle: val}"}</code> → <code>{"{{script.cle}}"}</code></p>
+              <details class="script-examples">
+                <summary class="field-hint">Exemples et syntaxe Rhai</summary>
+                <div class="script-examples-content">
+                  <p><strong>Variables et types :</strong> <code>let x = 42;</code> <code>let s = "hello";</code> <code>let b = true;</code></p>
+                  <p><strong>Conditions :</strong> <code>if x &gt; 10 {"{"} "grand" {"}"} else {"{"} "petit" {"}"}</code></p>
+                  <p><strong>Strings :</strong> <code>s.to_upper()</code> <code>s.len()</code> <code>s.contains("el")</code> <code>s.replace("a", "b")</code> <code>s.trim()</code></p>
+                  <p><strong>Concatenation :</strong> <code>`Bonjour ${"{"} request.path.nom {"}"}`</code> (backticks pour interpolation)</p>
+                  <p><strong>Objet retour :</strong> <code>#{"{"} cle1: "val1", cle2: request.query.param {"}"}</code></p>
+                  <p class="field-hint">Rhai est sandboxe : pas d'acces fichier/reseau, 10 000 operations max. <a href="https://rhai.rs/book/" target="_blank" rel="noopener">Documentation Rhai</a></p>
+                </div>
+              </details>
+            </div>
+          </div>
+        {/if}
+      </div>
+
       <div class="sub-section chaos-section">
-        <div class="chaos-toggle">
-          <strong>Mode Chaos</strong>
-          <button type="button" role="switch" aria-checked={chaosEnabled} aria-label="Activer le mode chaos" class="toggle-switch" class:active={chaosEnabled} onclick={() => chaosEnabled = !chaosEnabled}>
-            <span class="toggle-knob"></span>
-          </button>
-          <span aria-live="polite">{chaosEnabled ? 'Actif' : 'Inactif'}</span>
-        </div>
+        <ToggleSwitch label="Mode Chaos" checked={chaosEnabled} onchange={(v) => chaosEnabled = v} />
         {#if chaosEnabled}
           <div class="chaos-fields">
             <label>Latence fixe (ms) <input type="number" bind:value={chaos.delay_ms} min="0" max="30000" /></label>
@@ -583,15 +630,13 @@
 
   <!-- ACTIONS -->
   <div class="form-actions">
-    <button type="submit" class="btn btn-primary">{initial ? 'Enregistrer la regle' : 'Ajouter la regle'}</button>
+    <button type="submit" class="btn btn-primary">{init ? 'Enregistrer la regle' : 'Ajouter la regle'}</button>
     <button type="button" class="btn btn-secondary" onclick={onCancel}>Annuler</button>
   </div>
 </form>
 
 <style>
   .rule-form { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius); padding: 1.25rem; }
-  .form-error { background: #f8d7da; border: 1px solid #f1aeb5; color: #58151c; padding: 0.5rem 0.75rem; border-radius: var(--radius); margin-bottom: 1rem; font-weight: 500; }
-  :global([data-theme="dark"]) .form-error { background: #3b1219; border-color: #dc3545; color: #f1aeb5; }
 
   .action-section { border-color: var(--color-success); }
   .action-selector { display: flex; gap: 0.75rem; flex-wrap: wrap; }
@@ -610,10 +655,6 @@
   :global([data-theme="dark"]) .mode-warning { background: #332701; border-color: #e5a50a; color: #ffe082; }
   .mode-warning p { margin: 0 0 0.5rem; font-size: 0.875rem; }
   .mode-warning-actions { display: flex; gap: 0.5rem; }
-  .form-field { margin-bottom: 1rem; }
-  .form-field label { display: block; font-weight: 600; margin-bottom: 0.25rem; }
-  .form-field input, .form-field select { width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--color-border); border-radius: var(--radius); font-size: 1rem; font-family: inherit; }
-  .field-hint { display: block; font-size: 0.8125rem; color: var(--color-text-muted); margin-top: 0.25rem; }
 
   .section { border: 1px solid var(--color-border); border-radius: var(--radius); padding: 0.75rem; margin-bottom: 1rem; }
   .section legend { font-weight: 600; font-size: 0.875rem; padding: 0 0.375rem; }
@@ -652,38 +693,26 @@
   .inline-label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.375rem; }
   .inline-label input { padding: 0.375rem 0.5rem; border: 1px solid var(--color-border); border-radius: var(--radius); font-size: 0.875rem; }
 
-  .int-range { display: flex; gap: 0.75rem; margin-top: 0.375rem; }
-  .int-range label { display: flex; align-items: center; gap: 0.375rem; font-size: 0.875rem; }
-  .int-range input { width: 5rem; padding: 0.375rem 0.5rem; border: 1px solid var(--color-border); border-radius: var(--radius); font-size: 0.875rem; }
 
-  .path-help { margin-top: 0.375rem; }
-  .path-example { border-collapse: collapse; font-size: 0.8125rem; margin-bottom: 0.25rem; }
-  .path-example th, .path-example td { border: 1px solid var(--color-border); padding: 0.25rem 0.5rem; text-align: center; }
-  .path-example th { background: var(--color-bg); font-weight: 600; }
-  .path-example .hl { background: #d4edda; font-weight: 600; }
-
+  .script-section { border-top-color: var(--color-primary); }
+  .script-editor { margin-top: 0.75rem; }
+  .script-editor label { display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 0.25rem; }
+  .script-textarea { width: 100%; font-family: 'Cascadia Code', 'Fira Code', monospace; font-size: 0.8125rem; padding: 0.5rem; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-bg); color: var(--color-text); resize: vertical; }
+  .script-help { margin-top: 0.375rem; }
+  .script-help p { margin: 0.25rem 0; }
+  .script-help code { font-size: 0.8125rem; background: var(--color-bg); padding: 0.1rem 0.25rem; border-radius: 2px; }
+  .script-examples { margin-top: 0.375rem; }
+  .script-examples summary { cursor: pointer; color: var(--color-primary); font-size: 0.8125rem; }
+  .script-examples-content { padding: 0.5rem; background: var(--color-bg); border-radius: var(--radius); margin-top: 0.25rem; font-size: 0.8125rem; }
+  .script-examples-content p { margin: 0.25rem 0; }
+  .script-examples-content a { color: var(--color-primary); }
   .chaos-section { border-top-color: var(--color-warning); }
-  .chaos-toggle { display: flex; align-items: center; gap: 0.75rem; }
+
   .chaos-fields { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 0.5rem; }
   .chaos-fields label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.875rem; min-width: 8rem; }
   .chaos-fields input { padding: 0.375rem 0.5rem; border: 1px solid var(--color-border); border-radius: var(--radius); font-size: 0.875rem; }
 
-  .toggle-switch { position: relative; width: 44px; height: 24px; border-radius: 12px; border: 2px solid var(--color-border); background: var(--color-border); padding: 0; cursor: pointer; transition: background-color 0.2s; }
-  .toggle-switch.active { background: var(--color-warning); border-color: var(--color-warning); }
-  .toggle-knob { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.2); transition: transform 0.2s; }
-  .toggle-switch.active .toggle-knob { transform: translateX(20px); }
 
-  .form-actions { display: flex; gap: 0.75rem; margin-top: 1rem; }
-  .form-row { display: flex; gap: 0.75rem; flex-wrap: wrap; }
-
-  .btn { padding: 0.5rem 1.25rem; border-radius: var(--radius); border: 1px solid transparent; font-weight: 600; font-size: 0.9375rem; cursor: pointer; }
-  .btn-sm { padding: 0.25rem 0.75rem; font-size: 0.8125rem; }
-  .btn-primary { background: var(--color-primary); color: #fff; }
-  .btn-primary:hover { background: var(--color-primary-hover); }
-  .btn-secondary { background: var(--color-surface); color: var(--color-text); border-color: var(--color-border); }
-  .btn-secondary:hover { background: var(--color-bg); }
-  .btn-outline { background: var(--color-surface); color: var(--color-text-muted); border-color: var(--color-border); }
-  .btn-outline:hover { background: var(--color-bg); color: var(--color-text); }
   .btn-icon { width: 1.75rem; height: 1.75rem; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface); color: var(--color-text-muted); font-size: 0.75rem; cursor: pointer; }
   .btn-icon:hover:not(:disabled) { background: var(--color-bg); color: var(--color-text); }
   .btn-icon:disabled { opacity: 0.35; cursor: not-allowed; }

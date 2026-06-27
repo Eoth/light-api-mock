@@ -298,6 +298,7 @@ mod tests {
             headers: &EMPTY,
             request_body: EMPTY_BODY,
             seq_counter: 0,
+            script_result: None,
         }
     }
 

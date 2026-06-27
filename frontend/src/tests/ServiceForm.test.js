@@ -43,37 +43,37 @@ describe('ServiceForm validation', () => {
     expect(getByRole('alert')).toHaveTextContent('reserve');
   });
 
-  it('refuse un listen_path vide', async () => {
-    const onSave = vi.fn();
-    const { getByLabelText, container, getByRole } = render(ServiceForm, { props: { onSave } });
+  it('accepte un listen_path vide (catch-all)', async () => {
+    const onSave = vi.fn().mockResolvedValue({});
+    const { getByLabelText, container } = render(ServiceForm, { props: { onSave } });
 
     await setInput(getByLabelText('Nom du service'), 'my-svc');
-    await setInput(getByLabelText("Chemin d'ecoute"), '');
+    await setInput(getByLabelText(/Chemin d'ecoute/), '');
+    await setInput(getByLabelText('URL cible réelle'), 'http://backend:8080');
     await submitForm(container);
-    expect(onSave).not.toHaveBeenCalled();
-    expect(getByRole('alert')).toHaveTextContent('Interdit');
+    expect(onSave).toHaveBeenCalled();
   });
 
-  it('refuse un listen_path "/" seul', async () => {
-    const onSave = vi.fn();
-    const { getByLabelText, container, getByRole } = render(ServiceForm, { props: { onSave } });
+  it('accepte un listen_path "/" (catch-all)', async () => {
+    const onSave = vi.fn().mockResolvedValue({});
+    const { getByLabelText, container } = render(ServiceForm, { props: { onSave } });
 
     await setInput(getByLabelText('Nom du service'), 'my-svc');
-    await setInput(getByLabelText("Chemin d'ecoute"), '/');
+    await setInput(getByLabelText(/Chemin d'ecoute/), '/');
+    await setInput(getByLabelText('URL cible réelle'), 'http://backend:8080');
     await submitForm(container);
-    expect(onSave).not.toHaveBeenCalled();
-    expect(getByRole('alert')).toHaveTextContent('Interdit');
+    expect(onSave).toHaveBeenCalled();
   });
 
-  it('refuse un listen_path "/*" (catch-all racine)', async () => {
-    const onSave = vi.fn();
-    const { getByLabelText, container, getByRole } = render(ServiceForm, { props: { onSave } });
+  it('accepte un listen_path "/*" (catch-all explicite)', async () => {
+    const onSave = vi.fn().mockResolvedValue({});
+    const { getByLabelText, container } = render(ServiceForm, { props: { onSave } });
 
     await setInput(getByLabelText('Nom du service'), 'my-svc');
-    await setInput(getByLabelText("Chemin d'ecoute"), '/*');
+    await setInput(getByLabelText(/Chemin d'ecoute/), '/*');
+    await setInput(getByLabelText('URL cible réelle'), 'http://backend:8080');
     await submitForm(container);
-    expect(onSave).not.toHaveBeenCalled();
-    expect(getByRole('alert')).toHaveTextContent('Interdit');
+    expect(onSave).toHaveBeenCalled();
   });
 
   it('accepte un listen_path valide avec sous-chemin', async () => {
@@ -81,7 +81,7 @@ describe('ServiceForm validation', () => {
     const { getByLabelText, container } = render(ServiceForm, { props: { onSave } });
 
     await setInput(getByLabelText('Nom du service'), 'my-svc');
-    await setInput(getByLabelText("Chemin d'ecoute"), '/v1/users/*');
+    await setInput(getByLabelText(/Chemin d'ecoute/), '/v1/users/*');
     await setInput(getByLabelText('URL cible réelle'), 'http://backend:8080');
     await submitForm(container);
     expect(onSave).toHaveBeenCalled();
@@ -113,7 +113,6 @@ describe('ServiceForm validation', () => {
     const onSave = vi.fn().mockResolvedValue({});
     const existingService = {
       name: 'existing-svc',
-      method: 'GET',
       listen_path: '/v1/*',
       real_target_url: 'http://backend:8080',
       is_mocked: true,

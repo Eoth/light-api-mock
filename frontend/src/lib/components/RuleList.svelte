@@ -111,6 +111,7 @@
 
           <div class="rule-content">
             <span class="rule-index" aria-hidden="true">{idx + 1}</span>
+            <span class="rule-method-badge">{rule.method ?? 'ANY'}</span>
             <span class="rule-action-badge" class:proxy={rule.action === 'proxy'}>{(rule.action ?? 'mock').toUpperCase()}</span>
             <span class="rule-name">{rule.name}</span>
             <span class="rule-meta">
@@ -170,6 +171,7 @@
 
   .rule-content { flex: 1; display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
   .rule-index { display: inline-flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; border-radius: 50%; background: var(--color-bg); font-size: 0.75rem; font-weight: 700; flex-shrink: 0; }
+  .rule-method-badge { display: inline-block; padding: 0.0625rem 0.375rem; border-radius: var(--radius); font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.04em; background: var(--color-focus); color: var(--color-primary); flex-shrink: 0; }
   .rule-action-badge { display: inline-block; padding: 0.0625rem 0.375rem; border-radius: var(--radius); font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.04em; background: var(--color-success); color: #fff; flex-shrink: 0; }
   .rule-action-badge.proxy { background: var(--color-primary); }
   .rule-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -181,8 +183,4 @@
   .btn-icon:disabled { opacity: 0.35; cursor: not-allowed; }
   .btn-icon.btn-delete:hover:not(:disabled) { color: var(--color-danger); border-color: var(--color-danger); }
   .btn-icon.btn-edit:hover:not(:disabled) { color: var(--color-primary); border-color: var(--color-primary); }
-
-  .btn-sm { padding: 0.25rem 0.75rem; font-size: 0.8125rem; border-radius: var(--radius); border: 1px solid transparent; font-weight: 600; cursor: pointer; }
-  .btn-primary { background: var(--color-primary); color: #fff; }
-  .btn-primary:hover { background: var(--color-primary-hover); }
 </style>

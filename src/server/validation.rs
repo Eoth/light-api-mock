@@ -1,6 +1,7 @@
 use crate::models::Service;
 
 const RESERVED_NAMES: &[&str] = &["api", "auth", "index.html", "assets", "favicon.ico"];
+const VALID_METHODS: &[&str] = &["ANY", "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"];
 
 const RESERVED_PATH_PREFIXES: &[&str] = &[
     "/api/", "/api", "/index.html", "/assets/", "/favicon.ico",
@@ -21,14 +22,7 @@ pub fn is_internal_route(path: &str) -> bool {
         .any(|prefix| lower == *prefix || lower.starts_with(prefix))
 }
 
-fn is_dangerous_listen_path(listen_path: &str) -> bool {
-    let trimmed = listen_path.trim().trim_matches('/');
-    if trimmed.is_empty() {
-        return true;
-    }
-    if trimmed == "*" {
-        return true;
-    }
+fn is_dangerous_listen_path(_listen_path: &str) -> bool {
     false
 }
 
@@ -102,6 +96,17 @@ pub fn validate_service(service: &Service) -> Result<(), ValidationError> {
                 message: "Le nom de la regle est requis.".into(),
             });
         }
+        let method_upper = rule.method.trim().to_uppercase();
+        if !VALID_METHODS.contains(&method_upper.as_str()) {
+            return Err(ValidationError {
+                field: "rules",
+                message: format!(
+                    "Methode HTTP invalide \"{}\" pour la regle \"{rn}\". Valeurs acceptees : {}.",
+                    rule.method,
+                    VALID_METHODS.join(", ")
+                ),
+            });
+        }
         if !seen_rules.insert(rn.to_lowercase()) {
             return Err(ValidationError {
                 field: "rules",
@@ -120,17 +125,17 @@ mod tests {
     use super::*;
     use crate::models::Service;
 
-    use crate::models::{Rule, RuleAction, MockResponse, BodyFragment};
+    use crate::models::{Rule, RuleAction, MockResponse, BodyFragment, WsdlMode};
 
     fn svc(name: &str, listen_path: &str) -> Service {
         Service {
             name: name.into(),
-            method: "GET".into(),
             listen_path: listen_path.into(),
             real_target_url: "http://example.com".into(),
             is_mocked: false,
             rewrite_directory_urls: false,
             group_name: None,
+            wsdl_mode: WsdlMode::default(),
             rules: vec![],
         }
     }
@@ -139,7 +144,10 @@ mod tests {
         let mut s = svc(name, "/v1/*");
         s.rules = rule_names.iter().map(|rn| Rule {
             name: rn.to_string(),
+            method: "ANY".into(),
+            sub_path: None,
             action: RuleAction::default(),
+            script: None,
             conditions: Default::default(),
             response: MockResponse {
                 status: 200,
@@ -173,17 +181,16 @@ mod tests {
     }
 
     #[test]
-    fn reject_empty_listen_path() {
-        assert!(validate_service(&svc("my-svc", "")).is_err());
-        assert!(validate_service(&svc("my-svc", "  ")).is_err());
-        assert!(validate_service(&svc("my-svc", "/")).is_err());
-        assert!(validate_service(&svc("my-svc", "  /  ")).is_err());
+    fn accept_empty_listen_path() {
+        assert!(validate_service(&svc("my-svc", "")).is_ok());
+        assert!(validate_service(&svc("my-svc", "  ")).is_ok());
+        assert!(validate_service(&svc("my-svc", "/")).is_ok());
     }
 
     #[test]
-    fn reject_root_wildcard() {
-        assert!(validate_service(&svc("my-svc", "/*")).is_err());
-        assert!(validate_service(&svc("my-svc", "*")).is_err());
+    fn accept_root_wildcard() {
+        assert!(validate_service(&svc("my-svc", "/*")).is_ok());
+        assert!(validate_service(&svc("my-svc", "*")).is_ok());
     }
 
     #[test]

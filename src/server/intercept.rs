@@ -1,5 +1,7 @@
+use crate::engine::matcher::match_path;
+use crate::engine::script::{ScriptContext, ScriptResult};
 use crate::engine::{apply_chaos_and_render, MatchEngine, RequestData, TemplateContext};
-use crate::models::{RuleAction, Service};
+use crate::models::{RuleAction, Service, WsdlMode};
 use crate::server::AppState;
 use crate::server::validation::is_internal_route;
 use axum::body::Body;
@@ -9,6 +11,9 @@ use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use std::collections::HashMap;
 
+// Middleware Axum execute sur CHAQUE requete HTTP entrante.
+// Pipeline : route interne? → skip | chercher service par path → mock ou proxy
+// Les regles (Rule) sont evaluees dans l'ordre (first-match) si le service est en mode mock.
 pub async fn intercept_layer(
     State(state): State<AppState>,
     req: Request<Body>,
@@ -25,24 +30,25 @@ pub async fn intercept_layer(
     let config = state.store.snapshot().await;
 
     let matched = config.services.iter().find_map(|s| {
-        if method.as_str() != s.method {
-            return None;
-        }
         let effective = build_effective_pattern(&s.name, &s.listen_path);
         match_path(&effective, &path).map(|(params, remaining)| (s.clone(), params, remaining))
     });
 
     match matched {
-        Some((service, path_params, _remaining)) => {
-            handle_service(&state, &service, &path, path_params, req).await
+        Some((service, path_params, remaining)) => {
+            handle_service(&state, &service, &path, path_params, remaining, &method, req).await
         }
         None => next.run(req).await,
     }
 }
 
 fn build_effective_pattern(name: &str, listen_path: &str) -> String {
-    let lp = listen_path.trim_start_matches('/');
-    format!("/{name}/{lp}")
+    let lp = listen_path.trim().trim_start_matches('/');
+    if lp.is_empty() {
+        format!("/{name}/*")
+    } else {
+        format!("/{name}/{lp}")
+    }
 }
 
 async fn do_proxy(
@@ -69,14 +75,22 @@ async fn do_proxy(
         target = %target,
         "proxy forwarding"
     );
-    match state.proxy.forward(&service.real_target_url, proxy_path, req).await {
+    match state
+        .proxy
+        .forward(&service.real_target_url, proxy_path, req)
+        .await
+    {
         Ok(resp) => {
             let status = resp.status().as_u16();
-            state.request_log.log_proxy(&service.name, method_str, path, &target, status);
+            state
+                .request_log
+                .log_proxy(&service.name, method_str, path, &target, status);
             resp
         }
         Err(status) => {
-            state.request_log.log_proxy(&service.name, method_str, path, &target, status.as_u16());
+            state
+                .request_log
+                .log_proxy(&service.name, method_str, path, &target, status.as_u16());
             status.into_response()
         }
     }
@@ -87,12 +101,33 @@ async fn handle_service(
     service: &Service,
     path: &str,
     path_params: HashMap<String, String>,
+    remaining: String,
+    method: &axum::http::Method,
     req: Request<Body>,
 ) -> Response {
-    let method_str = req.method().to_string();
+    let method_str = method.to_string();
 
     if !service.is_mocked {
         return do_proxy(state, service, path, &method_str, "service-level", req).await;
+    }
+
+    if is_wsdl_request(req.uri().query()) {
+        match service.wsdl_mode {
+            WsdlMode::Mock => {
+                tracing::info!(
+                    service_key = %service.name, method = %method_str, path = %path,
+                    "WSDL request, mode=mock, applying rules"
+                );
+            }
+            WsdlMode::Auto | WsdlMode::Proxy => {
+                tracing::info!(
+                    service_key = %service.name, method = %method_str, path = %path,
+                    mode = "proxy", context = "wsdl-bypass",
+                    "WSDL request, bypassing mock rules"
+                );
+                return do_proxy(state, service, path, &method_str, "wsdl-bypass", req).await;
+            }
+        }
     }
 
     let uri = req.uri().clone();
@@ -111,17 +146,21 @@ async fn handle_service(
         body: body_bytes.to_vec(),
         content_type,
         path_params: path_params.clone(),
+        method: method_str.clone(),
+        remaining_path: remaining,
     };
 
-    let matched_rule = MatchEngine::first_match(&service.rules, &request_data);
+    let matched = MatchEngine::first_match(&service.rules, &request_data);
 
-    let Some(rule) = matched_rule else {
+    let Some((rule, sub_params)) = matched else {
         tracing::warn!(
             service_key = %service.name, method = %method_str, path = %path,
             mode = "no-rule",
             "no matching rule, returning 404"
         );
-        state.request_log.log_no_rule(&service.name, &method_str, path);
+        state
+            .request_log
+            .log_no_rule(&service.name, &method_str, path);
         return StatusCode::NOT_FOUND.into_response();
     };
 
@@ -131,21 +170,49 @@ async fn handle_service(
             rule = %rule.name, mode = "proxy",
             "rule matched with action=proxy"
         );
-        let proxy_req = rebuild_request_for_proxy(
-            &method_str, &uri, &request_data, &body_bytes
-        );
-        return do_proxy(state, service, path, &method_str, &format!("rule:{}", rule.name), proxy_req).await;
+        let proxy_req = rebuild_request_for_proxy(&method_str, &uri, &request_data, &body_bytes);
+        return do_proxy(
+            state,
+            service,
+            path,
+            &method_str,
+            &format!("rule:{}", rule.name),
+            proxy_req,
+        )
+        .await;
     }
 
     let path_segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
     let seq = state.next_seq(&service.name);
 
+    let mut merged_params = path_params;
+    merged_params.extend(sub_params);
+
+    let script_result = if let Some(ref script) = rule.script {
+        let script_ctx = ScriptContext {
+            body: String::from_utf8_lossy(&request_data.body).into_owned(),
+            headers: request_data.headers.clone(),
+            query_params: request_data.query_params.clone(),
+            path_params: merged_params.clone(),
+        };
+        match state.script_engine.execute(script, &script_ctx) {
+            Ok(result) => Some(result),
+            Err(e) => {
+                tracing::warn!(rule = %rule.name, error = %e, "script execution failed");
+                Some(ScriptResult::default())
+            }
+        }
+    } else {
+        None
+    };
+
     let ctx = TemplateContext {
-        path_params: &path_params,
+        path_params: &merged_params,
         query_params: &request_data.query_params,
         headers: &request_data.headers,
         request_body: &request_data.body,
         seq_counter: seq,
+        script_result: script_result.as_ref(),
     };
 
     match apply_chaos_and_render(&rule.response, &path_segments, &ctx).await {
@@ -159,7 +226,13 @@ async fn handle_service(
                 status = %status.as_u16(),
                 "request handled"
             );
-            state.request_log.log_mock(&service.name, &method_str, path, &rule.name, status.as_u16());
+            state.request_log.log_mock(
+                &service.name,
+                &method_str,
+                path,
+                &rule.name,
+                status.as_u16(),
+            );
             let mut response = axum::http::Response::builder().status(status);
             for (name, value) in &resp_headers {
                 if let Ok(hv) = HeaderValue::from_str(value) {
@@ -171,7 +244,13 @@ async fn handle_service(
                 .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())
         }
         Err(status) => {
-            state.request_log.log_mock(&service.name, &method_str, path, &rule.name, status.as_u16());
+            state.request_log.log_mock(
+                &service.name,
+                &method_str,
+                path,
+                &rule.name,
+                status.as_u16(),
+            );
             (status, "chaos error injected").into_response()
         }
     }
@@ -196,62 +275,15 @@ fn rebuild_request_for_proxy(
         .unwrap_or_else(|_| Request::new(Body::empty()))
 }
 
-fn match_path(listen_path: &str, request_path: &str) -> Option<(HashMap<String, String>, String)> {
-    let pattern_str = normalize_colon_syntax(listen_path);
-
-    let pattern_segs: Vec<&str> = pattern_str.split('/').filter(|s| !s.is_empty()).collect();
-    let request_segs: Vec<&str> = request_path.split('/').filter(|s| !s.is_empty()).collect();
-
-    if pattern_segs.is_empty() {
-        return None;
-    }
-
-    let mut params = HashMap::new();
-    let mut has_wildcard = false;
-    let mut matched_count = 0;
-
-    for (i, pat) in pattern_segs.iter().enumerate() {
-        if *pat == "*" {
-            has_wildcard = true;
-            matched_count = i;
-            break;
-        }
-        if i >= request_segs.len() {
-            return None;
-        }
-        if pat.starts_with('{') && pat.ends_with('}') {
-            let name = &pat[1..pat.len() - 1];
-            params.insert(name.to_string(), request_segs[i].to_string());
-        } else if *pat != request_segs[i] {
-            return None;
-        }
-        matched_count = i + 1;
-    }
-
-    if !has_wildcard && request_segs.len() != pattern_segs.len() {
-        return None;
-    }
-
-    let remaining = if matched_count < request_segs.len() {
-        format!("/{}", request_segs[matched_count..].join("/"))
-    } else {
-        String::new()
-    };
-
-    Some((params, remaining))
-}
-
-fn normalize_colon_syntax(s: &str) -> String {
-    s.split('/')
-        .map(|seg| {
-            if let Some(name) = seg.strip_prefix(':') {
-                format!("{{{name}}}")
-            } else {
-                seg.to_string()
-            }
+fn is_wsdl_request(query: Option<&str>) -> bool {
+    query
+        .map(|q| {
+            q.split('&').any(|part| {
+                let key = part.split('=').next().unwrap_or("");
+                key.eq_ignore_ascii_case("wsdl")
+            })
         })
-        .collect::<Vec<_>>()
-        .join("/")
+        .unwrap_or(false)
 }
 
 fn extract_query_params(query: Option<&str>) -> HashMap<String, String> {
@@ -279,6 +311,7 @@ fn extract_headers(headers: &axum::http::HeaderMap) -> HashMap<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::engine::matcher::match_path;
 
     #[test]
     fn effective_pattern() {
@@ -286,10 +319,7 @@ mod tests {
             build_effective_pattern("insee", "/v4/sirene/{siret}"),
             "/insee/v4/sirene/{siret}"
         );
-        assert_eq!(
-            build_effective_pattern("svc-a", "/*"),
-            "/svc-a/*"
-        );
+        assert_eq!(build_effective_pattern("svc-a", "/*"), "/svc-a/*");
     }
 
     #[test]
@@ -318,37 +348,6 @@ mod tests {
         assert!(r.is_some());
         let (_, remaining) = r.unwrap();
         assert_eq!(remaining, "/foo/bar");
-    }
-
-    #[test]
-    fn wildcard_backward_compat() {
-        let r = match_path("/svc-a/*", "/svc-a/foo/bar");
-        assert!(r.is_some());
-        let (params, remaining) = r.unwrap();
-        assert!(params.is_empty());
-        assert_eq!(remaining, "/foo/bar");
-    }
-
-    #[test]
-    fn named_param_single() {
-        let r = match_path("/v4/insee/{siret}", "/v4/insee/44306184100047");
-        assert!(r.is_some());
-        let (params, _) = r.unwrap();
-        assert_eq!(params.get("siret").unwrap(), "44306184100047");
-    }
-
-    #[test]
-    fn named_param_no_match_extra() {
-        assert!(match_path("/v4/insee/{siret}", "/v4/insee/123/extra").is_none());
-    }
-
-    #[test]
-    fn colon_syntax_normalized() {
-        let r = match_path("/api/:version/users/:id", "/api/v2/users/42");
-        assert!(r.is_some());
-        let (params, _) = r.unwrap();
-        assert_eq!(params.get("version").unwrap(), "v2");
-        assert_eq!(params.get("id").unwrap(), "42");
     }
 
     #[test]
@@ -429,15 +428,18 @@ mod tests {
     #[test]
     fn empty_listen_path_cannot_hijack_root() {
         let pattern = build_effective_pattern("hijacker", "");
+        assert_eq!(pattern, "/hijacker/*");
         assert!(
             match_path(&pattern, "/").is_none(),
             "service with empty listen_path must not capture /"
         );
+        assert!(match_path(&pattern, "/hijacker/any").is_some());
     }
 
     #[test]
     fn slash_listen_path_cannot_hijack_root() {
         let pattern = build_effective_pattern("hijacker", "/");
+        assert_eq!(pattern, "/hijacker/*");
         assert!(
             match_path(&pattern, "/").is_none(),
             "service with listen_path '/' must not capture /"
@@ -462,12 +464,41 @@ mod tests {
     }
 
     #[test]
-    fn effective_pattern_with_empty_path_only_has_name() {
-        let p = build_effective_pattern("hijacker", "");
-        assert_eq!(p, "/hijacker/");
+    fn empty_listen_path_produces_catchall() {
+        let p = build_effective_pattern("svc", "");
+        assert_eq!(p, "/svc/*");
         assert!(match_path(&p, "/").is_none(), "must not capture root");
-        // /hijacker matches ["hijacker"] which is valid — but validation prevents creating such a service
-        assert!(match_path(&p, "/hijacker").is_some());
+        assert!(match_path(&p, "/svc/foo").is_some());
+        assert!(match_path(&p, "/svc/foo/bar").is_some());
         assert!(match_path(&p, "/other").is_none());
+    }
+
+    #[test]
+    fn service_matches_any_method() {
+        let pattern = build_effective_pattern("svc", "/v1/*");
+        assert!(
+            match_path(&pattern, "/svc/v1/test").is_some(),
+            "service matching is path-only, no method check"
+        );
+    }
+
+    // --- WSDL bypass tests ---
+
+    #[test]
+    fn wsdl_query_detected() {
+        assert!(is_wsdl_request(Some("wsdl")));
+        assert!(is_wsdl_request(Some("WSDL")));
+        assert!(is_wsdl_request(Some("Wsdl")));
+        assert!(is_wsdl_request(Some("wsdl=")));
+        assert!(is_wsdl_request(Some("foo=bar&wsdl")));
+        assert!(is_wsdl_request(Some("WSDL&other=1")));
+    }
+
+    #[test]
+    fn non_wsdl_query_ignored() {
+        assert!(!is_wsdl_request(None));
+        assert!(!is_wsdl_request(Some("")));
+        assert!(!is_wsdl_request(Some("foo=bar")));
+        assert!(!is_wsdl_request(Some("wsdlx=true")));
     }
 }

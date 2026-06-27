@@ -28,18 +28,18 @@
 
   const demoService = {
     name: 'insee-demo',
-    method: 'GET',
     listen_path: '/v4/insee/sirene/etablissements/{siret}',
     real_target_url: 'https://staging.entreprise.api.gouv.fr',
     is_mocked: true,
     rewrite_directory_urls: false,
     rules: [{
       name: 'etablissement-mock',
+      method: 'GET',
       conditions: { all_of: [], any_of: [] },
       response: {
         status: 200,
         headers: [{ name: 'Content-Type', value: 'application/json' }],
-        body: [{ type: 'Template', template: '{{"siret":"{path.siret}","siren":"{path.siret | first(9)}","unite_legale":{{"denomination":"{fake.CompanyName}","date_creation":"{fake.DatePast}","adresse":{{"voie":"{fake.StreetName}","code_postal":"{fake.PostcodeFR}","ville":"{fake.CityFR}"}}}},"meta":{{"timestamp":{now_ms},"seq":{seq}}}}}' }],
+        body: [{ type: 'Template', template: '{"siret":"{{path.siret}}","siren":"{{path.siret | first(9)}}","unite_legale":{"denomination":"{{fake.CompanyName}}","date_creation":"{{fake.DatePast}}","adresse":{"voie":"{{fake.StreetName}}","code_postal":"{{fake.PostcodeFR}}","ville":"{{fake.CityFR}}"}},"meta":{"timestamp":{{now_ms}},"seq":{{seq}}}}' }],
         chaos: null,
       },
     }],
@@ -76,9 +76,7 @@
   async function loadData() {
     try {
       services = await getServices();
-      if (auth.enabled && auth.isSuperAdmin) {
-        groups = await getGroups();
-      }
+      try { groups = await getGroups(); } catch { groups = []; }
     } catch (e) {
       showNotification(`Erreur de chargement : ${e.message}`, 'error');
     }
@@ -214,9 +212,7 @@
       <p class="app-subtitle">Mock &amp; Proxy Intelligent</p>
       <div class="header-actions">
         <button type="button" class="btn btn-sm btn-outline" onclick={() => view = 'logs'} title="Journal des requetes">Logs</button>
-        {#if auth.enabled && auth.isSuperAdmin}
-          <button type="button" class="btn btn-sm btn-outline" onclick={() => view = 'groups'} title="Gestion des groupes">Groupes</button>
-        {/if}
+        <button type="button" class="btn btn-sm btn-outline" onclick={() => view = 'groups'} title="Gestion des groupes">Groupes</button>
         <button type="button" class="btn btn-sm btn-outline" onclick={exportConfig} title="Telecharger la configuration">Export</button>
         <button type="button" class="btn btn-sm btn-outline" onclick={importConfig} title="Charger une configuration">Import</button>
         <button type="button" class="btn btn-sm btn-outline btn-danger-outline" onclick={handleReset} title="Supprimer tous les services">Reset</button>
@@ -232,13 +228,28 @@
     </div>
   </header>
 
+  {#if view !== 'list'}
+    <nav class="breadcrumb" aria-label="Fil d'Ariane">
+      <ol>
+        <li><button type="button" class="breadcrumb-link" onclick={handleBack}>Services</button></li>
+        <li aria-current="page">
+          {#if view === 'logs'}Journal des requetes
+          {:else if view === 'groups'}Groupes de services
+          {:else if view === 'add'}Ajouter un service
+          {:else if view === 'detail' && currentService}Detail : {currentService.name}
+          {/if}
+        </li>
+      </ol>
+    </nav>
+  {/if}
+
   <main id="main-content" class="app-main">
     <Notification message={notification.message} type={notification.type} visible={notification.visible} />
 
     {#if view === 'logs'}
       <RequestLog />
     {:else if view === 'groups'}
-      <GroupManager onNotify={showNotification} onBack={handleBack} />
+      <GroupManager {services} authEnabled={auth.enabled} onNotify={showNotification} onBack={handleBack} onServiceUpdate={handleServiceUpdate} />
     {:else if view === 'add'}
       <ServiceForm
         existingNames={services.map(s => s.name)}
@@ -277,13 +288,20 @@
   .app-title { font-size: 1.5rem; margin: 0; color: var(--color-primary); }
   .app-subtitle { margin: 0; color: var(--color-text-muted); font-size: 0.875rem; }
   .app-main { max-width: 60rem; margin: 1.5rem auto; padding: 0 1.5rem; }
+
+  .breadcrumb { max-width: 60rem; margin: 0 auto; padding: 0.5rem 1.5rem; }
+  .breadcrumb ol { list-style: none; display: flex; align-items: center; gap: 0.375rem; margin: 0; padding: 0; font-size: 0.875rem; }
+  .breadcrumb li { display: flex; align-items: center; gap: 0.375rem; color: var(--color-text-muted); }
+  .breadcrumb li:not(:last-child)::after { content: "/"; color: var(--color-border); }
+  .breadcrumb li[aria-current="page"] { color: var(--color-text); font-weight: 600; }
+  .breadcrumb-link { background: none; border: none; padding: 0; color: var(--color-primary); cursor: pointer; font: inherit; text-decoration: underline; text-underline-offset: 2px; }
+  .breadcrumb-link:hover { color: var(--color-primary-hover); }
   .loading { text-align: center; padding: 3rem; color: var(--color-text-muted); }
   .list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
   .list-header h2 { margin: 0; }
 
   .demo-section { text-align: center; margin-top: 1rem; }
   .btn-demo { font-size: 1rem; padding: 0.75rem 1.5rem; }
-  .field-hint { display: block; font-size: 0.8125rem; color: var(--color-text-muted); margin-top: 0.375rem; }
 
   .user-badge {
     font-size: 0.8125rem;
@@ -295,12 +313,4 @@
     padding: 0.2rem 0.625rem;
   }
 
-  .btn { padding: 0.5rem 1.25rem; border-radius: var(--radius); border: 1px solid transparent; font-weight: 600; font-size: 0.9375rem; cursor: pointer; }
-  .btn-sm { padding: 0.25rem 0.75rem; font-size: 0.8125rem; }
-  .btn-primary { background: var(--color-primary); color: #fff; }
-  .btn-primary:hover { background: var(--color-primary-hover); }
-  .btn-outline { background: var(--color-surface); color: var(--color-text-muted); border-color: var(--color-border); }
-  .btn-outline:hover { background: var(--color-bg); color: var(--color-text); }
-  .btn-danger-outline { color: var(--color-danger); border-color: var(--color-danger); }
-  .btn-danger-outline:hover { background: var(--color-danger); color: #fff; }
 </style>
