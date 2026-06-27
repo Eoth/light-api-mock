@@ -62,12 +62,15 @@
   }
 
   async function handleDeleteGroup(name) {
-    if (!confirm(`Supprimer le groupe "${name}" ? Les services seront dissocies mais pas supprimes.`)) return;
+    if (!confirm(`Supprimer le groupe "${name}" ? Les services associes seront dissocies.`)) return;
     try {
       await deleteGroup(name);
       setGroups(groups.filter(g => g.name !== name));
       if (editingGroup === name) editingGroup = null;
-      onNotify(`Groupe "${name}" supprime`, 'success');
+      for (const svc of services.filter(s => s.group_name === name)) {
+        onServiceUpdate({ ...svc, group_name: null });
+      }
+      onNotify(`Groupe "${name}" supprime, services dissocies`, 'success');
     } catch (e) {
       onNotify(`Erreur : ${e.message}`, 'error');
     }

@@ -123,7 +123,7 @@
   function handleSelect(name) { selectedService = name; view = 'detail'; }
   function handleBack() { selectedService = null; view = 'list'; }
   function handleServiceUpdate(updated) { services = services.map(s => s.name === updated.name ? updated : s); selectedService = updated.name; }
-  function handleServiceDelete(name) { services = services.filter(s => s.name !== name); selectedService = null; view = 'list'; }
+  function handleServiceDelete(name) { view = 'list'; selectedService = null; services = services.filter(s => s.name !== name); }
 
   async function handleAddService(svc) {
     try {
@@ -195,8 +195,7 @@
     importPending = null;
     try {
       await putConfig(config);
-      services = config.services;
-      groups = config.groups || [];
+      await loadData();
       showNotification(`Configuration remplacee (${config.services.length} services)`, 'success');
       view = 'list'; selectedService = null;
     } catch (e) {
