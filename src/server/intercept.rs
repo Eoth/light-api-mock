@@ -30,24 +30,31 @@ pub async fn intercept_layer(
     let config = state.store.snapshot().await;
 
     let matched = config.services.iter().find_map(|s| {
-        let effective = build_effective_pattern(&s.name, &s.listen_path);
-        match_path(&effective, &path).map(|(params, remaining)| (s.clone(), params, remaining))
+        let group_code = s.group_name.as_ref().and_then(|gn| {
+            config.groups.iter().find(|g| &g.name == gn).map(|g| g.code.clone())
+        });
+        let effective = build_effective_pattern(group_code.as_deref(), &s.name, &s.listen_path);
+        match_path(&effective, &path).map(|(params, remaining)| (s.clone(), params, remaining, group_code))
     });
 
     match matched {
-        Some((service, path_params, remaining)) => {
-            handle_service(&state, &service, &path, path_params, remaining, &method, req).await
+        Some((service, path_params, remaining, group_code)) => {
+            handle_service(&state, &service, &path, path_params, remaining, group_code, &method, req).await
         }
         None => next.run(req).await,
     }
 }
 
-fn build_effective_pattern(name: &str, listen_path: &str) -> String {
+fn build_effective_pattern(group_code: Option<&str>, name: &str, listen_path: &str) -> String {
     let lp = listen_path.trim().trim_start_matches('/');
+    let base = match group_code {
+        Some(code) => format!("/{code}/{name}"),
+        None => format!("/{name}"),
+    };
     if lp.is_empty() {
-        format!("/{name}/*")
+        format!("{base}/*")
     } else {
-        format!("/{name}/{lp}")
+        format!("{base}/{lp}")
     }
 }
 
@@ -57,9 +64,13 @@ async fn do_proxy(
     path: &str,
     method_str: &str,
     context: &str,
+    group_code: Option<&str>,
     req: Request<Body>,
 ) -> Response {
-    let prefix = format!("/{}", service.name);
+    let prefix = match group_code {
+        Some(code) => format!("/{}/{}", code, service.name),
+        None => format!("/{}", service.name),
+    };
     let proxy_path = path.strip_prefix(&prefix).unwrap_or(path);
     let target = format!(
         "{}/{}",
@@ -102,13 +113,15 @@ async fn handle_service(
     path: &str,
     path_params: HashMap<String, String>,
     remaining: String,
+    group_code: Option<String>,
     method: &axum::http::Method,
     req: Request<Body>,
 ) -> Response {
     let method_str = method.to_string();
+    let gc = group_code.as_deref();
 
     if !service.is_mocked {
-        return do_proxy(state, service, path, &method_str, "service-level", req).await;
+        return do_proxy(state, service, path, &method_str, "service-level", gc, req).await;
     }
 
     if is_wsdl_request(req.uri().query()) {
@@ -125,7 +138,7 @@ async fn handle_service(
                     mode = "proxy", context = "wsdl-bypass",
                     "WSDL request, bypassing mock rules"
                 );
-                return do_proxy(state, service, path, &method_str, "wsdl-bypass", req).await;
+                return do_proxy(state, service, path, &method_str, "wsdl-bypass", gc, req).await;
             }
         }
     }
@@ -177,6 +190,7 @@ async fn handle_service(
             path,
             &method_str,
             &format!("rule:{}", rule.name),
+            gc,
             proxy_req,
         )
         .await;
@@ -316,15 +330,15 @@ mod tests {
     #[test]
     fn effective_pattern() {
         assert_eq!(
-            build_effective_pattern("insee", "/v4/sirene/{siret}"),
+            build_effective_pattern(None, "insee", "/v4/sirene/{siret}"),
             "/insee/v4/sirene/{siret}"
         );
-        assert_eq!(build_effective_pattern("svc-a", "/*"), "/svc-a/*");
+        assert_eq!(build_effective_pattern(None, "svc-a", "/*"), "/svc-a/*");
     }
 
     #[test]
     fn namespace_match() {
-        let pattern = build_effective_pattern("insee", "/v4/sirene/{siret}");
+        let pattern = build_effective_pattern(None, "insee", "/v4/sirene/{siret}");
         let r = match_path(&pattern, "/insee/v4/sirene/44306184100047");
         assert!(r.is_some());
         let (params, remaining) = r.unwrap();
@@ -334,8 +348,8 @@ mod tests {
 
     #[test]
     fn namespace_no_collision() {
-        let p1 = build_effective_pattern("svc-a", "/users/*");
-        let p2 = build_effective_pattern("svc-b", "/users/*");
+        let p1 = build_effective_pattern(None, "svc-a", "/users/*");
+        let p2 = build_effective_pattern(None, "svc-b", "/users/*");
         assert!(match_path(&p1, "/svc-a/users/42").is_some());
         assert!(match_path(&p1, "/svc-b/users/42").is_none());
         assert!(match_path(&p2, "/svc-b/users/42").is_some());
@@ -343,7 +357,7 @@ mod tests {
 
     #[test]
     fn namespace_wildcard_remaining() {
-        let pattern = build_effective_pattern("api", "/*");
+        let pattern = build_effective_pattern(None, "api", "/*");
         let r = match_path(&pattern, "/api/foo/bar");
         assert!(r.is_some());
         let (_, remaining) = r.unwrap();
@@ -388,7 +402,7 @@ mod tests {
 
     #[test]
     fn non_wildcard_remaining_is_empty() {
-        let pattern = build_effective_pattern("insee", "/v4/sirene/{siret}");
+        let pattern = build_effective_pattern(None, "insee", "/v4/sirene/{siret}");
         let r = match_path(&pattern, "/insee/v4/sirene/44306184100047");
         assert!(r.is_some());
         let (_, remaining) = r.unwrap();
@@ -427,7 +441,7 @@ mod tests {
 
     #[test]
     fn empty_listen_path_cannot_hijack_root() {
-        let pattern = build_effective_pattern("hijacker", "");
+        let pattern = build_effective_pattern(None, "hijacker", "");
         assert_eq!(pattern, "/hijacker/*");
         assert!(
             match_path(&pattern, "/").is_none(),
@@ -438,7 +452,7 @@ mod tests {
 
     #[test]
     fn slash_listen_path_cannot_hijack_root() {
-        let pattern = build_effective_pattern("hijacker", "/");
+        let pattern = build_effective_pattern(None, "hijacker", "/");
         assert_eq!(pattern, "/hijacker/*");
         assert!(
             match_path(&pattern, "/").is_none(),
@@ -465,7 +479,7 @@ mod tests {
 
     #[test]
     fn empty_listen_path_produces_catchall() {
-        let p = build_effective_pattern("svc", "");
+        let p = build_effective_pattern(None, "svc", "");
         assert_eq!(p, "/svc/*");
         assert!(match_path(&p, "/").is_none(), "must not capture root");
         assert!(match_path(&p, "/svc/foo").is_some());
@@ -475,11 +489,27 @@ mod tests {
 
     #[test]
     fn service_matches_any_method() {
-        let pattern = build_effective_pattern("svc", "/v1/*");
+        let pattern = build_effective_pattern(None, "svc", "/v1/*");
         assert!(
             match_path(&pattern, "/svc/v1/test").is_some(),
             "service matching is path-only, no method check"
         );
+    }
+
+    #[test]
+    fn group_code_prefixes_url() {
+        let pattern = build_effective_pattern(Some("qtr"), "insee", "/v4/*");
+        assert_eq!(pattern, "/qtr/insee/v4/*");
+        assert!(match_path(&pattern, "/qtr/insee/v4/sirene").is_some());
+        assert!(match_path(&pattern, "/insee/v4/sirene").is_none());
+    }
+
+    #[test]
+    fn group_code_catchall() {
+        let pattern = build_effective_pattern(Some("abc"), "svc", "");
+        assert_eq!(pattern, "/abc/svc/*");
+        assert!(match_path(&pattern, "/abc/svc/foo").is_some());
+        assert!(match_path(&pattern, "/svc/foo").is_none());
     }
 
     // --- WSDL bypass tests ---

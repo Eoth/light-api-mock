@@ -4,6 +4,7 @@
   let {
     groupName = 'Sans groupe',
     groupId = 'ungrouped',
+    groupCode = '',
     services = [],
     expanded = false,
     onToggleGroup = () => {},
@@ -36,7 +37,7 @@
       <ul class="service-list" role="list">
         {#each services as service (service.name)}
           <li>
-            <ServiceCard {service} {onToggle} {onSelect} />
+            <ServiceCard {service} {groupCode} {onToggle} {onSelect} />
           </li>
         {/each}
       </ul>
