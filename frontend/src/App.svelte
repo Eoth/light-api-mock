@@ -1,5 +1,5 @@
 <script>
-  import { getServices, getConfig, putConfig, toggleService, createService, updateService, resetConfig, getAuthStatus, validateToken, getGroups } from './lib/api.js';
+  import { getServices, getConfig, putConfig, toggleService, createService, updateService, resetConfig, getAuthStatus, validateToken, getGroups, createGroup } from './lib/api.js';
   import { auth, isLoggedIn, setAuth, logout, restoreAuth } from './lib/auth.svelte.js';
   import ServiceList from './lib/components/ServiceList.svelte';
   import ServiceDetail from './lib/components/ServiceDetail.svelte';
@@ -207,6 +207,14 @@
   async function doImportMerge(config) {
     importPending = null;
     try {
+      let addedGroups = 0;
+      for (const grp of (config.groups || [])) {
+        if (!groups.some(g => g.name === grp.name)) {
+          const created = await createGroup(grp);
+          groups = [...groups, created];
+          addedGroups++;
+        }
+      }
       let added = 0;
       for (const svc of config.services) {
         if (!services.some(s => s.name === svc.name)) {
@@ -215,7 +223,7 @@
           added++;
         }
       }
-      showNotification(`${added} service(s) ajoute(s), ${config.services.length - added} doublon(s) ignore(s)`, 'success');
+      showNotification(`${added} service(s) et ${addedGroups} groupe(s) ajoute(s)`, 'success');
       view = 'list'; selectedService = null;
     } catch (e) {
       showNotification(`Erreur import : ${e.message}`, 'error');

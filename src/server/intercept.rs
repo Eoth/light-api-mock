@@ -31,7 +31,9 @@ pub async fn intercept_layer(
 
     let matched = config.services.iter().find_map(|s| {
         let group_code = s.group_name.as_ref().and_then(|gn| {
-            config.groups.iter().find(|g| &g.name == gn).map(|g| g.code.clone())
+            config.groups.iter().find(|g| &g.name == gn)
+                .map(|g| g.code.clone())
+                .filter(|c| !c.trim().is_empty())
         });
         let effective = build_effective_pattern(group_code.as_deref(), &s.name, &s.listen_path);
         match_path(&effective, &path).map(|(params, remaining)| (s.clone(), params, remaining, group_code))
