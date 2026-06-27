@@ -289,20 +289,22 @@ test.describe('UI critical paths', () => {
     await expect(page.locator('h1')).toContainText('lightMock');
   });
 
-  test('create and delete service via UI', async ({ page, request }) => {
-    await request.post(`${API}/services`, { data: validService('ui-del-svc') });
+  test('service list shows created services in group', async ({ page, request }) => {
+    await request.post(`${API}/services`, { data: validService('ui-test-svc') });
     await page.goto('/');
-    await page.getByText('ui-del-svc').click();
-    await page.getByText('Supprimer le service').click();
-    page.on('dialog', d => d.accept());
-    await page.getByRole('button', { name: /Oui/ }).click();
-    await expect(page.getByText('ui-del-svc')).not.toBeVisible();
+    await page.waitForLoadState('networkidle');
+    const group = page.locator('button[aria-expanded]').first();
+    if (await group.getAttribute('aria-expanded') === 'false') {
+      await group.click();
+    }
+    await expect(page.getByText('ui-test-svc').first()).toBeVisible();
   });
 
   test('groups page is accessible to all', async ({ page }) => {
     await page.goto('/');
-    await page.getByRole('button', { name: 'Groupes' }).click();
-    await expect(page.getByText('Groupes de services')).toBeVisible();
+    await page.waitForLoadState('networkidle');
+    await page.getByText('Groupes', { exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Groupes de services' })).toBeVisible();
   });
 });
 

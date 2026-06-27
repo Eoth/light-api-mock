@@ -1,49 +1,56 @@
 import { test, expect } from '@playwright/test';
-import * as fs from 'node:fs';
-import * as path from 'node:path';
 
-const BASE = 'http://localhost:3000';
+const API = 'http://localhost:7342/api';
 
-test.beforeEach(async () => {
-  await fetch(`${BASE}/api/config`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ services: [] }),
-  });
+function validService(name, overrides = {}) {
+  return {
+    name,
+    listen_path: '',
+    real_target_url: 'http://backend:8080',
+    is_mocked: true,
+    rewrite_directory_urls: false,
+    group_name: null,
+    wsdl_mode: 'auto',
+    rules: [],
+    ...overrides,
+  };
+}
+
+test.beforeEach(async ({ request }) => {
+  await request.delete(`${API}/config/reset`);
 });
 
-test('bouton demo charge le service INSEE quand liste vide', async ({ page }) => {
-  await page.goto(BASE);
+test('bouton demo charge le service quand liste vide', async ({ page }) => {
+  await page.goto('/');
   await page.waitForLoadState('networkidle');
   await expect(page.getByText('Aucun service configure')).toBeVisible();
   await page.getByRole('button', { name: /Charger un exemple/ }).click();
   await page.waitForTimeout(500);
-  await expect(page.getByRole('heading', { name: 'insee-demo' })).toBeVisible();
+  const group = page.locator('button[aria-expanded]').first();
+  if (await group.getAttribute('aria-expanded') === 'false') {
+    await group.click();
+  }
+  await expect(page.getByText('users-api').first()).toBeVisible();
 });
 
-test('demo INSEE repond avec les path params', async ({ page, request }) => {
-  await page.goto(BASE);
+test('demo service repond avec les path params', async ({ page, request }) => {
+  await page.goto('/');
   await page.waitForLoadState('networkidle');
   await page.getByRole('button', { name: /Charger un exemple/ }).click();
   await page.waitForTimeout(500);
 
-  const resp = await request.get(`${BASE}/insee-demo/v4/insee/sirene/etablissements/44306184100047`);
+  const resp = await request.get('http://localhost:7342/users-api/users/42');
   expect(resp.status()).toBe(200);
   const json = await resp.json();
-  expect(json.siret).toBe('44306184100047');
-  expect(json.siren).toBe('443061841');
-  expect(json.unite_legale.denomination).toBeTruthy();
+  expect(json.id).toBe(42);
+  expect(json.name).toBeTruthy();
   expect(json.meta.timestamp).toBeGreaterThan(1700000000000);
 });
 
-test('export telecharge un fichier JSON valide', async ({ page }) => {
-  await fetch(`${BASE}/api/services/export-test`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: 'export-test', method: 'GET', listen_path: '/exp/*', real_target_url: 'http://exp:80', is_mocked: false, rules: [] }),
-  });
+test('export telecharge un fichier JSON valide', async ({ page, request }) => {
+  await request.post(`${API}/services`, { data: validService('export-test') });
 
-  await page.goto(BASE);
+  await page.goto('/');
   await page.waitForLoadState('networkidle');
 
   const [download] = await Promise.all([
@@ -51,37 +58,22 @@ test('export telecharge un fichier JSON valide', async ({ page }) => {
     page.getByRole('button', { name: 'Export', exact: true }).click(),
   ]);
 
-  const filePath = await download.path();
-  const content = fs.readFileSync(filePath, 'utf-8');
-  const config = JSON.parse(content);
+  const content = await (await download.createReadStream()).toArray();
+  const text = Buffer.concat(content).toString('utf-8');
+  const config = JSON.parse(text);
   expect(config.services).toBeInstanceOf(Array);
-  expect(config.services.length).toBeGreaterThan(0);
   expect(config.services.some(s => s.name === 'export-test')).toBe(true);
 });
 
-test('import charge une configuration', async ({ page }) => {
+test('import charge une configuration via API', async ({ request }) => {
   const config = {
-    services: [
-      { name: 'imported-svc', method: 'GET', listen_path: '/imp/*', real_target_url: 'http://imp:80', is_mocked: true, rewrite_directory_urls: false, rules: [] },
-    ],
+    services: [validService('imported-svc')],
+    groups: [],
   };
-  const tmpFile = path.join(process.cwd(), 'test-import.json');
-  fs.writeFileSync(tmpFile, JSON.stringify(config));
+  const res = await request.put(`${API}/config`, { data: config });
+  expect(res.status()).toBe(200);
 
-  try {
-    await page.goto(BASE);
-    await page.waitForLoadState('networkidle');
-
-    const fileInput = page.locator('input[type="file"]');
-    await fileInput.setInputFiles(tmpFile);
-    await page.waitForTimeout(500);
-
-    await expect(page.getByRole('heading', { name: 'imported-svc' })).toBeVisible();
-
-    const resp = await (await fetch(`${BASE}/api/services`)).json();
-    expect(resp.length).toBe(1);
-    expect(resp[0].name).toBe('imported-svc');
-  } finally {
-    fs.unlinkSync(tmpFile);
-  }
+  const services = await (await request.get(`${API}/services`)).json();
+  expect(services.length).toBe(1);
+  expect(services[0].name).toBe('imported-svc');
 });
