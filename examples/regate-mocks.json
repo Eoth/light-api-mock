@@ -287,6 +287,232 @@
           }
         }
       ]
+    },
+    {
+      "name": "drops",
+      "listen_path": "",
+      "real_target_url": "https://drops.internal.company.com",
+      "is_mocked": true,
+      "rewrite_directory_urls": false,
+      "group_name": "regate",
+      "wsdl_mode": "auto",
+      "rules": [
+        {
+          "name": "list-releases",
+          "method": "GET",
+          "sub_path": "/data/release",
+          "action": "mock",
+          "script": null,
+          "conditions": { "all_of": [], "any_of": [] },
+          "response": {
+            "status": 200,
+            "headers": [{ "name": "Content-Type", "value": "application/json" }],
+            "body": [{ "type": "Template", "template": "[{\"id\":101,\"version\":\"1.2.0\",\"status\":\"ACTIVE\",\"created_at\":\"{{now_iso}}\"},{\"id\":100,\"version\":\"1.1.0\",\"status\":\"CLOSED\",\"created_at\":\"{{now_iso}}\"}]" }],
+            "chaos": null
+          }
+        },
+        {
+          "name": "create-release",
+          "method": "POST",
+          "sub_path": "/data/release",
+          "action": "mock",
+          "script": null,
+          "conditions": { "all_of": [], "any_of": [] },
+          "response": {
+            "status": 201,
+            "headers": [{ "name": "Content-Type", "value": "application/json" }],
+            "body": [{ "type": "Template", "template": "{\"id\":{{seq}},\"version\":\"new-release\",\"status\":\"DRAFT\",\"created_at\":\"{{now_iso}}\"}" }],
+            "chaos": { "error_rate": 0.2, "error_status": 500, "delay_ms": null, "delay_min_ms": 100, "delay_max_ms": 300 }
+          }
+        },
+        {
+          "name": "create-import",
+          "method": "POST",
+          "sub_path": "/import",
+          "action": "mock",
+          "script": null,
+          "conditions": { "all_of": [], "any_of": [] },
+          "response": {
+            "status": 201,
+            "headers": [{ "name": "Content-Type", "value": "application/json" }],
+            "body": [{ "type": "Template", "template": "{\"id\":{{seq}},\"release_id\":{{query.release}},\"status\":\"CREATED\"}" }],
+            "chaos": null
+          }
+        },
+        {
+          "name": "create-import-component",
+          "method": "POST",
+          "sub_path": "/importExecutionComponent",
+          "action": "mock",
+          "script": null,
+          "conditions": { "all_of": [], "any_of": [] },
+          "response": {
+            "status": 201,
+            "headers": [{ "name": "Content-Type", "value": "application/json" }],
+            "body": [{ "type": "Template", "template": "{\"id\":{{seq}},\"status\":\"CREATED\"}" }],
+            "chaos": { "error_rate": 0.2, "error_status": 422, "delay_ms": null, "delay_min_ms": null, "delay_max_ms": null }
+          }
+        },
+        {
+          "name": "execute-import",
+          "method": "PUT",
+          "sub_path": "/import/{import_id}",
+          "action": "mock",
+          "script": null,
+          "conditions": { "all_of": [], "any_of": [] },
+          "response": {
+            "status": 200,
+            "headers": [{ "name": "Content-Type", "value": "application/json" }],
+            "body": [{ "type": "Template", "template": "{\"id\":{{path.import_id}},\"status\":\"EXECUTING\"}" }],
+            "chaos": null
+          }
+        },
+        {
+          "name": "poll-import",
+          "method": "GET",
+          "sub_path": "/data/importExecution/{import_id}",
+          "action": "mock",
+          "script": "let roll = random_int(1, 5);\nlet st = if roll <= 3 { \"COMPLETED\" } else if roll == 4 { \"EXECUTING\" } else { \"FAILED\" };\n#{ status: st }",
+          "conditions": { "all_of": [], "any_of": [] },
+          "response": {
+            "status": 200,
+            "headers": [{ "name": "Content-Type", "value": "application/json" }],
+            "body": [{ "type": "Template", "template": "{\"id\":{{path.import_id}},\"status\":\"{{script.status}}\",\"progress\":{{now_ms}}}" }],
+            "chaos": null
+          }
+        },
+        {
+          "name": "delete-import",
+          "method": "DELETE",
+          "sub_path": "/data/importExecution/{import_id}",
+          "action": "mock",
+          "script": null,
+          "conditions": { "all_of": [], "any_of": [] },
+          "response": {
+            "status": 204,
+            "headers": [],
+            "body": [],
+            "chaos": null
+          }
+        },
+        {
+          "name": "delete-release",
+          "method": "DELETE",
+          "sub_path": "/data/release/{release_id}",
+          "action": "mock",
+          "script": null,
+          "conditions": { "all_of": [], "any_of": [] },
+          "response": {
+            "status": 204,
+            "headers": [],
+            "body": [],
+            "chaos": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "promotion",
+      "listen_path": "/api/v1",
+      "real_target_url": "https://promotion.internal.company.com",
+      "is_mocked": true,
+      "rewrite_directory_urls": false,
+      "group_name": "regate",
+      "wsdl_mode": "auto",
+      "rules": [
+        {
+          "name": "oidc-config",
+          "method": "GET",
+          "sub_path": "/oidc-config",
+          "action": "mock",
+          "script": null,
+          "conditions": { "all_of": [], "any_of": [] },
+          "response": {
+            "status": 200,
+            "headers": [{ "name": "Content-Type", "value": "application/json" }],
+            "body": [{ "type": "Template", "template": "{\"token_endpoint\":\"https://keycloak.internal.company.com/auth/realms/tekton/protocol/openid-connect/token\"}" }],
+            "chaos": null
+          }
+        },
+        {
+          "name": "create-pipeline-run",
+          "method": "POST",
+          "sub_path": "/pipelineruns",
+          "action": "mock",
+          "script": null,
+          "conditions": { "all_of": [], "any_of": [] },
+          "response": {
+            "status": 201,
+            "headers": [{ "name": "Content-Type", "value": "application/json" }],
+            "body": [{ "type": "Template", "template": "{\"id\":\"run-{{uuid}}\",\"status\":\"RUNNING\",\"created_at\":\"{{now_iso}}\"}" }],
+            "chaos": { "error_rate": 0.2, "error_status": 502, "delay_ms": null, "delay_min_ms": 200, "delay_max_ms": 500 }
+          }
+        },
+        {
+          "name": "stream-logs",
+          "method": "GET",
+          "sub_path": "/pipelineruns/log/tekton/{run_id}",
+          "action": "mock",
+          "script": "let roll = random_int(1, 5);\nlet st = if roll <= 4 { \"SUCCESS\" } else { \"FAILURE\" };\n#{ status: st }",
+          "conditions": { "all_of": [], "any_of": [] },
+          "response": {
+            "status": 200,
+            "headers": [{ "name": "Content-Type", "value": "text/event-stream" }],
+            "body": [{ "type": "Template", "template": "data: [step-checkout] Cloning repository...\n\ndata: [step-checkout] Done.\n\ndata: [step-build] Building image...\n\ndata: [step-build] Image built successfully.\n\ndata: [step-promote] Promoting image to production registry...\n\ndata: [step-promote] {{script.status}}\n\ndata: endofstream\n\n" }],
+            "chaos": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "wikijs",
+      "listen_path": "",
+      "real_target_url": "https://wiki.internal.company.com",
+      "is_mocked": true,
+      "rewrite_directory_urls": false,
+      "group_name": "regate",
+      "wsdl_mode": "auto",
+      "rules": [
+        {
+          "name": "graphql-login",
+          "method": "POST",
+          "sub_path": "/graphql",
+          "action": "mock",
+          "script": "let body = request.body;\nif body.contains(\"authentication\") {\n  #{ type: \"login\", jwt: `jwt-${now_ms()}`, ok: \"true\" }\n} else if body.contains(\"mutation\") {\n  #{ type: \"mutation\", ok: \"true\", page_id: `${random_int(100, 999)}` }\n} else {\n  #{ type: \"query\", ok: \"true\" }\n}",
+          "conditions": { "all_of": [], "any_of": [] },
+          "response": {
+            "status": 200,
+            "headers": [{ "name": "Content-Type", "value": "application/json" }],
+            "body": [{ "type": "Template", "template": "{\"data\":{\"authentication\":{\"login\":{\"jwt\":\"{{script.jwt}}\",\"mustChangePwd\":false,\"mustProvideTFA\":false,\"mustSetupTFA\":false,\"continuationToken\":null,\"responseResult\":{\"succeeded\":true,\"errorCode\":0,\"slug\":\"\",\"message\":\"\"}}},\"pages\":{\"create\":{\"responseResult\":{\"succeeded\":true},\"page\":{\"id\":{{script.page_id}}}},\"delete\":{\"responseResult\":{\"succeeded\":true}}}}}" }],
+            "chaos": { "error_rate": 0.2, "error_status": 401, "delay_ms": null, "delay_min_ms": null, "delay_max_ms": null }
+          }
+        }
+      ]
+    },
+    {
+      "name": "keycloak-tekton",
+      "listen_path": "/auth/realms/tekton/protocol/openid-connect",
+      "real_target_url": "https://keycloak.internal.company.com",
+      "is_mocked": true,
+      "rewrite_directory_urls": false,
+      "group_name": "regate",
+      "wsdl_mode": "auto",
+      "rules": [
+        {
+          "name": "token-exchange",
+          "method": "POST",
+          "sub_path": "/token",
+          "action": "mock",
+          "script": null,
+          "conditions": { "all_of": [], "any_of": [] },
+          "response": {
+            "status": 200,
+            "headers": [{ "name": "Content-Type", "value": "application/json" }],
+            "body": [{ "type": "Template", "template": "{\"access_token\":\"mock-jwt-{{uuid}}\",\"token_type\":\"Bearer\",\"expires_in\":3600}" }],
+            "chaos": null
+          }
+        }
+      ]
     }
   ],
   "groups": [
