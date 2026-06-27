@@ -111,6 +111,10 @@ fn resolve_variable(name: &str, ctx: &TemplateContext) -> String {
     }
 }
 
+pub fn resolve_fake_public(kind: &str) -> String {
+    resolve_fake(kind)
+}
+
 fn resolve_fake(kind: &str) -> String {
     use crate::models::FakeKind;
     let fk = match kind {
