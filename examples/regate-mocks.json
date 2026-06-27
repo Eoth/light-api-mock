@@ -1,0 +1,300 @@
+{
+  "services": [
+    {
+      "name": "gitlab",
+      "listen_path": "/api/v4",
+      "real_target_url": "https://gitlab.internal.company.com",
+      "is_mocked": true,
+      "rewrite_directory_urls": false,
+      "group_name": "regate",
+      "wsdl_mode": "auto",
+      "rules": [
+        {
+          "name": "get-current-user",
+          "method": "GET",
+          "sub_path": "/user",
+          "action": "mock",
+          "script": null,
+          "conditions": { "all_of": [], "any_of": [] },
+          "response": {
+            "status": 200,
+            "headers": [{ "name": "Content-Type", "value": "application/json" }],
+            "body": [{ "type": "Template", "template": "{\"id\":42,\"username\":\"regate-bot\",\"name\":\"Regate CI\",\"state\":\"active\",\"web_url\":\"https://gitlab.internal.company.com/regate-bot\"}" }],
+            "chaos": { "error_rate": 0.2, "error_status": 503, "delay_ms": null, "delay_min_ms": 50, "delay_max_ms": 200 }
+          }
+        },
+        {
+          "name": "list-branches",
+          "method": "GET",
+          "sub_path": "/projects/{project_id}/repository/branches",
+          "action": "mock",
+          "script": null,
+          "conditions": { "all_of": [], "any_of": [] },
+          "response": {
+            "status": 200,
+            "headers": [{ "name": "Content-Type", "value": "application/json" }],
+            "body": [{ "type": "Template", "template": "[{\"name\":\"main\",\"default\":true,\"merged\":false,\"protected\":true,\"commit\":{\"id\":\"{{uuid}}\",\"short_id\":\"abc1234\",\"title\":\"chore: update deps\",\"created_at\":\"{{now_iso}}\"}},{\"name\":\"develop\",\"default\":false,\"merged\":false,\"protected\":false,\"commit\":{\"id\":\"{{uuid}}\",\"short_id\":\"def5678\",\"title\":\"feat: new feature\",\"created_at\":\"{{now_iso}}\"}}]" }],
+            "chaos": null
+          }
+        },
+        {
+          "name": "create-branch",
+          "method": "POST",
+          "sub_path": "/projects/{project_id}/repository/branches",
+          "action": "mock",
+          "script": null,
+          "conditions": { "all_of": [], "any_of": [] },
+          "response": {
+            "status": 201,
+            "headers": [{ "name": "Content-Type", "value": "application/json" }],
+            "body": [{ "type": "Template", "template": "{\"name\":\"{{query.branch}}\",\"default\":false,\"merged\":false,\"protected\":false,\"commit\":{\"id\":\"{{uuid}}\",\"short_id\":\"new1234\",\"title\":\"branch created\",\"created_at\":\"{{now_iso}}\"}}" }],
+            "chaos": { "error_rate": 0.2, "error_status": 409, "delay_ms": null, "delay_min_ms": null, "delay_max_ms": null }
+          }
+        },
+        {
+          "name": "get-file",
+          "method": "GET",
+          "sub_path": "/projects/{project_id}/repository/files/{file_path}",
+          "action": "mock",
+          "script": "let path = request.path.file_path;\nif path.contains(\"pom\") {\n  #{ content_type: \"text/xml\", content: \"PD94bWwgdmVyc2lvbj0iMS4wIj8+CjxwYXJlbnQ+Cjx2ZXJzaW9uPjEuMC4wPC92ZXJzaW9uPgo8L3BhcmVudD4=\" }\n} else {\n  #{ content_type: \"application/json\", content: \"eyJuYW1lIjogInJlZ2F0ZSIsICJ2ZXJzaW9uIjogIjEuMC4wIn0=\" }\n}",
+          "conditions": { "all_of": [], "any_of": [] },
+          "response": {
+            "status": 200,
+            "headers": [{ "name": "Content-Type", "value": "application/json" }],
+            "body": [{ "type": "Template", "template": "{\"file_name\":\"{{path.file_path}}\",\"file_path\":\"{{path.file_path}}\",\"size\":1024,\"encoding\":\"base64\",\"content_sha256\":\"{{uuid}}\",\"ref\":\"{{query.ref}}\",\"content\":\"{{script.content}}\"}" }],
+            "chaos": null
+          }
+        },
+        {
+          "name": "update-file",
+          "method": "PUT",
+          "sub_path": "/projects/{project_id}/repository/files/{file_path}",
+          "action": "mock",
+          "script": null,
+          "conditions": { "all_of": [], "any_of": [] },
+          "response": {
+            "status": 200,
+            "headers": [{ "name": "Content-Type", "value": "application/json" }],
+            "body": [{ "type": "Template", "template": "{\"file_path\":\"{{path.file_path}}\",\"branch\":\"develop\"}" }],
+            "chaos": { "error_rate": 0.2, "error_status": 500, "delay_ms": null, "delay_min_ms": null, "delay_max_ms": null }
+          }
+        },
+        {
+          "name": "list-tags",
+          "method": "GET",
+          "sub_path": "/projects/{project_id}/repository/tags",
+          "action": "mock",
+          "script": null,
+          "conditions": { "all_of": [], "any_of": [] },
+          "response": {
+            "status": 200,
+            "headers": [{ "name": "Content-Type", "value": "application/json" }],
+            "body": [{ "type": "Template", "template": "[{\"name\":\"v1.2.0\",\"message\":\"Release 1.2.0\",\"target\":\"{{uuid}}\",\"commit\":{\"id\":\"{{uuid}}\",\"created_at\":\"{{now_iso}}\"}},{\"name\":\"v1.1.0\",\"message\":\"Release 1.1.0\",\"target\":\"{{uuid}}\",\"commit\":{\"id\":\"{{uuid}}\",\"created_at\":\"{{now_iso}}\"}}]" }],
+            "chaos": null
+          }
+        },
+        {
+          "name": "create-tag",
+          "method": "POST",
+          "sub_path": "/projects/{project_id}/repository/tags",
+          "action": "mock",
+          "script": null,
+          "conditions": { "all_of": [], "any_of": [] },
+          "response": {
+            "status": 201,
+            "headers": [{ "name": "Content-Type", "value": "application/json" }],
+            "body": [{ "type": "Template", "template": "{\"name\":\"{{query.tag_name}}\",\"message\":\"{{query.message}}\",\"target\":\"{{uuid}}\",\"commit\":{\"id\":\"{{uuid}}\",\"created_at\":\"{{now_iso}}\"}}" }],
+            "chaos": { "error_rate": 0.2, "error_status": 422, "delay_ms": null, "delay_min_ms": null, "delay_max_ms": null }
+          }
+        },
+        {
+          "name": "create-merge-request",
+          "method": "POST",
+          "sub_path": "/projects/{project_id}/merge_requests",
+          "action": "mock",
+          "script": null,
+          "conditions": { "all_of": [], "any_of": [] },
+          "response": {
+            "status": 201,
+            "headers": [{ "name": "Content-Type", "value": "application/json" }],
+            "body": [{ "type": "Template", "template": "{\"id\":{{seq}},\"iid\":{{seq}},\"title\":\"Release merge request\",\"state\":\"opened\",\"web_url\":\"https://gitlab.internal.company.com/project/-/merge_requests/{{seq}}\",\"created_at\":\"{{now_iso}}\"}" }],
+            "chaos": null
+          }
+        },
+        {
+          "name": "close-merge-request",
+          "method": "PUT",
+          "sub_path": "/projects/{project_id}/merge_requests/{mr_iid}",
+          "action": "mock",
+          "script": null,
+          "conditions": { "all_of": [], "any_of": [] },
+          "response": {
+            "status": 200,
+            "headers": [{ "name": "Content-Type", "value": "application/json" }],
+            "body": [{ "type": "Template", "template": "{\"id\":{{path.mr_iid}},\"state\":\"closed\",\"updated_at\":\"{{now_iso}}\"}" }],
+            "chaos": null
+          }
+        },
+        {
+          "name": "delete-branch",
+          "method": "DELETE",
+          "sub_path": "/projects/{project_id}/repository/branches/{branch}",
+          "action": "mock",
+          "script": null,
+          "conditions": { "all_of": [], "any_of": [] },
+          "response": {
+            "status": 204,
+            "headers": [],
+            "body": [],
+            "chaos": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "jenkins",
+      "listen_path": "",
+      "real_target_url": "https://jenkins.internal.company.com",
+      "is_mocked": true,
+      "rewrite_directory_urls": false,
+      "group_name": "regate",
+      "wsdl_mode": "auto",
+      "rules": [
+        {
+          "name": "get-crumb",
+          "method": "GET",
+          "sub_path": "/crumbIssuer/api/json",
+          "action": "mock",
+          "script": null,
+          "conditions": { "all_of": [], "any_of": [] },
+          "response": {
+            "status": 200,
+            "headers": [{ "name": "Content-Type", "value": "application/json" }],
+            "body": [{ "type": "Template", "template": "{\"_class\":\"hudson.security.csrf.DefaultCrumbIssuer\",\"crumb\":\"{{uuid}}\",\"crumbRequestField\":\"Jenkins-Crumb\"}" }],
+            "chaos": { "error_rate": 0.2, "error_status": 403, "delay_ms": null, "delay_min_ms": null, "delay_max_ms": null }
+          }
+        },
+        {
+          "name": "trigger-build",
+          "method": "POST",
+          "sub_path": "/job/{job_path}/build",
+          "action": "mock",
+          "script": null,
+          "conditions": { "all_of": [], "any_of": [] },
+          "response": {
+            "status": 201,
+            "headers": [{ "name": "Location", "value": "https://jenkins.internal.company.com/queue/item/{{seq}}/" }],
+            "body": [],
+            "chaos": { "error_rate": 0.2, "error_status": 503, "delay_ms": null, "delay_min_ms": 100, "delay_max_ms": 500 }
+          }
+        },
+        {
+          "name": "build-with-params",
+          "method": "POST",
+          "sub_path": "/job/{job_path}/buildWithParameters",
+          "action": "mock",
+          "script": null,
+          "conditions": { "all_of": [], "any_of": [] },
+          "response": {
+            "status": 201,
+            "headers": [{ "name": "Location", "value": "https://jenkins.internal.company.com/queue/item/{{seq}}/" }],
+            "body": [],
+            "chaos": { "error_rate": 0.2, "error_status": 500, "delay_ms": null, "delay_min_ms": null, "delay_max_ms": null }
+          }
+        },
+        {
+          "name": "replay-run",
+          "method": "POST",
+          "sub_path": "/job/{job_path}/{build_id}/replay/run",
+          "action": "mock",
+          "script": null,
+          "conditions": { "all_of": [], "any_of": [] },
+          "response": {
+            "status": 200,
+            "headers": [{ "name": "Content-Type", "value": "text/html" }],
+            "body": [{ "type": "Literal", "value": "<html><body>Replay started</body></html>" }],
+            "chaos": null
+          }
+        },
+        {
+          "name": "stop-build",
+          "method": "POST",
+          "sub_path": "/job/{job_path}/{build_id}/stop",
+          "action": "mock",
+          "script": null,
+          "conditions": { "all_of": [], "any_of": [] },
+          "response": {
+            "status": 200,
+            "headers": [],
+            "body": [],
+            "chaos": null
+          }
+        },
+        {
+          "name": "kill-build",
+          "method": "POST",
+          "sub_path": "/job/{job_path}/{build_id}/kill",
+          "action": "mock",
+          "script": null,
+          "conditions": { "all_of": [], "any_of": [] },
+          "response": {
+            "status": 200,
+            "headers": [],
+            "body": [],
+            "chaos": null
+          }
+        },
+        {
+          "name": "get-build-api-json",
+          "method": "GET",
+          "sub_path": "/job/{job_path}/{build_id}/api/json",
+          "action": "mock",
+          "script": "let roll = random_int(1, 5);\nlet status = if roll <= 3 { \"SUCCESS\" } else if roll == 4 { \"BUILDING\" } else { \"FAILURE\" };\nlet building = status == \"BUILDING\";\n#{ result: status, building: `${building}`, number: request.path.build_id, duration: `${random_int(30000, 180000)}` }",
+          "conditions": { "all_of": [], "any_of": [] },
+          "response": {
+            "status": 200,
+            "headers": [{ "name": "Content-Type", "value": "application/json" }],
+            "body": [{ "type": "Template", "template": "{\"_class\":\"org.jenkinsci.plugins.workflow.job.WorkflowRun\",\"number\":{{script.number}},\"result\":\"{{script.result}}\",\"building\":{{script.building}},\"duration\":{{script.duration}},\"timestamp\":{{now_ms}},\"url\":\"https://jenkins.internal.company.com/job/{{path.job_path}}/{{path.build_id}}/\"}" }],
+            "chaos": null
+          }
+        },
+        {
+          "name": "wfapi-describe",
+          "method": "GET",
+          "sub_path": "/job/{job_path}/{build_id}/wfapi/describe",
+          "action": "mock",
+          "script": "let roll = random_int(1, 5);\nlet st = if roll <= 4 { \"SUCCESS\" } else { \"FAILED\" };\n#{ status: st, dur: `${random_int(5000, 60000)}` }",
+          "conditions": { "all_of": [], "any_of": [] },
+          "response": {
+            "status": 200,
+            "headers": [{ "name": "Content-Type", "value": "application/json" }],
+            "body": [{ "type": "Template", "template": "{\"id\":\"{{path.build_id}}\",\"name\":\"Pipeline\",\"status\":\"{{script.status}}\",\"durationMillis\":{{script.dur}},\"stages\":[{\"id\":\"1\",\"name\":\"Checkout\",\"status\":\"{{script.status}}\",\"durationMillis\":{{script.dur}}},{\"id\":\"2\",\"name\":\"Build\",\"status\":\"{{script.status}}\",\"durationMillis\":{{script.dur}}},{\"id\":\"3\",\"name\":\"Test\",\"status\":\"{{script.status}}\",\"durationMillis\":{{script.dur}}},{\"id\":\"4\",\"name\":\"Deploy\",\"status\":\"{{script.status}}\",\"durationMillis\":{{script.dur}}}]}" }],
+            "chaos": null
+          }
+        },
+        {
+          "name": "delete-build",
+          "method": "POST",
+          "sub_path": "/job/{job_path}/{build_id}/doDelete",
+          "action": "mock",
+          "script": null,
+          "conditions": { "all_of": [], "any_of": [] },
+          "response": {
+            "status": 204,
+            "headers": [],
+            "body": [],
+            "chaos": null
+          }
+        }
+      ]
+    }
+  ],
+  "groups": [
+    {
+      "name": "regate",
+      "code": "",
+      "admins": [],
+      "members": []
+    }
+  ]
+}
