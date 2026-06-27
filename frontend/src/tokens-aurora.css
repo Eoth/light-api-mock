@@ -1,0 +1,68 @@
+/* Tokens Aurora/ZAC — palette de couleurs, espacements, radius, typographie.
+ * Source : design system ZAC Orion (zac-orion-scss@1.4.1)
+ * Ce fichier contient uniquement les custom properties CSS.
+ * Le framework Aurora complet (composants Angular) n'est PAS charge — lightMock
+ * utilise ses propres composants Svelte avec les tokens ZAC comme base. */
+
+.custom-dt, :root {
+  --zac-color-primary-50: #f2f4fd;
+  --zac-color-primary-100: #e4e9fa;
+  --zac-color-primary-200: #c9d2f4;
+  --zac-color-primary-300: #92a5e8;
+  --zac-color-primary-400: #5b78dd;
+  --zac-color-primary-500: #244ad1;
+  --zac-color-primary-600: #0d22b5;
+  --zac-color-primary-700: #0a1a88;
+  --zac-color-primary-800: #07125b;
+  --zac-color-primary-900: #04092e;
+
+  --zac-color-error-50: #f9e9e8;
+  --zac-color-error-100: #f2d1cf;
+  --zac-color-error-200: #ebb8b5;
+  --zac-color-error-500: #ce564e;
+  --zac-color-error-600: #bf241a;
+  --zac-color-error-700: #901b14;
+  --zac-color-error-800: #60120d;
+
+  --zac-color-success-50: #d7e6d7;
+  --zac-color-success-100: #c0d7c4;
+  --zac-color-success-500: #488b60;
+  --zac-color-success-600: #186c38;
+  --zac-color-success-700: #12512a;
+  --zac-color-success-800: #0c361c;
+
+  --zac-color-warning-50: #fff6ed;
+  --zac-color-warning-500: #ea510c;
+  --zac-color-warning-600: #c23b0c;
+
+  --zac-color-neutral-0: #fff;
+  --zac-color-neutral-100: #f7f7f7;
+  --zac-color-neutral-200: #e8e8e8;
+  --zac-color-neutral-300: #cdcdcd;
+  --zac-color-neutral-400: #999;
+  --zac-color-neutral-500: #646464;
+  --zac-color-neutral-600: #424242;
+  --zac-color-neutral-700: #313131;
+  --zac-color-neutral-800: #202020;
+  --zac-color-neutral-900: #101010;
+
+  --zac-spacing-0px: 0;
+  --zac-spacing-2px: 2px;
+  --zac-spacing-4px: 4px;
+  --zac-spacing-8px: 8px;
+  --zac-spacing-12px: 12px;
+  --zac-spacing-16px: 16px;
+  --zac-spacing-24px: 24px;
+  --zac-spacing-32px: 32px;
+  --zac-spacing-40px: 40px;
+  --zac-spacing-48px: 48px;
+
+  --zac-size-radius-xs: 4px;
+  --zac-size-radius-s: 8px;
+  --zac-size-radius-m: 16px;
+  --zac-size-radius-l: 32px;
+
+  --zac-size-stroke-xs: 1px;
+  --zac-size-stroke-s: 2px;
+  --zac-size-stroke-m: 3px;
+}
