@@ -1,31 +1,33 @@
 <script>
+  import { untrack } from 'svelte';
+
   let {
     service = null,
     existingNames = [],
     availableGroups = [],
-    authEnabled = false,
     onSave = () => {},
     onCancel = () => {},
   } = $props();
 
-  const initial = service;
-  let name = $state(initial?.name ?? '');
-  let method = $state(initial?.method ?? 'GET');
-  let listenPath = $state(initial?.listen_path ?? '/v1/*');
-  let realTargetUrl = $state(initial?.real_target_url ?? 'http://');
-  let rewriteDirectoryUrls = $state(initial?.rewrite_directory_urls ?? false);
-  let groupName = $state(initial?.group_name ?? '');
+  const isEdit = untrack(() => !!service);
+  let name = $state(untrack(() => service?.name ?? ''));
+  let listenPath = $state(untrack(() => service?.listen_path ?? ''));
+  let realTargetUrl = $state(untrack(() => service?.real_target_url ?? 'http://'));
+  let rewriteDirectoryUrls = $state(untrack(() => service?.rewrite_directory_urls ?? false));
+  let groupName = $state(untrack(() => service?.group_name ?? ''));
+  let wsdlMode = $state(untrack(() => service?.wsdl_mode ?? 'auto'));
 
-  const httpMethods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'];
   const RESERVED_NAMES = ['api', 'auth', 'index.html', 'assets', 'favicon.ico'];
 
-  let testUrl = $derived(
-    `http://localhost:7342/${name.trim() || '...'}${listenPath.trim().startsWith('/') ? listenPath.trim() : '/' + listenPath.trim()}`
-  );
+  let testUrl = $derived(() => {
+    const n = name.trim() || '...';
+    const p = listenPath.trim();
+    if (!p) return `http://localhost:7342/${n}/*`;
+    return `http://localhost:7342/${n}${p.startsWith('/') ? p : '/' + p}`;
+  });
   let saving = $state(false);
   let error = $state('');
 
-  const isEdit = !!initial;
 
   function validateName(n) {
     const trimmed = n.trim();
@@ -42,14 +44,7 @@
     return null;
   }
 
-  function validatePath(p) {
-    const trimmed = p.trim().replace(/^\/+|\/+$/g, '');
-    if (!trimmed) {
-      return "Interdit : un chemin vide ou \"/\" capturerait la racine de lightMock et masquerait l'interface.";
-    }
-    if (trimmed === '*') {
-      return "Interdit : \"/*\" au premier niveau capturerait toutes les routes de lightMock.";
-    }
+  function validatePath(_p) {
     return null;
   }
 
@@ -69,12 +64,12 @@
     try {
       const payload = {
         name: name.trim(),
-        method,
         listen_path: listenPath.trim(),
         real_target_url: realTargetUrl.trim(),
-        is_mocked: initial?.is_mocked ?? false,
+        is_mocked: service?.is_mocked ?? false,
         rewrite_directory_urls: rewriteDirectoryUrls,
-        rules: initial?.rules ?? [],
+        wsdl_mode: wsdlMode,
+        rules: service?.rules ?? [],
       };
       if (groupName) payload.group_name = groupName;
       await onSave(payload);
@@ -106,26 +101,15 @@
   </div>
 
   <div class="form-field">
-    <label for="svc-method">Methode HTTP</label>
-    <select id="svc-method" bind:value={method} aria-describedby="svc-method-hint">
-      {#each httpMethods as m}
-        <option value={m}>{m}</option>
-      {/each}
-    </select>
-    <span class="field-hint" id="svc-method-hint">Un service = une methode. Pour GET + POST sur le meme path, creez 2 services.</span>
-  </div>
-
-  <div class="form-field">
-    <label for="svc-path">Chemin d'ecoute</label>
+    <label for="svc-path">Chemin d'ecoute (optionnel)</label>
     <input
       id="svc-path"
       type="text"
       bind:value={listenPath}
-      required
-      placeholder={`ex: /v4/api/insee/{siret}`}
+      placeholder="Vide = intercepte tout sous le nom du service"
       aria-describedby="svc-path-hint"
     />
-    <span class="field-hint" id="svc-path-hint">Route interceptee. Utilisez /* pour wildcard ou {`{param}`} pour capturer des segments nommes (ex: /v4/insee/{`{siret}`})</span>
+    <span class="field-hint" id="svc-path-hint">Laissez vide pour intercepter tout le trafic sous /{`{nom}`}/. Sinon, utilisez /* pour wildcard ou {`{param}`} pour capturer des segments.</span>
   </div>
 
   <div class="form-field">
@@ -149,7 +133,17 @@
     <span class="field-hint">Remplace les URL des backends dans les réponses d'annuaire pour les rediriger via lightMock</span>
   </div>
 
-  {#if authEnabled && availableGroups.length > 0}
+  <div class="form-field">
+    <label for="svc-wsdl">Mode WSDL</label>
+    <select id="svc-wsdl" bind:value={wsdlMode} aria-describedby="svc-wsdl-hint">
+      <option value="auto">Auto (proxy les requetes ?wsdl)</option>
+      <option value="proxy">Proxy (toujours proxifier les WSDL)</option>
+      <option value="mock">Mock (appliquer les regles meme pour WSDL)</option>
+    </select>
+    <span class="field-hint" id="svc-wsdl-hint">Controle le comportement quand une requete contient ?wsdl dans l'URL</span>
+  </div>
+
+  {#if availableGroups.length > 0}
     <div class="form-field">
       <label for="svc-group">Groupe</label>
       <select id="svc-group" bind:value={groupName} aria-describedby="svc-group-hint">
@@ -164,7 +158,7 @@
 
   {#if name.trim()}
     <div class="url-preview">
-      <strong>URL de test :</strong> <code>{method} {testUrl}</code>
+      <strong>URL de test :</strong> <code>{testUrl()}</code>
     </div>
   {/if}
 
@@ -186,40 +180,6 @@
     padding: 1.5rem;
   }
 
-  .form-error {
-    background: #f8d7da;
-    border: 1px solid #f1aeb5;
-    color: #58151c;
-    padding: 0.5rem 0.75rem;
-    border-radius: var(--radius);
-    margin-bottom: 1rem;
-    font-weight: 500;
-  }
-  :global([data-theme="dark"]) .form-error {
-    background: #3b1219;
-    border-color: #dc3545;
-    color: #f1aeb5;
-  }
-
-  .form-field {
-    margin-bottom: 1rem;
-  }
-
-  .form-field label {
-    display: block;
-    font-weight: 600;
-    margin-bottom: 0.25rem;
-  }
-
-  .form-field select {
-    width: 100%;
-    padding: 0.5rem 0.75rem;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
-    font-size: 1rem;
-    font-family: inherit;
-  }
-
   .url-preview {
     background: var(--color-bg);
     border: 1px solid var(--color-border);
@@ -229,26 +189,6 @@
     font-size: 0.875rem;
   }
   .url-preview code { background: none; padding: 0; font-weight: 600; color: var(--color-primary); }
-
-  .form-field input[type="text"],
-  .form-field input[type="url"] {
-    width: 100%;
-    padding: 0.5rem 0.75rem;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
-    font-size: 1rem;
-    font-family: inherit;
-  }
-
-  .form-field input:focus-visible {
-    outline: 3px solid var(--color-primary);
-    outline-offset: 1px;
-  }
-
-  .form-field input:disabled {
-    background: var(--color-bg);
-    color: var(--color-text-muted);
-  }
 
   .form-field-check label {
     display: flex;
@@ -261,51 +201,5 @@
   .form-field-check input[type="checkbox"] {
     width: 1.125rem;
     height: 1.125rem;
-  }
-
-  .field-hint {
-    display: block;
-    font-size: 0.8125rem;
-    color: var(--color-text-muted);
-    margin-top: 0.25rem;
-  }
-
-  .form-actions {
-    display: flex;
-    gap: 0.75rem;
-    margin-top: 1.25rem;
-  }
-
-  .btn {
-    padding: 0.5rem 1.25rem;
-    border-radius: var(--radius);
-    border: 1px solid transparent;
-    font-weight: 600;
-    font-size: 0.9375rem;
-    transition: background-color 0.15s;
-  }
-
-  .btn-primary {
-    background: var(--color-primary);
-    color: #fff;
-  }
-
-  .btn-primary:hover:not(:disabled) {
-    background: var(--color-primary-hover);
-  }
-
-  .btn-primary:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-
-  .btn-secondary {
-    background: var(--color-surface);
-    color: var(--color-text);
-    border-color: var(--color-border);
-  }
-
-  .btn-secondary:hover:not(:disabled) {
-    background: var(--color-bg);
   }
 </style>

@@ -90,7 +90,7 @@ pub fn visible_services(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{Group, MockConfig, Service};
+    use crate::models::{Group, MockConfig, Service, WsdlMode};
 
     fn test_config() -> AuthConfig {
         AuthConfig {
@@ -113,12 +113,12 @@ mod tests {
     fn test_service(group: Option<&str>) -> Service {
         Service {
             name: "svc".into(),
-            method: "GET".into(),
             listen_path: "/v1/*".into(),
             real_target_url: "http://svc:80".into(),
             is_mocked: true,
             rewrite_directory_urls: false,
             group_name: group.map(String::from),
+            wsdl_mode: WsdlMode::default(),
             rules: vec![],
         }
     }
@@ -180,5 +180,38 @@ mod tests {
         let visible = visible_services("dev-a1", false, &config);
         assert_eq!(visible.len(), 1);
         assert_eq!(visible[0].name, "svc");
+    }
+
+    #[test]
+    fn member_cannot_manage_group() {
+        let group = &test_groups()[0];
+        assert!(!can_manage_group("dev-a1", false, group));
+        assert!(!can_manage_group("dev-a2", false, group));
+    }
+
+    #[test]
+    fn group_admin_can_manage() {
+        let group = &test_groups()[0];
+        assert!(can_manage_group("lead-a", false, group));
+    }
+
+    #[test]
+    fn super_admin_can_manage_any_group() {
+        let group = &test_groups()[0];
+        assert!(can_manage_group("random-user", true, group));
+    }
+
+    #[test]
+    fn service_with_group_visible_to_members() {
+        let config = MockConfig {
+            services: vec![
+                test_service(Some("team-a")),
+            ],
+            groups: test_groups(),
+        };
+        assert_eq!(visible_services("dev-a1", false, &config).len(), 1);
+        assert_eq!(visible_services("dev-a2", false, &config).len(), 1);
+        assert_eq!(visible_services("outsider", false, &config).len(), 0);
+        assert_eq!(visible_services("admin1", true, &config).len(), 1);
     }
 }

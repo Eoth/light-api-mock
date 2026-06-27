@@ -1,9 +1,13 @@
+// Structures de donnees serializees en YAML (persistance) et JSON (API REST).
+// Hierarchie : MockConfig → Service[] + Group[]
+//              Service → Rule[] (regles de matching, first-match)
+//              Rule → method + sub_path + conditions + response + script
+// Modifier un champ ici impacte : le YAML stocke, l'API JSON, et le frontend.
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct MockConfig {
     pub services: Vec<Service>,
-    #[serde(default)]
     pub groups: Vec<Group>,
 }
 
@@ -16,32 +20,34 @@ pub struct Group {
     pub members: Vec<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum WsdlMode {
+    #[default]
+    Auto,
+    Proxy,
+    Mock,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Service {
     pub name: String,
-    #[serde(default = "default_method")]
-    pub method: String,
     pub listen_path: String,
     pub real_target_url: String,
     pub is_mocked: bool,
-    #[serde(default)]
     pub rewrite_directory_urls: bool,
-    #[serde(default)]
     pub group_name: Option<String>,
-    #[serde(default)]
+    pub wsdl_mode: WsdlMode,
     pub rules: Vec<Rule>,
-}
-
-fn default_method() -> String {
-    "GET".into()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Rule {
     pub name: String,
-    #[serde(default)]
+    pub method: String,
+    pub sub_path: Option<String>,
     pub action: RuleAction,
-    #[serde(default)]
+    pub script: Option<String>,
     pub conditions: ConditionGroup,
     pub response: MockResponse,
 }
@@ -180,15 +186,19 @@ mod tests {
         MockConfig {
             services: vec![Service {
                 name: "service-a".into(),
-                method: "GET".into(),
+
                 listen_path: "/service-a/*".into(),
                 real_target_url: "http://service-a.default.svc:8080".into(),
                 is_mocked: true,
                 rewrite_directory_urls: false,
                 group_name: None,
+                wsdl_mode: WsdlMode::default(),
                 rules: vec![Rule {
                     name: "rule-login-ok".into(),
+                    method: "ANY".into(),
+                    sub_path: None,
                     action: RuleAction::default(),
+                    script: None,
                     conditions: ConditionGroup {
                         all_of: vec![
                             Condition {
@@ -262,6 +272,11 @@ services:
     listen_path: /svc/*
     real_target_url: http://svc:80
     is_mocked: false
+    rewrite_directory_urls: false
+    group_name: ~
+    wsdl_mode: auto
+    rules: []
+groups: []
 "#;
         let config: MockConfig = serde_yaml::from_str(yaml).expect("deserialize");
         assert_eq!(config.services.len(), 1);
@@ -277,8 +292,15 @@ services:
     listen_path: /t/*
     real_target_url: http://t:80
     is_mocked: true
+    rewrite_directory_urls: false
+    group_name: ~
+    wsdl_mode: auto
     rules:
       - name: all-sources
+        method: ANY
+        sub_path: ~
+        action: mock
+        script: ~
         conditions:
           all_of:
             - source: { type: QueryParam, key: q }
@@ -299,6 +321,7 @@ services:
           body:
             - type: Literal
               value: ok
+groups: []
 "#;
         let config: MockConfig = serde_yaml::from_str(yaml).expect("deserialize");
         let rule = &config.services[0].rules[0];
@@ -314,8 +337,16 @@ services:
     listen_path: /f/*
     real_target_url: http://f:80
     is_mocked: true
+    rewrite_directory_urls: false
+    group_name: ~
+    wsdl_mode: auto
     rules:
       - name: fragments
+        method: ANY
+        sub_path: ~
+        action: mock
+        script: ~
+        conditions: {}
         response:
           body:
             - type: Literal
@@ -335,6 +366,7 @@ services:
               kind: { type: Integer, min: 1, max: 100 }
             - type: PathSegment
               index: 2
+groups: []
 "#;
         let config: MockConfig = serde_yaml::from_str(yaml).expect("deserialize");
         let body = &config.services[0].rules[0].response.body;
@@ -350,8 +382,16 @@ services:
     listen_path: /c/*
     real_target_url: http://c:80
     is_mocked: true
+    rewrite_directory_urls: false
+    group_name: ~
+    wsdl_mode: auto
     rules:
       - name: chaos-rule
+        method: ANY
+        sub_path: ~
+        action: mock
+        script: ~
+        conditions: {}
         response:
           body:
             - type: Literal
@@ -360,6 +400,7 @@ services:
             delay_ms: 500
             error_rate: 0.25
             error_status: 502
+groups: []
 "#;
         let config: MockConfig = serde_yaml::from_str(yaml).expect("deserialize");
         let chaos = config.services[0].rules[0]
@@ -380,12 +421,21 @@ services:
     listen_path: /d/*
     real_target_url: http://d:80
     is_mocked: true
+    rewrite_directory_urls: false
+    group_name: ~
+    wsdl_mode: auto
     rules:
       - name: no-chaos
+        method: ANY
+        sub_path: ~
+        action: mock
+        script: ~
+        conditions: {}
         response:
           body:
             - type: Literal
               value: ok
+groups: []
 "#;
         let config: MockConfig = serde_yaml::from_str(yaml).expect("deserialize");
         assert!(config.services[0].rules[0].response.chaos.is_none());
@@ -401,19 +451,6 @@ services:
     }
 
     #[test]
-    fn rewrite_directory_urls_defaults_false() {
-        let yaml = r#"
-services:
-  - name: svc
-    listen_path: /svc/*
-    real_target_url: http://svc:80
-    is_mocked: false
-"#;
-        let config: MockConfig = serde_yaml::from_str(yaml).expect("deserialize");
-        assert!(!config.services[0].rewrite_directory_urls);
-    }
-
-    #[test]
     fn status_defaults_to_200() {
         let yaml = r#"
 services:
@@ -421,34 +458,24 @@ services:
     listen_path: /s/*
     real_target_url: http://s:80
     is_mocked: true
+    rewrite_directory_urls: false
+    group_name: ~
+    wsdl_mode: auto
     rules:
       - name: r
+        method: GET
+        sub_path: ~
+        action: mock
+        script: ~
+        conditions: {}
         response:
           body:
             - type: Literal
               value: hi
+groups: []
 "#;
         let config: MockConfig = serde_yaml::from_str(yaml).expect("deserialize");
         assert_eq!(config.services[0].rules[0].response.status, 200);
-    }
-
-    #[test]
-    fn rule_action_defaults_to_mock() {
-        let yaml = r#"
-services:
-  - name: s
-    listen_path: /s/*
-    real_target_url: http://s:80
-    is_mocked: true
-    rules:
-      - name: r
-        response:
-          body:
-            - type: Literal
-              value: hi
-"#;
-        let config: MockConfig = serde_yaml::from_str(yaml).expect("deserialize");
-        assert_eq!(config.services[0].rules[0].action, RuleAction::Mock);
     }
 
     #[test]
@@ -459,19 +486,31 @@ services:
     listen_path: /s/*
     real_target_url: http://s:80
     is_mocked: true
+    rewrite_directory_urls: false
+    group_name: ~
+    wsdl_mode: auto
     rules:
       - name: proxy-rule
+        method: ANY
+        sub_path: ~
         action: proxy
+        script: ~
+        conditions: {}
         response:
           body:
             - type: Literal
               value: unused
       - name: mock-rule
+        method: ANY
+        sub_path: ~
         action: mock
+        script: ~
+        conditions: {}
         response:
           body:
             - type: Literal
               value: mocked
+groups: []
 "#;
         let config: MockConfig = serde_yaml::from_str(yaml).expect("deserialize");
         assert_eq!(config.services[0].rules[0].action, RuleAction::Proxy);
@@ -483,42 +522,6 @@ services:
     }
 
     #[test]
-    fn backward_compat_no_action_field() {
-        let yaml = r#"
-services:
-  - name: old
-    listen_path: /old/*
-    real_target_url: http://old:80
-    is_mocked: true
-    rules:
-      - name: legacy
-        conditions:
-          all_of: []
-          any_of: []
-        response:
-          body:
-            - type: Literal
-              value: ok
-"#;
-        let config: MockConfig = serde_yaml::from_str(yaml).expect("deserialize");
-        assert_eq!(config.services[0].rules[0].action, RuleAction::Mock);
-    }
-
-    #[test]
-    fn backward_compat_no_groups_field() {
-        let yaml = r#"
-services:
-  - name: svc
-    listen_path: /svc/*
-    real_target_url: http://svc:80
-    is_mocked: false
-"#;
-        let config: MockConfig = serde_yaml::from_str(yaml).expect("deserialize");
-        assert!(config.groups.is_empty());
-        assert!(config.services[0].group_name.is_none());
-    }
-
-    #[test]
     fn deserialize_config_with_groups() {
         let yaml = r#"
 services:
@@ -526,7 +529,10 @@ services:
     listen_path: /svc/*
     real_target_url: http://svc:80
     is_mocked: true
+    rewrite_directory_urls: false
     group_name: team-a
+    wsdl_mode: auto
+    rules: []
 groups:
   - name: team-a
     admins:
@@ -557,4 +563,26 @@ groups:
         let parsed: MockConfig = serde_yaml::from_str(&yaml).expect("deserialize");
         assert_eq!(config, parsed);
     }
+
+    #[test]
+    fn wsdl_mode_mock_roundtrip() {
+        let yaml = r#"
+services:
+  - name: svc
+    listen_path: /svc/*
+    real_target_url: http://svc:80
+    is_mocked: true
+    rewrite_directory_urls: false
+    group_name: ~
+    wsdl_mode: mock
+    rules: []
+groups: []
+"#;
+        let config: MockConfig = serde_yaml::from_str(yaml).expect("deserialize");
+        assert_eq!(config.services[0].wsdl_mode, WsdlMode::Mock);
+        let re_yaml = serde_yaml::to_string(&config).expect("serialize");
+        let re_parsed: MockConfig = serde_yaml::from_str(&re_yaml).expect("re-deserialize");
+        assert_eq!(re_parsed.services[0].wsdl_mode, WsdlMode::Mock);
+    }
+
 }
