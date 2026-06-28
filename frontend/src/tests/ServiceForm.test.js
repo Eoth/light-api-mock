@@ -97,16 +97,16 @@ describe('ServiceForm validation', () => {
     expect(getByRole('alert')).toHaveTextContent('separateur');
   });
 
-  it('refuse un nom deja existant en creation', async () => {
-    const onSave = vi.fn();
-    const { getByLabelText, container, getByRole } = render(ServiceForm, {
+  it('permet la soumission meme si nom existe (unicite geree par le backend par groupe)', async () => {
+    const onSave = vi.fn().mockResolvedValue({});
+    const { getByLabelText, container } = render(ServiceForm, {
       props: { onSave, existingNames: ['existing-svc'] },
     });
 
     await setInput(getByLabelText('Nom du service'), 'existing-svc');
+    await setInput(getByLabelText('URL cible réelle'), 'http://backend:8080');
     await submitForm(container);
-    expect(onSave).not.toHaveBeenCalled();
-    expect(getByRole('alert')).toHaveTextContent('existe deja');
+    expect(onSave).toHaveBeenCalled();
   });
 
   it('autorise le meme nom en edition', async () => {
