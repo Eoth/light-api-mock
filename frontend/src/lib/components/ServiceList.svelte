@@ -1,7 +1,7 @@
 <script>
   import ServiceGroup from './ServiceGroup.svelte';
 
-  let { services = [], groups = [], onToggle = () => {}, onSelect = () => {} } = $props();
+  let { services = [], groups = [], onToggle = () => {}, onSelect = () => {}, onClone = () => {} } = $props();
 
   let search = $state('');
   let expandedGroups = $state(new Set());
@@ -35,10 +35,6 @@
 
   $effect(() => {
     if (!initialized && services.length > 0) {
-      const groups = grouped();
-      if (groups.length <= 3) {
-        expandedGroups = new Set(groups.map(([key]) => key));
-      }
       initialized = true;
     }
   });
@@ -113,6 +109,7 @@
             onToggleGroup={() => toggleGroup(key)}
             {onToggle}
             {onSelect}
+            {onClone}
           />
         {/each}
       </div>

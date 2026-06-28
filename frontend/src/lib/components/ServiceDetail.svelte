@@ -66,6 +66,16 @@
     }
   }
 
+  function handleCloneRule(idx) {
+    const source = JSON.parse(JSON.stringify(service.rules[idx]));
+    source.name = '';
+    editingRuleIdx = null;
+    addingRule = true;
+    clonedRule = source;
+  }
+
+  let clonedRule = $state(null);
+
   async function handleDeleteRule(idx) {
     const rules = service.rules.filter((_, i) => i !== idx);
     const updated = { ...service, rules };
@@ -136,9 +146,10 @@
     />
   {:else if addingRule}
     <RuleForm
+      rule={clonedRule}
       existingRuleNames={(service.rules ?? []).map(r => r.name)}
       onSave={handleSaveRule}
-      onCancel={() => addingRule = false}
+      onCancel={() => { addingRule = false; clonedRule = null; }}
     />
   {:else}
     <RuleList
@@ -146,7 +157,8 @@
       onReorder={handleReorder}
       onEditRule={(idx) => editingRuleIdx = idx}
       onDeleteRule={handleDeleteRule}
-      onAddRule={() => addingRule = true}
+      onCloneRule={handleCloneRule}
+      onAddRule={() => { addingRule = true; clonedRule = null; }}
     />
   {/if}
 </div>

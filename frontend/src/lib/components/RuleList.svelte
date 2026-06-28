@@ -4,6 +4,7 @@
     onReorder = () => {},
     onEditRule = () => {},
     onDeleteRule = () => {},
+    onCloneRule = () => {},
     onAddRule = () => {},
   } = $props();
 
@@ -111,7 +112,7 @@
 
           <div class="rule-content">
             <span class="rule-index" aria-hidden="true">{idx + 1}</span>
-            <span class="rule-method-badge">{rule.method}</span>
+            <span class="method-badge" data-method={rule.method}>{rule.method}</span>
             <span class="rule-action-badge" class:proxy={rule.action === 'proxy'}>{(rule.action ?? 'mock').toUpperCase()}</span>
             <span class="rule-name">{rule.name}</span>
             <span class="rule-meta">
@@ -127,6 +128,7 @@
             <button type="button" class="btn-icon" onclick={() => moveUp(idx)} disabled={idx === 0} aria-label="Monter la regle {rule.name}" title="Monter">&#9650;</button>
             <button type="button" class="btn-icon" onclick={() => moveDown(idx)} disabled={idx === rules.length - 1} aria-label="Descendre la regle {rule.name}" title="Descendre">&#9660;</button>
             <button type="button" class="btn-icon btn-edit" onclick={(e) => clickEdit(e, idx)} aria-label="Modifier la regle {rule.name}" title="Modifier">&#9998;</button>
+            <button type="button" class="btn-icon" onclick={(e) => { e.stopPropagation(); onCloneRule(idx); }} aria-label="Dupliquer la regle {rule.name}" title="Dupliquer">&#10697;</button>
             <button type="button" class="btn-icon btn-delete" onclick={(e) => clickDelete(e, idx)} aria-label="Supprimer la regle {rule.name}" title="Supprimer">&#10005;</button>
           </div>
         </li>
@@ -171,7 +173,6 @@
 
   .rule-content { flex: 1; display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
   .rule-index { display: inline-flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; border-radius: 50%; background: var(--color-bg); font-size: 0.75rem; font-weight: 700; flex-shrink: 0; }
-  .rule-method-badge { display: inline-block; padding: 0.0625rem 0.375rem; border-radius: var(--radius); font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.04em; background: var(--color-focus); color: var(--color-primary); flex-shrink: 0; }
   .rule-action-badge { display: inline-block; padding: 0.0625rem 0.375rem; border-radius: var(--radius); font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.04em; background: var(--color-success); color: #fff; flex-shrink: 0; }
   .rule-action-badge.proxy { background: var(--color-primary); }
   .rule-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

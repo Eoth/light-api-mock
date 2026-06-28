@@ -13,7 +13,7 @@ pub struct KeycloakClient {
 
 struct CachedJwks {
     keys: Vec<JwkEntry>,
-    fetched_at: std::time::Instant,
+    fetched_at: Option<std::time::Instant>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -90,8 +90,7 @@ impl KeycloakClient {
             config,
             jwks: Arc::new(RwLock::new(CachedJwks {
                 keys: vec![],
-                fetched_at: std::time::Instant::now()
-                    - std::time::Duration::from_secs(JWKS_TTL_SECS + 1),
+                fetched_at: None,
             })),
         }
     }
@@ -262,7 +261,10 @@ impl KeycloakClient {
     async fn refresh_jwks_if_stale(&self) -> Result<(), AuthError> {
         {
             let cached = self.jwks.read().await;
-            if cached.fetched_at.elapsed().as_secs() < JWKS_TTL_SECS && !cached.keys.is_empty() {
+            let is_fresh = cached.fetched_at
+                .map(|t| t.elapsed().as_secs() < JWKS_TTL_SECS)
+                .unwrap_or(false);
+            if is_fresh && !cached.keys.is_empty() {
                 return Ok(());
             }
         }
@@ -288,7 +290,7 @@ impl KeycloakClient {
 
         let mut cached = self.jwks.write().await;
         cached.keys = jwk_set.keys;
-        cached.fetched_at = std::time::Instant::now();
+        cached.fetched_at = Some(std::time::Instant::now());
 
         Ok(())
     }

@@ -2,7 +2,7 @@
   import ToggleSwitch from './ToggleSwitch.svelte';
   import StatusBadge from './StatusBadge.svelte';
 
-  let { service, groupCode = '', onToggle = () => {}, onSelect = () => {} } = $props();
+  let { service, groupCode = '', onToggle = () => {}, onSelect = () => {}, onClone = () => {} } = $props();
 </script>
 
 <article class="service-card" aria-label="Service {service.name}">
@@ -36,6 +36,9 @@
   <div class="card-actions">
     <button type="button" class="btn btn-sm btn-primary" onclick={() => onSelect(service.name)} aria-label="Configurer le service {service.name}">
       Configurer
+    </button>
+    <button type="button" class="btn btn-sm btn-outline" onclick={() => onClone(service)} aria-label="Dupliquer le service {service.name}" title="Dupliquer">
+      &#10697;
     </button>
   </div>
 </article>
