@@ -157,6 +157,27 @@ impl MatchEngine {
     }
 }
 
+fn url_decode(s: &str) -> String {
+    let mut result = String::with_capacity(s.len());
+    let bytes = s.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            if let Ok(byte) = u8::from_str_radix(
+                std::str::from_utf8(&bytes[i + 1..i + 3]).unwrap_or(""),
+                16,
+            ) {
+                result.push(byte as char);
+                i += 3;
+                continue;
+            }
+        }
+        result.push(bytes[i] as char);
+        i += 1;
+    }
+    result
+}
+
 pub(crate) fn match_path(
     listen_path: &str,
     request_path: &str,
@@ -164,7 +185,8 @@ pub(crate) fn match_path(
     let pattern_str = normalize_colon_syntax(listen_path);
 
     let pattern_segs: Vec<&str> = pattern_str.split('/').filter(|s| !s.is_empty()).collect();
-    let request_segs: Vec<&str> = request_path.split('/').filter(|s| !s.is_empty()).collect();
+    let decoded_req: Vec<String> = request_path.split('/').filter(|s| !s.is_empty()).map(|s| url_decode(s)).collect();
+    let request_segs: Vec<&str> = decoded_req.iter().map(|s| s.as_str()).collect();
 
     if pattern_segs.is_empty() {
         return None;
@@ -604,6 +626,30 @@ mod tests {
         assert!(r.is_some());
         let (params, _) = r.unwrap();
         assert_eq!(params.get("siret").unwrap(), "44306184100047");
+    }
+
+    #[test]
+    fn match_path_url_encoded() {
+        let r = match_path("/api/v1/*", "/api/v1/hello%20world");
+        assert!(r.is_some());
+        let (_, remaining) = r.unwrap();
+        assert_eq!(remaining, "/hello world");
+    }
+
+    #[test]
+    fn match_path_encoded_param() {
+        let r = match_path("/users/{name}", "/users/John%20Doe");
+        assert!(r.is_some());
+        let (params, _) = r.unwrap();
+        assert_eq!(params.get("name").unwrap(), "John Doe");
+    }
+
+    #[test]
+    fn match_path_special_chars() {
+        let r = match_path("/api/*", "/api/path%3Awith%3Acolons");
+        assert!(r.is_some());
+        let (_, remaining) = r.unwrap();
+        assert_eq!(remaining, "/path:with:colons");
     }
 
     #[test]
