@@ -44,9 +44,6 @@
     if (trimmed.includes('/') || trimmed.includes('\\')) {
       return 'Le nom du service ne peut pas contenir de separateur de chemin (/ ou \\).';
     }
-    if (!isEdit && existingNames.includes(trimmed)) {
-      return `Un service avec le nom "${trimmed}" existe deja.`;
-    }
     return null;
   }
 

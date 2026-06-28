@@ -80,7 +80,18 @@ test.describe('Service CRUD', () => {
     expect(body.message).toBe('hello');
   });
 
-  test('duplicate service name returns 409', async ({ request }) => {
+  test('same service name in different groups is allowed', async ({ request }) => {
+    await request.post(`${API}/groups`, { data: { name: 'grp-x', code: '', admins: [], members: [] } });
+    await request.post(`${API}/groups`, { data: { name: 'grp-y', code: '', admins: [], members: [] } });
+
+    const r1 = await request.post(`${API}/services`, { data: validService('shared-name', { group_name: 'grp-x' }) });
+    expect(r1.status()).toBe(201);
+
+    const r2 = await request.post(`${API}/services`, { data: validService('shared-name', { group_name: 'grp-y' }) });
+    expect(r2.status()).toBe(201);
+  });
+
+  test('duplicate service name in same group returns 409', async ({ request }) => {
     await request.post(`${API}/services`, { data: validService('dup-svc') });
     const dup = await request.post(`${API}/services`, { data: validService('dup-svc') });
     expect(dup.status()).toBe(409);

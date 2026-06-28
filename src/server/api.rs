@@ -309,10 +309,13 @@ async fn create_service(
 
     {
         let config = state.store.snapshot().await;
-        if config.services.iter().any(|s| s.name == service.name) {
-            tracing::warn!(service = %service.name, "service creation refused: name already exists");
+        let same_group = config.services.iter().any(|s| {
+            s.name == service.name && s.group_name == service.group_name
+        });
+        if same_group {
+            tracing::warn!(service = %service.name, "service creation refused: name already exists in group");
             return Err(AppError::Conflict(format!(
-                "Un service avec le nom \"{}\" existe deja.",
+                "Un service avec le nom \"{}\" existe deja dans ce groupe.",
                 service.name
             )));
         }
