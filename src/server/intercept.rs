@@ -53,10 +53,12 @@ fn build_effective_pattern(group_code: Option<&str>, name: &str, listen_path: &s
         Some(code) => format!("/{code}/{name}"),
         None => format!("/{name}"),
     };
-    if lp.is_empty() {
+    if lp.is_empty() || lp == "*" {
         format!("{base}/*")
-    } else {
+    } else if lp.ends_with('*') || lp.contains('{') {
         format!("{base}/{lp}")
+    } else {
+        format!("{base}/{lp}/*")
     }
 }
 
@@ -336,6 +338,11 @@ mod tests {
             "/insee/v4/sirene/{siret}"
         );
         assert_eq!(build_effective_pattern(None, "svc-a", "/*"), "/svc-a/*");
+        assert_eq!(
+            build_effective_pattern(None, "svc", "/api/v4"),
+            "/svc/api/v4/*",
+            "listen_path sans wildcard ni param doit ajouter /* implicitement"
+        );
     }
 
     #[test]
