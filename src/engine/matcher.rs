@@ -184,7 +184,8 @@ pub(crate) fn match_path(
 ) -> Option<(HashMap<String, String>, String)> {
     let pattern_str = normalize_colon_syntax(listen_path);
 
-    let pattern_segs: Vec<&str> = pattern_str.split('/').filter(|s| !s.is_empty()).collect();
+    let decoded_pat: Vec<String> = pattern_str.split('/').filter(|s| !s.is_empty()).map(|s| url_decode(s)).collect();
+    let pattern_segs: Vec<&str> = decoded_pat.iter().map(|s| s.as_str()).collect();
     let decoded_req: Vec<String> = request_path.split('/').filter(|s| !s.is_empty()).map(|s| url_decode(s)).collect();
     let request_segs: Vec<&str> = decoded_req.iter().map(|s| s.as_str()).collect();
 
@@ -650,6 +651,37 @@ mod tests {
         assert!(r.is_some());
         let (_, remaining) = r.unwrap();
         assert_eq!(remaining, "/path:with:colons");
+    }
+
+    #[test]
+    fn match_path_jenkins_spaces_in_pattern() {
+        let pattern = "/job/Zone - Services/job/{branch}/build";
+        let url = "/job/Zone%20-%20Services/job/develop/build";
+        let r = match_path(pattern, url);
+        assert!(r.is_some(), "spaces in pattern must match %20 in URL");
+        let (params, _) = r.unwrap();
+        assert_eq!(params.get("branch").unwrap(), "develop");
+    }
+
+    #[test]
+    fn match_path_pattern_encoded() {
+        let pattern = "/job/Zone%20-%20Services/job/{branch}/build";
+        let url = "/job/Zone%20-%20Services/job/main/build";
+        let r = match_path(pattern, url);
+        assert!(r.is_some(), "%20 in pattern must match %20 in URL");
+        let (params, _) = r.unwrap();
+        assert_eq!(params.get("branch").unwrap(), "main");
+    }
+
+    #[test]
+    fn match_path_jenkins_deep_nested() {
+        let pattern = "/job/Zone - Services aux usagers/job/QUARTIER-Gestion/job/ILOT-Cnt/job/{space}/job/{project}/build";
+        let url = "/job/Zone%20-%20Services%20aux%20usagers/job/QUARTIER-Gestion/job/ILOT-Cnt/job/my-space/job/my-project/build";
+        let r = match_path(pattern, url);
+        assert!(r.is_some());
+        let (params, _) = r.unwrap();
+        assert_eq!(params.get("space").unwrap(), "my-space");
+        assert_eq!(params.get("project").unwrap(), "my-project");
     }
 
     #[test]
