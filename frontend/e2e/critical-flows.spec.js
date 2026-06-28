@@ -223,6 +223,44 @@ test.describe('Rules with method and sub_path', () => {
     const miss = await request.get('http://localhost:7342/subpath-svc/orders/1');
     expect(miss.status()).toBe(404);
   });
+
+  test('listen_path + sub_path combined', async ({ request }) => {
+    const svc = validService('combo-svc', {
+      listen_path: '/api/v4',
+      rules: [
+        validRule('get-user', {
+          sub_path: '/user',
+          response: {
+            status: 200,
+            headers: [],
+            body: [{ type: 'Template', template: '{"endpoint":"user"}' }],
+            chaos: null,
+          },
+        }),
+        validRule('get-projects', {
+          sub_path: '/projects/{id}',
+          response: {
+            status: 200,
+            headers: [],
+            body: [{ type: 'Template', template: '{"project":"{{path.id}}"}' }],
+            chaos: null,
+          },
+        }),
+      ],
+    });
+    await request.post(`${API}/services`, { data: svc });
+
+    const user = await request.get('http://localhost:7342/combo-svc/api/v4/user');
+    expect(user.status()).toBe(200);
+    expect((await user.json()).endpoint).toBe('user');
+
+    const proj = await request.get('http://localhost:7342/combo-svc/api/v4/projects/42');
+    expect(proj.status()).toBe(200);
+    expect((await proj.json()).project).toBe('42');
+
+    const miss = await request.get('http://localhost:7342/combo-svc/api/v4/unknown');
+    expect(miss.status()).toBe(404);
+  });
 });
 
 test.describe('Script execution', () => {
