@@ -165,9 +165,16 @@ input, select, textarea { background: var(--color-surface); color: var(--color-t
 
 .method-badge {
   display: inline-block; padding: 0.1rem 0.375rem; border-radius: 3px;
-  font-size: 0.7rem; font-weight: 700;
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.03em;
   background: var(--color-focus); color: var(--color-primary);
 }
+.method-badge[data-method="GET"] { background: var(--zac-color-primary-100, #e4e9fa); color: var(--zac-color-primary-700, #0a1a88); }
+.method-badge[data-method="POST"] { background: var(--zac-color-success-100, #c0d7c4); color: var(--zac-color-success-800, #0c361c); }
+.method-badge[data-method="PUT"] { background: var(--zac-color-warning-50, #fff6ed); color: var(--zac-color-warning-600, #c23b0c); }
+.method-badge[data-method="PATCH"] { background: #fff3cd; color: #856404; }
+.method-badge[data-method="DELETE"] { background: var(--zac-color-error-50, #f9e9e8); color: var(--zac-color-error-700, #901b14); }
+.method-badge[data-method="OPTIONS"] { background: var(--zac-color-neutral-200, #e8e8e8); color: var(--zac-color-neutral-600, #424242); }
+.method-badge[data-method="HEAD"] { background: var(--zac-color-neutral-200, #e8e8e8); color: var(--zac-color-neutral-600, #424242); }
 
 /* ── Modale ─────────────────────────────────────────────────── */
 

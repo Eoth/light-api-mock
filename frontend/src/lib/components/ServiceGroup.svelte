@@ -10,6 +10,7 @@
     onToggleGroup = () => {},
     onToggle = () => {},
     onSelect = () => {},
+    onClone = () => {},
   } = $props();
 </script>
 
@@ -37,7 +38,7 @@
       <ul class="service-list" role="list">
         {#each services as service (service.name)}
           <li>
-            <ServiceCard {service} {groupCode} {onToggle} {onSelect} />
+            <ServiceCard {service} {groupCode} {onToggle} {onSelect} {onClone} />
           </li>
         {/each}
       </ul>

@@ -167,7 +167,7 @@
             <tr>
               <td class="col-time">{formatTime(log.timestamp)}</td>
               <td><strong>{log.service_name}</strong></td>
-              <td><span class="method-badge">{log.method}</span></td>
+              <td><span class="method-badge" data-method={log.method}>{log.method}</span></td>
               <td class="col-path"><code>{log.path}</code></td>
               <td><span class="badge {modeBadge(log.mode)}">{log.mode}</span></td>
               <td class="col-detail" title={log.rule_matched || log.target_url || '-'}>{log.rule_matched || log.target_url || '-'}</td>
@@ -202,7 +202,7 @@
         </div>
         <div class="detail-row">
           <dt>Methode</dt>
-          <dd><span class="method-badge">{detailLog.method}</span></dd>
+          <dd><span class="method-badge" data-method={detailLog.method}>{detailLog.method}</span></dd>
         </div>
         <div class="detail-row">
           <dt>Path</dt>
