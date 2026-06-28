@@ -13,9 +13,11 @@
   let name = $state(untrack(() => service?.name ?? ''));
   let listenPath = $state(untrack(() => service?.listen_path ?? ''));
   let realTargetUrl = $state(untrack(() => service?.real_target_url ?? 'http://'));
-  let rewriteDirectoryUrls = $state(untrack(() => service?.rewrite_directory_urls ?? false));
+  let serviceType = $state(untrack(() => {
+    if (service?.wsdl_mode === 'mock' || service?.wsdl_mode === 'proxy') return 'soap';
+    return service?.rewrite_directory_urls ? 'soap' : 'rest';
+  }));
   let groupName = $state(untrack(() => service?.group_name ?? ''));
-  let wsdlMode = $state(untrack(() => service?.wsdl_mode ?? 'auto'));
 
   const RESERVED_NAMES = ['api', 'auth', 'index.html', 'assets', 'favicon.ico'];
 
@@ -66,13 +68,14 @@
 
     saving = true;
     try {
+      const isSoap = serviceType === 'soap';
       const payload = {
         name: name.trim(),
         listen_path: listenPath.trim(),
         real_target_url: realTargetUrl.trim(),
         is_mocked: service?.is_mocked ?? false,
-        rewrite_directory_urls: rewriteDirectoryUrls,
-        wsdl_mode: wsdlMode,
+        rewrite_directory_urls: isSoap,
+        wsdl_mode: isSoap ? 'auto' : 'auto',
         rules: service?.rules ?? [],
       };
       if (groupName) payload.group_name = groupName;
@@ -129,22 +132,19 @@
     <span class="field-hint" id="svc-target-hint">Adresse du vrai backend dans le cluster (utilisée en mode proxy)</span>
   </div>
 
-  <div class="form-field form-field-check">
-    <label>
-      <input type="checkbox" bind:checked={rewriteDirectoryUrls} />
-      Réécrire les URL d'annuaire
-    </label>
-    <span class="field-hint">Remplace les URL des backends dans les réponses d'annuaire pour les rediriger via lightMock</span>
-  </div>
-
   <div class="form-field">
-    <label for="svc-wsdl">Mode WSDL</label>
-    <select id="svc-wsdl" bind:value={wsdlMode} aria-describedby="svc-wsdl-hint">
-      <option value="auto">Auto (proxy les requetes ?wsdl)</option>
-      <option value="proxy">Proxy (toujours proxifier les WSDL)</option>
-      <option value="mock">Mock (appliquer les regles meme pour WSDL)</option>
+    <label for="svc-type">Type de service</label>
+    <select id="svc-type" bind:value={serviceType} aria-describedby="svc-type-hint">
+      <option value="rest">REST</option>
+      <option value="soap">SOAP / XML</option>
     </select>
-    <span class="field-hint" id="svc-wsdl-hint">Controle le comportement quand une requete contient ?wsdl dans l'URL</span>
+    <span class="field-hint" id="svc-type-hint">
+      {#if serviceType === 'soap'}
+        Les requetes ?wsdl seront automatiquement proxyfiees vers le backend reel.
+      {:else}
+        API REST standard (JSON).
+      {/if}
+    </span>
   </div>
 
   {#if availableGroups.length > 0}
@@ -194,16 +194,4 @@
   }
   .url-preview code { background: none; padding: 0; font-weight: 600; color: var(--color-primary); }
 
-  .form-field-check label {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-weight: 500;
-    cursor: pointer;
-  }
-
-  .form-field-check input[type="checkbox"] {
-    width: 1.125rem;
-    height: 1.125rem;
-  }
 </style>

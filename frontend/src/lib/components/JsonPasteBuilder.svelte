@@ -6,6 +6,7 @@
   let pasteInput = $state('');
   let parseError = $state('');
   let parsed = $state(false);
+  let isArrayRoot = $state(false);
 
   const valueSources = [
     { value: 'fixed', label: 'Garder la valeur' },
@@ -33,12 +34,21 @@
     const text = pasteInput.trim();
     if (!text) { parseError = 'Collez un JSON valide.'; return; }
     try {
-      const obj = JSON.parse(text);
-      if (typeof obj !== 'object' || Array.isArray(obj)) {
-        parseError = 'Le JSON doit etre un objet (pas un tableau).';
+      const data = JSON.parse(text);
+      if (Array.isArray(data)) {
+        if (data.length === 0) {
+          parseError = 'Le tableau est vide. Collez un tableau avec au moins un element.';
+          return;
+        }
+        isArrayRoot = true;
+        fields = objectToFields(typeof data[0] === 'object' && data[0] !== null ? data[0] : { value: data[0] });
+      } else if (typeof data === 'object' && data !== null) {
+        isArrayRoot = false;
+        fields = objectToFields(data);
+      } else {
+        parseError = 'Le JSON doit etre un objet ou un tableau.';
         return;
       }
-      fields = objectToFields(obj);
       parsed = true;
       emit();
     } catch (e) {
@@ -89,7 +99,8 @@
   }
 
   export function toTemplate() {
-    return fieldsToTemplate(fields);
+    const obj = fieldsToTemplate(fields);
+    return isArrayRoot ? `[${obj}]` : obj;
   }
 </script>
 
@@ -113,7 +124,7 @@
     </div>
   {:else}
     <div class="paste-header">
-      <span class="field-hint">{fields.length} champ{fields.length !== 1 ? 's' : ''} detecte{fields.length !== 1 ? 's' : ''} — choisissez la source de chaque valeur</span>
+      <span class="field-hint">{isArrayRoot ? 'Tableau de ' : ''}{fields.length} champ{fields.length !== 1 ? 's' : ''} detecte{fields.length !== 1 ? 's' : ''} — choisissez la source de chaque valeur</span>
       <button type="button" class="btn btn-outline btn-sm" onclick={() => { parsed = false; pasteInput = ''; }}>
         Recoller un JSON
       </button>
