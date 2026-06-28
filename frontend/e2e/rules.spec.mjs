@@ -86,6 +86,9 @@ test('bouton supprimer retire la regle', async ({ page }) => {
 test('toggle mock/proxy fonctionne', async ({ page }) => {
   await page.goto('/');
   await page.waitForLoadState('networkidle');
+  const group = page.locator('button[aria-expanded="false"]').first();
+  await group.click();
+  await page.waitForTimeout(200);
   await page.getByRole('switch').first().click();
   await page.waitForTimeout(500);
 });

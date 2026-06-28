@@ -165,9 +165,16 @@ input, select, textarea { background: var(--color-surface); color: var(--color-t
 
 .method-badge {
   display: inline-block; padding: 0.1rem 0.375rem; border-radius: 3px;
-  font-size: 0.7rem; font-weight: 700;
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.03em;
   background: var(--color-focus); color: var(--color-primary);
 }
+.method-badge[data-method="GET"] { background: #e4e9fa; color: #0a1a88; }
+.method-badge[data-method="POST"] { background: #c0d7c4; color: #0c361c; }
+.method-badge[data-method="PUT"] { background: #fff6ed; color: #c23b0c; }
+.method-badge[data-method="PATCH"] { background: #fff3cd; color: #856404; }
+.method-badge[data-method="DELETE"] { background: #f9e9e8; color: #901b14; }
+.method-badge[data-method="OPTIONS"] { background: #e8e8e8; color: #424242; }
+.method-badge[data-method="HEAD"] { background: #e8e8e8; color: #424242; }
 
 /* ── Modale ─────────────────────────────────────────────────── */
 

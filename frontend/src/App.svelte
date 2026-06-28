@@ -120,8 +120,14 @@
     }
   }
 
+  let clonedService = $state(null);
+
   function handleSelect(name) { selectedService = name; view = 'detail'; }
-  function handleBack() { selectedService = null; view = 'list'; }
+  function handleBack() { selectedService = null; clonedService = null; view = 'list'; }
+  function handleCloneService(svc) {
+    clonedService = { ...JSON.parse(JSON.stringify(svc)), name: '' };
+    view = 'add';
+  }
   function handleServiceUpdate(updated) { services = services.map(s => s.name === updated.name ? updated : s); selectedService = updated.name; }
   function handleServiceDelete(name) { view = 'list'; selectedService = null; services = services.filter(s => s.name !== name); }
 
@@ -331,6 +337,7 @@
       <GroupManager {services} authEnabled={auth.enabled} onNotify={showNotification} onBack={handleBack} onServiceUpdate={handleServiceUpdate} onGroupsChange={(g) => groups = g} />
     {:else if view === 'add'}
       <ServiceForm
+        service={clonedService}
         existingNames={services.map(s => s.name)}
         availableGroups={availableGroupsList}
         authEnabled={auth.enabled}
@@ -344,7 +351,7 @@
         <h2>Services</h2>
         <button type="button" class="btn btn-primary" onclick={() => view = 'add'}>+ Ajouter un service</button>
       </div>
-      <ServiceList {services} {groups} onToggle={handleToggle} onSelect={handleSelect} />
+      <ServiceList {services} {groups} onToggle={handleToggle} onSelect={handleSelect} onClone={handleCloneService} />
       {#if services.length === 0}
         <div class="demo-section">
           <button type="button" class="btn btn-outline btn-demo" onclick={loadDemo}>

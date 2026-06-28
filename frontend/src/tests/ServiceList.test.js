@@ -16,11 +16,11 @@ describe('ServiceList', () => {
     expect(getByText('Aucun service configure')).toBeInTheDocument();
   });
 
-  it('affiche tous les services dans des groupes', () => {
-    const { getByText } = render(ServiceList, { props: { services: mockServices } });
-    expect(getByText('svc-users')).toBeInTheDocument();
-    expect(getByText('svc-orders')).toBeInTheDocument();
-    expect(getByText('insee-api')).toBeInTheDocument();
+  it('affiche les groupes plies par defaut', () => {
+    const { getByText, queryByText } = render(ServiceList, { props: { services: mockServices } });
+    expect(getByText('team-a')).toBeInTheDocument();
+    expect(getByText('Sans groupe')).toBeInTheDocument();
+    expect(queryByText('svc-users')).not.toBeInTheDocument();
   });
 
   it('affiche les noms de groupes', () => {
