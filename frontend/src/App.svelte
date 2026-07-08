@@ -125,7 +125,7 @@
   function handleSelect(name) { selectedService = name; view = 'detail'; }
   function handleBack() { selectedService = null; clonedService = null; view = 'list'; }
   function handleCloneService(svc) {
-    clonedService = { ...JSON.parse(JSON.stringify(svc)), name: '' };
+    clonedService = { ...JSON.parse(JSON.stringify(svc)), name: `${svc.name}-copie` };
     view = 'add';
   }
   function handleServiceUpdate(updated) { services = services.map(s => s.name === updated.name ? updated : s); selectedService = updated.name; }
