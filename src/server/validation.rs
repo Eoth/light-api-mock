@@ -7,6 +7,9 @@ const RESERVED_PATH_PREFIXES: &[&str] = &[
     "/api/", "/api", "/index.html", "/assets/", "/favicon.ico",
 ];
 
+static NAME_CHARSET_RE: std::sync::LazyLock<regex::Regex> =
+    std::sync::LazyLock::new(|| regex::Regex::new(r"^[A-Za-z0-9_-]+$").unwrap());
+
 pub fn is_reserved_name(name: &str) -> bool {
     let normalized = name.trim().to_lowercase();
     RESERVED_NAMES.contains(&normalized.as_str())
@@ -63,6 +66,13 @@ pub fn validate_service(service: &Service) -> Result<(), ValidationError> {
             field: "name",
             message: "Le nom du service ne peut pas contenir de separateur de chemin (/ ou \\)."
                 .into(),
+        });
+    }
+
+    if !NAME_CHARSET_RE.is_match(name) {
+        return Err(ValidationError {
+            field: "name",
+            message: "Le nom du service ne peut contenir que des lettres, chiffres, tirets (-) et underscores (_).".into(),
         });
     }
 
@@ -178,6 +188,26 @@ mod tests {
     fn reject_name_with_slashes() {
         assert!(validate_service(&svc("my/svc", "/foo")).is_err());
         assert!(validate_service(&svc("my\\svc", "/foo")).is_err());
+    }
+
+    #[test]
+    fn reject_name_with_spaces() {
+        assert!(validate_service(&svc("my svc", "/foo")).is_err());
+    }
+
+    #[test]
+    fn reject_name_with_special_chars() {
+        assert!(validate_service(&svc("svc@name", "/foo")).is_err());
+        assert!(validate_service(&svc("svc.name", "/foo")).is_err());
+        assert!(validate_service(&svc("100%svc", "/foo")).is_err());
+        assert!(validate_service(&svc("caf\u{e9}-svc", "/foo")).is_err());
+        assert!(validate_service(&svc("svc#1", "/foo")).is_err());
+    }
+
+    #[test]
+    fn accept_name_with_underscore_and_digits() {
+        assert!(validate_service(&svc("svc_v2-42", "/foo")).is_ok());
+        assert!(validate_service(&svc("SVC_NAME", "/foo")).is_ok());
     }
 
     #[test]

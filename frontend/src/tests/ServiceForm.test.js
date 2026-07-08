@@ -120,10 +120,80 @@ describe('ServiceForm validation', () => {
       rules: [],
     };
     const { getByLabelText, container } = render(ServiceForm, {
-      props: { service: existingService, existingNames: ['existing-svc'], onSave },
+      props: { service: existingService, existingNames: ['existing-svc'], isEdit: true, onSave },
     });
 
     await setInput(getByLabelText('URL cible réelle'), 'http://new-backend:9090');
+    await submitForm(container);
+    expect(onSave).toHaveBeenCalled();
+  });
+
+  it('desactive le champ nom en mode edition', async () => {
+    const existingService = {
+      name: 'existing-svc',
+      listen_path: '/v1/*',
+      real_target_url: 'http://backend:8080',
+      is_mocked: true,
+      rewrite_directory_urls: false,
+      rules: [],
+    };
+    const { getByLabelText } = render(ServiceForm, {
+      props: { service: existingService, isEdit: true },
+    });
+
+    expect(getByLabelText('Nom du service')).toBeDisabled();
+  });
+
+  it('laisse le champ nom editable lors d\'un clonage (service pre-rempli sans isEdit)', async () => {
+    const clonedService = {
+      name: 'existing-svc-copie',
+      listen_path: '/v1/*',
+      real_target_url: 'http://backend:8080',
+      is_mocked: true,
+      rewrite_directory_urls: false,
+      rules: [],
+    };
+    const onSave = vi.fn().mockResolvedValue({});
+    const { getByLabelText, container } = render(ServiceForm, {
+      props: { service: clonedService, onSave },
+    });
+
+    const nameInput = getByLabelText('Nom du service');
+    expect(nameInput).not.toBeDisabled();
+    expect(nameInput.value).toBe('existing-svc-copie');
+
+    await setInput(nameInput, 'renamed-clone');
+    await setInput(getByLabelText('URL cible réelle'), 'http://backend:8080');
+    await submitForm(container);
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ name: 'renamed-clone' }));
+  });
+
+  it('refuse un nom contenant un espace', async () => {
+    const onSave = vi.fn();
+    const { getByLabelText, container, getByRole } = render(ServiceForm, { props: { onSave } });
+
+    await setInput(getByLabelText('Nom du service'), 'my svc');
+    await submitForm(container);
+    expect(onSave).not.toHaveBeenCalled();
+    expect(getByRole('alert')).toHaveTextContent('lettres, chiffres, tirets');
+  });
+
+  it('refuse un nom contenant un caractere special', async () => {
+    const onSave = vi.fn();
+    const { getByLabelText, container, getByRole } = render(ServiceForm, { props: { onSave } });
+
+    await setInput(getByLabelText('Nom du service'), 'svc@name!');
+    await submitForm(container);
+    expect(onSave).not.toHaveBeenCalled();
+    expect(getByRole('alert')).toHaveTextContent('lettres, chiffres, tirets');
+  });
+
+  it('accepte un nom avec underscores et chiffres', async () => {
+    const onSave = vi.fn().mockResolvedValue({});
+    const { getByLabelText, container } = render(ServiceForm, { props: { onSave } });
+
+    await setInput(getByLabelText('Nom du service'), 'svc_v2-42');
+    await setInput(getByLabelText('URL cible réelle'), 'http://backend:8080');
     await submitForm(container);
     expect(onSave).toHaveBeenCalled();
   });

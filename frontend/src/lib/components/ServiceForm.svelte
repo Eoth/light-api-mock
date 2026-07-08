@@ -5,11 +5,10 @@
     service = null,
     existingNames = [],
     availableGroups = [],
+    isEdit = false,
     onSave = () => {},
     onCancel = () => {},
   } = $props();
-
-  const isEdit = untrack(() => !!service);
   let name = $state(untrack(() => service?.name ?? ''));
   let listenPath = $state(untrack(() => service?.listen_path ?? ''));
   let realTargetUrl = $state(untrack(() => service?.real_target_url ?? 'http://'));
@@ -43,6 +42,9 @@
     }
     if (trimmed.includes('/') || trimmed.includes('\\')) {
       return 'Le nom du service ne peut pas contenir de separateur de chemin (/ ou \\).';
+    }
+    if (!/^[A-Za-z0-9_-]+$/.test(trimmed)) {
+      return 'Le nom du service ne peut contenir que des lettres, chiffres, tirets (-) et underscores (_).';
     }
     return null;
   }

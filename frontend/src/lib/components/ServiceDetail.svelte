@@ -101,7 +101,7 @@
   </nav>
 
   {#if editing}
-    <ServiceForm service={service} onSave={handleSaveService} onCancel={() => editing = false} />
+    <ServiceForm service={service} isEdit={true} onSave={handleSaveService} onCancel={() => editing = false} />
   {:else}
     <div class="detail-card">
       <dl class="detail-dl">
