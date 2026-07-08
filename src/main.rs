@@ -1,15 +1,19 @@
 // Modules du projet — chaque dossier src/<module>/ contient un mod.rs
 // Pour modifier un comportement, trouver le module correspondant :
-//   auth/     → authentification Keycloak, permissions groupes
-//   models/   → structures de donnees (Service, Rule, Group, etc.)
-//   engine/   → moteur de matching, proxy HTTP, template, scripts rhai
-//   store/    → persistance YAML sur disque
-//   server/   → API REST (routes /api/*), middleware d'interception HTTP
+//   auth/      → authentification Keycloak, permissions groupes
+//   models/    → structures de donnees (Service, Rule, Group, etc.)
+//   engine/    → moteur de matching, proxy HTTP, template, scripts rhai
+//   store/     → persistance YAML sur disque
+//   server/    → API REST (routes /api/*), middleware d'interception HTTP
+//   messaging/ → cadrage MOM/Kafka (etude), feature "messaging-kafka" NON
+//                active par defaut — ce module ne compile meme pas sinon
 pub mod auth;
 pub mod models;
 pub mod engine;
 pub mod store;
 pub mod server;
+#[cfg(feature = "messaging-kafka")]
+pub mod messaging;
 
 use crate::auth::AuthConfig;
 use crate::auth::keycloak::KeycloakClient;
