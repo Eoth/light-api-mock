@@ -157,7 +157,9 @@ mod tests {
             method: "GET".into(),
             sub_path: None,
             action: RuleAction::default(),
+            pre_script: None,
             script: None,
+            post_script: None,
             conditions: Default::default(),
             response: MockResponse {
                 status: 200,

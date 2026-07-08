@@ -42,13 +42,29 @@ pub struct Service {
     pub rules: Vec<Rule>,
 }
 
+// pre_script/post_script : blocs additionnels optionnels executes au meme
+// point du pipeline que `script` (intercept.rs, juste avant le rendu du
+// template), SANS chainage entre eux — chacun recoit le meme ScriptContext
+// (donnees de la requete uniquement), aucun ne voit le resultat des autres.
+// Ce choix evite d'introduire une surface de mutation/ordonnancement inter-
+// scripts ; le nommage pre/post est une convention d'ecriture pour l'auteur
+// de regle (preparer vs. finaliser des donnees), pas deux phases d'execution
+// reellement separees. Resultats exposes independamment en template :
+// {{pre_script}}/{{pre_script.champ}}, {{post_script}}/{{post_script.champ}},
+// en plus de {{script}}/{{script.champ}} (inchange). Comme `script`, ces deux
+// champs n'ont PAS de #[serde(default)] (coherent avec le point 16 de
+// CLAUDE.md — pas de retrocompat serde) : tout YAML doit desormais fournir
+// ces deux cles (a `~`/null si non utilisees). Les YAML existants doivent
+// etre re-sauvegardes via l'UI (qui reecrit toujours la config complete).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Rule {
     pub name: String,
     pub method: String,
     pub sub_path: Option<String>,
     pub action: RuleAction,
+    pub pre_script: Option<String>,
     pub script: Option<String>,
+    pub post_script: Option<String>,
     pub conditions: ConditionGroup,
     pub response: MockResponse,
 }
@@ -199,7 +215,9 @@ mod tests {
                     method: "GET".into(),
                     sub_path: None,
                     action: RuleAction::default(),
+                    pre_script: None,
                     script: None,
+                    post_script: None,
                     conditions: ConditionGroup {
                         all_of: vec![
                             Condition {
@@ -301,7 +319,9 @@ services:
         method: ANY
         sub_path: ~
         action: mock
+        pre_script: ~
         script: ~
+        post_script: ~
         conditions:
           all_of:
             - source: { type: QueryParam, key: q }
@@ -346,7 +366,9 @@ services:
         method: ANY
         sub_path: ~
         action: mock
+        pre_script: ~
         script: ~
+        post_script: ~
         conditions: {}
         response:
           body:
@@ -391,7 +413,9 @@ services:
         method: ANY
         sub_path: ~
         action: mock
+        pre_script: ~
         script: ~
+        post_script: ~
         conditions: {}
         response:
           body:
@@ -430,7 +454,9 @@ services:
         method: ANY
         sub_path: ~
         action: mock
+        pre_script: ~
         script: ~
+        post_script: ~
         conditions: {}
         response:
           body:
@@ -467,7 +493,9 @@ services:
         method: GET
         sub_path: ~
         action: mock
+        pre_script: ~
         script: ~
+        post_script: ~
         conditions: {}
         response:
           body:
@@ -495,7 +523,9 @@ services:
         method: ANY
         sub_path: ~
         action: proxy
+        pre_script: ~
         script: ~
+        post_script: ~
         conditions: {}
         response:
           body:
@@ -505,7 +535,9 @@ services:
         method: ANY
         sub_path: ~
         action: mock
+        pre_script: ~
         script: ~
+        post_script: ~
         conditions: {}
         response:
           body:

@@ -1,5 +1,5 @@
 use crate::engine::matcher::match_path;
-use crate::engine::script::{ScriptContext, ScriptResult};
+use crate::engine::script::{ScriptContext, ScriptEngine, ScriptResult};
 use crate::engine::{apply_chaos_and_render, MatchEngine, RequestData, TemplateContext};
 use crate::models::{RuleAction, Service, WsdlMode};
 use crate::server::AppState;
@@ -10,6 +10,28 @@ use axum::http::{HeaderValue, StatusCode};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use std::collections::HashMap;
+
+/// Execute un des 3 blocs de script d'une regle (pre_script/script/post_script),
+/// independamment des autres (meme ScriptContext, pas de chainage — voir
+/// commentaire sur Rule dans models/mod.rs). `None` si le slot n'a pas de
+/// script. En cas d'erreur d'execution, log + repli sur un resultat vide
+/// (soft-fail : la requete continue, jamais bloquee par un script casse).
+fn run_rule_script(
+    engine: &ScriptEngine,
+    rule_name: &str,
+    slot: &str,
+    script: &Option<String>,
+    ctx: &ScriptContext,
+) -> Option<ScriptResult> {
+    let script = script.as_ref()?;
+    match engine.execute(script, ctx) {
+        Ok(result) => Some(result),
+        Err(e) => {
+            tracing::warn!(rule = rule_name, slot, error = %e, "script execution failed");
+            Some(ScriptResult::default())
+        }
+    }
+}
 
 // Middleware Axum execute sur CHAQUE requete HTTP entrante.
 // Pipeline : route interne? → skip | chercher service par path → mock ou proxy
@@ -206,23 +228,19 @@ async fn handle_service(
     let mut merged_params = path_params;
     merged_params.extend(sub_params);
 
-    let script_result = if let Some(ref script) = rule.script {
-        let script_ctx = ScriptContext {
-            body: String::from_utf8_lossy(&request_data.body).into_owned(),
-            headers: request_data.headers.clone(),
-            query_params: request_data.query_params.clone(),
-            path_params: merged_params.clone(),
-        };
-        match state.script_engine.execute(script, &script_ctx) {
-            Ok(result) => Some(result),
-            Err(e) => {
-                tracing::warn!(rule = %rule.name, error = %e, "script execution failed");
-                Some(ScriptResult::default())
-            }
-        }
-    } else {
-        None
+    // pre_script/script/post_script s'executent independamment (meme
+    // ScriptContext, pas de chainage entre eux — voir commentaire sur Rule
+    // dans models/mod.rs). Meme comportement "soft-fail" pour les 3 : une
+    // erreur de script est loggee mais ne bloque pas la requete.
+    let script_ctx = ScriptContext {
+        body: String::from_utf8_lossy(&request_data.body).into_owned(),
+        headers: request_data.headers.clone(),
+        query_params: request_data.query_params.clone(),
+        path_params: merged_params.clone(),
     };
+    let pre_script_result = run_rule_script(&state.script_engine, &rule.name, "pre_script", &rule.pre_script, &script_ctx);
+    let script_result = run_rule_script(&state.script_engine, &rule.name, "script", &rule.script, &script_ctx);
+    let post_script_result = run_rule_script(&state.script_engine, &rule.name, "post_script", &rule.post_script, &script_ctx);
 
     let ctx = TemplateContext {
         path_params: &merged_params,
@@ -231,6 +249,8 @@ async fn handle_service(
         request_body: &request_data.body,
         seq_counter: seq,
         script_result: script_result.as_ref(),
+        pre_script_result: pre_script_result.as_ref(),
+        post_script_result: post_script_result.as_ref(),
     };
 
     match apply_chaos_and_render(&rule.response, &path_segments, &ctx).await {
@@ -539,5 +559,54 @@ mod tests {
         assert!(!is_wsdl_request(Some("")));
         assert!(!is_wsdl_request(Some("foo=bar")));
         assert!(!is_wsdl_request(Some("wsdlx=true")));
+    }
+
+    fn empty_script_ctx() -> ScriptContext {
+        ScriptContext {
+            body: String::new(),
+            headers: HashMap::new(),
+            query_params: HashMap::new(),
+            path_params: HashMap::new(),
+        }
+    }
+
+    #[test]
+    fn run_rule_script_returns_none_when_no_script() {
+        let engine = ScriptEngine::new();
+        let result = run_rule_script(&engine, "my-rule", "pre_script", &None, &empty_script_ctx());
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn run_rule_script_executes_and_returns_result() {
+        let engine = ScriptEngine::new();
+        let script = Some(r#""hello""#.to_string());
+        let result = run_rule_script(&engine, "my-rule", "script", &script, &empty_script_ctx());
+        assert_eq!(result.unwrap().value, "hello");
+    }
+
+    #[test]
+    fn run_rule_script_soft_fails_on_invalid_script() {
+        let engine = ScriptEngine::new();
+        let script = Some("this is not valid rhai (((".to_string());
+        let result = run_rule_script(&engine, "my-rule", "post_script", &script, &empty_script_ctx());
+        // Soft-fail : jamais None ni panique, un ScriptResult vide en repli.
+        assert_eq!(result.unwrap().value, "");
+    }
+
+    #[test]
+    fn pre_script_and_post_script_are_independent_slots() {
+        let engine = ScriptEngine::new();
+        let pre = Some(r#""PRE""#.to_string());
+        let post = Some(r#""POST""#.to_string());
+        let ctx = empty_script_ctx();
+
+        let pre_result = run_rule_script(&engine, "r", "pre_script", &pre, &ctx);
+        let post_result = run_rule_script(&engine, "r", "post_script", &post, &ctx);
+        let script_result = run_rule_script(&engine, "r", "script", &None, &ctx);
+
+        assert_eq!(pre_result.unwrap().value, "PRE");
+        assert_eq!(post_result.unwrap().value, "POST");
+        assert!(script_result.is_none());
     }
 }

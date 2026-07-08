@@ -15,6 +15,12 @@ pub struct TemplateContext<'a> {
     pub request_body: &'a [u8],
     pub seq_counter: u64,
     pub script_result: Option<&'a ScriptResult>,
+    // pre_script/post_script : blocs additionnels, executes independamment de
+    // `script` (meme ScriptContext, pas de chainage — voir commentaire sur
+    // Rule dans models/mod.rs). Exposes en template comme {{pre_script}}/
+    // {{pre_script.champ}} et {{post_script}}/{{post_script.champ}}.
+    pub pre_script_result: Option<&'a ScriptResult>,
+    pub post_script_result: Option<&'a ScriptResult>,
 }
 
 pub fn render_template(template: &str, ctx: &TemplateContext) -> String {
@@ -98,6 +104,30 @@ fn resolve_variable(name: &str, ctx: &TemplateContext) -> String {
     if let Some(field) = name.strip_prefix("script.") {
         return ctx
             .script_result
+            .and_then(|r| r.fields.get(field).cloned())
+            .unwrap_or_default();
+    }
+    if name == "pre_script" {
+        return ctx
+            .pre_script_result
+            .map(|r| r.value.clone())
+            .unwrap_or_default();
+    }
+    if let Some(field) = name.strip_prefix("pre_script.") {
+        return ctx
+            .pre_script_result
+            .and_then(|r| r.fields.get(field).cloned())
+            .unwrap_or_default();
+    }
+    if name == "post_script" {
+        return ctx
+            .post_script_result
+            .map(|r| r.value.clone())
+            .unwrap_or_default();
+    }
+    if let Some(field) = name.strip_prefix("post_script.") {
+        return ctx
+            .post_script_result
             .and_then(|r| r.fields.get(field).cloned())
             .unwrap_or_default();
     }
@@ -327,11 +357,82 @@ mod tests {
             request_body: body,
             seq_counter: seq,
             script_result: None,
+            pre_script_result: None,
+            post_script_result: None,
         }
     }
 
     fn empty_ctx() -> (HashMap<String, String>, HashMap<String, String>, HashMap<String, String>) {
         (HashMap::new(), HashMap::new(), HashMap::new())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn make_ctx_full<'a>(
+        path: &'a HashMap<String, String>,
+        query: &'a HashMap<String, String>,
+        headers: &'a HashMap<String, String>,
+        body: &'a [u8],
+        seq: u64,
+        script_result: Option<&'a ScriptResult>,
+        pre_script_result: Option<&'a ScriptResult>,
+        post_script_result: Option<&'a ScriptResult>,
+    ) -> TemplateContext<'a> {
+        TemplateContext {
+            path_params: path,
+            query_params: query,
+            headers,
+            request_body: body,
+            seq_counter: seq,
+            script_result,
+            pre_script_result,
+            post_script_result,
+        }
+    }
+
+    #[test]
+    fn script_variable_resolves_from_populated_result() {
+        let (p, q, h) = empty_ctx();
+        let sr = ScriptResult { value: "hello".into(), fields: HashMap::new() };
+        let ctx = make_ctx_full(&p, &q, &h, b"", 0, Some(&sr), None, None);
+        assert_eq!(render_template("{{script}}", &ctx), "hello");
+    }
+
+    #[test]
+    fn script_field_variable_resolves_from_populated_result() {
+        let (p, q, h) = empty_ctx();
+        let mut fields = HashMap::new();
+        fields.insert("role".to_string(), "admin".to_string());
+        let sr = ScriptResult { value: String::new(), fields };
+        let ctx = make_ctx_full(&p, &q, &h, b"", 0, Some(&sr), None, None);
+        assert_eq!(render_template("{{script.role}}", &ctx), "admin");
+    }
+
+    #[test]
+    fn pre_script_variable_resolves_independently() {
+        let (p, q, h) = empty_ctx();
+        let sr = ScriptResult { value: "pre-val".into(), fields: HashMap::new() };
+        let ctx = make_ctx_full(&p, &q, &h, b"", 0, None, Some(&sr), None);
+        assert_eq!(render_template("{{pre_script}}", &ctx), "pre-val");
+    }
+
+    #[test]
+    fn post_script_field_variable_resolves_independently() {
+        let (p, q, h) = empty_ctx();
+        let mut fields = HashMap::new();
+        fields.insert("total".to_string(), "42".to_string());
+        let sr = ScriptResult { value: String::new(), fields };
+        let ctx = make_ctx_full(&p, &q, &h, b"", 0, None, None, Some(&sr));
+        assert_eq!(render_template("{{post_script.total}}", &ctx), "42");
+    }
+
+    #[test]
+    fn pre_script_and_post_script_do_not_leak_into_each_other() {
+        let (p, q, h) = empty_ctx();
+        let pre = ScriptResult { value: "PRE".into(), fields: HashMap::new() };
+        let post = ScriptResult { value: "POST".into(), fields: HashMap::new() };
+        let ctx = make_ctx_full(&p, &q, &h, b"", 0, None, Some(&pre), Some(&post));
+        assert_eq!(render_template("{{pre_script}}-{{post_script}}", &ctx), "PRE-POST");
+        assert_eq!(render_template("{{script}}", &ctx), "");
     }
 
     #[test]
