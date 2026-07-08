@@ -10,6 +10,18 @@
 // choix fait pour le ping (src/server/ping.rs). Rotation immediate apres
 // coup pour ne garder que BACKUP_MAX_COUNT fichiers (defaut 5), necessaire
 // vu la contrainte PVC 64Mi en K8s (cf CLAUDE.md).
+//
+// Backup pre-reset protege : avant un reset complet (DELETE /api/config/reset),
+// backup_before_reset() copie la config courante dans backups/protected/. Ce
+// sous-repertoire est EXEMPT de rotate_backups() (qui ne liste que les
+// fichiers directement dans backups/, pas ses sous-dossiers) — un reset ne
+// peut donc jamais se faire "avaler" par le quota BACKUP_MAX_COUNT classique
+// a cause d'ecritures ulterieures. Il n'est purge que par expiration
+// (PROTECTED_BACKUP_MAX_AGE_MS, 30 jours), verifiee de facon opportuniste a
+// chaque ecriture normale (toujours event-driven, jamais de timer/cron) :
+// l'interpretation retenue est qu'une ecriture survenant >=30 jours apres le
+// reset est le signal que plus personne ne depend de cet ancien etat — pas de
+// comptage d'activite plus fin que ca.
 use crate::models::MockConfig;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -17,6 +29,8 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 static BACKUP_SEQ: AtomicU64 = AtomicU64::new(0);
+
+const PROTECTED_BACKUP_MAX_AGE_MS: u128 = 30 * 24 * 60 * 60 * 1000;
 
 #[derive(Clone)]
 pub struct MockStore {
@@ -93,6 +107,27 @@ impl MockStore {
         Ok(guard.clone())
     }
 
+    /// Sauvegarde protegee avant un reset complet. A appeler explicitement
+    /// AVANT `replace(MockConfig::empty())` dans le handler de reset — ne
+    /// fait pas partie du chemin d'ecriture normal (atomic_write), donc les
+    /// ecritures ordinaires ne creent jamais de backup "protected".
+    pub async fn backup_before_reset(&self) -> Result<(), StoreError> {
+        if !self.path.exists() {
+            return Ok(());
+        }
+        let parent = self.path.parent().ok_or_else(|| {
+            StoreError::Io("config path has no parent directory".into())
+        })?;
+
+        let protected_dir = parent.join("backups").join("protected");
+        std::fs::create_dir_all(&protected_dir).map_err(|e| StoreError::Io(e.to_string()))?;
+
+        let dest = protected_dir.join(format!("pre-reset-{}.yaml", Self::now_ms()));
+        std::fs::copy(&self.path, &dest).map_err(|e| StoreError::Io(e.to_string()))?;
+        tracing::info!(path = %dest.display(), "pre-reset backup created (protected, 30j)");
+        Ok(())
+    }
+
     fn atomic_write(path: &Path, config: &MockConfig) -> Result<(), StoreError> {
         let yaml = serde_yaml::to_string(config).map_err(|e| StoreError::Yaml(e.to_string()))?;
 
@@ -100,6 +135,7 @@ impl MockStore {
             StoreError::Io("config path has no parent directory".into())
         })?;
 
+        Self::purge_expired_protected_backups(parent)?;
         Self::backup_before_overwrite(path, parent)?;
 
         let tmp_path = parent.join(".mock-config.yaml.tmp");
@@ -107,6 +143,41 @@ impl MockStore {
         std::fs::rename(&tmp_path, path).map_err(|e| StoreError::Io(e.to_string()))?;
 
         Ok(())
+    }
+
+    /// Purge les backups pre-reset (backups/protected/) plus vieux que
+    /// PROTECTED_BACKUP_MAX_AGE_MS. Opportuniste : declenche par l'ecriture
+    /// en cours, pas de timer. Age lu depuis le timestamp encode dans le nom
+    /// de fichier (`pre-reset-{ts}.yaml`), pas depuis les metadonnees disque.
+    fn purge_expired_protected_backups(parent: &Path) -> Result<(), StoreError> {
+        let protected_dir = parent.join("backups").join("protected");
+        if !protected_dir.exists() {
+            return Ok(());
+        }
+
+        let now = Self::now_ms();
+        for entry in std::fs::read_dir(&protected_dir).map_err(|e| StoreError::Io(e.to_string()))? {
+            let Ok(entry) = entry else { continue };
+            let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
+            if let Some(ts) = Self::extract_protected_timestamp(&path) {
+                if now.saturating_sub(ts) >= PROTECTED_BACKUP_MAX_AGE_MS {
+                    std::fs::remove_file(&path).map_err(|e| StoreError::Io(e.to_string()))?;
+                    tracing::info!(path = %path.display(), "expired pre-reset backup purged");
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn extract_protected_timestamp(path: &Path) -> Option<u128> {
+        path.file_stem()?
+            .to_str()?
+            .strip_prefix("pre-reset-")?
+            .parse::<u128>()
+            .ok()
     }
 
     /// Copie le fichier de config existant (avant ecrasement) dans un
@@ -340,6 +411,98 @@ mod tests {
         assert_eq!(count, 3, "backups should be capped at BACKUP_MAX_COUNT");
 
         unsafe { std::env::remove_var("BACKUP_MAX_COUNT") };
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test]
+    async fn protected_backup_created_before_reset() {
+        let dir = temp_dir();
+        let store = MockStore::load_or_init(&dir).await.unwrap();
+        store.replace(sample_config()).await.unwrap();
+
+        store.backup_before_reset().await.unwrap();
+
+        let protected_dir = dir.join("backups").join("protected");
+        let count = std::fs::read_dir(&protected_dir).unwrap().count();
+        assert_eq!(count, 1, "expected exactly one pre-reset backup");
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test]
+    async fn protected_backup_exempt_from_normal_rotation() {
+        let dir = temp_dir();
+        unsafe { std::env::set_var("BACKUP_MAX_COUNT", "2") };
+
+        let store = MockStore::load_or_init(&dir).await.unwrap();
+        store.replace(sample_config()).await.unwrap();
+        store.backup_before_reset().await.unwrap();
+        store.replace(MockConfig::empty()).await.unwrap();
+
+        // Many writes after the reset, well beyond BACKUP_MAX_COUNT=2 —
+        // the protected pre-reset backup must survive all of them.
+        for i in 0..8 {
+            let mut cfg = sample_config();
+            cfg.services[0].name = format!("svc-{i}");
+            store.replace(cfg).await.unwrap();
+        }
+
+        let protected_dir = dir.join("backups").join("protected");
+        let count = std::fs::read_dir(&protected_dir).unwrap().count();
+        assert_eq!(count, 1, "pre-reset backup must not be rotated away by normal quota");
+
+        let backups_dir = dir.join("backups");
+        let normal_count = std::fs::read_dir(&backups_dir)
+            .unwrap()
+            .filter(|e| e.as_ref().unwrap().path().is_file())
+            .count();
+        assert_eq!(normal_count, 2, "normal backups still capped at BACKUP_MAX_COUNT");
+
+        unsafe { std::env::remove_var("BACKUP_MAX_COUNT") };
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test]
+    async fn protected_backup_purged_after_one_month_on_next_write() {
+        let dir = temp_dir();
+        let store = MockStore::load_or_init(&dir).await.unwrap();
+        store.replace(sample_config()).await.unwrap();
+
+        let protected_dir = dir.join("backups").join("protected");
+        std::fs::create_dir_all(&protected_dir).unwrap();
+        let old_ts = MockStore::now_ms() - PROTECTED_BACKUP_MAX_AGE_MS - 1_000;
+        std::fs::write(
+            protected_dir.join(format!("pre-reset-{old_ts}.yaml")),
+            b"services: []\ngroups: []\n",
+        )
+        .unwrap();
+
+        // Any subsequent write is the "activity 1 month later" signal.
+        store.replace(MockConfig::empty()).await.unwrap();
+
+        let count = std::fs::read_dir(&protected_dir).unwrap().count();
+        assert_eq!(count, 0, "pre-reset backup older than 30 days should be purged");
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test]
+    async fn protected_backup_kept_if_not_yet_expired() {
+        let dir = temp_dir();
+        let store = MockStore::load_or_init(&dir).await.unwrap();
+        store.replace(sample_config()).await.unwrap();
+
+        let protected_dir = dir.join("backups").join("protected");
+        std::fs::create_dir_all(&protected_dir).unwrap();
+        let recent_ts = MockStore::now_ms() - 1_000;
+        std::fs::write(
+            protected_dir.join(format!("pre-reset-{recent_ts}.yaml")),
+            b"services: []\ngroups: []\n",
+        )
+        .unwrap();
+
+        store.replace(MockConfig::empty()).await.unwrap();
+
+        let count = std::fs::read_dir(&protected_dir).unwrap().count();
+        assert_eq!(count, 1, "pre-reset backup under 30 days old must be kept");
         std::fs::remove_dir_all(&dir).ok();
     }
 
