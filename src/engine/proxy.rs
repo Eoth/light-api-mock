@@ -7,9 +7,11 @@ use std::time::Duration;
 
 const PING_TIMEOUT: Duration = Duration::from_secs(3);
 
-/// Statut de disponibilite reseau d'une URL cible (real_target_url d'un service).
-/// N'importe quel code HTTP recu compte comme "joignable" ; seule une erreur
-/// reseau (timeout, connexion refusee, DNS) compte comme "injoignable".
+/// Statut de disponibilite RESEAU (pas applicatif) d'une URL cible
+/// (real_target_url d'un service). Base uniquement sur une connexion TCP :
+/// "joignable" = le socket s'est ouvert avant le timeout, "injoignable" =
+/// timeout, connexion refusee ou echec DNS. Aucune requete HTTP n'est
+/// envoyee — voir `ProxyClient::ping`.
 #[derive(Debug, Clone, Serialize)]
 pub struct PingStatus {
     pub reachable: bool,
@@ -39,20 +41,44 @@ impl ProxyClient {
         }
     }
 
-    /// Verifie l'accessibilite reseau d'une URL cible : n'importe quel code
-    /// HTTP recu compte comme "joignable", seule une erreur reseau (timeout,
-    /// connexion refusee, DNS) compte comme "injoignable".
+    /// Verifie l'accessibilite RESEAU d'une URL cible : une simple connexion TCP
+    /// vers host:port, resolue depuis l'URL (port explicite, sinon 443 pour
+    /// https, 80 sinon). AUCUNE requete HTTP n'est envoyee — pas de GET/HEAD,
+    /// pas de handshake TLS, pas d'appel a une route applicative du backend
+    /// cible. La reponse ne dit donc rien sur la sante fonctionnelle de l'API,
+    /// seulement "le socket s'est ouvert ou non" dans le timeout imparti.
     pub async fn ping(&self, url: &str) -> PingStatus {
-        match self.client.head(url).timeout(PING_TIMEOUT).send().await {
-            Ok(_resp) => PingStatus {
+        let (host, port) = match parse_host_port(url) {
+            Ok(hp) => hp,
+            Err(e) => {
+                return PingStatus {
+                    reachable: false,
+                    checked_at: now_ms(),
+                    error: Some(e),
+                };
+            }
+        };
+
+        match tokio::time::timeout(
+            PING_TIMEOUT,
+            tokio::net::TcpStream::connect((host.as_str(), port)),
+        )
+        .await
+        {
+            Ok(Ok(_stream)) => PingStatus {
                 reachable: true,
                 checked_at: now_ms(),
                 error: None,
             },
-            Err(e) => PingStatus {
+            Ok(Err(e)) => PingStatus {
                 reachable: false,
                 checked_at: now_ms(),
                 error: Some(e.to_string()),
+            },
+            Err(_elapsed) => PingStatus {
+                reachable: false,
+                checked_at: now_ms(),
+                error: Some(format!("timeout apres {}s", PING_TIMEOUT.as_secs())),
             },
         }
     }
@@ -137,6 +163,21 @@ impl ProxyClient {
     }
 }
 
+/// Extrait host+port d'une URL pour le test de connectivite TCP. Port
+/// explicite dans l'URL en priorite, sinon 443 pour https, 80 pour tout le
+/// reste (http ou schema inconnu).
+fn parse_host_port(url: &str) -> Result<(String, u16), String> {
+    let parsed = url::Url::parse(url).map_err(|e| format!("URL invalide: {e}"))?;
+    let host = parsed
+        .host_str()
+        .ok_or_else(|| "URL sans host".to_string())?
+        .to_string();
+    let port = parsed
+        .port()
+        .unwrap_or(if parsed.scheme() == "https" { 443 } else { 80 });
+    Ok((host, port))
+}
+
 fn is_hop_by_hop(name: &str) -> bool {
     matches!(
         name,
@@ -180,6 +221,64 @@ mod tests {
         let status = client.ping("http://127.0.0.1:1").await;
         assert!(!status.reachable);
         assert!(status.error.is_some());
+    }
+
+    #[tokio::test]
+    async fn ping_reachable_host_returns_reachable_via_tcp_only() {
+        // Un simple listener TCP local, sans serveur HTTP derriere : si ping()
+        // envoyait une vraie requete HTTP (GET/HEAD), le listener n'y repondrait
+        // jamais correctement. Le fait que reachable=true prouve que seul le
+        // handshake TCP compte.
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            let _ = listener.accept().await;
+        });
+
+        let client = ProxyClient::new();
+        let status = client.ping(&format!("http://{addr}")).await;
+        assert!(status.reachable);
+        assert!(status.error.is_none());
+    }
+
+    #[test]
+    fn ping_never_issues_http_request() {
+        // parse_host_port ne fait que du parsing d'URL, aucun I/O reseau —
+        // garantit que la resolution host/port ne declenche jamais elle-meme
+        // un appel HTTP (contrairement a l'ancienne implementation HEAD).
+        let (host, port) = parse_host_port("http://example.invalid:1234/some/business/path").unwrap();
+        assert_eq!(host, "example.invalid");
+        assert_eq!(port, 1234);
+    }
+
+    #[test]
+    fn parse_host_port_explicit_port() {
+        assert_eq!(
+            parse_host_port("http://svc.default.svc:9090").unwrap(),
+            ("svc.default.svc".to_string(), 9090)
+        );
+    }
+
+    #[test]
+    fn parse_host_port_defaults_http_80() {
+        assert_eq!(
+            parse_host_port("http://svc.default.svc").unwrap(),
+            ("svc.default.svc".to_string(), 80)
+        );
+    }
+
+    #[test]
+    fn parse_host_port_defaults_https_443() {
+        assert_eq!(
+            parse_host_port("https://secure.example.com").unwrap(),
+            ("secure.example.com".to_string(), 443)
+        );
+    }
+
+    #[test]
+    fn parse_host_port_invalid_url_errors() {
+        assert!(parse_host_port("not a url at all").is_err());
+        assert!(parse_host_port("").is_err());
     }
 
     #[test]
