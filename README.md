@@ -132,6 +132,7 @@ curl http://localhost:7342/demo/v1/anything
 | `PORT` | `7342` | Port d'ecoute HTTP |
 | `RUST_LOG` | `light_mock=info` | Filtre de logs (ex: `light_mock=debug`) |
 | `BACKUP_MAX_COUNT` | `5` | Nombre de sauvegardes conservees dans `{DATA_PATH}/backups/` avant rotation |
+| `SHOW_RESET_BUTTON` | `false` | Affiche le bouton "Reset complet" dans l'UI quand `AUTH_ENABLED=false` (sinon toujours cache par defaut). **N'est pas une mesure de securite** : quand l'auth est activee, seuls les super-admins peuvent reinitialiser (verifie cote serveur) ; quand elle est desactivee, l'API reste ouverte independamment de ce flag, qui ne pilote que l'affichage. |
 
 ## Sauvegardes et rollback
 

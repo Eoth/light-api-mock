@@ -50,11 +50,13 @@ async fn health() -> StatusCode {
 #[derive(serde::Serialize)]
 struct AuthStatusResponse {
     enabled: bool,
+    show_reset_button: bool,
 }
 
 async fn auth_status(State(state): State<AppState>) -> Json<AuthStatusResponse> {
     Json(AuthStatusResponse {
         enabled: state.auth_config.enabled,
+        show_reset_button: state.auth_config.show_reset_button,
     })
 }
 
