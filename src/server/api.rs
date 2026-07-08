@@ -219,6 +219,8 @@ async fn reset_config(
 ) -> Result<StatusCode, AppError> {
     require_super_admin(&user)?;
 
+    state.store.backup_before_reset().await.map_err(AppError::Store)?;
+
     tracing::info!(user = %user.username, "config reset: all services removed");
     state
         .store

@@ -133,6 +133,19 @@ curl http://localhost:7342/demo/v1/anything
 | `RUST_LOG` | `light_mock=info` | Filtre de logs (ex: `light_mock=debug`) |
 | `BACKUP_MAX_COUNT` | `5` | Nombre de sauvegardes conservees dans `{DATA_PATH}/backups/` avant rotation |
 
+## Sauvegardes et rollback
+
+Avant chaque ecriture qui modifie la configuration, l'ancien fichier `mock-config.yaml` est
+copie dans `{DATA_PATH}/backups/` (rotation automatique, `BACKUP_MAX_COUNT` fichiers conserves).
+Avant un `DELETE /api/config/reset`, une sauvegarde supplementaire est creee dans
+`{DATA_PATH}/backups/protected/` : elle n'est **jamais** supprimee par la rotation normale,
+seulement au bout de 30 jours (au moment de la premiere ecriture suivante, pas de tache
+planifiee).
+
+**Rollback manuel** : arreter le service (ou agir entre deux ecritures), copier le fichier
+choisi depuis `backups/` ou `backups/protected/` par-dessus `mock-config.yaml`, puis
+redemarrer le service.
+
 ## Tests
 
 ```bash
