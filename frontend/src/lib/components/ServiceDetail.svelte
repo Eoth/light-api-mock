@@ -2,6 +2,7 @@
   import ServiceForm from './ServiceForm.svelte';
   import RuleList from './RuleList.svelte';
   import RuleForm from './RuleForm.svelte';
+  import UrlHealthBadge from './UrlHealthBadge.svelte';
   import { updateService, deleteService, reorderRules } from '../api.js';
 
   let {
@@ -112,6 +113,10 @@
         <div class="dl-row">
           <dt>URL cible réelle</dt>
           <dd><code>{service.real_target_url}</code></dd>
+        </div>
+        <div class="dl-row">
+          <dt>Disponibilité</dt>
+          <dd><UrlHealthBadge serviceName={service.name} /></dd>
         </div>
         <div class="dl-row">
           <dt>Réécriture annuaire</dt>

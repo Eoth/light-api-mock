@@ -27,6 +27,7 @@ pub fn routes() -> Router<AppState> {
             get(get_service).put(update_service).delete(delete_service),
         )
         .route("/services/:name/toggle", put(toggle_service))
+        .route("/services/:name/ping", post(ping_service))
         .route("/services/:name/rules/reorder", put(reorder_rules))
         .route("/script/validate", post(validate_script))
         .route("/logs", get(get_logs))
@@ -455,6 +456,37 @@ async fn toggle_service(
         .cloned()
         .map(Json)
         .ok_or(AppError::NotFound)
+}
+
+async fn ping_service(
+    State(state): State<AppState>,
+    Extension(user): Extension<AuthUser>,
+    Path(name): Path<String>,
+) -> Result<Json<crate::engine::PingStatus>, AppError> {
+    let target_url = {
+        let config = state.store.snapshot().await;
+        let svc = config
+            .services
+            .iter()
+            .find(|s| s.name == name)
+            .ok_or(AppError::NotFound)?;
+
+        if state.auth_config.enabled
+            && !can_access_service(&user.username, user.is_super_admin, svc, &config.groups)
+        {
+            return Err(AppError::Forbidden);
+        }
+
+        svc.real_target_url.clone()
+    };
+
+    if let Some(cached) = state.ping_cache.get_fresh(&name, crate::server::ping::PING_TTL_MS) {
+        return Ok(Json(cached));
+    }
+
+    let status = state.proxy.ping(&target_url).await;
+    state.ping_cache.set(&name, status.clone());
+    Ok(Json(status))
 }
 
 #[derive(serde::Deserialize)]

@@ -76,6 +76,10 @@ export function toggleService(name, isMocked) {
   return request('PUT', `/services/${encodeURIComponent(name)}/toggle`, { is_mocked: isMocked });
 }
 
+export function pingService(name) {
+  return request('POST', `/services/${encodeURIComponent(name)}/ping`);
+}
+
 export function reorderRules(serviceName, order) {
   return request('PUT', `/services/${encodeURIComponent(serviceName)}/rules/reorder`, { order });
 }
