@@ -20,20 +20,45 @@
   let scriptCode = $state(init?.script ?? '');
   let scriptValidation = $state({ status: '', message: '' });
 
-  async function handleValidateScript() {
-    if (!scriptCode.trim()) {
-      scriptValidation = { status: 'error', message: 'Le script est vide.' };
-      return;
+  // pre_script/post_script : blocs additionnels independants (meme
+  // ScriptContext que "script", pas de chainage entre eux — voir
+  // commentaire sur Rule dans src/models/mod.rs). Meme endpoint de
+  // validation (content-agnostic), reutilise pour les 3 slots.
+  let preScriptEnabled = $state(!!init?.pre_script);
+  let preScriptCode = $state(init?.pre_script ?? '');
+  let preScriptValidation = $state({ status: '', message: '' });
+
+  let postScriptEnabled = $state(!!init?.post_script);
+  let postScriptCode = $state(init?.post_script ?? '');
+  let postScriptValidation = $state({ status: '', message: '' });
+
+  async function validateScriptCode(code) {
+    if (!code.trim()) {
+      return { status: 'error', message: 'Le script est vide.' };
     }
-    scriptValidation = { status: 'pending', message: 'Validation...' };
     try {
-      const result = await apiValidateScript(scriptCode);
-      scriptValidation = result.valid
+      const result = await apiValidateScript(code);
+      return result.valid
         ? { status: 'ok', message: 'Script valide.' }
         : { status: 'error', message: result.error };
     } catch (e) {
-      scriptValidation = { status: 'error', message: e.message };
+      return { status: 'error', message: e.message };
     }
+  }
+
+  async function handleValidateScript() {
+    scriptValidation = { status: 'pending', message: 'Validation...' };
+    scriptValidation = await validateScriptCode(scriptCode);
+  }
+
+  async function handleValidatePreScript() {
+    preScriptValidation = { status: 'pending', message: 'Validation...' };
+    preScriptValidation = await validateScriptCode(preScriptCode);
+  }
+
+  async function handleValidatePostScript() {
+    postScriptValidation = { status: 'pending', message: 'Validation...' };
+    postScriptValidation = await validateScriptCode(postScriptCode);
   }
 
   const httpMethods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'];
@@ -144,7 +169,9 @@
       method: ruleMethod,
       sub_path: subPath.trim() || null,
       action: ruleAction,
+      pre_script: preScriptEnabled && preScriptCode.trim() ? preScriptCode.trim() : null,
       script: scriptEnabled && scriptCode.trim() ? scriptCode.trim() : null,
+      post_script: postScriptEnabled && postScriptCode.trim() ? postScriptCode.trim() : null,
       conditions: { all_of: allOf, any_of: anyOf },
       response: {
         status: finalStatus,
@@ -619,6 +646,49 @@
         <p class="section-help" style="margin-top:0.5rem">La reponse sera 204 No Content, sans body.</p>
       {/if}
 
+      {#snippet scriptSlot(id, toggleLabel, varName, enabled, code, onToggle, onCodeInput, validation, onValidate)}
+        <div class="sub-section script-section">
+          <ToggleSwitch label={toggleLabel} checked={enabled} onchange={onToggle} />
+          {#if enabled}
+            <div class="script-editor">
+              <label for={id}>Code Rhai</label>
+              <textarea
+                {id}
+                value={code}
+                oninput={(e) => onCodeInput(e.target.value)}
+                rows="5"
+                class="script-textarea"
+                aria-describedby="{id}-hint"
+              ></textarea>
+              <div class="script-actions">
+                <button type="button" class="btn btn-outline btn-sm" onclick={onValidate} disabled={validation.status === 'pending'}>
+                  {validation.status === 'pending' ? 'Validation...' : 'Valider le script'}
+                </button>
+                {#if validation.status === 'ok'}
+                  <span class="script-valid" role="status">&#10003; {validation.message}</span>
+                {:else if validation.status === 'error'}
+                  <span class="script-invalid" role="alert">{validation.message}</span>
+                {/if}
+              </div>
+              <div class="script-help" id="{id}-hint">
+                <p class="field-hint">
+                  Execute independamment des autres blocs de script (meme contexte requete, pas de chainage).
+                  Resultat accessible via <code>{`{{${varName}}}`}</code> ou <code>{`{{${varName}.champ}}`}</code>.
+                  Meme syntaxe Rhai que le "Script personnalise" ci-dessous (voir ses exemples).
+                </p>
+              </div>
+            </div>
+          {/if}
+        </div>
+      {/snippet}
+
+      {@render scriptSlot(
+        'rule-pre-script', 'Pré-script (préparation)', 'pre_script',
+        preScriptEnabled, preScriptCode,
+        (v) => preScriptEnabled = v, (v) => preScriptCode = v,
+        preScriptValidation, handleValidatePreScript
+      )}
+
       <!-- CHAOS -->
       <div class="sub-section script-section">
         <ToggleSwitch label="Script personnalise" checked={scriptEnabled} onchange={(v) => scriptEnabled = v} />
@@ -655,6 +725,13 @@
           </div>
         {/if}
       </div>
+
+      {@render scriptSlot(
+        'rule-post-script', 'Post-script (finalisation)', 'post_script',
+        postScriptEnabled, postScriptCode,
+        (v) => postScriptEnabled = v, (v) => postScriptCode = v,
+        postScriptValidation, handleValidatePostScript
+      )}
 
       <div class="sub-section chaos-section">
         <ToggleSwitch label="Mode Chaos" checked={chaosEnabled} onchange={(v) => chaosEnabled = v} />

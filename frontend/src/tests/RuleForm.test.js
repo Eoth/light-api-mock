@@ -76,3 +76,57 @@ describe('RuleForm: rule name uniqueness', () => {
     expect(getByRole('alert')).toHaveTextContent('requis');
   });
 });
+
+describe('RuleForm: pre_script / post_script', () => {
+  it('envoie pre_script et post_script a null quand les toggles restent desactives', async () => {
+    const onSave = vi.fn();
+    const { getByLabelText, container } = render(RuleForm, { props: { onSave } });
+
+    await setInput(getByLabelText('Nom de la regle'), 'r1');
+    await submitForm(container);
+
+    const [payload] = onSave.mock.calls[0];
+    expect(payload.pre_script).toBeNull();
+    expect(payload.post_script).toBeNull();
+  });
+
+  it('affiche les toggles Pré-script et Post-script', () => {
+    const { getByRole } = render(RuleForm);
+    expect(getByRole('switch', { name: 'Pré-script (préparation)' })).toBeInTheDocument();
+    expect(getByRole('switch', { name: 'Post-script (finalisation)' })).toBeInTheDocument();
+  });
+
+  it('inclut pre_script et post_script dans le payload une fois actives et remplis', async () => {
+    const onSave = vi.fn();
+    const { getByLabelText, getByRole, container } = render(RuleForm, { props: { onSave } });
+
+    await setInput(getByLabelText('Nom de la regle'), 'r2');
+    await fireEvent.click(getByRole('switch', { name: 'Pré-script (préparation)' }));
+    await fireEvent.click(getByRole('switch', { name: 'Post-script (finalisation)' }));
+
+    const preTextarea = container.querySelector('#rule-pre-script');
+    const postTextarea = container.querySelector('#rule-post-script');
+    expect(preTextarea).toBeInTheDocument();
+    expect(postTextarea).toBeInTheDocument();
+
+    await setInput(preTextarea, '"pre-result"');
+    await setInput(postTextarea, '"post-result"');
+    await submitForm(container);
+
+    const [payload] = onSave.mock.calls[0];
+    expect(payload.pre_script).toBe('"pre-result"');
+    expect(payload.post_script).toBe('"post-result"');
+  });
+
+  it('n\'envoie pas pre_script si le champ reste vide meme toggle actif', async () => {
+    const onSave = vi.fn();
+    const { getByLabelText, getByRole, container } = render(RuleForm, { props: { onSave } });
+
+    await setInput(getByLabelText('Nom de la regle'), 'r3');
+    await fireEvent.click(getByRole('switch', { name: 'Pré-script (préparation)' }));
+    await submitForm(container);
+
+    const [payload] = onSave.mock.calls[0];
+    expect(payload.pre_script).toBeNull();
+  });
+});
