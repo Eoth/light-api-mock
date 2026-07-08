@@ -9,6 +9,7 @@ import {
   buildExpr,
   varNameToSource,
   xmlFieldsToTemplate,
+  exampleJsonToFields,
 } from '../lib/tpl-utils.js';
 
 // ── fieldsToTemplate ─────────────────────────────────────────────────
@@ -384,5 +385,68 @@ describe('validateTemplateAsXml edge cases', () => {
 
   it('rejects empty tag names', () => {
     expect(validateTemplateAsXml('<></>') ).not.toBeNull();
+  });
+});
+
+// ── exampleJsonToFields (mode "coller un exemple") ────────────────────
+
+describe('exampleJsonToFields', () => {
+  it('convertit un objet plat en champs fixed', () => {
+    const fields = exampleJsonToFields({ siret: '44306184100047', nom: 'ACME Corp' });
+    expect(fields).toEqual([
+      { key: 'siret', fieldType: 'value', source: 'fixed', value: '44306184100047', pipe: '', asNumber: false },
+      { key: 'nom', fieldType: 'value', source: 'fixed', value: 'ACME Corp', pipe: '', asNumber: false },
+    ]);
+  });
+
+  it('marque les nombres et booleens avec asNumber', () => {
+    const fields = exampleJsonToFields({ age: 42, actif: true });
+    expect(fields[0].asNumber).toBe(true);
+    expect(fields[0].value).toBe('42');
+    expect(fields[1].asNumber).toBe(true);
+  });
+
+  it('convertit un objet imbrique en fieldType object', () => {
+    const fields = exampleJsonToFields({ adresse: { ville: 'Paris', cp: '75001' } });
+    expect(fields[0].fieldType).toBe('object');
+    expect(fields[0].children).toEqual([
+      { key: 'ville', fieldType: 'value', source: 'fixed', value: 'Paris', pipe: '', asNumber: false },
+      { key: 'cp', fieldType: 'value', source: 'fixed', value: '75001', pipe: '', asNumber: false },
+    ]);
+  });
+
+  it('convertit un tableau de scalaires en array-values', () => {
+    const fields = exampleJsonToFields({ tags: ['a', 'b'] });
+    expect(fields[0].fieldType).toBe('array-values');
+    expect(fields[0].items).toEqual([
+      { source: 'fixed', value: 'a', pipe: '', asNumber: false },
+      { source: 'fixed', value: 'b', pipe: '', asNumber: false },
+    ]);
+  });
+
+  it('convertit un tableau d\'objets en array-objects (template sur le 1er element)', () => {
+    const fields = exampleJsonToFields({ items: [{ id: 1 }, { id: 2 }] });
+    expect(fields[0].fieldType).toBe('array-objects');
+    expect(fields[0].template).toEqual([
+      { key: 'id', fieldType: 'value', source: 'fixed', value: '1', pipe: '', asNumber: true },
+    ]);
+  });
+
+  it('gere un tableau de null sans planter', () => {
+    expect(() => exampleJsonToFields({ items: [null, null] })).not.toThrow();
+    const fields = exampleJsonToFields({ items: [null, null] });
+    expect(fields[0].fieldType).toBe('array-values');
+  });
+
+  it('rejette une racine non-objet (tableau ou scalaire)', () => {
+    expect(() => exampleJsonToFields([1, 2, 3])).toThrow(TypeError);
+    expect(() => exampleJsonToFields('just a string')).toThrow(TypeError);
+    expect(() => exampleJsonToFields(null)).toThrow(TypeError);
+  });
+
+  it('round-trip avec fieldsToTemplate produit un template valide', () => {
+    const fields = exampleJsonToFields({ siret: '123', nested: { x: 1 } });
+    const tpl = fieldsToTemplate(fields);
+    expect(validateTemplateAsJson(tpl)).toBeNull();
   });
 });

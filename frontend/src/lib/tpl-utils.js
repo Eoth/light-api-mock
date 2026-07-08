@@ -256,6 +256,43 @@ export function varNameToSource(varName) {
   return { source: 'fixed', value: varName };
 }
 
+// ── Example JSON: raw value → Fields (mode "coller un exemple") ──────
+// Contrairement a templateToFields (qui parse un template {{...}} deja
+// existant), cette fonction part d'un exemple JSON brut (litteral, sans
+// {{}}) tel que colle par l'utilisateur : chaque valeur devient un champ
+// fieldType:'value', source:'fixed' pre-rempli avec la valeur collee, que
+// l'utilisateur peut ensuite reassigner (path/query/fake/etc.) dans le
+// builder guide.
+
+export function exampleJsonToFields(value) {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    throw new TypeError('exampleJsonToFields attend un objet JSON en racine.');
+  }
+  return objectToFields(value);
+}
+
+function objectToFields(obj) {
+  return Object.entries(obj).map(([key, value]) => {
+    if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+      return { key, fieldType: 'object', children: objectToFields(value) };
+    }
+    if (Array.isArray(value)) {
+      if (value.length > 0 && typeof value[0] === 'object' && value[0] !== null) {
+        return { key, fieldType: 'array-objects', template: objectToFields(value[0]) };
+      }
+      return {
+        key, fieldType: 'array-values',
+        items: value.map(v => ({ source: 'fixed', value: String(v), pipe: '', asNumber: typeof v === 'number' })),
+      };
+    }
+    return {
+      key, fieldType: 'value', source: 'fixed',
+      value: String(value ?? ''), pipe: '',
+      asNumber: typeof value === 'number' || typeof value === 'boolean',
+    };
+  });
+}
+
 // ── Low-level JSON-aware parser ─────────────────────────────────────
 
 function extractTplEntries(objStr) {

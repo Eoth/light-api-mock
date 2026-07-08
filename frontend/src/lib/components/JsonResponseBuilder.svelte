@@ -39,6 +39,46 @@
     return current;
   }
 
+  function getByPathSafe(root, path) {
+    let current = root;
+    for (const key of path) {
+      if (current == null) return undefined;
+      current = current[key];
+    }
+    return current;
+  }
+
+  // Navigation dans l'arborescence (breadcrumb) : focusPath pointe vers un
+  // tableau de Fields (racine [] ou [...idx, 'children'|'template']). Le
+  // rendu complet reste disponible (aucune fonctionnalite perdue) — le
+  // breadcrumb est une aide de navigation en plus de l'indentation, pas un
+  // mode exclusif, pour ne pas regresser sur le builder existant.
+  let focusPath = $state([]);
+
+  $effect(() => {
+    if (focusPath.length > 0 && getByPathSafe(fields, focusPath) === undefined) {
+      focusPath = [];
+    }
+  });
+
+  let focusedFields = $derived(getByPathSafe(fields, focusPath) ?? []);
+
+  function breadcrumbTrail(path) {
+    const trail = [{ label: 'racine', path: [] }];
+    let current = fields;
+    for (let i = 0; i < path.length; i += 2) {
+      const idx = path[i];
+      const prop = path[i + 1];
+      const field = current?.[idx];
+      if (!field) break;
+      trail.push({ label: field.key?.trim() || `#${idx + 1}`, path: path.slice(0, i + 2) });
+      current = field[prop];
+    }
+    return trail;
+  }
+
+  let breadcrumb = $derived(breadcrumbTrail(focusPath));
+
   function mutate(fn) {
     const clone = deepClone(fields);
     fn(clone);
@@ -229,6 +269,15 @@
             {@render renderValueControls(field, path, idx)}
           {/if}
           <div class="field-actions">
+            {#if ft === 'object' || ft === 'array-objects'}
+              <button
+                type="button"
+                class="btn-icon"
+                onclick={() => focusPath = [...path, idx, ft === 'object' ? 'children' : 'template']}
+                aria-label="Naviguer dans {field.key || 'ce champ'}"
+                title="Naviguer dans ce champ"
+              >&#8594;</button>
+            {/if}
             <button type="button" class="btn-icon" onclick={() => moveAt(path, idx, -1)} disabled={idx === 0} aria-label="Monter" title="Monter">&#9650;</button>
             <button type="button" class="btn-icon" onclick={() => moveAt(path, idx, 1)} disabled={idx === fieldList.length - 1} aria-label="Descendre" title="Descendre">&#9660;</button>
             <button type="button" class="btn-icon btn-delete" onclick={() => removeAt(path, idx)} aria-label="Supprimer le champ {field.key || idx + 1}">&#10005;</button>
@@ -262,9 +311,25 @@
     {/each}
   {/snippet}
 
-  {@render renderFields(fields, [], 0)}
+  {#if focusPath.length > 0}
+    <nav class="data-breadcrumb" aria-label="Chemin des donnees">
+      <ol>
+        {#each breadcrumb as segment, i}
+          <li aria-current={i === breadcrumb.length - 1 ? 'page' : undefined}>
+            {#if i === breadcrumb.length - 1}
+              <span>{segment.label}</span>
+            {:else}
+              <button type="button" class="breadcrumb-link" onclick={() => focusPath = segment.path}>{segment.label}</button>
+            {/if}
+          </li>
+        {/each}
+      </ol>
+    </nav>
+  {/if}
 
-  <button type="button" class="btn btn-sm btn-outline" onclick={() => addFieldAt([])}>+ Ajouter un champ</button>
+  {@render renderFields(focusedFields, focusPath, 0)}
+
+  <button type="button" class="btn btn-sm btn-outline" onclick={() => addFieldAt(focusPath)}>+ Ajouter un champ</button>
 
   <datalist id="dl-pipes">
     {#each pipeOptions.filter(p => p.value) as p}<option value={p.value}>{p.label}</option>{/each}
@@ -319,6 +384,14 @@
   .item-index { display: inline-flex; align-items: center; justify-content: center; width: 1.25rem; height: 1.25rem; border-radius: 50%; background: var(--color-text-muted); color: #fff; font-size: 0.65rem; font-weight: 700; flex-shrink: 0; }
 
   .btn-xs { padding: 0.15rem 0.5rem; font-size: 0.75rem; border-radius: var(--radius); border: 1px solid transparent; font-weight: 600; }
+
+  .data-breadcrumb { margin: 0.25rem 0; }
+  .data-breadcrumb ol { list-style: none; display: flex; align-items: center; gap: 0.375rem; flex-wrap: wrap; margin: 0; padding: 0; font-size: 0.8125rem; }
+  .data-breadcrumb li { display: flex; align-items: center; gap: 0.375rem; color: var(--color-text-muted); }
+  .data-breadcrumb li:not(:last-child)::after { content: ">"; color: var(--color-border); }
+  .data-breadcrumb li[aria-current="page"] { color: var(--color-text); font-weight: 600; }
+  .breadcrumb-link { background: none; border: none; padding: 0; color: var(--color-primary); cursor: pointer; font: inherit; text-decoration: underline; text-underline-offset: 2px; }
+  .breadcrumb-link:hover { color: var(--color-primary-hover); }
 
   .preview-section { margin-top: 0.375rem; }
   .preview-section summary { font-size: 0.8125rem; cursor: pointer; color: var(--color-text-muted); }

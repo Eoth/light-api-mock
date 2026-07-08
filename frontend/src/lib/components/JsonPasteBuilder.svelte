@@ -1,5 +1,5 @@
 <script>
-  import { buildExpr as sharedBuildExpr, fieldsToTemplate } from '../tpl-utils.js';
+  import { buildExpr as sharedBuildExpr, fieldsToTemplate, exampleJsonToFields } from '../tpl-utils.js';
 
   let { fields = [], onUpdate = () => {} } = $props();
 
@@ -41,10 +41,10 @@
           return;
         }
         isArrayRoot = true;
-        fields = objectToFields(typeof data[0] === 'object' && data[0] !== null ? data[0] : { value: data[0] });
+        fields = exampleJsonToFields(typeof data[0] === 'object' && data[0] !== null ? data[0] : { value: data[0] });
       } else if (typeof data === 'object' && data !== null) {
         isArrayRoot = false;
-        fields = objectToFields(data);
+        fields = exampleJsonToFields(data);
       } else {
         parseError = 'Le JSON doit etre un objet ou un tableau.';
         return;
@@ -54,28 +54,6 @@
     } catch (e) {
       parseError = `JSON invalide : ${e.message}`;
     }
-  }
-
-  function objectToFields(obj, depth = 0) {
-    return Object.entries(obj).map(([key, value]) => {
-      if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
-        return { key, fieldType: 'object', children: objectToFields(value, depth + 1) };
-      }
-      if (Array.isArray(value)) {
-        if (value.length > 0 && typeof value[0] === 'object') {
-          return { key, fieldType: 'array-objects', template: objectToFields(value[0], depth + 1) };
-        }
-        return {
-          key, fieldType: 'array-values',
-          items: value.map(v => ({ source: 'fixed', value: String(v), pipe: '', asNumber: typeof v === 'number' })),
-        };
-      }
-      return {
-        key, fieldType: 'value', source: 'fixed',
-        value: String(value ?? ''), pipe: '',
-        asNumber: typeof value === 'number' || typeof value === 'boolean',
-      };
-    });
   }
 
   function deepClone(obj) { return JSON.parse(JSON.stringify(obj)); }
