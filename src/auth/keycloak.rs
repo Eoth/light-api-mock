@@ -307,6 +307,7 @@ mod tests {
             realm: "entreprise".into(),
             client_id: "lightmock".into(),
             super_admins: vec!["admin".into()],
+            show_reset_button: false,
         }
     }
 

@@ -8,8 +8,10 @@
   import RequestLog from './lib/components/RequestLog.svelte';
   import LoginForm from './lib/components/LoginForm.svelte';
   import GroupManager from './lib/components/GroupManager.svelte';
+  import ConfirmDialog from './lib/components/ConfirmDialog.svelte';
 
   let services = $state([]);
+  let resetPending = $state(false);
   let groups = $state([]);
   let notification = $state({ message: '', type: 'info', visible: false });
   let selectedService = $state(null);
@@ -67,8 +69,10 @@
     try {
       const status = await getAuthStatus();
       auth.enabled = status.enabled;
+      auth.showResetButton = status.show_reset_button;
     } catch {
       auth.enabled = false;
+      auth.showResetButton = false;
     }
 
     const params = new URLSearchParams(window.location.search);
@@ -241,7 +245,7 @@
   }
 
   async function handleReset() {
-    if (!confirm('Supprimer tous les services et repartir de zero ?')) return;
+    resetPending = false;
     try {
       await resetConfig();
       services = [];
@@ -252,6 +256,8 @@
       showNotification(`Erreur reset : ${e.message}`, 'error');
     }
   }
+
+  let canShowReset = $derived(auth.enabled ? auth.isSuperAdmin : auth.showResetButton);
 
   $effect(() => { init(); });
 
@@ -277,7 +283,9 @@
         <button type="button" class="btn btn-sm btn-outline" onclick={() => view = 'groups'} title="Gestion des groupes">Groupes</button>
         <button type="button" class="btn btn-sm btn-outline" onclick={exportConfig} title="Telecharger la configuration">Export</button>
         <button type="button" class="btn btn-sm btn-outline" onclick={importConfig} title="Charger une configuration">Import</button>
-        <button type="button" class="btn btn-sm btn-outline btn-danger-outline" onclick={handleReset} title="Supprimer tous les services">Reset</button>
+        {#if canShowReset}
+          <button type="button" class="btn btn-sm btn-outline btn-danger-outline" onclick={() => resetPending = true} title="Supprimer tous les services">Reset</button>
+        {/if}
         <button type="button" class="btn btn-sm btn-outline" onclick={() => darkMode = !darkMode} title={darkMode ? 'Mode clair' : 'Mode sombre'} aria-label={darkMode ? 'Activer le mode clair' : 'Activer le mode sombre'}>
           {darkMode ? 'Clair' : 'Sombre'}
         </button>
@@ -327,6 +335,16 @@
       </div>
     </div>
   {/if}
+
+  <ConfirmDialog
+    open={resetPending}
+    title="Reinitialiser la configuration"
+    message="Supprimer tous les services et repartir de zero ? Une sauvegarde protegee sera conservee 30 jours, mais cette action reste lourde de consequences."
+    confirmLabel="Reinitialiser"
+    confirmKeyword="RESET"
+    onConfirm={handleReset}
+    onCancel={() => resetPending = false}
+  />
 
   <main id="main-content" class="app-main">
     <Notification message={notification.message} type={notification.type} visible={notification.visible} />

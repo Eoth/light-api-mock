@@ -4,6 +4,11 @@
 // automatiquement dans les headers HTTP par api.js.
 export const auth = $state({
   enabled: false,
+  // Pilote uniquement l'affichage du bouton "Reset complet" quand enabled=false
+  // (quand enabled=true, la visibilite suit isSuperAdmin). Ce n'est pas une
+  // mesure de securite : le backend reste seul autoritaire sur le droit reel
+  // d'executer le reset (require_super_admin cote serveur).
+  showResetButton: false,
   token: null,
   refreshToken: null,
   username: null,
