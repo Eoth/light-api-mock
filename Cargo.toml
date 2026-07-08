@@ -52,6 +52,13 @@ rhai = { version = "1", features = ["sync"] }
 # URL parsing (form_urlencoded for condition extraction)
 url = "2"
 
+[features]
+# Cadrage MOM/Kafka (etude) : NON active par defaut, zero impact sur le
+# binaire/tests tant que non active. Ne contient que le modele de config
+# et son parsing (pas de dependance rdkafka dans cette passe). Voir
+# CLAUDE.md section "Support MOM/Messaging".
+messaging-kafka = []
+
 [profile.release]
 opt-level = 3
 lto = true
