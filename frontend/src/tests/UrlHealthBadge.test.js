@@ -17,7 +17,7 @@ describe('UrlHealthBadge', () => {
     pingService.mockResolvedValue({ reachable: true, checked_at: Date.now(), error: null });
     const { getByText } = render(UrlHealthBadge, { props: { serviceName: 'svc-a' } });
 
-    await fireEvent.click(getByText('Tester la cible'));
+    await fireEvent.click(getByText(/Tester la cible/));
 
     await waitFor(() => expect(getByText('Accessible')).toBeInTheDocument());
     expect(pingService).toHaveBeenCalledWith('svc-a');
@@ -27,7 +27,7 @@ describe('UrlHealthBadge', () => {
     pingService.mockResolvedValue({ reachable: false, checked_at: Date.now(), error: 'connection refused' });
     const { getByText } = render(UrlHealthBadge, { props: { serviceName: 'svc-b' } });
 
-    await fireEvent.click(getByText('Tester la cible'));
+    await fireEvent.click(getByText(/Tester la cible/));
 
     await waitFor(() => expect(getByText('Inaccessible')).toBeInTheDocument());
     expect(getByText(/Seul le mode mock est utilisable/)).toBeInTheDocument();
@@ -37,8 +37,27 @@ describe('UrlHealthBadge', () => {
     pingService.mockRejectedValue(new Error('502 Bad Gateway'));
     const { getByText } = render(UrlHealthBadge, { props: { serviceName: 'svc-c' } });
 
-    await fireEvent.click(getByText('Tester la cible'));
+    await fireEvent.click(getByText(/Tester la cible/));
 
     await waitFor(() => expect(getByText('502 Bad Gateway')).toBeInTheDocument());
+  });
+
+  it('mentionne explicitement qu\'il s\'agit d\'un test reseau, pas applicatif', () => {
+    const { getByText } = render(UrlHealthBadge, { props: { serviceName: 'svc-d' } });
+    expect(getByText(/reseau uniquement/)).toBeInTheDocument();
+  });
+
+  it('affiche "Expiré" quand le dernier test date de plus de PING_TTL_MS', async () => {
+    vi.useFakeTimers();
+    pingService.mockResolvedValue({ reachable: true, checked_at: Date.now(), error: null });
+    const { getByText } = render(UrlHealthBadge, { props: { serviceName: 'svc-e' } });
+
+    await fireEvent.click(getByText(/Tester la cible/));
+    await vi.waitFor(() => expect(getByText('Accessible')).toBeInTheDocument());
+
+    await vi.advanceTimersByTimeAsync(130_000);
+
+    expect(getByText('Expiré')).toBeInTheDocument();
+    vi.useRealTimers();
   });
 });
