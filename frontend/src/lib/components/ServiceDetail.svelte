@@ -3,6 +3,7 @@
   import RuleList from './RuleList.svelte';
   import RuleForm from './RuleForm.svelte';
   import UrlHealthBadge from './UrlHealthBadge.svelte';
+  import ConfirmDialog from './ConfirmDialog.svelte';
   import { updateService, deleteService, reorderRules } from '../api.js';
 
   let {
@@ -30,6 +31,7 @@
   }
 
   async function handleDeleteService() {
+    confirmDelete = false;
     try {
       await deleteService(service.name);
       onDelete(service.name);
@@ -127,20 +129,21 @@
         <button type="button" class="btn btn-primary" onclick={() => editing = true}>
           Modifier le service
         </button>
-        {#if confirmDelete}
-          <span class="confirm-msg" role="alert">
-            Confirmer la suppression ?
-            <button type="button" class="btn btn-danger btn-sm" onclick={handleDeleteService}>Oui, supprimer</button>
-            <button type="button" class="btn btn-secondary btn-sm" onclick={() => confirmDelete = false}>Annuler</button>
-          </span>
-        {:else}
-          <button type="button" class="btn btn-danger" onclick={() => confirmDelete = true}>
-            Supprimer
-          </button>
-        {/if}
+        <button type="button" class="btn btn-danger" onclick={() => confirmDelete = true}>
+          Supprimer
+        </button>
       </div>
     </div>
   {/if}
+
+  <ConfirmDialog
+    open={confirmDelete}
+    title="Supprimer le service"
+    message={`Confirmer la suppression du service "${service.name}" ? Cette action est irreversible.`}
+    confirmLabel="Oui, supprimer"
+    onConfirm={handleDeleteService}
+    onCancel={() => confirmDelete = false}
+  />
 
   {#if editingRuleIdx !== null}
     <RuleForm
@@ -201,8 +204,6 @@
     padding-top: 1rem;
     border-top: 1px solid var(--color-border);
   }
-
-  .confirm-msg { display: flex; align-items: center; gap: 0.5rem; font-weight: 500; }
 
   .btn-back { padding: 0.375rem 0.75rem; font-size: 0.875rem; }
 </style>

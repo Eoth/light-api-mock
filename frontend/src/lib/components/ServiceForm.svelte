@@ -1,5 +1,6 @@
 <script>
   import { untrack } from 'svelte';
+  import FormField from './FormField.svelte';
 
   let {
     service = null,
@@ -92,71 +93,65 @@
     <div class="form-error" role="alert" aria-live="assertive">{error}</div>
   {/if}
 
-  <div class="form-field">
-    <label for="svc-name">Nom du service</label>
-    <input
-      id="svc-name"
-      type="text"
-      bind:value={name}
-      required
-      disabled={isEdit}
-      placeholder="ex: service-users"
-      aria-describedby="svc-name-hint"
-    />
-    <span class="field-hint" id="svc-name-hint">Identifiant unique, sert aussi de prefixe URL : /{`{nom}`}/...</span>
-  </div>
+  <FormField id="svc-name" label="Nom du service" hint="Identifiant unique, sert aussi de prefixe URL : /{`{nom}`}/...">
+    {#snippet children({ id, describedBy })}
+      <input
+        {id}
+        type="text"
+        bind:value={name}
+        required
+        disabled={isEdit}
+        placeholder="ex: service-users"
+        aria-describedby={describedBy}
+      />
+    {/snippet}
+  </FormField>
 
-  <div class="form-field">
-    <label for="svc-path">Chemin d'ecoute (optionnel)</label>
-    <input
-      id="svc-path"
-      type="text"
-      bind:value={listenPath}
-      placeholder="Vide = intercepte tout sous le nom du service"
-      aria-describedby="svc-path-hint"
-    />
-    <span class="field-hint" id="svc-path-hint">Laissez vide pour intercepter tout le trafic sous /{`{nom}`}/. Sinon, utilisez /* pour wildcard ou {`{param}`} pour capturer des segments.</span>
-  </div>
+  <FormField id="svc-path" label="Chemin d'ecoute (optionnel)" hint="Laissez vide pour intercepter tout le trafic sous /{`{nom}`}/. Sinon, utilisez /* pour wildcard ou {`{param}`} pour capturer des segments.">
+    {#snippet children({ id, describedBy })}
+      <input
+        {id}
+        type="text"
+        bind:value={listenPath}
+        placeholder="Vide = intercepte tout sous le nom du service"
+        aria-describedby={describedBy}
+      />
+    {/snippet}
+  </FormField>
 
-  <div class="form-field">
-    <label for="svc-target">URL cible réelle</label>
-    <input
-      id="svc-target"
-      type="url"
-      bind:value={realTargetUrl}
-      required
-      placeholder="ex: http://service-users.default.svc:8080"
-      aria-describedby="svc-target-hint"
-    />
-    <span class="field-hint" id="svc-target-hint">Adresse du vrai backend dans le cluster (utilisée en mode proxy)</span>
-  </div>
+  <FormField id="svc-target" label="URL cible réelle" hint="Adresse du vrai backend dans le cluster (utilisée en mode proxy)">
+    {#snippet children({ id, describedBy })}
+      <input
+        {id}
+        type="url"
+        bind:value={realTargetUrl}
+        required
+        placeholder="ex: http://service-users.default.svc:8080"
+        aria-describedby={describedBy}
+      />
+    {/snippet}
+  </FormField>
 
-  <div class="form-field">
-    <label for="svc-type">Type de service</label>
-    <select id="svc-type" bind:value={serviceType} aria-describedby="svc-type-hint">
-      <option value="rest">REST</option>
-      <option value="soap">SOAP / XML</option>
-    </select>
-    <span class="field-hint" id="svc-type-hint">
-      {#if serviceType === 'soap'}
-        Les requetes ?wsdl seront automatiquement proxyfiees vers le backend reel.
-      {:else}
-        API REST standard (JSON).
-      {/if}
-    </span>
-  </div>
+  <FormField id="svc-type" label="Type de service" hint={serviceType === 'soap' ? 'Les requetes ?wsdl seront automatiquement proxyfiees vers le backend reel.' : 'API REST standard (JSON).'}>
+    {#snippet children({ id, describedBy })}
+      <select {id} bind:value={serviceType} aria-describedby={describedBy}>
+        <option value="rest">REST</option>
+        <option value="soap">SOAP / XML</option>
+      </select>
+    {/snippet}
+  </FormField>
 
   {#if availableGroups.length > 0}
-    <div class="form-field">
-      <label for="svc-group">Groupe</label>
-      <select id="svc-group" bind:value={groupName} aria-describedby="svc-group-hint">
-        <option value="">-- Aucun groupe --</option>
-        {#each availableGroups as g}
-          <option value={g.name}>{g.name} (/{g.code})</option>
-        {/each}
-      </select>
-      <span class="field-hint" id="svc-group-hint">Associe le service a un groupe pour gerer les droits d'acces</span>
-    </div>
+    <FormField id="svc-group" label="Groupe" hint="Associe le service a un groupe pour gerer les droits d'acces">
+      {#snippet children({ id, describedBy })}
+        <select {id} bind:value={groupName} aria-describedby={describedBy}>
+          <option value="">-- Aucun groupe --</option>
+          {#each availableGroups as g}
+            <option value={g.name}>{g.name} (/{g.code})</option>
+          {/each}
+        </select>
+      {/snippet}
+    </FormField>
   {/if}
 
   {#if name.trim()}

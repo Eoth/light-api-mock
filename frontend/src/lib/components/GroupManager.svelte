@@ -1,5 +1,7 @@
 <script>
   import { getGroups, createGroup, deleteGroup, updateGroupMembers, updateService } from '../api.js';
+  import ConfirmDialog from './ConfirmDialog.svelte';
+  import RemovableList from './RemovableList.svelte';
 
   let {
     services = [],
@@ -19,6 +21,7 @@
   let newMember = $state('');
   let newAdmin = $state('');
   let formError = $state('');
+  let groupPendingDelete = $state(null);
 
   let servicesOfGroup = $derived((groupName) =>
     services.filter(s => s.group_name === groupName)
@@ -62,7 +65,7 @@
   }
 
   async function handleDeleteGroup(name) {
-    if (!confirm(`Supprimer le groupe "${name}" ? Les services associes seront dissocies.`)) return;
+    groupPendingDelete = null;
     try {
       await deleteGroup(name);
       setGroups(groups.filter(g => g.name !== name));
@@ -209,7 +212,7 @@
               <button type="button" class="btn btn-outline btn-sm" onclick={() => startEdit(group.name)}>
                 {editingGroup === group.name ? 'Fermer' : 'Gerer'}
               </button>
-              <button type="button" class="btn btn-danger-outline btn-sm" onclick={() => handleDeleteGroup(group.name)}>
+              <button type="button" class="btn btn-danger-outline btn-sm" onclick={() => groupPendingDelete = group.name}>
                 Supprimer
               </button>
             </div>
@@ -250,17 +253,11 @@
               {#if authEnabled}
                 <div class="edit-section">
                   <h4>Administrateurs</h4>
-                  {#if group.admins.length === 0}
-                    <p class="empty-hint">Aucun administrateur</p>
-                  {/if}
-                  <ul class="people-list">
-                    {#each group.admins as admin}
-                      <li>
-                        <span>{admin}</span>
-                        <button type="button" class="chip-remove" onclick={() => removePerson(group.name, admin, 'admin')} title="Retirer">x</button>
-                      </li>
-                    {/each}
-                  </ul>
+                  <RemovableList
+                    items={group.admins}
+                    onRemove={(admin) => removePerson(group.name, admin, 'admin')}
+                    emptyText="Aucun administrateur"
+                  />
                   <div class="inline-form">
                     <input type="text" bind:value={newAdmin} placeholder="Ajouter un admin" />
                     <button type="button" class="btn btn-outline btn-sm" onclick={() => addAdmin(group.name)}>+</button>
@@ -269,17 +266,11 @@
 
                 <div class="edit-section">
                   <h4>Membres</h4>
-                  {#if group.members.length === 0}
-                    <p class="empty-hint">Aucun membre</p>
-                  {/if}
-                  <ul class="people-list">
-                    {#each group.members as member}
-                      <li>
-                        <span>{member}</span>
-                        <button type="button" class="chip-remove" onclick={() => removePerson(group.name, member, 'member')} title="Retirer">x</button>
-                      </li>
-                    {/each}
-                  </ul>
+                  <RemovableList
+                    items={group.members}
+                    onRemove={(member) => removePerson(group.name, member, 'member')}
+                    emptyText="Aucun membre"
+                  />
                   <div class="inline-form">
                     <input type="text" bind:value={newMember} placeholder="Ajouter un membre" />
                     <button type="button" class="btn btn-outline btn-sm" onclick={() => addMember(group.name)}>+</button>
@@ -292,6 +283,15 @@
       {/each}
     </div>
   {/if}
+
+  <ConfirmDialog
+    open={groupPendingDelete !== null}
+    title="Supprimer le groupe"
+    message={groupPendingDelete ? `Supprimer le groupe "${groupPendingDelete}" ? Les services associes seront dissocies.` : ''}
+    confirmLabel="Oui, supprimer"
+    onConfirm={() => handleDeleteGroup(groupPendingDelete)}
+    onCancel={() => groupPendingDelete = null}
+  />
 </div>
 
 <style>
@@ -334,9 +334,6 @@
   .edit-section h4 { margin: 0 0 0.5rem; font-size: 0.875rem; color: var(--color-text-muted); }
 
   .service-assign-list { display: flex; flex-wrap: wrap; gap: 0.375rem; }
-
-  .people-list { list-style: none; padding: 0; margin: 0 0 0.5rem; }
-  .people-list li { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; font-size: 0.875rem; }
 
   .loading-text, .empty-text { color: var(--color-text-muted); font-size: 0.875rem; text-align: center; padding: 1rem; }
 </style>
