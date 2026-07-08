@@ -131,6 +131,7 @@ curl http://localhost:7342/demo/v1/anything
 | `STATIC_DIR` | `./frontend/dist` | Assets Svelte compiles |
 | `PORT` | `7342` | Port d'ecoute HTTP |
 | `RUST_LOG` | `light_mock=info` | Filtre de logs (ex: `light_mock=debug`) |
+| `BACKUP_MAX_COUNT` | `5` | Nombre de sauvegardes conservees dans `{DATA_PATH}/backups/` avant rotation |
 
 ## Tests
 
