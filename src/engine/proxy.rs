@@ -2,6 +2,27 @@ use axum::body::Body;
 use axum::http::{Request, Response, StatusCode};
 use futures_util::StreamExt;
 use reqwest::Client;
+use serde::Serialize;
+use std::time::Duration;
+
+const PING_TIMEOUT: Duration = Duration::from_secs(3);
+
+/// Statut de disponibilite reseau d'une URL cible (real_target_url d'un service).
+/// N'importe quel code HTTP recu compte comme "joignable" ; seule une erreur
+/// reseau (timeout, connexion refusee, DNS) compte comme "injoignable".
+#[derive(Debug, Clone, Serialize)]
+pub struct PingStatus {
+    pub reachable: bool,
+    pub checked_at: u64,
+    pub error: Option<String>,
+}
+
+pub fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64
+}
 
 #[derive(Clone)]
 pub struct ProxyClient {
@@ -15,6 +36,24 @@ impl ProxyClient {
                 .redirect(reqwest::redirect::Policy::none())
                 .build()
                 .expect("reqwest client"),
+        }
+    }
+
+    /// Verifie l'accessibilite reseau d'une URL cible : n'importe quel code
+    /// HTTP recu compte comme "joignable", seule une erreur reseau (timeout,
+    /// connexion refusee, DNS) compte comme "injoignable".
+    pub async fn ping(&self, url: &str) -> PingStatus {
+        match self.client.head(url).timeout(PING_TIMEOUT).send().await {
+            Ok(_resp) => PingStatus {
+                reachable: true,
+                checked_at: now_ms(),
+                error: None,
+            },
+            Err(e) => PingStatus {
+                reachable: false,
+                checked_at: now_ms(),
+                error: Some(e.to_string()),
+            },
         }
     }
 
@@ -133,6 +172,14 @@ mod tests {
 
         let result = client.forward("http://127.0.0.1:1", "/test", req).await;
         assert_eq!(result.unwrap_err(), StatusCode::BAD_GATEWAY);
+    }
+
+    #[tokio::test]
+    async fn ping_unreachable_host_returns_unreachable() {
+        let client = ProxyClient::new();
+        let status = client.ping("http://127.0.0.1:1").await;
+        assert!(!status.reachable);
+        assert!(status.error.is_some());
     }
 
     #[test]

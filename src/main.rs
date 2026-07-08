@@ -15,6 +15,7 @@ use crate::auth::AuthConfig;
 use crate::auth::keycloak::KeycloakClient;
 use crate::engine::ProxyClient;
 use crate::engine::script::ScriptEngine;
+use crate::server::ping::PingCache;
 use crate::server::request_log::RequestLog;
 use crate::server::{AppState, build_router};
 use crate::store::MockStore;
@@ -69,6 +70,7 @@ async fn main() {
         auth_config,
         keycloak,
         script_engine: ScriptEngine::new(),
+        ping_cache: PingCache::new(),
     };
 
     let app = build_router(state, &static_dir);

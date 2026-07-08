@@ -1,6 +1,7 @@
 <script>
   import ToggleSwitch from './ToggleSwitch.svelte';
   import StatusBadge from './StatusBadge.svelte';
+  import UrlHealthBadge from './UrlHealthBadge.svelte';
 
   let { service, groupCode = '', onToggle = () => {}, onSelect = () => {}, onClone = () => {} } = $props();
 </script>
@@ -26,6 +27,10 @@
       <div class="detail-row">
         <dt>Cible</dt>
         <dd><code>{service.real_target_url}</code></dd>
+      </div>
+      <div class="detail-row">
+        <dt>Disponibilité</dt>
+        <dd><UrlHealthBadge serviceName={service.name} /></dd>
       </div>
       <div class="detail-row">
         <dt>Regles</dt>

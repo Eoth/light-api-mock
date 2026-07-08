@@ -6,6 +6,7 @@
 mod api;
 pub(crate) mod codegen;
 mod intercept;
+pub mod ping;
 pub mod request_log;
 pub mod validation;
 
@@ -15,6 +16,7 @@ use crate::engine::ProxyClient;
 use crate::engine::script::ScriptEngine;
 use crate::store::MockStore;
 use axum::Router;
+use ping::PingCache;
 use request_log::RequestLog;
 use std::collections::HashMap;
 use std::path::Path;
@@ -32,6 +34,7 @@ pub struct AppState {
     pub auth_config: AuthConfig,
     pub keycloak: Option<KeycloakClient>,
     pub script_engine: ScriptEngine,
+    pub ping_cache: PingCache,
 }
 
 impl AppState {
