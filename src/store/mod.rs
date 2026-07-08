@@ -3,10 +3,20 @@
 // snapshot() retourne un Arc (clone du pointeur, pas des donnees).
 // Les ecritures (update/replace) clonent les donnees, les modifient,
 // puis font un atomic write (ecriture tmp + rename) pour eviter la corruption.
+//
+// Backup/rollback : avant chaque ecrasement du fichier de config, l'ancien
+// contenu est copie dans {data_dir}/backups/. C'est event-driven (declenche
+// par l'ecriture elle-meme), PAS une tache de fond/cron — coherent avec le
+// choix fait pour le ping (src/server/ping.rs). Rotation immediate apres
+// coup pour ne garder que BACKUP_MAX_COUNT fichiers (defaut 5), necessaire
+// vu la contrainte PVC 64Mi en K8s (cf CLAUDE.md).
 use crate::models::MockConfig;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::RwLock;
+
+static BACKUP_SEQ: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Clone)]
 pub struct MockStore {
@@ -30,6 +40,13 @@ impl MockStore {
 
     pub fn config_file(data_dir: &Path) -> PathBuf {
         data_dir.join("mock-config.yaml")
+    }
+
+    pub fn backup_max_count() -> usize {
+        std::env::var("BACKUP_MAX_COUNT")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(5)
     }
 
     pub async fn load_or_init(data_dir: &Path) -> Result<Self, StoreError> {
@@ -83,11 +100,62 @@ impl MockStore {
             StoreError::Io("config path has no parent directory".into())
         })?;
 
+        Self::backup_before_overwrite(path, parent)?;
+
         let tmp_path = parent.join(".mock-config.yaml.tmp");
         std::fs::write(&tmp_path, yaml.as_bytes()).map_err(|e| StoreError::Io(e.to_string()))?;
         std::fs::rename(&tmp_path, path).map_err(|e| StoreError::Io(e.to_string()))?;
 
         Ok(())
+    }
+
+    /// Copie le fichier de config existant (avant ecrasement) dans un
+    /// repertoire de backups, puis purge les plus anciens au-dela de
+    /// `backup_max_count()`. Ne fait rien si `path` n'existe pas encore
+    /// (premier ecrit, rien a sauvegarder).
+    fn backup_before_overwrite(path: &Path, parent: &Path) -> Result<(), StoreError> {
+        if !path.exists() {
+            return Ok(());
+        }
+
+        let backups_dir = parent.join("backups");
+        std::fs::create_dir_all(&backups_dir).map_err(|e| StoreError::Io(e.to_string()))?;
+
+        let seq = BACKUP_SEQ.fetch_add(1, Ordering::Relaxed);
+        let backup_name = format!("mock-config-{}-{:06}.yaml", Self::now_ms(), seq);
+        std::fs::copy(path, backups_dir.join(&backup_name))
+            .map_err(|e| StoreError::Io(e.to_string()))?;
+
+        Self::rotate_backups(&backups_dir)?;
+        Ok(())
+    }
+
+    fn rotate_backups(backups_dir: &Path) -> Result<(), StoreError> {
+        let mut files: Vec<PathBuf> = std::fs::read_dir(backups_dir)
+            .map_err(|e| StoreError::Io(e.to_string()))?
+            .filter_map(|entry| entry.ok())
+            .map(|entry| entry.path())
+            .filter(|p| p.is_file())
+            .collect();
+
+        // Le nom encode timestamp+seq avec largeur fixe : le tri lexicographique
+        // correspond a l'ordre chronologique (plus recent = plus grand).
+        files.sort();
+
+        let max = Self::backup_max_count();
+        if files.len() > max {
+            for old in &files[..files.len() - max] {
+                std::fs::remove_file(old).map_err(|e| StoreError::Io(e.to_string()))?;
+            }
+        }
+        Ok(())
+    }
+
+    fn now_ms() -> u128 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis()
     }
 }
 
@@ -240,6 +308,52 @@ mod tests {
         let tmp_path = dir.join(".mock-config.yaml.tmp");
         assert!(!tmp_path.exists(), "temp file should be cleaned up after rename");
         std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test]
+    async fn backup_created_on_write() {
+        let dir = temp_dir();
+        let store = MockStore::load_or_init(&dir).await.unwrap();
+        // load_or_init writes the initial empty config; no prior file to back up yet.
+        store.replace(sample_config()).await.unwrap();
+
+        let backups_dir = dir.join("backups");
+        let count = std::fs::read_dir(&backups_dir).unwrap().count();
+        assert!(count >= 1, "expected at least one backup after overwriting an existing config");
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test]
+    async fn backup_rotation_keeps_max_n() {
+        let dir = temp_dir();
+        unsafe { std::env::set_var("BACKUP_MAX_COUNT", "3") };
+
+        let store = MockStore::load_or_init(&dir).await.unwrap();
+        for i in 0..6 {
+            let mut cfg = sample_config();
+            cfg.services[0].name = format!("svc-{i}");
+            store.replace(cfg).await.unwrap();
+        }
+
+        let backups_dir = dir.join("backups");
+        let count = std::fs::read_dir(&backups_dir).unwrap().count();
+        assert_eq!(count, 3, "backups should be capped at BACKUP_MAX_COUNT");
+
+        unsafe { std::env::remove_var("BACKUP_MAX_COUNT") };
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn backup_max_count_default() {
+        unsafe { std::env::remove_var("BACKUP_MAX_COUNT") };
+        assert_eq!(MockStore::backup_max_count(), 5);
+    }
+
+    #[test]
+    fn backup_max_count_from_env() {
+        unsafe { std::env::set_var("BACKUP_MAX_COUNT", "12") };
+        assert_eq!(MockStore::backup_max_count(), 12);
+        unsafe { std::env::remove_var("BACKUP_MAX_COUNT") };
     }
 
     #[tokio::test]
