@@ -57,17 +57,18 @@
     class="badge badge-pill badge-{state()}"
     role="status"
     aria-live="polite"
+    data-testid="url-health-badge-status-{serviceName}"
   >
     {LABELS[state()]}
   </span>
-  <button type="button" class="btn btn-sm btn-outline" onclick={handleTest} disabled={loading}>
+  <button type="button" class="btn btn-sm btn-outline" onclick={handleTest} disabled={loading} data-testid="url-health-badge-test-button-{serviceName}">
     Tester la cible (reseau uniquement)
   </button>
   {#if error}
-    <span class="ping-error" role="alert">{error}</span>
+    <span class="ping-error" role="alert" data-testid="url-health-badge-error-{serviceName}">{error}</span>
   {/if}
   {#if status && !isExpired && !status.reachable}
-    <p class="ping-warning" role="alert">
+    <p class="ping-warning" role="alert" data-testid="url-health-badge-warning-{serviceName}">
       Seul le mode mock est utilisable pour ce service tant que la cible n'est pas accessible
       (test reseau uniquement — connexion TCP, pas d'appel applicatif).
     </p>

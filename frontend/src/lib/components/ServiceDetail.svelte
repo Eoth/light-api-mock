@@ -115,7 +115,7 @@
 {:else}
 <div class="service-detail">
   <nav class="detail-nav" aria-label="Navigation du service">
-    <button type="button" class="btn btn-secondary btn-back" onclick={onBack}>
+    <button type="button" class="btn btn-secondary btn-back" onclick={onBack} data-testid="service-detail-back-button">
       &#8592; Retour
     </button>
     <h2>{service.name}</h2>
@@ -144,10 +144,10 @@
         </div>
       </dl>
       <div class="detail-actions">
-        <button type="button" class="btn btn-primary" onclick={() => editing = true}>
+        <button type="button" class="btn btn-primary" onclick={() => editing = true} data-testid="service-detail-edit-button">
           Modifier le service
         </button>
-        <button type="button" class="btn btn-danger" onclick={() => confirmDelete = true}>
+        <button type="button" class="btn btn-danger" onclick={() => confirmDelete = true} data-testid="service-detail-delete-button">
           Supprimer
         </button>
       </div>

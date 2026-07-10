@@ -57,17 +57,17 @@
 <div class="backup-manager">
   <div class="list-header">
     <h2>Sauvegardes de configuration</h2>
-    <button type="button" class="btn btn-outline btn-sm" onclick={onBack}>Retour</button>
+    <button type="button" class="btn btn-outline btn-sm" onclick={onBack} data-testid="backup-manager-back-button">Retour</button>
   </div>
 
   {#if loading}
     <p class="loading-text">Chargement des sauvegardes...</p>
   {:else if backups.length === 0}
-    <p class="empty-text">Aucune sauvegarde disponible pour le moment.</p>
+    <p class="empty-text" data-testid="backup-manager-empty-message">Aucune sauvegarde disponible pour le moment.</p>
   {:else}
     <ul class="backup-list">
       {#each backups as backup (backup.filename)}
-        <li class="backup-card">
+        <li class="backup-card" data-testid="backup-manager-item-{backup.filename}">
           <div class="backup-info">
             <span class="backup-name">{backup.filename}</span>
             <span class="backup-meta">
@@ -82,6 +82,7 @@
             class="btn btn-outline btn-sm"
             disabled={restoring}
             onclick={() => restorePending = backup.filename}
+            data-testid="backup-manager-restore-button-{backup.filename}"
           >
             Restaurer
           </button>

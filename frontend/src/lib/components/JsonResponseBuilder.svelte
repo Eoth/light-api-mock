@@ -195,10 +195,12 @@
   {/if}
 
   {#snippet renderValueControls(field, path, idx)}
+    {@const testPath = [...path, idx].join('-')}
     <select
       value={field.source}
       onchange={(e) => updateProp(path, idx, 'source', e.target.value)}
       aria-label="Source de la valeur"
+      data-testid="json-builder-source-select-{testPath}"
     >
       {#each valueSources as vs}
         <option value={vs.value}>{vs.label}</option>
@@ -209,6 +211,7 @@
         value={field.value}
         onchange={(e) => updateProp(path, idx, 'value', e.target.value)}
         aria-label="Type de donnee fictive"
+        data-testid="json-builder-fake-select-{testPath}"
       >
         {#each fakeOptions as fo}
           <option value={fo}>{fo}</option>
@@ -222,6 +225,7 @@
         oninput={(e) => updateProp(path, idx, 'value', e.target.value)}
         placeholder={fieldPlaceholder(field.source)}
         aria-label="Valeur"
+        data-testid="json-builder-value-input-{testPath}"
       />
     {/if}
     {#if field.source !== 'fixed'}
@@ -234,10 +238,11 @@
         aria-label="Pipe de transformation"
         list="dl-pipes"
         autocomplete="off"
+        data-testid="json-builder-pipe-input-{testPath}"
       />
     {/if}
     <label class="number-toggle" title="Rendre sans guillemets (nombre JSON)">
-      <input type="checkbox" checked={field.asNumber} onchange={(e) => updateProp(path, idx, 'asNumber', e.target.checked)} />
+      <input type="checkbox" checked={field.asNumber} onchange={(e) => updateProp(path, idx, 'asNumber', e.target.checked)} data-testid="json-builder-asnumber-checkbox-{testPath}" />
       <span class="number-label">#</span>
     </label>
   {/snippet}
@@ -245,6 +250,7 @@
   {#snippet renderFields(fieldList, path, depth)}
     {#each fieldList as field, idx}
       {@const ft = field.fieldType || 'value'}
+      {@const testPath = [...path, idx].join('-')}
       <div class="field-row" style:margin-left="{depth * 1.25}rem">
         <div class="field-main">
           <input
@@ -254,12 +260,14 @@
             oninput={(e) => updateProp(path, idx, 'key', e.target.value)}
             placeholder="cle"
             aria-label="Nom de la cle"
+            data-testid="json-builder-key-input-{testPath}"
           />
           <select
             class="type-select"
             value={ft}
             onchange={(e) => changeFieldType(path, idx, e.target.value)}
             aria-label="Type de champ"
+            data-testid="json-builder-type-select-{testPath}"
           >
             {#each fieldTypes as t}
               <option value={t.value}>{t.label}</option>
@@ -276,18 +284,19 @@
                 onclick={() => focusPath = [...path, idx, ft === 'object' ? 'children' : 'template']}
                 aria-label="Naviguer dans {field.key || 'ce champ'}"
                 title="Naviguer dans ce champ"
+                data-testid="json-builder-navigate-button-{testPath}"
               >&#8594;</button>
             {/if}
-            <button type="button" class="btn-icon" onclick={() => moveAt(path, idx, -1)} disabled={idx === 0} aria-label="Monter" title="Monter">&#9650;</button>
-            <button type="button" class="btn-icon" onclick={() => moveAt(path, idx, 1)} disabled={idx === fieldList.length - 1} aria-label="Descendre" title="Descendre">&#9660;</button>
-            <button type="button" class="btn-icon btn-delete" onclick={() => removeAt(path, idx)} aria-label="Supprimer le champ {field.key || idx + 1}">&#10005;</button>
+            <button type="button" class="btn-icon" onclick={() => moveAt(path, idx, -1)} disabled={idx === 0} aria-label="Monter" title="Monter" data-testid="json-builder-moveup-button-{testPath}">&#9650;</button>
+            <button type="button" class="btn-icon" onclick={() => moveAt(path, idx, 1)} disabled={idx === fieldList.length - 1} aria-label="Descendre" title="Descendre" data-testid="json-builder-movedown-button-{testPath}">&#9660;</button>
+            <button type="button" class="btn-icon btn-delete" onclick={() => removeAt(path, idx)} aria-label="Supprimer le champ {field.key || idx + 1}" data-testid="json-builder-delete-button-{testPath}">&#10005;</button>
           </div>
         </div>
 
         {#if ft === 'object'}
           <div class="nested-block">
             {@render renderFields(field.children || [], [...path, idx, 'children'], depth + 1)}
-            <button type="button" class="btn btn-xs btn-outline" onclick={() => addFieldAt([...path, idx, 'children'])}>+ Sous-champ</button>
+            <button type="button" class="btn btn-xs btn-outline" onclick={() => addFieldAt([...path, idx, 'children'])} data-testid="json-builder-add-subfield-button-{testPath}">+ Sous-champ</button>
           </div>
         {:else if ft === 'array-values'}
           <div class="nested-block">
@@ -295,16 +304,16 @@
               <div class="array-item">
                 <span class="item-index">{iidx + 1}</span>
                 {@render renderValueControls(item, [...path, idx, 'items'], iidx)}
-                <button type="button" class="btn-icon btn-delete" onclick={() => removeAt([...path, idx, 'items'], iidx)} aria-label="Supprimer l'element {iidx + 1}">&#10005;</button>
+                <button type="button" class="btn-icon btn-delete" onclick={() => removeAt([...path, idx, 'items'], iidx)} aria-label="Supprimer l'element {iidx + 1}" data-testid="json-builder-delete-item-button-{testPath}-{iidx}">&#10005;</button>
               </div>
             {/each}
-            <button type="button" class="btn btn-xs btn-outline" onclick={() => addArrayItem([...path, idx, 'items'])}>+ Element</button>
+            <button type="button" class="btn btn-xs btn-outline" onclick={() => addArrayItem([...path, idx, 'items'])} data-testid="json-builder-add-item-button-{testPath}">+ Element</button>
           </div>
         {:else if ft === 'array-objects'}
           <div class="nested-block">
             <span class="nested-hint">Schema d'un element du tableau :</span>
             {@render renderFields(field.template || [], [...path, idx, 'template'], depth + 1)}
-            <button type="button" class="btn btn-xs btn-outline" onclick={() => addFieldAt([...path, idx, 'template'])}>+ Champ</button>
+            <button type="button" class="btn btn-xs btn-outline" onclick={() => addFieldAt([...path, idx, 'template'])} data-testid="json-builder-add-template-field-button-{testPath}">+ Champ</button>
           </div>
         {/if}
       </div>
@@ -319,7 +328,7 @@
             {#if i === breadcrumb.length - 1}
               <span>{segment.label}</span>
             {:else}
-              <button type="button" class="breadcrumb-link" onclick={() => focusPath = segment.path}>{segment.label}</button>
+              <button type="button" class="breadcrumb-link" onclick={() => focusPath = segment.path} data-testid="json-builder-breadcrumb-link-{i}">{segment.label}</button>
             {/if}
           </li>
         {/each}
@@ -329,7 +338,7 @@
 
   {@render renderFields(focusedFields, focusPath, 0)}
 
-  <button type="button" class="btn btn-sm btn-outline" onclick={() => addFieldAt(focusPath)}>+ Ajouter un champ</button>
+  <button type="button" class="btn btn-sm btn-outline" onclick={() => addFieldAt(focusPath)} data-testid="json-builder-add-field-button">+ Ajouter un champ</button>
 
   <datalist id="dl-pipes">
     {#each pipeOptions.filter(p => p.value) as p}<option value={p.value}>{p.label}</option>{/each}

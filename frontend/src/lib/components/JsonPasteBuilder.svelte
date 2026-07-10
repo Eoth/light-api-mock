@@ -92,18 +92,19 @@
         rows="6"
         class="paste-textarea"
         placeholder={'{\n  "siret": "44306184100047",\n  "nom": "ACME Corp",\n  "status": "actif"\n}'}
+        data-testid="json-paste-builder-textarea"
       ></textarea>
       {#if parseError}
-        <div class="form-error" role="alert">{parseError}</div>
+        <div class="form-error" role="alert" data-testid="json-paste-builder-error">{parseError}</div>
       {/if}
-      <button type="button" class="btn btn-primary btn-sm" onclick={handleParse}>
+      <button type="button" class="btn btn-primary btn-sm" onclick={handleParse} data-testid="json-paste-builder-analyze-button">
         Analyser et variabiliser
       </button>
     </div>
   {:else}
     <div class="paste-header">
       <span class="field-hint">{isArrayRoot ? 'Tableau de ' : ''}{fields.length} champ{fields.length !== 1 ? 's' : ''} detecte{fields.length !== 1 ? 's' : ''} — choisissez la source de chaque valeur</span>
-      <button type="button" class="btn btn-outline btn-sm" onclick={() => { parsed = false; pasteInput = ''; }}>
+      <button type="button" class="btn btn-outline btn-sm" onclick={() => { parsed = false; pasteInput = ''; }} data-testid="json-paste-builder-reset-button">
         Recoller un JSON
       </button>
     </div>
@@ -121,14 +122,14 @@
             <span class="paste-type-badge">tableau</span>
           {:else}
             <div class="paste-controls">
-              <select value={field.source} onchange={(e) => updateField(currentPath, 'source', e.target.value)} aria-label="Source pour {field.key}">
+              <select value={field.source} onchange={(e) => updateField(currentPath, 'source', e.target.value)} aria-label="Source pour {field.key}" data-testid="json-paste-builder-source-select-{currentPath.join('-')}">
                 {#each valueSources as vs}
                   <option value={vs.value}>{vs.label}</option>
                 {/each}
               </select>
 
               {#if field.source === 'fake'}
-                <select value={field.value} onchange={(e) => updateField(currentPath, 'value', e.target.value)} aria-label="Type fictif">
+                <select value={field.value} onchange={(e) => updateField(currentPath, 'value', e.target.value)} aria-label="Type fictif" data-testid="json-paste-builder-fake-select-{currentPath.join('-')}">
                   {#each fakeOptions as fo}
                     <option value={fo}>{fo}</option>
                   {/each}
@@ -141,6 +142,7 @@
                   oninput={(e) => updateField(currentPath, 'value', e.target.value)}
                   placeholder={field.source === 'fixed' ? 'valeur fixe' : 'nom du parametre'}
                   aria-label="Valeur pour {field.key}"
+                  data-testid="json-paste-builder-value-input-{currentPath.join('-')}"
                 />
               {/if}
 

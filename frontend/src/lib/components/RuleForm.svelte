@@ -465,14 +465,14 @@
 
   <div class="form-field">
     <label for="rule-name">Nom de la regle</label>
-    <input id="rule-name" type="text" bind:value={name} required placeholder="ex: get-siret" aria-describedby="rn-hint" />
+    <input id="rule-name" type="text" bind:value={name} required placeholder="ex: get-siret" aria-describedby="rn-hint" data-testid="rule-form-name-input" />
     <span class="field-hint" id="rn-hint">Identifiant unique de cette regle dans le service</span>
   </div>
 
   <div class="form-row">
     <div class="form-field">
       <label for="rule-method">Methode HTTP</label>
-      <select id="rule-method" bind:value={ruleMethod} aria-describedby="rule-method-hint">
+      <select id="rule-method" bind:value={ruleMethod} aria-describedby="rule-method-hint" data-testid="rule-form-method-select">
         {#each httpMethods as m}
           <option value={m}>{m}</option>
         {/each}
@@ -482,7 +482,7 @@
 
     <div class="form-field">
       <label for="rule-subpath">Sous-chemin (optionnel)</label>
-      <input id="rule-subpath" type="text" bind:value={subPath} placeholder="ex: /users/{'{id}'}" aria-describedby="rule-subpath-hint" />
+      <input id="rule-subpath" type="text" bind:value={subPath} placeholder="ex: /users/{'{id}'}" aria-describedby="rule-subpath-hint" data-testid="rule-form-subpath-input" />
       <span class="field-hint" id="rule-subpath-hint">Affine le matching au sein du service</span>
     </div>
   </div>
@@ -492,12 +492,12 @@
     <legend>Action quand cette regle matche</legend>
     <div class="action-selector">
       <label class="action-option" class:selected={ruleAction === 'mock'}>
-        <input type="radio" bind:group={ruleAction} value="mock" />
+        <input type="radio" bind:group={ruleAction} value="mock" data-testid="rule-form-action-mock-radio" />
         <span class="action-label">Mock</span>
         <span class="action-desc">Retourner la reponse simulee ci-dessous</span>
       </label>
       <label class="action-option" class:selected={ruleAction === 'proxy'}>
-        <input type="radio" bind:group={ruleAction} value="proxy" />
+        <input type="radio" bind:group={ruleAction} value="proxy" data-testid="rule-form-action-proxy-radio" />
         <span class="action-label">Proxy</span>
         <span class="action-desc">Forwarder vers la cible reelle du service</span>
       </label>
@@ -523,7 +523,7 @@
         {#each allOf as cond, idx}
           <li class="cond-item">
             <span>{conditionLabel(cond)}</span>
-            <button type="button" class="btn-icon btn-delete" onclick={() => removeCondition('all_of', idx)} aria-label="Supprimer">&#10005;</button>
+            <button type="button" class="btn-icon btn-delete" onclick={() => removeCondition('all_of', idx)} aria-label="Supprimer" data-testid="rule-form-remove-condition-allof-button-{idx}">&#10005;</button>
           </li>
         {/each}
       </ul>
@@ -536,7 +536,7 @@
         onCancel={() => addingConditionTo = null}
       />
     {:else}
-      <button type="button" class="btn btn-sm btn-outline" onclick={() => addingConditionTo = 'all_of'}>+ Condition ET</button>
+      <button type="button" class="btn btn-sm btn-outline" onclick={() => addingConditionTo = 'all_of'} data-testid="rule-form-add-condition-allof-button">+ Condition ET</button>
     {/if}
   </fieldset>
 
@@ -547,7 +547,7 @@
         {#each anyOf as cond, idx}
           <li class="cond-item">
             <span>{conditionLabel(cond)}</span>
-            <button type="button" class="btn-icon btn-delete" onclick={() => removeCondition('any_of', idx)} aria-label="Supprimer">&#10005;</button>
+            <button type="button" class="btn-icon btn-delete" onclick={() => removeCondition('any_of', idx)} aria-label="Supprimer" data-testid="rule-form-remove-condition-anyof-button-{idx}">&#10005;</button>
           </li>
         {/each}
       </ul>
@@ -560,7 +560,7 @@
         onCancel={() => addingConditionTo = null}
       />
     {:else}
-      <button type="button" class="btn btn-sm btn-outline" onclick={() => addingConditionTo = 'any_of'}>+ Condition OU</button>
+      <button type="button" class="btn btn-sm btn-outline" onclick={() => addingConditionTo = 'any_of'} data-testid="rule-form-add-condition-anyof-button">+ Condition OU</button>
     {/if}
   </fieldset>
 
@@ -568,7 +568,7 @@
   {#if ruleAction === 'mock'}
   <fieldset class="section section-response">
     <legend>
-      <button type="button" class="legend-toggle" onclick={() => responseOpen = !responseOpen} aria-expanded={responseOpen}>
+      <button type="button" class="legend-toggle" onclick={() => responseOpen = !responseOpen} aria-expanded={responseOpen} data-testid="rule-form-response-toggle-button">
         {responseOpen ? '▼' : '▶'} Reponse mockee
       </button>
     </legend>
@@ -577,7 +577,7 @@
       {#key modeKey}
       <div class="mode-selector" role="radiogroup" aria-label="Mode de reponse">
         {#each [['json-paste','JSON par exemple'],['json-guided','JSON guide'],['xml-guided','XML guide'],['text','Texte'],['advanced','Template avance'],['empty','Vide (204)']] as [val, label]}
-          <button type="button" class="mode-btn" class:mode-active={responseMode === val} onclick={() => requestModeSwitch(val)} role="radio" aria-checked={responseMode === val}>{label}</button>
+          <button type="button" class="mode-btn" class:mode-active={responseMode === val} onclick={() => requestModeSwitch(val)} role="radio" aria-checked={responseMode === val} data-testid="rule-form-mode-button-{val}">{label}</button>
         {/each}
       </div>
       {/key}
@@ -586,8 +586,8 @@
         <div class="mode-warning" role="alert">
           <p>{pendingConvMessage || `Changer vers le mode "${pendingMode}" pourrait entrainer une perte de donnees.`}</p>
           <div class="mode-warning-actions">
-            <button type="button" class="btn btn-sm btn-primary" onclick={confirmModeSwitch}>Changer quand meme</button>
-            <button type="button" class="btn btn-sm btn-secondary" onclick={cancelModeSwitch}>Annuler</button>
+            <button type="button" class="btn btn-sm btn-primary" onclick={confirmModeSwitch} data-testid="rule-form-mode-switch-confirm-button">Changer quand meme</button>
+            <button type="button" class="btn btn-sm btn-secondary" onclick={cancelModeSwitch} data-testid="rule-form-mode-switch-cancel-button">Annuler</button>
           </div>
         </div>
       {/if}
@@ -596,7 +596,7 @@
         <div class="form-row">
           <div class="form-field" style="max-width:8rem">
             <label for="resp-status">Code HTTP</label>
-            <input id="resp-status" type="number" bind:value={status} min="100" max="599" />
+            <input id="resp-status" type="number" bind:value={status} min="100" max="599" data-testid="rule-form-status-input" />
           </div>
         </div>
 
@@ -604,9 +604,9 @@
           <strong>En-tetes</strong>
           {#each respHeaders as hdr, idx}
             <div class="header-row">
-              <input type="text" bind:value={hdr.name} placeholder="Content-Type" aria-label="Nom de l'en-tete {idx + 1}" list="dl-header-names" autocomplete="off" />
-              <input type="text" bind:value={hdr.value} placeholder="application/json" aria-label="Valeur de l'en-tete {idx + 1}" list={hdr.name?.toLowerCase() === 'content-type' ? 'dl-content-types' : undefined} autocomplete="off" />
-              <button type="button" class="btn-icon btn-delete" onclick={() => removeHeader(idx)} aria-label="Supprimer l'en-tete">&#10005;</button>
+              <input type="text" bind:value={hdr.name} placeholder="Content-Type" aria-label="Nom de l'en-tete {idx + 1}" list="dl-header-names" autocomplete="off" data-testid="rule-form-header-name-input-{idx}" />
+              <input type="text" bind:value={hdr.value} placeholder="application/json" aria-label="Valeur de l'en-tete {idx + 1}" list={hdr.name?.toLowerCase() === 'content-type' ? 'dl-content-types' : undefined} autocomplete="off" data-testid="rule-form-header-value-input-{idx}" />
+              <button type="button" class="btn-icon btn-delete" onclick={() => removeHeader(idx)} aria-label="Supprimer l'en-tete" data-testid="rule-form-remove-header-button-{idx}">&#10005;</button>
             </div>
           {/each}
           <datalist id="dl-header-names">
@@ -615,7 +615,7 @@
           <datalist id="dl-content-types">
             {#each commonContentTypes as ct}<option value={ct}></option>{/each}
           </datalist>
-          <button type="button" class="btn btn-sm btn-outline" onclick={addHeader}>+ En-tete</button>
+          <button type="button" class="btn btn-sm btn-outline" onclick={addHeader} data-testid="rule-form-add-header-button">+ En-tete</button>
           {#if responseMode === 'json-guided' || responseMode === 'json-paste'}
             <span class="field-hint">Content-Type: application/json sera ajoute automatiquement.</span>
           {/if}
@@ -640,7 +640,7 @@
       {:else if responseMode === 'text'}
         <div class="sub-section">
           <strong>Contenu texte</strong>
-          <textarea bind:value={textContent} rows="5" placeholder="Contenu de la reponse en texte brut" aria-label="Contenu texte de la reponse" class="text-area"></textarea>
+          <textarea bind:value={textContent} rows="5" placeholder="Contenu de la reponse en texte brut" aria-label="Contenu texte de la reponse" class="text-area" data-testid="rule-form-text-content-textarea"></textarea>
         </div>
 
       {:else if responseMode === 'advanced'}
@@ -649,43 +649,43 @@
           <p class="section-help">Composez la reponse en ajoutant des blocs concatenes dans l'ordre.</p>
 
           {#each fragments as frag, idx}
-            <div class="fragment-card">
+            <div class="fragment-card" data-testid="rule-form-fragment-card-{idx}">
               <div class="fragment-header">
                 <span class="frag-index">{idx + 1}</span>
-                <select value={frag.type} onchange={(e) => updateFragmentType(idx, e.target.value)} aria-label="Type du fragment {idx + 1}">
+                <select value={frag.type} onchange={(e) => updateFragmentType(idx, e.target.value)} aria-label="Type du fragment {idx + 1}" data-testid="rule-form-fragment-type-select-{idx}">
                   {#each fragmentTypes as ft}
                     <option value={ft.value}>{ft.label}</option>
                   {/each}
                 </select>
                 <div class="fragment-actions">
-                  <button type="button" class="btn-icon" onclick={() => moveFragment(idx, -1)} disabled={idx === 0} aria-label="Monter" title="Monter">&#9650;</button>
-                  <button type="button" class="btn-icon" onclick={() => moveFragment(idx, 1)} disabled={idx === fragments.length - 1} aria-label="Descendre" title="Descendre">&#9660;</button>
-                  <button type="button" class="btn-icon btn-delete" onclick={() => removeFragment(idx)} aria-label="Supprimer" title="Supprimer">&#10005;</button>
+                  <button type="button" class="btn-icon" onclick={() => moveFragment(idx, -1)} disabled={idx === 0} aria-label="Monter" title="Monter" data-testid="rule-form-fragment-moveup-button-{idx}">&#9650;</button>
+                  <button type="button" class="btn-icon" onclick={() => moveFragment(idx, 1)} disabled={idx === fragments.length - 1} aria-label="Descendre" title="Descendre" data-testid="rule-form-fragment-movedown-button-{idx}">&#9660;</button>
+                  <button type="button" class="btn-icon btn-delete" onclick={() => removeFragment(idx)} aria-label="Supprimer" title="Supprimer" data-testid="rule-form-fragment-delete-button-{idx}">&#10005;</button>
                 </div>
               </div>
               <div class="fragment-body">
                 {#if frag.type === 'Literal'}
-                  <textarea bind:value={frag.value} rows="2" placeholder='ex: {`{"siret":"`}' aria-label="Contenu texte"></textarea>
+                  <textarea bind:value={frag.value} rows="2" placeholder='ex: {`{"siret":"`}' aria-label="Contenu texte" data-testid="rule-form-fragment-literal-textarea-{idx}"></textarea>
                 {:else if frag.type === 'Uuid'}
                   <p class="frag-info">UUID v4 genere a chaque requete.</p>
                 {:else if frag.type === 'PickFrom'}
                   {#each frag.values as val, vi}
                     <div class="pick-row">
-                      <input type="text" bind:value={frag.values[vi]} placeholder="Valeur {vi + 1}" aria-label="Valeur {vi + 1}" />
-                      <button type="button" class="btn-icon btn-delete" onclick={() => removePickValue(idx, vi)} aria-label="Supprimer">&#10005;</button>
+                      <input type="text" bind:value={frag.values[vi]} placeholder="Valeur {vi + 1}" aria-label="Valeur {vi + 1}" data-testid="rule-form-fragment-pick-input-{idx}-{vi}" />
+                      <button type="button" class="btn-icon btn-delete" onclick={() => removePickValue(idx, vi)} aria-label="Supprimer" data-testid="rule-form-fragment-pick-remove-button-{idx}-{vi}">&#10005;</button>
                     </div>
                   {/each}
-                  <button type="button" class="btn btn-sm btn-outline" onclick={() => addPickValue(idx)}>+ Valeur</button>
+                  <button type="button" class="btn btn-sm btn-outline" onclick={() => addPickValue(idx)} data-testid="rule-form-fragment-pick-add-button-{idx}">+ Valeur</button>
                 {:else if frag.type === 'FakeData'}
-                  <select value={frag.kind?.type ?? 'FirstName'} onchange={(e) => updateFakeKind(idx, e.target.value)} aria-label="Type fictif">
+                  <select value={frag.kind?.type ?? 'FirstName'} onchange={(e) => updateFakeKind(idx, e.target.value)} aria-label="Type fictif" data-testid="rule-form-fragment-fake-select-{idx}">
                     {#each fakeKinds as fk}<option value={fk.value}>{fk.label}</option>{/each}
                   </select>
                 {:else if frag.type === 'PathSegment'}
-                  <label class="inline-label">Position <input type="number" bind:value={frag.index} min="0" style="width:5rem" /></label>
+                  <label class="inline-label">Position <input type="number" bind:value={frag.index} min="0" style="width:5rem" data-testid="rule-form-fragment-pathsegment-input-{idx}" /></label>
                 {:else if frag.type === 'Template'}
                   <textarea bind:value={frag.template} rows="5" class="template-textarea"
                     placeholder={`Ex: {{"siret":"{path.siret}","siren":"{path.siret | first(9)}"}}`}
-                    aria-label="Template"></textarea>
+                    aria-label="Template" data-testid="rule-form-fragment-template-textarea-{idx}"></textarea>
                   <div class="template-help">
                     <span class="field-hint"><strong>Variables :</strong> <code>{`{path.nom}`}</code>, <code>{`{query.id}`}</code>, <code>{`{uuid}`}</code>, <code>{`{now_ms}`}</code>, <code>{`{fake.CompanyName}`}</code>, <code>{`{seq}`}</code></span>
                     <span class="field-hint"><strong>Pipes :</strong> <code>| lower</code>, <code>| upper</code>, <code>| capitalize</code>, <code>| first(N)</code>, <code>| last(N)</code>, <code>| substr(start,len)</code>, <code>| replace("a","b")</code>, <code>| prepend("x")</code>, <code>| append("x")</code>, <code>| default("val")</code>, <code>| length</code>, <code>| trim</code>. JSON : <code>{`{{`}</code> / <code>{`}}`}</code></span>
@@ -694,7 +694,7 @@
               </div>
             </div>
           {/each}
-          <button type="button" class="btn btn-sm btn-outline" onclick={addFragment}>+ Ajouter un fragment</button>
+          <button type="button" class="btn btn-sm btn-outline" onclick={addFragment} data-testid="rule-form-fragment-add-button">+ Ajouter un fragment</button>
         </div>
 
       {:else if responseMode === 'empty'}
@@ -709,13 +709,13 @@
               <label for={id}>Code Rhai</label>
               <RhaiScriptEditor {id} value={code} onInput={onCodeInput} rows={5} ariaDescribedby="{id}-hint" />
               <div class="script-actions">
-                <button type="button" class="btn btn-outline btn-sm" onclick={onValidate} disabled={validation.status === 'pending'}>
+                <button type="button" class="btn btn-outline btn-sm" onclick={onValidate} disabled={validation.status === 'pending'} data-testid="rule-form-validate-script-button-{id}">
                   {validation.status === 'pending' ? 'Validation...' : 'Valider le script'}
                 </button>
                 {#if validation.status === 'ok'}
-                  <span class="script-valid" role="status">&#10003; {validation.message}</span>
+                  <span class="script-valid" role="status" data-testid="rule-form-script-valid-{id}">&#10003; {validation.message}</span>
                 {:else if validation.status === 'error'}
-                  <span class="script-invalid" role="alert">{validation.message}</span>
+                  <span class="script-invalid" role="alert" data-testid="rule-form-script-invalid-{id}">{validation.message}</span>
                 {/if}
               </div>
               <div class="script-help" id="{id}-hint">
@@ -752,13 +752,13 @@
               ariaDescribedby="script-hint"
             />
             <div class="script-actions">
-              <button type="button" class="btn btn-outline btn-sm" onclick={handleValidateScript} disabled={scriptValidation.status === 'pending'}>
+              <button type="button" class="btn btn-outline btn-sm" onclick={handleValidateScript} disabled={scriptValidation.status === 'pending'} data-testid="rule-form-validate-script-button-rule-script">
                 {scriptValidation.status === 'pending' ? 'Validation...' : 'Valider le script'}
               </button>
               {#if scriptValidation.status === 'ok'}
-                <span class="script-valid" role="status">&#10003; {scriptValidation.message}</span>
+                <span class="script-valid" role="status" data-testid="rule-form-script-valid-rule-script">&#10003; {scriptValidation.message}</span>
               {:else if scriptValidation.status === 'error'}
-                <span class="script-invalid" role="alert">{scriptValidation.message}</span>
+                <span class="script-invalid" role="alert" data-testid="rule-form-script-invalid-rule-script">{scriptValidation.message}</span>
               {/if}
             </div>
             <div class="script-help" id="script-hint">
@@ -798,11 +798,11 @@
         <ToggleSwitch label="Mode Chaos" checked={chaosEnabled} onchange={(v) => chaosEnabled = v} />
         {#if chaosEnabled}
           <div class="chaos-fields">
-            <label>Latence fixe (ms) <input type="number" bind:value={chaos.delay_ms} min="0" max="30000" /></label>
-            <label>Latence min (ms) <input type="number" bind:value={chaos.delay_min_ms} min="0" max="30000" /></label>
-            <label>Latence max (ms) <input type="number" bind:value={chaos.delay_max_ms} min="0" max="30000" /></label>
-            <label>Taux d'erreur (0-1) <input type="number" bind:value={chaos.error_rate} min="0" max="1" step="0.05" /></label>
-            <label>Code erreur <input type="number" bind:value={chaos.error_status} min="400" max="599" /></label>
+            <label>Latence fixe (ms) <input type="number" bind:value={chaos.delay_ms} min="0" max="30000" data-testid="rule-form-chaos-delay-input" /></label>
+            <label>Latence min (ms) <input type="number" bind:value={chaos.delay_min_ms} min="0" max="30000" data-testid="rule-form-chaos-delay-min-input" /></label>
+            <label>Latence max (ms) <input type="number" bind:value={chaos.delay_max_ms} min="0" max="30000" data-testid="rule-form-chaos-delay-max-input" /></label>
+            <label>Taux d'erreur (0-1) <input type="number" bind:value={chaos.error_rate} min="0" max="1" step="0.05" data-testid="rule-form-chaos-error-rate-input" /></label>
+            <label>Code erreur <input type="number" bind:value={chaos.error_status} min="400" max="599" data-testid="rule-form-chaos-error-status-input" /></label>
           </div>
           <span class="field-hint">Si min/max sont remplis, la latence est aleatoire dans la plage (ignore la latence fixe).</span>
         {/if}
@@ -813,8 +813,8 @@
 
   <!-- ACTIONS -->
   <div class="form-actions">
-    <button type="submit" class="btn btn-primary">{init ? 'Enregistrer la regle' : 'Ajouter la regle'}</button>
-    <button type="button" class="btn btn-secondary" onclick={onCancel}>Annuler</button>
+    <button type="submit" class="btn btn-primary" data-testid="rule-form-submit-button">{init ? 'Enregistrer la regle' : 'Ajouter la regle'}</button>
+    <button type="button" class="btn btn-secondary" onclick={onCancel} data-testid="rule-form-cancel-button">Annuler</button>
   </div>
 </form>
 

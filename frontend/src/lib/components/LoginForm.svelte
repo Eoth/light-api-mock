@@ -36,7 +36,7 @@
 
     <form class="login-form" onsubmit={handleSubmit}>
       {#if error}
-        <div class="form-error" role="alert" aria-live="assertive">{error}</div>
+        <div class="form-error" role="alert" aria-live="assertive" data-testid="login-form-error">{error}</div>
       {/if}
 
       <div class="form-field">
@@ -48,6 +48,7 @@
           required
           autocomplete="username"
           disabled={loading}
+          data-testid="login-form-username-input"
         />
       </div>
 
@@ -60,10 +61,11 @@
           required
           autocomplete="current-password"
           disabled={loading}
+          data-testid="login-form-password-input"
         />
       </div>
 
-      <button type="submit" class="btn btn-primary btn-login" disabled={loading}>
+      <button type="submit" class="btn btn-primary btn-login" disabled={loading} data-testid="login-form-submit-button">
         {loading ? 'Connexion...' : 'Se connecter'}
       </button>
     </form>

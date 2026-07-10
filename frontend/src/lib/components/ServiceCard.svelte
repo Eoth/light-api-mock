@@ -9,7 +9,7 @@
   let testUrl = $derived(buildServiceTestUrl({ name: service.name, listenPath: service.listen_path, groupCode }));
 </script>
 
-<article class="service-card" aria-label="Service {service.name}">
+<article class="service-card" aria-label="Service {service.name}" data-testid="service-card-{service.name}">
   <div class="card-header">
     <div class="card-info">
       <h3 class="card-title">{service.name}</h3>
@@ -42,10 +42,10 @@
     </dl>
   </div>
   <div class="card-actions">
-    <button type="button" class="btn btn-sm btn-primary" onclick={() => onSelect(service.name, service.group_name)} aria-label="Configurer le service {service.name}">
+    <button type="button" class="btn btn-sm btn-primary" onclick={() => onSelect(service.name, service.group_name)} aria-label="Configurer le service {service.name}" data-testid="service-card-configure-button-{service.name}">
       Configurer
     </button>
-    <button type="button" class="btn btn-sm btn-outline" onclick={() => onClone(service)} aria-label="Dupliquer le service {service.name}" title="Dupliquer">
+    <button type="button" class="btn btn-sm btn-outline" onclick={() => onClone(service)} aria-label="Dupliquer le service {service.name}" title="Dupliquer" data-testid="service-card-clone-button-{service.name}">
       &#10697;
     </button>
   </div>

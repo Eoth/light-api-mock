@@ -22,6 +22,7 @@
     aria-expanded={expanded}
     aria-controls="group-panel-{groupId}"
     onclick={onToggleGroup}
+    data-testid="service-group-header-{groupId}"
   >
     <span class="group-chevron" class:expanded aria-hidden="true">&#9654;</span>
     <h3 class="group-name">{groupName}</h3>
@@ -34,6 +35,7 @@
       role="region"
       aria-labelledby="group-header-{groupId}"
       class="group-panel"
+      data-testid="service-group-panel-{groupId}"
     >
       <ul class="service-list" role="list">
         {#each services as service (service.name)}

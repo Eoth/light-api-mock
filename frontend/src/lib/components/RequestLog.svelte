@@ -92,13 +92,13 @@
   <div class="log-header">
     <h2>Journal des requetes</h2>
     <div class="log-controls">
-      <button type="button" class="btn btn-sm btn-outline" onclick={refresh}>Rafraichir</button>
+      <button type="button" class="btn btn-sm btn-outline" onclick={refresh} data-testid="request-log-refresh-button">Rafraichir</button>
     </div>
   </div>
 
   <div class="filters-bar">
     {#if serviceNames.length > 1}
-      <select class="filter-select" bind:value={filterService} aria-label="Filtrer par service">
+      <select class="filter-select" bind:value={filterService} aria-label="Filtrer par service" data-testid="request-log-filter-service">
         <option value="">Tous les services</option>
         {#each serviceNames as sn}
           <option value={sn}>{sn}</option>
@@ -106,14 +106,14 @@
       </select>
     {/if}
 
-    <select class="filter-select" bind:value={filterMode} aria-label="Filtrer par mode">
+    <select class="filter-select" bind:value={filterMode} aria-label="Filtrer par mode" data-testid="request-log-filter-mode">
       <option value="">Tous les modes</option>
       <option value="mock">Mock</option>
       <option value="proxy">Proxy</option>
       <option value="no-rule">No-rule</option>
     </select>
 
-    <select class="filter-select" bind:value={filterStatus} aria-label="Filtrer par statut HTTP">
+    <select class="filter-select" bind:value={filterStatus} aria-label="Filtrer par statut HTTP" data-testid="request-log-filter-status">
       <option value="">Tous les status</option>
       <option value="2xx">2xx (succes)</option>
       <option value="3xx">3xx (redirection)</option>
@@ -121,7 +121,7 @@
       <option value="5xx">5xx (erreur serveur)</option>
     </select>
 
-    <select class="filter-select" bind:value={filterTime} aria-label="Filtrer par periode">
+    <select class="filter-select" bind:value={filterTime} aria-label="Filtrer par periode" data-testid="request-log-filter-time">
       <option value="">Toute la periode</option>
       <option value="1m">Derniere minute</option>
       <option value="5m">5 dernieres minutes</option>
@@ -134,10 +134,11 @@
       bind:value={filterText}
       placeholder="Rechercher un path..."
       aria-label="Recherche textuelle sur le path"
+      data-testid="request-log-filter-search"
     />
 
     {#if activeFilterCount > 0}
-      <button type="button" class="btn btn-sm btn-outline btn-clear" onclick={clearFilters} title="Effacer tous les filtres">
+      <button type="button" class="btn btn-sm btn-outline btn-clear" onclick={clearFilters} title="Effacer tous les filtres" data-testid="request-log-clear-filters-button">
         Effacer ({activeFilterCount})
       </button>
     {/if}
@@ -170,8 +171,8 @@
           </tr>
         </thead>
         <tbody>
-          {#each filteredLogs() as log}
-            <tr>
+          {#each filteredLogs() as log, idx}
+            <tr data-testid="request-log-row-{idx}">
               <td class="col-time">{formatDateTime(log.timestamp)}</td>
               <td><strong>{log.service_name}</strong></td>
               <td><span class="method-badge" data-method={log.method}>{log.method}</span></td>
@@ -180,7 +181,7 @@
               <td class="col-detail" title={log.rule_matched || log.target_url || '-'}>{log.rule_matched || log.target_url || '-'}</td>
               <td><span class="status" class:status-ok={log.status < 400} class:status-err={log.status >= 400}>{log.status}</span></td>
               <td>
-                <button type="button" class="btn-detail" onclick={() => openDetail(log)} aria-label="Voir le detail de la requete {log.path}" title="Detail">&#8942;</button>
+                <button type="button" class="btn-detail" onclick={() => openDetail(log)} aria-label="Voir le detail de la requete {log.path}" title="Detail" data-testid="request-log-detail-button-{idx}">&#8942;</button>
               </td>
             </tr>
           {/each}
@@ -192,11 +193,11 @@
 
 {#if detailLog}
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-  <div class="modal-overlay" role="dialog" aria-modal="true" aria-label="Detail de la requete" tabindex="-1" onkeydown={handleKeydown} onclick={handleBackdrop}>
+  <div class="modal-overlay" role="dialog" aria-modal="true" aria-label="Detail de la requete" tabindex="-1" onkeydown={handleKeydown} onclick={handleBackdrop} data-testid="request-log-detail-modal">
     <div class="modal-content" role="document">
       <div class="modal-header">
         <h3>Detail de la requete</h3>
-        <button type="button" class="btn-close" onclick={closeDetail} aria-label="Fermer">&#10005;</button>
+        <button type="button" class="btn-close" onclick={closeDetail} aria-label="Fermer" data-testid="request-log-detail-modal-close-button">&#10005;</button>
       </div>
       <dl class="detail-list">
         <div class="detail-row">

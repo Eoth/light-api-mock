@@ -104,7 +104,7 @@
   {:else}
     <FormField id="rule-tester-log" label="Requête capturée" hint="Rejeu en lecture seule, aucune requête n'est renvoyée">
       {#snippet children({ id, describedBy })}
-        <select {id} bind:value={selectedIndex} aria-describedby={describedBy}>
+        <select {id} bind:value={selectedIndex} aria-describedby={describedBy} data-testid="rule-tester-log-select">
           <option value="" disabled>Choisir une requête</option>
           {#each testableLogs as log, idx}
             <option value={String(idx)}>{logLabel(log)}</option>
@@ -113,16 +113,16 @@
       {/snippet}
     </FormField>
 
-    <button type="button" class="btn btn-sm btn-secondary" disabled={selectedIndex === '' || testing} onclick={handleTest}>
+    <button type="button" class="btn btn-sm btn-secondary" disabled={selectedIndex === '' || testing} onclick={handleTest} data-testid="rule-tester-test-button">
       {testing ? 'Test en cours…' : 'Tester contre cette requête'}
     </button>
 
     {#if errorMessage}
-      <p class="form-error" role="alert">{errorMessage}</p>
+      <p class="form-error" role="alert" data-testid="rule-tester-error">{errorMessage}</p>
     {/if}
 
     {#if result}
-      <div class="tester-result" role="status">
+      <div class="tester-result" role="status" data-testid="rule-tester-result">
         <p class="result-banner" class:result-ok={result.overall_matched} class:result-fail={!result.overall_matched}>
           {#if result.overall_matched}
             ✓ Cette règle matcherait cette requête

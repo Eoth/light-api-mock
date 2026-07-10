@@ -114,47 +114,49 @@
 <div class="xml-builder" aria-label="Constructeur de reponse XML">
   <div class="builder-header">
     <strong>Noeuds XML</strong>
-    <label class="inline-label">Tag racine : <input type="text" bind:value={rootTag} class="root-input" /></label>
+    <label class="inline-label">Tag racine : <input type="text" bind:value={rootTag} class="root-input" data-testid="xml-builder-root-tag-input" /></label>
   </div>
 
   {#snippet renderValueControls(field, path, idx)}
-    <select value={field.source} onchange={(e) => updateProp(path, idx, 'source', e.target.value)} aria-label="Source">
+    {@const testPath = [...path, idx].join('-')}
+    <select value={field.source} onchange={(e) => updateProp(path, idx, 'source', e.target.value)} aria-label="Source" data-testid="xml-builder-source-select-{testPath}">
       {#each valueSources as vs}<option value={vs.value}>{vs.label}</option>{/each}
     </select>
     {#if field.source === 'fake'}
-      <select value={field.value} onchange={(e) => updateProp(path, idx, 'value', e.target.value)} aria-label="Type fictif">
+      <select value={field.value} onchange={(e) => updateProp(path, idx, 'value', e.target.value)} aria-label="Type fictif" data-testid="xml-builder-fake-select-{testPath}">
         {#each fakeOptions as fo}<option value={fo}>{fo}</option>{/each}
       </select>
     {:else if needsValueInput(field.source)}
-      <input type="text" class="value-input" value={field.value} oninput={(e) => updateProp(path, idx, 'value', e.target.value)} placeholder="valeur" aria-label="Valeur" />
+      <input type="text" class="value-input" value={field.value} oninput={(e) => updateProp(path, idx, 'value', e.target.value)} placeholder="valeur" aria-label="Valeur" data-testid="xml-builder-value-input-{testPath}" />
     {/if}
     {#if field.source !== 'fixed'}
-      <input type="text" class="pipe-input" value={field.pipe || ''} oninput={(e) => updateProp(path, idx, 'pipe', e.target.value)} placeholder="ex: lower | first(5)" aria-label="Pipe" list="dl-xml-pipes" autocomplete="off" />
+      <input type="text" class="pipe-input" value={field.pipe || ''} oninput={(e) => updateProp(path, idx, 'pipe', e.target.value)} placeholder="ex: lower | first(5)" aria-label="Pipe" list="dl-xml-pipes" autocomplete="off" data-testid="xml-builder-pipe-input-{testPath}" />
     {/if}
   {/snippet}
 
   {#snippet renderNodes(nodeList, path, depth)}
     {#each nodeList as field, idx}
       {@const nt = field.nodeType || 'value'}
+      {@const testPath = [...path, idx].join('-')}
       <div class="field-row" style:margin-left="{depth * 1.25}rem">
         <div class="field-main">
-          <input type="text" class="tag-input" value={field.tag} oninput={(e) => updateProp(path, idx, 'tag', e.target.value)} placeholder="tag" aria-label="Tag XML" />
-          <select class="type-select" value={nt} onchange={(e) => changeNodeType(path, idx, e.target.value)} aria-label="Type de noeud">
+          <input type="text" class="tag-input" value={field.tag} oninput={(e) => updateProp(path, idx, 'tag', e.target.value)} placeholder="tag" aria-label="Tag XML" data-testid="xml-builder-tag-input-{testPath}" />
+          <select class="type-select" value={nt} onchange={(e) => changeNodeType(path, idx, e.target.value)} aria-label="Type de noeud" data-testid="xml-builder-type-select-{testPath}">
             {#each nodeTypes as t}<option value={t.value}>{t.label}</option>{/each}
           </select>
           {#if nt === 'value'}
             {@render renderValueControls(field, path, idx)}
           {/if}
           <div class="field-actions">
-            <button type="button" class="btn-icon" onclick={() => moveAt(path, idx, -1)} disabled={idx === 0} aria-label="Monter" title="Monter">&#9650;</button>
-            <button type="button" class="btn-icon" onclick={() => moveAt(path, idx, 1)} disabled={idx === nodeList.length - 1} aria-label="Descendre" title="Descendre">&#9660;</button>
-            <button type="button" class="btn-icon btn-delete" onclick={() => removeAt(path, idx)} aria-label="Supprimer">&#10005;</button>
+            <button type="button" class="btn-icon" onclick={() => moveAt(path, idx, -1)} disabled={idx === 0} aria-label="Monter" title="Monter" data-testid="xml-builder-moveup-button-{testPath}">&#9650;</button>
+            <button type="button" class="btn-icon" onclick={() => moveAt(path, idx, 1)} disabled={idx === nodeList.length - 1} aria-label="Descendre" title="Descendre" data-testid="xml-builder-movedown-button-{testPath}">&#9660;</button>
+            <button type="button" class="btn-icon btn-delete" onclick={() => removeAt(path, idx)} aria-label="Supprimer" data-testid="xml-builder-delete-button-{testPath}">&#10005;</button>
           </div>
         </div>
         {#if nt === 'parent'}
           <div class="nested-block">
             {@render renderNodes(field.children || [], [...path, idx, 'children'], depth + 1)}
-            <button type="button" class="btn btn-xs btn-outline" onclick={() => addNodeAt([...path, idx, 'children'])}>+ Sous-noeud</button>
+            <button type="button" class="btn btn-xs btn-outline" onclick={() => addNodeAt([...path, idx, 'children'])} data-testid="xml-builder-add-subnode-button-{testPath}">+ Sous-noeud</button>
           </div>
         {/if}
       </div>
@@ -167,7 +169,7 @@
     {#each pipeOptions.filter(p => p.value) as p}<option value={p.value}>{p.label}</option>{/each}
   </datalist>
 
-  <button type="button" class="btn btn-sm btn-outline" onclick={() => addNodeAt([])}>+ Ajouter un noeud</button>
+  <button type="button" class="btn btn-sm btn-outline" onclick={() => addNodeAt([])} data-testid="xml-builder-add-node-button">+ Ajouter un noeud</button>
 
   {#if fields.length > 0}
     <details class="preview-section">

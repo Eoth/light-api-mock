@@ -173,15 +173,15 @@
   <div class="list-header">
     <h2>Groupes de services</h2>
     <div class="header-actions">
-      <button type="button" class="btn btn-primary btn-sm" onclick={() => { showForm = !showForm; formError = ''; }}>
+      <button type="button" class="btn btn-primary btn-sm" onclick={() => { showForm = !showForm; formError = ''; }} data-testid="group-manager-new-group-button">
         {showForm ? 'Annuler' : '+ Nouveau groupe'}
       </button>
-      <button type="button" class="btn btn-outline btn-sm" onclick={onBack}>Retour</button>
+      <button type="button" class="btn btn-outline btn-sm" onclick={onBack} data-testid="group-manager-back-button">Retour</button>
     </div>
   </div>
 
   {#if showForm}
-    <form class="group-create-form" onsubmit={handleCreateGroup}>
+    <form class="group-create-form" onsubmit={handleCreateGroup} data-testid="group-manager-create-form">
       <FormField
         id="new-group-name"
         label="Nom du groupe"
@@ -198,11 +198,12 @@
             bind:value={newGroupName}
             placeholder="ex: API Internes"
             required
+            data-testid="group-manager-name-input"
           />
         {/snippet}
       </FormField>
       <div class="form-actions">
-        <button type="submit" class="btn btn-primary btn-sm">Creer</button>
+        <button type="submit" class="btn btn-primary btn-sm" data-testid="group-manager-create-submit-button">Creer</button>
       </div>
     </form>
   {/if}
@@ -215,16 +216,16 @@
     <div class="group-list">
       {#each groups as group}
         {@const groupServices = servicesOfGroup(group.name)}
-        <div class="group-card">
+        <div class="group-card" data-testid="group-manager-card-{group.name}">
           <div class="group-header-row">
             <h3>{group.name}</h3>
             <span class="group-code-badge">/{group.code}</span>
             <span class="group-count">{groupServices.length} service{groupServices.length !== 1 ? 's' : ''}</span>
             <div class="group-actions">
-              <button type="button" class="btn btn-outline btn-sm" onclick={() => startEdit(group.name)}>
+              <button type="button" class="btn btn-outline btn-sm" onclick={() => startEdit(group.name)} data-testid="group-manager-manage-button-{group.name}">
                 {editingGroup === group.name ? 'Fermer' : 'Gerer'}
               </button>
-              <button type="button" class="btn btn-danger-outline btn-sm" onclick={() => groupPendingDelete = group.name}>
+              <button type="button" class="btn btn-danger-outline btn-sm" onclick={() => groupPendingDelete = group.name} data-testid="group-manager-delete-button-{group.name}">
                 Supprimer
               </button>
             </div>
@@ -236,7 +237,7 @@
                 <li>
                   <span class="service-chip">
                     {svc.name}
-                    <button type="button" class="chip-remove" onclick={() => removeServiceFromGroup(svc.name)} title="Retirer du groupe" aria-label="Retirer {svc.name} du groupe">x</button>
+                    <button type="button" class="chip-remove" onclick={() => removeServiceFromGroup(svc.name)} title="Retirer du groupe" aria-label="Retirer {svc.name} du groupe" data-testid="group-manager-remove-service-button-{group.name}-{svc.name}">x</button>
                   </span>
                 </li>
               {/each}
@@ -254,7 +255,7 @@
                 {:else}
                   <div class="service-assign-list">
                     {#each ungroupedServices as svc}
-                      <button type="button" class="btn btn-outline btn-sm" onclick={() => assignServiceToGroup(svc.name, group.name)}>
+                      <button type="button" class="btn btn-outline btn-sm" onclick={() => assignServiceToGroup(svc.name, group.name)} data-testid="group-manager-assign-service-button-{group.name}-{svc.name}">
                         + {svc.name}
                       </button>
                     {/each}
@@ -271,8 +272,8 @@
                     emptyText="Aucun administrateur"
                   />
                   <div class="inline-form">
-                    <input type="text" bind:value={newAdmin} placeholder="Ajouter un admin" />
-                    <button type="button" class="btn btn-outline btn-sm" onclick={() => addAdmin(group.name)}>+</button>
+                    <input type="text" bind:value={newAdmin} placeholder="Ajouter un admin" data-testid="group-manager-new-admin-input-{group.name}" />
+                    <button type="button" class="btn btn-outline btn-sm" onclick={() => addAdmin(group.name)} data-testid="group-manager-add-admin-button-{group.name}">+</button>
                   </div>
                 </div>
 
@@ -284,8 +285,8 @@
                     emptyText="Aucun membre"
                   />
                   <div class="inline-form">
-                    <input type="text" bind:value={newMember} placeholder="Ajouter un membre" />
-                    <button type="button" class="btn btn-outline btn-sm" onclick={() => addMember(group.name)}>+</button>
+                    <input type="text" bind:value={newMember} placeholder="Ajouter un membre" data-testid="group-manager-new-member-input-{group.name}" />
+                    <button type="button" class="btn btn-outline btn-sm" onclick={() => addMember(group.name)} data-testid="group-manager-add-member-button-{group.name}">+</button>
                   </div>
                 </div>
               {/if}

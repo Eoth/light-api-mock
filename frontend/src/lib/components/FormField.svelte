@@ -23,9 +23,9 @@
   <label for={id}>{label}{#if required}<span aria-hidden="true"> *</span>{/if}</label>
   {@render children?.({ id, describedBy, invalid: !!error })}
   {#if hint}
-    <span class="field-hint" id={hintId}>{hint}</span>
+    <span class="field-hint" id={hintId} data-testid="form-field-hint-{id}">{hint}</span>
   {/if}
   {#if error}
-    <span class="form-error" id={errorId} role="alert">{error}</span>
+    <span class="form-error" id={errorId} role="alert" data-testid="form-field-error-{id}">{error}</span>
   {/if}
 </div>
