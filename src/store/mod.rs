@@ -107,6 +107,111 @@ impl MockStore {
         Ok(guard.clone())
     }
 
+    /// Liste les backups disponibles (backups/ + backups/protected/), triees
+    /// des plus recents aux plus anciens. Lecture de metadonnees fichier
+    /// uniquement (nom, taille, mtime via DirEntry::metadata()) — le contenu
+    /// YAML n'est jamais charge pour construire cette liste.
+    pub async fn list_backups(&self) -> Result<Vec<BackupInfo>, StoreError> {
+        let parent = self.path.parent().ok_or_else(|| {
+            StoreError::Io("config path has no parent directory".into())
+        })?;
+
+        let backups_dir = parent.join("backups");
+        let mut result = Vec::new();
+        Self::collect_backups_dir(&backups_dir, false, &mut result)?;
+        Self::collect_backups_dir(&backups_dir.join("protected"), true, &mut result)?;
+
+        result.sort_by(|a, b| b.created_at_ms.cmp(&a.created_at_ms));
+        Ok(result)
+    }
+
+    fn collect_backups_dir(
+        dir: &Path,
+        protected: bool,
+        out: &mut Vec<BackupInfo>,
+    ) -> Result<(), StoreError> {
+        if !dir.exists() {
+            return Ok(());
+        }
+
+        for entry in std::fs::read_dir(dir).map_err(|e| StoreError::Io(e.to_string()))? {
+            let Ok(entry) = entry else { continue };
+            let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
+            let Ok(meta) = entry.metadata() else { continue };
+            let Some(filename) = path.file_name().and_then(|n| n.to_str()) else { continue };
+
+            let created_at_ms = Self::extract_backup_timestamp(&path, protected)
+                .unwrap_or_else(|| {
+                    meta.modified()
+                        .ok()
+                        .and_then(|m| m.duration_since(std::time::UNIX_EPOCH).ok())
+                        .map(|d| d.as_millis())
+                        .unwrap_or(0)
+                }) as u64;
+
+            out.push(BackupInfo {
+                filename: filename.to_string(),
+                protected,
+                size_bytes: meta.len(),
+                created_at_ms,
+            });
+        }
+        Ok(())
+    }
+
+    fn extract_backup_timestamp(path: &Path, protected: bool) -> Option<u128> {
+        if protected {
+            Self::extract_protected_timestamp(path)
+        } else {
+            path.file_stem()?
+                .to_str()?
+                .strip_prefix("mock-config-")?
+                .split('-')
+                .next()?
+                .parse::<u128>()
+                .ok()
+        }
+    }
+
+    /// Restaure la config depuis un fichier de backup (backups/ ou
+    /// backups/protected/). `filename` doit deja avoir ete valide par
+    /// l'appelant (`validate_backup_filename`, anti-traversal) — cette
+    /// methode ne refait pas cette verification, elle se contente de
+    /// chercher le nom tel quel dans les deux repertoires de backups.
+    /// Reutilise `replace()` pour la reecriture : `atomic_write()` cree donc
+    /// automatiquement un backup de l'etat courant AVANT d'ecraser avec le
+    /// contenu restaure, sans logique dupliquee.
+    pub async fn restore_from_backup(&self, filename: &str) -> Result<(), StoreError> {
+        let parent = self.path.parent().ok_or_else(|| {
+            StoreError::Io("config path has no parent directory".into())
+        })?;
+
+        let backups_dir = parent.join("backups");
+        let candidate = backups_dir.join(filename);
+        let protected_candidate = backups_dir.join("protected").join(filename);
+
+        let source = if candidate.is_file() {
+            candidate
+        } else if protected_candidate.is_file() {
+            protected_candidate
+        } else {
+            return Err(StoreError::NotFound(format!(
+                "backup file not found: {filename}"
+            )));
+        };
+
+        let content =
+            std::fs::read_to_string(&source).map_err(|e| StoreError::Io(e.to_string()))?;
+        let config: MockConfig =
+            serde_yaml::from_str(&content).map_err(|e| StoreError::Yaml(e.to_string()))?;
+
+        tracing::info!(path = %source.display(), "config restore from backup");
+        self.replace(config).await
+    }
+
     /// Sauvegarde protegee avant un reset complet. A appeler explicitement
     /// AVANT `replace(MockConfig::empty())` dans le handler de reset — ne
     /// fait pas partie du chemin d'ecriture normal (atomic_write), donc les
@@ -230,10 +335,21 @@ impl MockStore {
     }
 }
 
+/// Metadonnees d'un fichier de backup (jamais le contenu YAML), exposees par
+/// `GET /api/config/backups`.
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+pub struct BackupInfo {
+    pub filename: String,
+    pub protected: bool,
+    pub size_bytes: u64,
+    pub created_at_ms: u64,
+}
+
 #[derive(Debug, Clone)]
 pub enum StoreError {
     Io(String),
     Yaml(String),
+    NotFound(String),
 }
 
 impl std::fmt::Display for StoreError {
@@ -241,6 +357,7 @@ impl std::fmt::Display for StoreError {
         match self {
             StoreError::Io(msg) => write!(f, "IO error: {msg}"),
             StoreError::Yaml(msg) => write!(f, "YAML error: {msg}"),
+            StoreError::NotFound(msg) => write!(f, "Not found: {msg}"),
         }
     }
 }
@@ -530,6 +647,137 @@ mod tests {
 
         let snapshot = store.snapshot().await;
         assert!(snapshot.services.is_empty());
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test]
+    async fn list_backups_empty_dir() {
+        let dir = temp_dir();
+        let store = MockStore::load_or_init(&dir).await.unwrap();
+        // load_or_init only writes the initial config, no prior file to back up.
+        let backups = store.list_backups().await.unwrap();
+        assert!(backups.is_empty());
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test]
+    async fn list_backups_includes_normal_and_protected() {
+        let dir = temp_dir();
+        let store = MockStore::load_or_init(&dir).await.unwrap();
+        store.replace(sample_config()).await.unwrap();
+        store.replace(sample_config()).await.unwrap();
+        store.backup_before_reset().await.unwrap();
+
+        let backups = store.list_backups().await.unwrap();
+        assert_eq!(backups.iter().filter(|b| !b.protected).count(), 2);
+        assert_eq!(backups.iter().filter(|b| b.protected).count(), 1);
+        assert!(backups.iter().all(|b| b.size_bytes > 0));
+        assert!(backups.iter().all(|b| b.created_at_ms > 0));
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test]
+    async fn list_backups_sorted_most_recent_first() {
+        let dir = temp_dir();
+        let store = MockStore::load_or_init(&dir).await.unwrap();
+        for i in 0..3 {
+            let mut cfg = sample_config();
+            cfg.services[0].name = format!("svc-{i}");
+            store.replace(cfg).await.unwrap();
+        }
+
+        let backups = store.list_backups().await.unwrap();
+        assert!(backups.len() >= 2);
+        for pair in backups.windows(2) {
+            assert!(pair[0].created_at_ms >= pair[1].created_at_ms);
+        }
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test]
+    async fn restore_from_backup_replaces_config() {
+        let dir = temp_dir();
+        let store = MockStore::load_or_init(&dir).await.unwrap();
+        store.replace(sample_config()).await.unwrap();
+
+        let mut other = sample_config();
+        other.services[0].name = "restored-svc".into();
+        store.replace(other).await.unwrap();
+
+        let backups = store.list_backups().await.unwrap();
+        let first_backup = backups
+            .iter()
+            .find(|b| !b.protected)
+            .expect("expected at least one normal backup");
+
+        store.restore_from_backup(&first_backup.filename).await.unwrap();
+
+        let restored = store.snapshot().await;
+        assert_eq!(restored.services[0].name, "svc-a");
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test]
+    async fn restore_from_backup_finds_protected_file() {
+        let dir = temp_dir();
+        let store = MockStore::load_or_init(&dir).await.unwrap();
+        store.replace(sample_config()).await.unwrap();
+        store.backup_before_reset().await.unwrap();
+        store.replace(MockConfig::empty()).await.unwrap();
+
+        let backups = store.list_backups().await.unwrap();
+        let protected = backups
+            .iter()
+            .find(|b| b.protected)
+            .expect("expected a protected backup");
+
+        store.restore_from_backup(&protected.filename).await.unwrap();
+
+        let restored = store.snapshot().await;
+        assert_eq!(restored.services.len(), 1);
+        assert_eq!(restored.services[0].name, "svc-a");
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test]
+    async fn restore_from_backup_unknown_filename_errors() {
+        let dir = temp_dir();
+        let store = MockStore::load_or_init(&dir).await.unwrap();
+        store.replace(sample_config()).await.unwrap();
+
+        let err = store
+            .restore_from_backup("mock-config-9999999999999-000042.yaml")
+            .await
+            .unwrap_err();
+        assert!(matches!(err, StoreError::NotFound(_)));
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test]
+    async fn restore_from_backup_creates_safety_backup_of_current_state_first() {
+        let dir = temp_dir();
+        let store = MockStore::load_or_init(&dir).await.unwrap();
+        store.replace(sample_config()).await.unwrap();
+
+        let mut other = sample_config();
+        other.services[0].name = "before-restore".into();
+        store.replace(other).await.unwrap();
+
+        let backups_before = store.list_backups().await.unwrap();
+        let target = backups_before
+            .iter()
+            .find(|b| !b.protected)
+            .unwrap()
+            .filename
+            .clone();
+
+        store.restore_from_backup(&target).await.unwrap();
+
+        // restore_from_backup() -> replace() -> atomic_write() must have backed up
+        // "before-restore" (the state overwritten by the restore) before writing
+        // the restored content — never lose the pre-restore state.
+        let backups_after = store.list_backups().await.unwrap();
+        assert!(backups_after.iter().filter(|b| !b.protected).count() > backups_before.iter().filter(|b| !b.protected).count());
         std::fs::remove_dir_all(&dir).ok();
     }
 

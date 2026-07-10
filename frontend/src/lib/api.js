@@ -105,6 +105,14 @@ export function resetConfig() {
   return request('DELETE', '/config/reset');
 }
 
+export function getBackups() {
+  return request('GET', '/config/backups');
+}
+
+export function restoreBackup(filename) {
+  return request('POST', `/config/restore/${encodeURIComponent(filename)}`);
+}
+
 // Groups
 export function getGroups() {
   return request('GET', '/groups');

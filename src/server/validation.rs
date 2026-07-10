@@ -10,6 +10,13 @@ const RESERVED_PATH_PREFIXES: &[&str] = &[
 static NAME_CHARSET_RE: std::sync::LazyLock<regex::Regex> =
     std::sync::LazyLock::new(|| regex::Regex::new(r"^[A-Za-z0-9_-]+$").unwrap());
 
+// Les deux schemas de nommage generes par MockStore : "mock-config-{ts}-{seq}.yaml"
+// (backups/) et "pre-reset-{ts}.yaml" (backups/protected/). Le charset exclut
+// tout separateur de chemin ('/', '\\') et toute sequence '..', empechant une
+// traversee de repertoire meme si le nom vient d'un segment d'URL decode.
+static BACKUP_FILENAME_RE: std::sync::LazyLock<regex::Regex> =
+    std::sync::LazyLock::new(|| regex::Regex::new(r"^[A-Za-z0-9_-]+\.yaml$").unwrap());
+
 pub fn is_reserved_name(name: &str) -> bool {
     let normalized = name.trim().to_lowercase();
     RESERVED_NAMES.contains(&normalized.as_str())
@@ -125,6 +132,38 @@ pub fn validate_service(service: &Service) -> Result<(), ValidationError> {
                 ),
             });
         }
+    }
+
+    Ok(())
+}
+
+/// Valide un nom de fichier de backup recu depuis un segment d'URL
+/// (`POST /api/config/restore/:filename`) avant toute operation disque.
+/// Rejette explicitement '..' et les separateurs de chemin AVANT le test de
+/// charset, pour renvoyer un message specifique sur la tentative de
+/// traversee plutot qu'un simple "format invalide".
+pub fn validate_backup_filename(filename: &str) -> Result<(), ValidationError> {
+    let name = filename.trim();
+
+    if name.is_empty() {
+        return Err(ValidationError {
+            field: "filename",
+            message: "Le nom du fichier de sauvegarde est requis.".into(),
+        });
+    }
+
+    if name.contains("..") || name.contains('/') || name.contains('\\') {
+        return Err(ValidationError {
+            field: "filename",
+            message: "Le nom du fichier ne peut pas contenir de separateur de chemin (/ ou \\) ni de sequence \"..\".".into(),
+        });
+    }
+
+    if !BACKUP_FILENAME_RE.is_match(name) {
+        return Err(ValidationError {
+            field: "filename",
+            message: "Nom de fichier de sauvegarde invalide.".into(),
+        });
     }
 
     Ok(())
@@ -278,5 +317,40 @@ mod tests {
     fn accept_same_rule_name_across_services() {
         assert!(validate_service(&svc_with_rules("svc-a", &["shared-rule"])).is_ok());
         assert!(validate_service(&svc_with_rules("svc-b", &["shared-rule"])).is_ok());
+    }
+
+    #[test]
+    fn accept_valid_backup_filenames() {
+        assert!(validate_backup_filename("mock-config-1690000000000-000001.yaml").is_ok());
+        assert!(validate_backup_filename("pre-reset-1690000000000.yaml").is_ok());
+    }
+
+    #[test]
+    fn reject_empty_backup_filename() {
+        assert!(validate_backup_filename("").is_err());
+        assert!(validate_backup_filename("   ").is_err());
+    }
+
+    #[test]
+    fn reject_backup_filename_path_traversal() {
+        assert!(validate_backup_filename("../mock-config.yaml").is_err());
+        assert!(validate_backup_filename("../../etc/passwd").is_err());
+        assert!(validate_backup_filename("protected/../../mock-config.yaml").is_err());
+        assert!(validate_backup_filename("..\\mock-config.yaml").is_err());
+    }
+
+    #[test]
+    fn reject_backup_filename_with_path_separators() {
+        assert!(validate_backup_filename("protected/pre-reset-1.yaml").is_err());
+        assert!(validate_backup_filename("subdir\\mock-config.yaml").is_err());
+        assert!(validate_backup_filename("/etc/passwd").is_err());
+    }
+
+    #[test]
+    fn reject_backup_filename_wrong_extension_or_charset() {
+        assert!(validate_backup_filename("mock-config.txt").is_err());
+        assert!(validate_backup_filename("mock config.yaml").is_err());
+        assert!(validate_backup_filename("mock-config.yaml.bak").is_err());
+        assert!(validate_backup_filename("caf\u{e9}.yaml").is_err());
     }
 }
