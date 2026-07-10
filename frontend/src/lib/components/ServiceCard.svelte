@@ -2,8 +2,11 @@
   import ToggleSwitch from './ToggleSwitch.svelte';
   import StatusBadge from './StatusBadge.svelte';
   import UrlHealthBadge from './UrlHealthBadge.svelte';
+  import { buildServiceTestUrl } from '../service-url.js';
 
   let { service, groupCode = '', onToggle = () => {}, onSelect = () => {}, onClone = () => {} } = $props();
+
+  let testUrl = $derived(buildServiceTestUrl({ name: service.name, listenPath: service.listen_path, groupCode }));
 </script>
 
 <article class="service-card" aria-label="Service {service.name}">
@@ -15,14 +18,14 @@
     <ToggleSwitch
       label="Mock {service.name}"
       checked={service.is_mocked}
-      onchange={(val) => onToggle(service.name, val)}
+      onchange={(val) => onToggle(service.name, val, service.group_name)}
     />
   </div>
   <div class="card-details" id="desc-{service.name}">
     <dl>
       <div class="detail-row">
         <dt>URL test</dt>
-        <dd><code>{groupCode ? `/${groupCode}` : ''}/{service.name}{service.listen_path || '/*'}</code></dd>
+        <dd><code>{testUrl}</code></dd>
       </div>
       <div class="detail-row">
         <dt>Cible</dt>
@@ -30,7 +33,7 @@
       </div>
       <div class="detail-row">
         <dt>Disponibilité</dt>
-        <dd><UrlHealthBadge serviceName={service.name} /></dd>
+        <dd><UrlHealthBadge serviceName={service.name} groupName={service.group_name} /></dd>
       </div>
       <div class="detail-row">
         <dt>Regles</dt>
@@ -39,7 +42,7 @@
     </dl>
   </div>
   <div class="card-actions">
-    <button type="button" class="btn btn-sm btn-primary" onclick={() => onSelect(service.name)} aria-label="Configurer le service {service.name}">
+    <button type="button" class="btn btn-sm btn-primary" onclick={() => onSelect(service.name, service.group_name)} aria-label="Configurer le service {service.name}">
       Configurer
     </button>
     <button type="button" class="btn btn-sm btn-outline" onclick={() => onClone(service)} aria-label="Dupliquer le service {service.name}" title="Dupliquer">

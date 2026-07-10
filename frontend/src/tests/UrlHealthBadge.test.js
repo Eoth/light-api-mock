@@ -20,7 +20,7 @@ describe('UrlHealthBadge', () => {
     await fireEvent.click(getByText(/Tester la cible/));
 
     await waitFor(() => expect(getByText('Accessible')).toBeInTheDocument());
-    expect(pingService).toHaveBeenCalledWith('svc-a');
+    expect(pingService).toHaveBeenCalledWith('svc-a', null);
   });
 
   it('affiche "Inaccessible" et un avertissement si la cible ne repond pas', async () => {

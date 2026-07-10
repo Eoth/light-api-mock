@@ -20,6 +20,12 @@
   let messagingAvailable = $state(false);
   let notification = $state({ message: '', type: 'info', visible: false });
   let selectedService = $state(null);
+  // Le nom seul ne suffit pas a identifier un service (deux services
+  // peuvent partager un nom dans des groupes differents, cf CLAUDE.md) :
+  // on garde le groupe d'origine a cote du nom selectionne pour que
+  // currentService/handleServiceUpdate/handleServiceDelete resolvent le bon
+  // service sans ambiguite.
+  let selectedServiceGroup = $state(null);
   let view = $state('list');
   let loading = $state(true);
   let darkMode = $state(
@@ -130,12 +136,13 @@
     groups = [];
     view = 'list';
     selectedService = null;
+    selectedServiceGroup = null;
   }
 
-  async function handleToggle(name, isMocked) {
+  async function handleToggle(name, isMocked, groupName) {
     try {
-      const updated = await toggleService(name, isMocked);
-      services = services.map(s => s.name === name ? updated : s);
+      const updated = await toggleService(name, groupName, isMocked);
+      services = services.map(s => s.name === name && s.group_name === groupName ? updated : s);
       showNotification(`${name} : mode ${isMocked ? 'mock' : 'proxy'} active`, 'success');
     } catch (e) {
       showNotification(`Erreur : ${e.message}`, 'error');
@@ -144,14 +151,27 @@
 
   let clonedService = $state(null);
 
-  function handleSelect(name) { selectedService = name; view = 'detail'; }
-  function handleBack() { selectedService = null; clonedService = null; view = 'list'; }
+  function handleSelect(name, groupName) { selectedService = name; selectedServiceGroup = groupName ?? null; view = 'detail'; }
+  function handleBack() { selectedService = null; selectedServiceGroup = null; clonedService = null; view = 'list'; }
   function handleCloneService(svc) {
     clonedService = { ...JSON.parse(JSON.stringify(svc)), name: `${svc.name}-copie` };
     view = 'add';
   }
-  function handleServiceUpdate(updated) { services = services.map(s => s.name === updated.name ? updated : s); selectedService = updated.name; }
-  function handleServiceDelete(name) { view = 'list'; selectedService = null; services = services.filter(s => s.name !== name); }
+  // `previousGroupName` est le groupe AVANT la mutation (capture par
+  // ServiceDetail/GroupManager avant l'appel API) : necessaire pour
+  // retrouver l'entree a remplacer meme si `updated.group_name` a change
+  // (deplacement vers un autre groupe) — `updated.name` seul ne suffit pas.
+  function handleServiceUpdate(updated, previousGroupName = updated.group_name) {
+    services = services.map(s => (s.name === updated.name && s.group_name === previousGroupName) ? updated : s);
+    selectedService = updated.name;
+    selectedServiceGroup = updated.group_name ?? null;
+  }
+  function handleServiceDelete(name, groupName) {
+    view = 'list';
+    selectedService = null;
+    selectedServiceGroup = null;
+    services = services.filter(s => !(s.name === name && s.group_name === (groupName ?? null)));
+  }
 
   async function handleAddService(svc) {
     try {
@@ -159,6 +179,7 @@
       services = [...services, result];
       view = 'detail';
       selectedService = result.name;
+      selectedServiceGroup = result.group_name ?? null;
       showNotification(`Service "${result.name}" cree`, 'success');
     } catch (e) {
       showNotification(`Erreur : ${e.message}`, 'error');
@@ -225,7 +246,7 @@
       await putConfig(config);
       await loadData();
       showNotification(`Configuration remplacee (${config.services.length} services)`, 'success');
-      view = 'list'; selectedService = null;
+      view = 'list'; selectedService = null; selectedServiceGroup = null;
     } catch (e) {
       showNotification(`Erreur import : ${e.message}`, 'error');
     }
@@ -244,14 +265,17 @@
       }
       let added = 0;
       for (const svc of config.services) {
-        if (!services.some(s => s.name === svc.name)) {
+        // Scope par nom ET groupe : deux services du meme nom dans des
+        // groupes differents sont distincts (cf CLAUDE.md), sinon la fusion
+        // ignorerait a tort un service reellement nouveau.
+        if (!services.some(s => s.name === svc.name && s.group_name === (svc.group_name ?? null))) {
           const result = await createService(svc);
           services = [...services, result];
           added++;
         }
       }
       showNotification(`${added} service(s) et ${addedGroups} groupe(s) ajoute(s)`, 'success');
-      view = 'list'; selectedService = null;
+      view = 'list'; selectedService = null; selectedServiceGroup = null;
     } catch (e) {
       showNotification(`Erreur import : ${e.message}`, 'error');
     }
@@ -268,6 +292,7 @@
       await resetConfig();
       services = [];
       selectedService = null;
+      selectedServiceGroup = null;
       view = 'list';
       showNotification('Configuration reinitialised — tous les services supprimes', 'success');
     } catch (e) {
@@ -279,7 +304,7 @@
 
   $effect(() => { init(); });
 
-  let currentService = $derived(services.find(s => s.name === selectedService) ?? null);
+  let currentService = $derived(services.find(s => s.name === selectedService && s.group_name === selectedServiceGroup) ?? null);
   let availableGroupsList = $derived(groups.map(g => ({ name: g.name, code: g.code })));
 </script>
 
@@ -391,7 +416,7 @@
         onCancel={handleBack}
       />
     {:else if view === 'detail' && currentService}
-      <ServiceDetail service={currentService} onBack={handleBack} onUpdate={handleServiceUpdate} onDelete={handleServiceDelete} onNotify={showNotification} />
+      <ServiceDetail service={currentService} availableGroups={availableGroupsList} onBack={handleBack} onUpdate={handleServiceUpdate} onDelete={handleServiceDelete} onNotify={showNotification} />
     {:else}
       <div class="list-header">
         <h2>Services</h2>

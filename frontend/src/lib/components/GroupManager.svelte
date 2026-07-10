@@ -70,7 +70,7 @@
       setGroups(groups.filter(g => g.name !== name));
       if (editingGroup === name) editingGroup = null;
       for (const svc of services.filter(s => s.group_name === name)) {
-        onServiceUpdate({ ...svc, group_name: null });
+        onServiceUpdate({ ...svc, group_name: null }, svc.group_name);
       }
       onNotify(`Groupe "${name}" supprime, services dissocies`, 'success');
     } catch (e) {
@@ -88,8 +88,8 @@
     const svc = services.find(s => s.name === serviceName);
     if (!svc) return;
     try {
-      const updated = await updateService(serviceName, { ...svc, group_name: groupName || null });
-      onServiceUpdate(updated);
+      const updated = await updateService(serviceName, svc.group_name, { ...svc, group_name: groupName || null });
+      onServiceUpdate(updated, svc.group_name);
       onNotify(`Service "${serviceName}" associe au groupe "${groupName}"`, 'success');
     } catch (e) {
       onNotify(`Erreur : ${e.message}`, 'error');
@@ -102,8 +102,8 @@
     try {
       const payload = { ...svc };
       delete payload.group_name;
-      const updated = await updateService(serviceName, payload);
-      onServiceUpdate(updated);
+      const updated = await updateService(serviceName, svc.group_name, payload);
+      onServiceUpdate(updated, svc.group_name);
       onNotify(`Service "${serviceName}" retire du groupe`, 'success');
     } catch (e) {
       onNotify(`Erreur : ${e.message}`, 'error');

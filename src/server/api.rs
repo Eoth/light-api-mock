@@ -31,6 +31,13 @@ pub fn routes() -> Router<AppState> {
         .route("/services/:name/toggle", put(toggle_service))
         .route("/services/:name/ping", post(ping_service))
         .route("/services/:name/rules/reorder", put(reorder_rules))
+        .route(
+            "/groups/:group/services/:name",
+            get(get_service_grouped).put(update_service_grouped).delete(delete_service_grouped),
+        )
+        .route("/groups/:group/services/:name/toggle", put(toggle_service_grouped))
+        .route("/groups/:group/services/:name/ping", post(ping_service_grouped))
+        .route("/groups/:group/services/:name/rules/reorder", put(reorder_rules_grouped))
         .route("/script/validate", post(validate_script))
         .route("/logs", get(get_logs))
         .route("/groups", get(list_groups).post(create_group))
@@ -378,16 +385,26 @@ async fn list_services(
     Json(visible_services(&user.username, user.is_super_admin, &config))
 }
 
-async fn get_service(
-    State(state): State<AppState>,
-    Extension(user): Extension<AuthUser>,
-    Path(name): Path<String>,
+// Un service est identifie de facon non ambigue par (group_name, name) : le
+// nom seul ne suffit pas puisque `create_service` autorise deux services du
+// meme nom dans des groupes differents (cf commit 8fdb9c0, "unicite service
+// par groupe, pas globale"). `group` vaut `None` pour le perimetre "sans
+// groupe", qui forme son propre espace de noms au meme titre qu'un groupe.
+fn service_matches(s: &Service, group: Option<&str>, name: &str) -> bool {
+    s.name == name && s.group_name.as_deref() == group
+}
+
+async fn get_service_impl(
+    state: AppState,
+    user: AuthUser,
+    group: Option<String>,
+    name: String,
 ) -> Result<Json<Service>, AppError> {
     let config = state.store.snapshot().await;
     let service = config
         .services
         .iter()
-        .find(|s| s.name == name)
+        .find(|s| service_matches(s, group.as_deref(), &name))
         .ok_or(AppError::NotFound)?;
 
     if state.auth_config.enabled
@@ -397,6 +414,22 @@ async fn get_service(
     }
 
     Ok(Json(service.clone()))
+}
+
+async fn get_service(
+    State(state): State<AppState>,
+    Extension(user): Extension<AuthUser>,
+    Path(name): Path<String>,
+) -> Result<Json<Service>, AppError> {
+    get_service_impl(state, user, None, name).await
+}
+
+async fn get_service_grouped(
+    State(state): State<AppState>,
+    Extension(user): Extension<AuthUser>,
+    Path((group, name)): Path<(String, String)>,
+) -> Result<Json<Service>, AppError> {
+    get_service_impl(state, user, Some(group), name).await
 }
 
 async fn create_service(
@@ -460,18 +493,19 @@ async fn create_service(
         .ok_or(AppError::NotFound)
 }
 
-async fn update_service(
-    State(state): State<AppState>,
-    Extension(user): Extension<AuthUser>,
-    Path(name): Path<String>,
-    Json(service): Json<Service>,
+async fn update_service_impl(
+    state: AppState,
+    user: AuthUser,
+    group: Option<String>,
+    name: String,
+    service: Service,
 ) -> Result<Json<Service>, AppError> {
     {
         let config = state.store.snapshot().await;
         let existing = config
             .services
             .iter()
-            .find(|s| s.name == name)
+            .find(|s| service_matches(s, group.as_deref(), &name))
             .ok_or(AppError::NotFound)?;
 
         if state.auth_config.enabled
@@ -491,10 +525,16 @@ async fn update_service(
         return Err(AppError::Validation(e.message));
     }
 
+    let new_group = service.group_name.clone();
+    let new_name = service.name.clone();
     let updated = state
         .store
         .update(|cfg| {
-            if let Some(existing) = cfg.services.iter_mut().find(|s| s.name == name) {
+            if let Some(existing) = cfg
+                .services
+                .iter_mut()
+                .find(|s| service_matches(s, group.as_deref(), &name))
+            {
                 *existing = service.clone();
             }
         })
@@ -504,16 +544,35 @@ async fn update_service(
     updated
         .services
         .iter()
-        .find(|s| s.name == service.name)
+        .find(|s| service_matches(s, new_group.as_deref(), &new_name))
         .cloned()
         .map(Json)
         .ok_or(AppError::NotFound)
 }
 
-async fn delete_service(
+async fn update_service(
     State(state): State<AppState>,
     Extension(user): Extension<AuthUser>,
     Path(name): Path<String>,
+    Json(service): Json<Service>,
+) -> Result<Json<Service>, AppError> {
+    update_service_impl(state, user, None, name, service).await
+}
+
+async fn update_service_grouped(
+    State(state): State<AppState>,
+    Extension(user): Extension<AuthUser>,
+    Path((group, name)): Path<(String, String)>,
+    Json(service): Json<Service>,
+) -> Result<Json<Service>, AppError> {
+    update_service_impl(state, user, Some(group), name, service).await
+}
+
+async fn delete_service_impl(
+    state: AppState,
+    user: AuthUser,
+    group: Option<String>,
+    name: String,
 ) -> Result<StatusCode, AppError> {
     if state.auth_config.enabled {
         require_super_admin(&user)?;
@@ -522,16 +581,37 @@ async fn delete_service(
     let updated = state
         .store
         .update(|cfg| {
-            cfg.services.retain(|s| s.name != name);
+            cfg.services
+                .retain(|s| !service_matches(s, group.as_deref(), &name));
         })
         .await
         .map_err(AppError::Store)?;
 
-    if updated.services.iter().any(|s| s.name == name) {
+    if updated
+        .services
+        .iter()
+        .any(|s| service_matches(s, group.as_deref(), &name))
+    {
         Err(AppError::NotFound)
     } else {
         Ok(StatusCode::NO_CONTENT)
     }
+}
+
+async fn delete_service(
+    State(state): State<AppState>,
+    Extension(user): Extension<AuthUser>,
+    Path(name): Path<String>,
+) -> Result<StatusCode, AppError> {
+    delete_service_impl(state, user, None, name).await
+}
+
+async fn delete_service_grouped(
+    State(state): State<AppState>,
+    Extension(user): Extension<AuthUser>,
+    Path((group, name)): Path<(String, String)>,
+) -> Result<StatusCode, AppError> {
+    delete_service_impl(state, user, Some(group), name).await
 }
 
 #[derive(serde::Deserialize)]
@@ -539,18 +619,19 @@ struct TogglePayload {
     is_mocked: bool,
 }
 
-async fn toggle_service(
-    State(state): State<AppState>,
-    Extension(user): Extension<AuthUser>,
-    Path(name): Path<String>,
-    Json(payload): Json<TogglePayload>,
+async fn toggle_service_impl(
+    state: AppState,
+    user: AuthUser,
+    group: Option<String>,
+    name: String,
+    payload: TogglePayload,
 ) -> Result<Json<Service>, AppError> {
     {
         let config = state.store.snapshot().await;
         let svc = config
             .services
             .iter()
-            .find(|s| s.name == name)
+            .find(|s| service_matches(s, group.as_deref(), &name))
             .ok_or(AppError::NotFound)?;
 
         if state.auth_config.enabled
@@ -563,7 +644,11 @@ async fn toggle_service(
     let updated = state
         .store
         .update(|cfg| {
-            if let Some(svc) = cfg.services.iter_mut().find(|s| s.name == name) {
+            if let Some(svc) = cfg
+                .services
+                .iter_mut()
+                .find(|s| service_matches(s, group.as_deref(), &name))
+            {
                 svc.is_mocked = payload.is_mocked;
             }
         })
@@ -573,23 +658,42 @@ async fn toggle_service(
     updated
         .services
         .iter()
-        .find(|s| s.name == name)
+        .find(|s| service_matches(s, group.as_deref(), &name))
         .cloned()
         .map(Json)
         .ok_or(AppError::NotFound)
 }
 
-async fn ping_service(
+async fn toggle_service(
     State(state): State<AppState>,
     Extension(user): Extension<AuthUser>,
     Path(name): Path<String>,
+    Json(payload): Json<TogglePayload>,
+) -> Result<Json<Service>, AppError> {
+    toggle_service_impl(state, user, None, name, payload).await
+}
+
+async fn toggle_service_grouped(
+    State(state): State<AppState>,
+    Extension(user): Extension<AuthUser>,
+    Path((group, name)): Path<(String, String)>,
+    Json(payload): Json<TogglePayload>,
+) -> Result<Json<Service>, AppError> {
+    toggle_service_impl(state, user, Some(group), name, payload).await
+}
+
+async fn ping_service_impl(
+    state: AppState,
+    user: AuthUser,
+    group: Option<String>,
+    name: String,
 ) -> Result<Json<crate::engine::PingStatus>, AppError> {
     let target_url = {
         let config = state.store.snapshot().await;
         let svc = config
             .services
             .iter()
-            .find(|s| s.name == name)
+            .find(|s| service_matches(s, group.as_deref(), &name))
             .ok_or(AppError::NotFound)?;
 
         if state.auth_config.enabled
@@ -601,6 +705,13 @@ async fn ping_service(
         svc.real_target_url.clone()
     };
 
+    // Cache clef par nom seul (pas par groupe) : deux services de meme nom
+    // dans des groupes differents auraient des cibles reseau distinctes
+    // partageant la meme cle de cache — limitation pre-existante mineure
+    // (le pire cas est un badge de disponibilite affichant un resultat en
+    // cache pour le mauvais service pendant la TTL de 2 min), non corrigee
+    // ici car hors perimetre de ce correctif (ambiguite d'IDENTIFICATION du
+    // service cible, pas de son statut de ping affiche).
     if let Some(cached) = state.ping_cache.get_fresh(&name, crate::server::ping::PING_TTL_MS) {
         return Ok(Json(cached));
     }
@@ -610,23 +721,40 @@ async fn ping_service(
     Ok(Json(status))
 }
 
+async fn ping_service(
+    State(state): State<AppState>,
+    Extension(user): Extension<AuthUser>,
+    Path(name): Path<String>,
+) -> Result<Json<crate::engine::PingStatus>, AppError> {
+    ping_service_impl(state, user, None, name).await
+}
+
+async fn ping_service_grouped(
+    State(state): State<AppState>,
+    Extension(user): Extension<AuthUser>,
+    Path((group, name)): Path<(String, String)>,
+) -> Result<Json<crate::engine::PingStatus>, AppError> {
+    ping_service_impl(state, user, Some(group), name).await
+}
+
 #[derive(serde::Deserialize)]
 struct ReorderPayload {
     order: Vec<String>,
 }
 
-async fn reorder_rules(
-    State(state): State<AppState>,
-    Extension(user): Extension<AuthUser>,
-    Path(name): Path<String>,
-    Json(payload): Json<ReorderPayload>,
+async fn reorder_rules_impl(
+    state: AppState,
+    user: AuthUser,
+    group: Option<String>,
+    name: String,
+    payload: ReorderPayload,
 ) -> Result<Json<Service>, AppError> {
     {
         let config = state.store.snapshot().await;
         let svc = config
             .services
             .iter()
-            .find(|s| s.name == name)
+            .find(|s| service_matches(s, group.as_deref(), &name))
             .ok_or(AppError::NotFound)?;
 
         if state.auth_config.enabled
@@ -639,7 +767,11 @@ async fn reorder_rules(
     let updated = state
         .store
         .update(|cfg| {
-            if let Some(svc) = cfg.services.iter_mut().find(|s| s.name == name) {
+            if let Some(svc) = cfg
+                .services
+                .iter_mut()
+                .find(|s| service_matches(s, group.as_deref(), &name))
+            {
                 let mut reordered = Vec::with_capacity(svc.rules.len());
                 for rule_name in &payload.order {
                     if let Some(pos) = svc.rules.iter().position(|r| &r.name == rule_name) {
@@ -656,10 +788,28 @@ async fn reorder_rules(
     updated
         .services
         .iter()
-        .find(|s| s.name == name)
+        .find(|s| service_matches(s, group.as_deref(), &name))
         .cloned()
         .map(Json)
         .ok_or(AppError::NotFound)
+}
+
+async fn reorder_rules(
+    State(state): State<AppState>,
+    Extension(user): Extension<AuthUser>,
+    Path(name): Path<String>,
+    Json(payload): Json<ReorderPayload>,
+) -> Result<Json<Service>, AppError> {
+    reorder_rules_impl(state, user, None, name, payload).await
+}
+
+async fn reorder_rules_grouped(
+    State(state): State<AppState>,
+    Extension(user): Extension<AuthUser>,
+    Path((group, name)): Path<(String, String)>,
+    Json(payload): Json<ReorderPayload>,
+) -> Result<Json<Service>, AppError> {
+    reorder_rules_impl(state, user, Some(group), name, payload).await
 }
 
 // --------------- Groups ---------------
@@ -991,5 +1141,191 @@ mod tests {
     fn require_super_admin_accepts_admin() {
         let user = AuthUser { username: "alice".into(), is_super_admin: true };
         assert!(require_super_admin(&user).is_ok());
+    }
+
+    // service_matches() est la seule fonction qui decide de l'identite d'un
+    // service (name + group_name) — utilisee par TOUS les handlers scopes
+    // (get/update/delete/toggle/ping/reorder). Ces tests couvrent directement
+    // la portee reelle de l'unicite (par groupe, pas globale) sans avoir
+    // besoin d'un serveur HTTP complet.
+    fn svc_named(name: &str, group: Option<&str>) -> Service {
+        Service {
+            name: name.into(),
+            listen_path: "".into(),
+            real_target_url: "http://example.com".into(),
+            is_mocked: true,
+            rewrite_directory_urls: false,
+            group_name: group.map(|g| g.to_string()),
+            wsdl_mode: crate::models::WsdlMode::default(),
+            rules: vec![],
+        }
+    }
+
+    #[test]
+    fn service_matches_same_name_same_group() {
+        let s = svc_named("foo", Some("team-a"));
+        assert!(service_matches(&s, Some("team-a"), "foo"));
+    }
+
+    #[test]
+    fn service_matches_same_name_different_group_does_not_match() {
+        let s = svc_named("foo", Some("team-a"));
+        assert!(!service_matches(&s, Some("team-b"), "foo"));
+    }
+
+    #[test]
+    fn service_matches_ungrouped_is_its_own_scope() {
+        let grouped = svc_named("foo", Some("team-a"));
+        let ungrouped = svc_named("foo", None);
+        assert!(!service_matches(&grouped, None, "foo"));
+        assert!(service_matches(&ungrouped, None, "foo"));
+    }
+
+    #[test]
+    fn service_matches_different_name_never_matches() {
+        let s = svc_named("foo", Some("team-a"));
+        assert!(!service_matches(&s, Some("team-a"), "bar"));
+    }
+
+    // --- Infra de test HTTP minimale (reprend le pattern deja etabli dans
+    // server::intercept::tests : vrai routeur Axum + vrai listener TCP,
+    // plutot qu'un style tower::oneshot qui n'existe pas encore dans ce
+    // projet). Justifie ici par la gravite du bug couvert (suppression
+    // croisee entre groupes) : une regression doit etre detectee par
+    // `cargo test` seul, sans dependre de la suite Playwright.
+    async fn spawn_test_app(config: MockConfig) -> String {
+        let data_dir = std::env::temp_dir().join(format!(
+            "lightmock-api-test-{}",
+            fastrand::u64(..)
+        ));
+        std::fs::create_dir_all(&data_dir).unwrap();
+        let store = crate::store::MockStore::new(data_dir.join("mock-config.yaml"));
+        store.replace(config).await.unwrap();
+        store.flush().await;
+
+        #[cfg(feature = "messaging-kafka")]
+        let messaging = crate::messaging::MessagingState {
+            message_log: crate::messaging::message_log::MessageLog::new(),
+            reply_topic: None,
+            publisher: crate::messaging::consumer::Publisher::None,
+        };
+        let state = AppState {
+            store,
+            proxy: crate::engine::ProxyClient::new(),
+            seq_counters: Arc::new(std::sync::RwLock::new(std::collections::HashMap::new())),
+            request_log: crate::server::request_log::RequestLog::new(),
+            auth_config: crate::auth::AuthConfig {
+                enabled: false,
+                keycloak_url: String::new(),
+                realm: String::new(),
+                client_id: String::new(),
+                super_admins: vec![],
+                show_reset_button: false,
+            },
+            keycloak: None,
+            script_engine: crate::engine::script::ScriptEngine::new(),
+            ping_cache: crate::server::ping::PingCache::new(),
+            #[cfg(feature = "messaging-kafka")]
+            messaging,
+        };
+        let app = crate::server::build_router(state, &data_dir);
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            axum::serve(listener, app).await.unwrap();
+        });
+        format!("http://127.0.0.1:{port}/api")
+    }
+
+    fn ambiguous_services() -> Vec<Service> {
+        vec![
+            svc_named("shared-name", Some("team-a")),
+            svc_named("shared-name", Some("team-b")),
+            svc_named("shared-name", None),
+        ]
+    }
+
+    #[tokio::test]
+    async fn get_service_grouped_route_returns_only_the_matching_group() {
+        let base = spawn_test_app(MockConfig { services: ambiguous_services(), groups: vec![] }).await;
+        let client = reqwest::Client::new();
+
+        let via_group_a = client
+            .get(format!("{base}/groups/team-a/services/shared-name"))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(via_group_a.status(), 200);
+        let svc: Service = via_group_a.json().await.unwrap();
+        assert_eq!(svc.group_name.as_deref(), Some("team-a"));
+
+        let via_flat = client
+            .get(format!("{base}/services/shared-name"))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(via_flat.status(), 200);
+        let svc: Service = via_flat.json().await.unwrap();
+        assert_eq!(svc.group_name, None, "la route non scopee doit resoudre au service SANS groupe, pas au premier trouve");
+    }
+
+    #[tokio::test]
+    async fn delete_ambiguous_service_only_removes_the_targeted_group() {
+        let base = spawn_test_app(MockConfig { services: ambiguous_services(), groups: vec![] }).await;
+        let client = reqwest::Client::new();
+
+        let del = client
+            .delete(format!("{base}/groups/team-a/services/shared-name"))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(del.status(), 204);
+
+        let still_team_b = client
+            .get(format!("{base}/groups/team-b/services/shared-name"))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(still_team_b.status(), 200, "le service de team-b ne doit pas avoir ete supprime");
+
+        let still_ungrouped = client
+            .get(format!("{base}/services/shared-name"))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(still_ungrouped.status(), 200, "le service sans groupe ne doit pas avoir ete supprime");
+
+        let gone_team_a = client
+            .get(format!("{base}/groups/team-a/services/shared-name"))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(gone_team_a.status(), 404);
+    }
+
+    #[tokio::test]
+    async fn update_via_flat_route_does_not_touch_grouped_namesakes() {
+        let base = spawn_test_app(MockConfig { services: ambiguous_services(), groups: vec![] }).await;
+        let client = reqwest::Client::new();
+
+        let mut updated = svc_named("shared-name", None);
+        updated.real_target_url = "http://changed.example.com".into();
+        let put = client
+            .put(format!("{base}/services/shared-name"))
+            .json(&updated)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(put.status(), 200);
+
+        let team_a = client
+            .get(format!("{base}/groups/team-a/services/shared-name"))
+            .send()
+            .await
+            .unwrap()
+            .json::<Service>()
+            .await
+            .unwrap();
+        assert_eq!(team_a.real_target_url, "http://example.com", "team-a ne doit pas avoir ete modifie par un PUT scope sans groupe");
     }
 }

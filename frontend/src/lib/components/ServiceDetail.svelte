@@ -8,6 +8,7 @@
 
   let {
     service,
+    availableGroups = [],
     onBack = () => {},
     onUpdate = () => {},
     onDelete = () => {},
@@ -19,10 +20,19 @@
   let addingRule = $state(false);
   let confirmDelete = $state(false);
 
+  // Capture le nom/groupe AVANT tout point d'attente (await) : `service` est
+  // une prop reactive, et onDelete()/onUpdate() peuvent faire disparaitre le
+  // service courant du parent (App.svelte) pendant qu'une requete est en
+  // vol, ce qui rend `service` null en cours de route. Lire une valeur
+  // capturee au debut de la fonction, plutot que relire la prop apres un
+  // await, evite cette course — pas un simple garde `if (!service)` qui
+  // masquerait le symptome sans corriger la cause (cf CLAUDE.md).
   async function handleSaveService(updated) {
+    const name = service.name;
+    const groupName = service.group_name;
     try {
-      const result = await updateService(service.name, updated);
-      onUpdate(result);
+      const result = await updateService(name, groupName, updated);
+      onUpdate(result, groupName);
       editing = false;
       onNotify(`Service "${result.name}" mis à jour`, 'success');
     } catch (e) {
@@ -32,19 +42,23 @@
 
   async function handleDeleteService() {
     confirmDelete = false;
+    const name = service.name;
+    const groupName = service.group_name;
     try {
-      await deleteService(service.name);
-      onDelete(service.name);
-      onNotify(`Service "${service.name}" supprimé`, 'success');
+      await deleteService(name, groupName);
+      onNotify(`Service "${name}" supprimé`, 'success');
+      onDelete(name, groupName);
     } catch (e) {
       onNotify(`Erreur : ${e.message}`, 'error');
     }
   }
 
   async function handleReorder(order) {
+    const name = service.name;
+    const groupName = service.group_name;
     try {
-      const result = await reorderRules(service.name, order);
-      onUpdate(result);
+      const result = await reorderRules(name, groupName, order);
+      onUpdate(result, groupName);
     } catch (e) {
       onNotify(`Erreur de réordonnancement : ${e.message}`, 'error');
     }
@@ -58,9 +72,11 @@
       rules.push(rule);
     }
     const updated = { ...service, rules };
+    const name = service.name;
+    const groupName = service.group_name;
     try {
-      const result = await updateService(service.name, updated);
-      onUpdate(result);
+      const result = await updateService(name, groupName, updated);
+      onUpdate(result, groupName);
       editingRuleIdx = null;
       addingRule = false;
       onNotify(`Règle "${rule.name}" enregistrée`, 'success');
@@ -82,9 +98,11 @@
   async function handleDeleteRule(idx) {
     const rules = service.rules.filter((_, i) => i !== idx);
     const updated = { ...service, rules };
+    const name = service.name;
+    const groupName = service.group_name;
     try {
-      const result = await updateService(service.name, updated);
-      onUpdate(result);
+      const result = await updateService(name, groupName, updated);
+      onUpdate(result, groupName);
       onNotify('Règle supprimée', 'success');
     } catch (e) {
       onNotify(`Erreur : ${e.message}`, 'error');
@@ -104,7 +122,7 @@
   </nav>
 
   {#if editing}
-    <ServiceForm service={service} isEdit={true} onSave={handleSaveService} onCancel={() => editing = false} />
+    <ServiceForm service={service} {availableGroups} isEdit={true} onSave={handleSaveService} onCancel={() => editing = false} />
   {:else}
     <div class="detail-card">
       <dl class="detail-dl">
@@ -118,7 +136,7 @@
         </div>
         <div class="dl-row">
           <dt>Disponibilité</dt>
-          <dd><UrlHealthBadge serviceName={service.name} /></dd>
+          <dd><UrlHealthBadge serviceName={service.name} groupName={service.group_name} /></dd>
         </div>
         <div class="dl-row">
           <dt>Réécriture annuaire</dt>

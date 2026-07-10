@@ -36,11 +36,12 @@ describe('ServiceCard', () => {
     expect(getByText('Configurer')).toBeInTheDocument();
   });
 
-  it('appelle onSelect au clic sur Configurer', async () => {
+  it('appelle onSelect au clic sur Configurer avec le nom et le groupe du service', async () => {
     const onSelect = vi.fn();
-    const { getByText } = render(ServiceCard, { props: { service: mockService, onSelect } });
+    const svc = { ...mockService, group_name: 'team-a' };
+    const { getByText } = render(ServiceCard, { props: { service: svc, onSelect } });
     await fireEvent.click(getByText('Configurer'));
-    expect(onSelect).toHaveBeenCalledWith('svc-users');
+    expect(onSelect).toHaveBeenCalledWith('svc-users', 'team-a');
   });
 
   it('affiche le badge MOCK quand is_mocked est true', () => {

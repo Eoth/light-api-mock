@@ -52,36 +52,49 @@ export function getMe() {
 }
 
 // Services
+//
+// Un service est identifie sans ambiguite par (group_name, name) : le backend
+// autorise deux services du meme nom dans des groupes differents (le nom
+// seul ne suffit pas, cf CLAUDE.md). `servicePath` est la source unique de
+// verite pour construire le bon chemin : `/groups/:group/services/:name...`
+// quand `groupName` est fourni (service groupe), `/services/:name...` sinon
+// (perimetre "sans groupe").
+function servicePath(name, groupName, suffix = '') {
+  return groupName
+    ? `/groups/${encodeURIComponent(groupName)}/services/${encodeURIComponent(name)}${suffix}`
+    : `/services/${encodeURIComponent(name)}${suffix}`;
+}
+
 export function getServices() {
   return request('GET', '/services');
 }
 
-export function getService(name) {
-  return request('GET', `/services/${encodeURIComponent(name)}`);
+export function getService(name, groupName = null) {
+  return request('GET', servicePath(name, groupName));
 }
 
 export function createService(service) {
   return request('POST', '/services', service);
 }
 
-export function updateService(name, service) {
-  return request('PUT', `/services/${encodeURIComponent(name)}`, service);
+export function updateService(name, groupName, service) {
+  return request('PUT', servicePath(name, groupName), service);
 }
 
-export function deleteService(name) {
-  return request('DELETE', `/services/${encodeURIComponent(name)}`);
+export function deleteService(name, groupName = null) {
+  return request('DELETE', servicePath(name, groupName));
 }
 
-export function toggleService(name, isMocked) {
-  return request('PUT', `/services/${encodeURIComponent(name)}/toggle`, { is_mocked: isMocked });
+export function toggleService(name, groupName, isMocked) {
+  return request('PUT', servicePath(name, groupName, '/toggle'), { is_mocked: isMocked });
 }
 
-export function pingService(name) {
-  return request('POST', `/services/${encodeURIComponent(name)}/ping`);
+export function pingService(name, groupName = null) {
+  return request('POST', servicePath(name, groupName, '/ping'));
 }
 
-export function reorderRules(serviceName, order) {
-  return request('PUT', `/services/${encodeURIComponent(serviceName)}/rules/reorder`, { order });
+export function reorderRules(serviceName, groupName, order) {
+  return request('PUT', servicePath(serviceName, groupName, '/rules/reorder'), { order });
 }
 
 // Config
