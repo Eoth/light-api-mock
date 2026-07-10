@@ -2,30 +2,37 @@
 
 Mock & Proxy Intelligent pour environnements Kubernetes.
 
-Un seul binaire Rust qui intercepte les requetes HTTP, les mock ou les proxifie vers le vrai backend, configurable en temps reel via une interface web. Chaque service est expose sous `/{service_name}/...` avec une methode HTTP explicite, sans redemarrage de pod.
+Un seul binaire Rust qui intercepte les requetes HTTP, les mock ou les proxifie vers le vrai backend, configurable en temps reel via une interface web. Chaque service est expose sous `/{service_name}/...` (ou `/{group_code}/{service_name}/...` s'il appartient a un groupe), sans redemarrage de pod.
 
 ## Fonctionnalites
 
 - **Namespace URL par service** : chaque service est expose sous `/{name}/{listen_path}`, pas de collision
-- **Methode HTTP explicite** : un service = une methode (GET, POST, PUT, etc.)
-- **Bascule Mock / Proxy** : toggle ON/OFF depuis l'IHM, sans redemarrage
+- **Methode HTTP par regle** : chaque regle d'un service definit sa propre methode (GET, POST, PUT, ...) et un `sub_path` optionnel — le service lui-meme matche sur le path seul
+- **Bascule Mock / Proxy** : au niveau service (toggle ON/OFF) et/ou au niveau regle (`action: mock|proxy`, mock partiel)
 - **Moteur de regles** : conditions combinables (ET/OU) sur path params, query, headers, body JSON/XML/form
-- **Templates dynamiques** : expressions `{path.siret}`, `{fake.CompanyName}`, `{now_ms}`, pipes `| first(9)`, `| upper`, `| replace("a","b")`, `| capitalize`, `| substr(0,5)`, `| length`, `| prepend("x")`, `| append("x")`
-- **Action par regle** : chaque regle decide independamment de mocker ou proxyfier (mock partiel)
+- **Templates dynamiques** : expressions `{{path.siret}}`, `{{fake.CompanyName}}`, `{{now_ms}}`, pipes `| first(9)`, `| upper`, `| replace("a","b")`, `| capitalize`, `| substr(0,5)`, `| length`, `| prepend("x")`, `| append("x")`
+- **Scripts Rhai** : jusqu'a 3 blocs par regle (`pre_script`/`script`/`post_script`, independants), fonctions natives dont des generateurs deterministes par seed (`seeded_int`, `seeded_pick`) et des dates formattables (`date_now`, `date_past`, `date_future`) — voir [Scripts Rhai](#scripts-rhai)
+- **Groupes de services** : regroupement visuel (accordeons) + prefixe d'URL optionnel (`/{code}/...`), gestion des permissions (admins/membres)
+- **SOAP/WSDL** : mode par service (`Auto`/`Proxy`/`Mock`) pour choisir si les requetes WSDL bypassent le mock ou non
 - **Mode Chaos** : injection de latence (fixe ou plage) et d'erreurs HTTP
 - **Journal des requetes** : historique consultable dans l'IHM avec filtre par service
+- **Ping de disponibilite** : test de connexion TCP a la demande vers `real_target_url` (jamais de requete HTTP fonctionnelle)
+- **Sauvegardes et restauration** : rotation automatique des backups YAML + restauration depuis l'UI (voir [Sauvegardes et rollback](#sauvegardes-et-rollback))
+- **Auth Keycloak (optionnelle)** : desactivee par defaut ; une fois activee, roles et permissions par groupe de services
+- **Kafka (optionnel, feature `messaging-kafka`)** : mock/proxy applique aussi aux messages Kafka, non compile par defaut
 - **Import / Export / Reset** : sauvegarde, restauration et reinitialisation de la configuration
 - **Mode sombre** : theme clair/sombre (preference navigateur ou toggle manuel)
-- **Zero dependance externe** : pas de base de donnees, persistance fichier YAML atomique
+- **Zero dependance externe obligatoire** : pas de base de donnees, persistance fichier YAML (ecriture asynchrone en arriere-plan, mutation en memoire instantanee)
 - **Interface accessible** : conformite RGAA niveau AA
 
 ## Prerequis
 
 | Outil    | Version min | Notes |
 |----------|-------------|-------|
-| Rust     | 1.75+       | Avec toolchain MSVC sur Windows |
+| Rust     | 1.85+       | Edition 2024, toolchain MSVC sur Windows |
 | Node.js  | 20+         | Pour le frontend Svelte |
 | npm      | 9+          | |
+| cmake + toolchain C | - | Uniquement pour compiler avec `--features messaging-kafka` (librdkafka est compilee depuis les sources) |
 
 > **Setup automatise** : voir [scripts/bootstrap-windows.ps1](scripts/bootstrap-windows.ps1) ou [scripts/bootstrap-linux.sh](scripts/bootstrap-linux.sh)
 
@@ -69,51 +76,69 @@ Terminal 2 : `cd frontend && npm run dev` → http://localhost:5173
 
 ## Concept cle : URL namespace
 
-Chaque service est expose sous **`/{name}/{listen_path}`**. Exemples :
+Chaque service est expose sous **`/{name}/{listen_path}`** (ou **`/{group_code}/{name}/{listen_path}`** s'il appartient a un groupe). La methode HTTP n'est **pas** fixee au niveau du service : elle est definie par chaque regle (`Rule.method` + `Rule.sub_path` optionnel), ce qui permet a un meme service de repondre a plusieurs methodes/sous-chemins.
 
-| Service name | Methode | listen_path | URL finale de test |
+| Service name | listen_path | Regle : method + sub_path | URL finale de test |
 |---|---|---|---|
-| `insee` | GET | `/v4/sirene/{siret}` | `GET /insee/v4/sirene/{siret}` |
-| `auth` | POST | `/login` | `POST /auth/login` |
-| `users` | GET | `/*` | `GET /users/anything` |
+| `insee` | `/v4/sirene/{siret}` | `GET`, sub_path vide | `GET /insee/v4/sirene/{siret}` |
+| `auth` | `/login` | `POST`, sub_path vide | `POST /auth/login` |
+| `users` | *(vide → catch-all `/*`)* | `GET`, sub_path vide | `GET /users/anything` |
 
-En mode proxy, le prefixe `/{name}` est strippe avant forward vers le vrai backend.
+En mode proxy, le prefixe `/{name}` (et `/{group_code}` le cas echeant) est strippe avant forward vers le vrai backend. Si `listen_path` est vide, un catch-all `/{name}/*` est genere automatiquement.
 
 ## API REST
 
 | Methode | Endpoint | Description |
 |---|---|---|
+| GET | `/api/health` | Sonde de sante (exempt d'auth, utilise par K8s) |
 | GET | `/api/config` | Configuration complete |
 | PUT | `/api/config` | Remplacer toute la config |
-| DELETE | `/api/config/reset` | Reinitialiser (supprime tous les services) |
+| DELETE | `/api/config/reset` | Reinitialiser (supprime tous les services, super-admin requis) |
+| GET | `/api/config/backups` | Liste des sauvegardes disponibles (super-admin requis) |
+| POST | `/api/config/restore/:filename` | Restaurer une sauvegarde (super-admin requis) |
 | GET | `/api/services` | Liste des services |
-| POST | `/api/services` | Creer un service (409 si le nom existe deja) |
-| GET | `/api/services/:name` | Detail d'un service |
-| PUT | `/api/services/:name` | Modifier un service existant |
-| DELETE | `/api/services/:name` | Supprimer un service |
-| PUT | `/api/services/:name/toggle` | Basculer mock/proxy |
-| PUT | `/api/services/:name/rules/reorder` | Reordonner les regles |
+| POST | `/api/services` | Creer un service (409 si le nom existe deja dans le meme perimetre) |
+| GET / PUT / DELETE | `/api/services/:name` | Detail / modification / suppression d'un service **sans groupe** |
+| GET / PUT / DELETE | `/api/groups/:group/services/:name` | Idem, pour un service **appartenant a un groupe** |
+| PUT | `/api/services/:name/toggle` (ou variante groupee) | Basculer mock/proxy |
+| POST | `/api/services/:name/ping` (ou variante groupee) | Test de connexion TCP vers `real_target_url` |
+| PUT | `/api/services/:name/rules/reorder` (ou variante groupee) | Reordonner les regles |
+| POST | `/api/script/validate` | Valider la syntaxe d'un script Rhai (script/pre_script/post_script) |
 | GET | `/api/logs?limit=50` | Journal des requetes |
+| GET / POST | `/api/groups` | Liste / creation d'un groupe de services |
+| GET / PUT / DELETE | `/api/groups/:name` | Detail / modification / suppression d'un groupe |
+| PUT | `/api/groups/:name/members` | Gestion des membres/admins d'un groupe |
+| POST | `/api/auth/login`, `/api/auth/validate`, GET `/api/auth/me`, `/api/auth/status` | Authentification Keycloak (no-op si `AUTH_ENABLED=false`) |
+| GET | `/api/messaging/status`, `/api/messaging/logs`, POST `/api/messaging/simulate` | Uniquement si compile avec `--features messaging-kafka` |
 
-### Exemple : creer un service
+> Un service identifie par son nom seul (`/api/services/:name`) est toujours scope au perimetre "sans groupe" — un service qui appartient a un groupe doit etre adresse via `/api/groups/:group/services/:name`.
+
+### Exemple : creer un service avec une regle mockee
 
 ```bash
 curl -X POST http://localhost:7342/api/services \
   -H "Content-Type: application/json" \
   -d '{
     "name": "demo",
-    "method": "GET",
-    "listen_path": "/v1/*",
+    "listen_path": "/v1/{id}",
     "real_target_url": "http://httpbin.org",
     "is_mocked": true,
+    "rewrite_directory_urls": false,
+    "group_name": null,
+    "wsdl_mode": "auto",
     "rules": [{
       "name": "hello",
+      "method": "GET",
+      "sub_path": null,
       "action": "mock",
+      "pre_script": null,
+      "script": null,
+      "post_script": null,
       "conditions": { "all_of": [], "any_of": [] },
       "response": {
         "status": 200,
         "headers": [{"name": "Content-Type", "value": "application/json"}],
-        "body": [{"type": "Template", "template": "{{\"message\":\"Hello from lightMock!\"}}"}],
+        "body": [{"type": "Template", "template": "{\"id\":\"{{path.id}}\",\"message\":\"Hello from lightMock!\"}"}],
         "chaos": null
       }
     }]
@@ -122,6 +147,8 @@ curl -X POST http://localhost:7342/api/services \
 # Tester : GET /demo/v1/anything
 curl http://localhost:7342/demo/v1/anything
 ```
+
+`Service` n'a pas de champ `method` : chaque regle definit la sienne. Tous les champs listes ci-dessus sont obligatoires (pas de valeur par defaut cote serveur) — mettre `null`/`~` explicitement pour les champs optionnels non utilises (`sub_path`, `group_name`, scripts).
 
 ## Variables d'environnement
 
@@ -132,7 +159,12 @@ curl http://localhost:7342/demo/v1/anything
 | `PORT` | `7342` | Port d'ecoute HTTP |
 | `RUST_LOG` | `light_mock=info` | Filtre de logs (ex: `light_mock=debug`) |
 | `BACKUP_MAX_COUNT` | `5` | Nombre de sauvegardes conservees dans `{DATA_PATH}/backups/` avant rotation |
-| `SHOW_RESET_BUTTON` | `false` | Affiche le bouton "Reset complet" dans l'UI quand `AUTH_ENABLED=false` (sinon toujours cache par defaut). **N'est pas une mesure de securite** : quand l'auth est activee, seuls les super-admins peuvent reinitialiser (verifie cote serveur) ; quand elle est desactivee, l'API reste ouverte independamment de ce flag, qui ne pilote que l'affichage. |
+| `AUTH_ENABLED` | `false` | Active l'authentification Keycloak. Si `true`, `KEYCLOAK_URL`/`KEYCLOAK_REALM`/`KEYCLOAK_CLIENT_ID` deviennent obligatoires (le demarrage echoue sinon). |
+| `KEYCLOAK_URL` | *(vide)* | URL du serveur Keycloak (requis si `AUTH_ENABLED=true`). |
+| `KEYCLOAK_REALM` | *(vide)* | Realm Keycloak (requis si `AUTH_ENABLED=true`). |
+| `KEYCLOAK_CLIENT_ID` | *(vide)* | Client ID Keycloak (requis si `AUTH_ENABLED=true`). |
+| `SUPER_ADMINS` | *(vide)* | Liste d'identifiants (CSV) ayant le role super-admin (reset complet, restauration de backups). |
+| `SHOW_RESET_BUTTON` | `false` | Affiche le bouton "Reset complet" dans l'UI quand `AUTH_ENABLED=false`. **N'est pas une mesure de securite** : `require_super_admin()` reste la seule autorite reelle cote serveur ; ce flag ne pilote que l'affichage. |
 | `KAFKA_ENABLED` | `false` | Active le consumer Kafka au demarrage. Sans effet si le binaire n'est pas compile avec `--features messaging-kafka`. |
 | `KAFKA_BROKERS` | *(vide)* | Liste de brokers Kafka separes par des virgules (ex: `broker1:9092,broker2:9092`). |
 | `KAFKA_CONSUMER_GROUP` | `lightmock` | Consumer group Kafka utilise pour ecouter `KAFKA_LISTEN_TOPIC`. |
@@ -143,27 +175,36 @@ curl http://localhost:7342/demo/v1/anything
 
 ## Sauvegardes et rollback
 
-Avant chaque ecriture qui modifie la configuration, l'ancien fichier `mock-config.yaml` est
-copie dans `{DATA_PATH}/backups/` (rotation automatique, `BACKUP_MAX_COUNT` fichiers conserves).
-Avant un `DELETE /api/config/reset`, une sauvegarde supplementaire est creee dans
-`{DATA_PATH}/backups/protected/` : elle n'est **jamais** supprimee par la rotation normale,
-seulement au bout de 30 jours (au moment de la premiere ecriture suivante, pas de tache
-planifiee).
+Avant chaque mutation de la configuration, l'ancien contenu de `mock-config.yaml` est copie
+(de facon synchrone) dans `{DATA_PATH}/backups/` (rotation automatique, `BACKUP_MAX_COUNT`
+fichiers conserves). Avant un `DELETE /api/config/reset`, une sauvegarde supplementaire est
+creee dans `{DATA_PATH}/backups/protected/` : elle n'est **jamais** supprimee par la rotation
+normale, seulement au bout de 30 jours (verifie a la premiere ecriture suivante, pas de tache
+planifiee). L'ecriture disque elle-meme est asynchrone (write-behind) : une mutation est
+appliquee en memoire instantanement, puis persistee en arriere-plan.
 
-**Rollback manuel** : arreter le service (ou agir entre deux ecritures), copier le fichier
-choisi depuis `backups/` ou `backups/protected/` par-dessus `mock-config.yaml`, puis
+**Restauration via l'UI/API** (recommande) : le bouton "Sauvegardes" liste les fichiers
+disponibles et permet une restauration en un clic (`GET /api/config/backups` +
+`POST /api/config/restore/:filename`, reserves aux super-admins). Une restauration cree
+automatiquement un nouveau backup de l'etat ecrase juste avant, donc reversible.
+
+**Rollback manuel** (sans UI) : arreter le service (ou agir entre deux ecritures), copier le
+fichier choisi depuis `backups/` ou `backups/protected/` par-dessus `mock-config.yaml`, puis
 redemarrer le service.
 
 ## Tests
 
 ```bash
-# Rust (132 tests)
-cargo test -- --test-threads=1
+# Rust (262 tests par defaut)
+cargo test
 
-# Frontend unitaires (91+ tests Vitest)
+# Rust + Kafka (feature optionnelle, necessite cmake + toolchain C, +31 tests)
+cargo test --features messaging-kafka messaging::
+
+# Frontend unitaires (211 tests Vitest)
 cd frontend && npm test
 
-# E2E navigateur (17 tests Playwright, serveur doit tourner)
+# E2E navigateur (77 tests Playwright, serveur doit tourner)
 cd frontend && npm run test:e2e
 ```
 
@@ -172,15 +213,19 @@ cd frontend && npm run test:e2e
 ```
 light-mock/
   src/
-    models/        # Service, Rule, RuleAction, Condition, BodyFragment, FakeKind, ChaosConfig
-    engine/        # matcher, proxy, renderer, template (expressions + 12 pipes)
-    store/         # Persistance YAML atomique (Arc<RwLock<>>)
-    server/        # Axum : API REST, intercept middleware, request_log, validation
+    models/        # Service, Rule, RuleAction, Group, Condition, BodyFragment, FakeKind, ChaosConfig, WsdlMode
+    engine/        # matcher, proxy, renderer, template (expressions + 12 pipes), script (moteur Rhai)
+    auth/          # AuthConfig, client Keycloak, middleware
+    messaging/     # Kafka (matcher, consumer, journal) — feature "messaging-kafka" uniquement
+    store/         # Persistance YAML (Arc<RwLock<Arc<>>>, write-behind, backups/restauration)
+    server/        # Axum : API REST, intercept middleware, request_log, ping, validation
   frontend/
     src/lib/
-      tpl-utils.js   # Module partage : serialisation/validation/conversion templates
-      api.js         # Client API REST
-      components/    # Composants Svelte 5 (13 composants)
+      tpl-utils.js        # Module partage : serialisation/validation/conversion templates
+      rhai-functions.js   # Module partage : fonctions natives Rhai (doc + autocompletion)
+      service-url.js      # Module partage : construction de l'URL de test d'un service
+      api.js               # Client API REST
+      components/          # Composants Svelte 5 (25 composants)
     src/tests/       # Tests unitaires Vitest
     e2e/             # Tests Playwright
   k8s/             # Manifests K8s + Gloo Edge
@@ -188,21 +233,97 @@ light-mock/
   Dockerfile       # Build multi-stage
 ```
 
-### Format template
+## Format template
 
-Le moteur de templates lightMock utilise une syntaxe propre pour generer des reponses dynamiques :
+Le moteur de templates lightMock utilise une syntaxe propre pour generer des reponses
+dynamiques. Les accolades simples `{` `}` sont des caracteres litteraux (utiles pour du JSON/XML
+brut) ; les doubles accolades `{{ }}` delimitent une expression evaluee au runtime :
 
 | Syntaxe | Signification | Exemple |
 |---|---|---|
-| `{{` / `}}` | Accolades JSON litterales | `{{"key":"value"}}` → `{"key":"value"}` |
-| `{variable}` | Expression evaluee au runtime | `{path.siret}` → `44306184100047` |
-| `{var \| pipe}` | Variable avec transformation | `{path.siret \| first(9)}` → `443061841` |
+| `{` / `}` | Accolade JSON/XML litterale | `{"key":"value"}` reste tel quel |
+| `{{variable}}` | Expression evaluee au runtime | `{{path.siret}}` → `44306184100047` |
+| `{{variable \| pipe}}` | Variable avec transformation | `{{path.siret \| first(9)}}` → `443061841` |
 
-**Variables disponibles** : `path.X`, `query.X`, `header.X`, `body.X` (JSON pointer), `fake.Kind`, `uuid`, `now_ms`, `now_iso`, `now_epoch`, `seq`
+**Variables disponibles** : `path.X`, `query.X`, `header.X`, `body.X` (JSON pointer), `fake.Kind`,
+`uuid`, `now_ms`, `now_iso`, `now_epoch`, `seq`, `script`/`script.X`, `pre_script`/`pre_script.X`,
+`post_script`/`post_script.X` (ces trois derniers exposent le resultat des blocs de script de la
+regle, voir [Scripts Rhai](#scripts-rhai)).
 
 **Pipes** : `lower`, `upper`, `trim`, `capitalize`, `first(N)`, `last(N)`, `substr(start,len)`, `default("val")`, `replace("a","b")`, `prepend("x")`, `append("x")`, `length`
 
 **Fake data** : `FirstName`, `LastName`, `Email`, `PhoneNumberFR`, `Integer{min,max}`, `CompanyName`, `StreetName`, `CityFR`, `PostcodeFR`, `Siren`, `Siret`, `FullAddressFR`, `DatePast`, `DateFuture`, `TimestampMs`, `BoolRandom`, `LoremSentence`, `CountryFR`, `IbanFR`
+
+## Scripts Rhai
+
+Chaque regle peut executer jusqu'a 3 blocs de script independants (pas de chainage entre eux,
+meme contexte de requete pour chacun) : `pre_script`, `script`, `post_script`. Le sandbox limite
+l'execution a 10K operations et 1 Mo de chaines. Le resultat de chaque bloc est accessible dans
+le template via `{{script}}` / `{{pre_script}}` / `{{post_script}}` (valeur brute, si le script
+retourne une chaine) ou `{{script.champ}}` (si le script retourne une map Rhai `#{...}`).
+L'editeur de script dans l'IHM propose une autocompletion (`Ctrl+Espace` ou en tapant) sur ces
+fonctions natives :
+
+| Fonction | Description |
+|---|---|
+| `random_int(min, max)` | Entier aleatoire dans `[min, max]` |
+| `now_ms()` | Timestamp courant en millisecondes |
+| `now_iso()` | Date/heure courante au format `AAAA-MM-JJ` |
+| `year()` | Annee courante |
+| `uuid()` | UUID v4 |
+| `fake("Kind")` | Donnee factice (memes types que le body builder, ex. `fake("Siret")`) |
+| `date_now(format?)` | Date du jour ; `format` optionnel : `"iso"` (defaut, `AAAA-MM-JJ`), `"fr"` (`JJ/MM/AAAA`), `"en"` (`MM/JJ/AAAA`) |
+| `date_past(jours, format?)` | Date dans le passe (`jours` avant aujourd'hui, borne a 0 si negatif/nul) |
+| `date_future(jours, format?)` | Date dans le futur (`jours` apres aujourd'hui, borne a 0 si negatif/nul) |
+| `seeded_int(seed, min, max)` | Entier deterministe dans `[min, max]` pour un `seed` donne (meme seed → meme valeur) |
+| `seeded_pick(seed, [liste])` | Element deterministe de `liste` pour un `seed` donne |
+
+`seed` accepte n'importe quel type Rhai (string, entier, booleen...), typiquement une donnee de
+la requete (`request.path.siret`, `request.query.X`, `request.headers.X`). Utile pour mocker une
+API type INSEE/SIRET ou un meme SIRET doit toujours renvoyer le meme resultat.
+
+### Exemple : reponse deterministe par SIRET
+
+Service `seeded-test`, `listen_path: "/entreprise/{siret}"`, une regle `GET` sans conditions :
+
+```
+script: #{ name: seeded_pick(request.path.siret, ["Dupont SARL", "Martin SAS", "Petit EURL"]), score: seeded_int(request.path.siret, 0, 100) }
+```
+
+Body de la reponse (fragment `Template`) :
+
+```json
+{"siret":"{{path.siret}}","name":"{{script.name}}","score":{{script.score}}}
+```
+
+`GET /seeded-test/entreprise/44306184100047` renvoie systematiquement le meme `name`/`score`
+pour ce SIRET (verifie par un test E2E, `frontend/e2e/insee.spec.mjs`), et un resultat different
+pour un autre SIRET.
+
+## Groupes de services
+
+Un service peut appartenir a un groupe (`group_name`) affiche comme un accordeon dans l'IHM.
+Chaque groupe a un `code` technique (5 caracteres, genere automatiquement, insensible a la
+casse du nom) qui prefixe l'URL des services du groupe : `/{code}/{service}/...`. Tout le monde
+peut creer un groupe (le createur en devient automatiquement admin) ; les admins du groupe
+peuvent le modifier/supprimer et gerer ses membres ; un super-admin peut tout controler.
+
+## Authentification (optionnelle)
+
+Desactivee par defaut (`AUTH_ENABLED=false`, acces complet anonyme). Une fois activee, lightMock
+delegue l'authentification a Keycloak (login ROPC, validation JWT via JWKS). Les roles
+determinent l'acces aux services et groupes ; `SUPER_ADMINS` (liste d'identifiants) donne un
+acces complet, y compris le reset et la restauration de sauvegardes.
+
+## Messaging Kafka (optionnel)
+
+Feature Cargo `messaging-kafka`, **non activee par defaut** (`cargo build`/`cargo test` sans
+`--features messaging-kafka` ne compilent ni ne telechargent la dependance Kafka). Une fois
+activee et configuree (`KAFKA_*`, voir tableau des variables d'environnement), lightMock
+consomme un topic et applique le meme moteur de regles/templates que le HTTP (sans
+`pre_script`/`script`/`post_script`, qui restent HTTP-only dans cette version), avec un journal
+consultable dans l'IHM et une simulation possible sans producteur Kafka reel
+(`POST /api/messaging/simulate`).
 
 ## Deploiement Kubernetes
 
@@ -220,9 +341,9 @@ kubectl apply -k k8s/
 | `cargo build` echoue avec `link.exe not found` | Installer VS Build Tools : `winget install Microsoft.VisualStudio.2022.BuildTools --override "--quiet --add Microsoft.VisualStudio.Workload.VCTools"` |
 | Port 7342 deja utilise | `$env:PORT = "7343"` ou tuer le processus existant |
 | Frontend ne s'affiche pas | Verifier `STATIC_DIR` pointe vers `frontend/dist` (chemin absolu recommande sur Windows) |
-| Tests Rust flaky sur env var | Utiliser `cargo test -- --test-threads=1` |
-| Requete mock retourne 404 | Verifier l'URL inclut le namespace : `/{service_name}/{path}` |
-| Requete POST sur un service GET | Chaque service a une methode fixe, creer un 2e service pour POST |
+| Requete mock retourne 404 | Verifier l'URL inclut le namespace : `/{service_name}/{path}` (et `/{group_code}/...` si le service est groupe) |
+| Requete sur une methode/sous-chemin non couvert | La methode est definie par regle, pas par service : verifier qu'une regle existe pour cette methode/`sub_path` |
+| `cargo build --features messaging-kafka` echoue (linker, cmake, chemin trop long) | Voir la section "Support MOM / Messaging" de [CLAUDE.md](CLAUDE.md) pour les contournements Windows connus |
 
 ## Licence
 
