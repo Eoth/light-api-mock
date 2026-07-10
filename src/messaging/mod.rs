@@ -1,12 +1,29 @@
-// Cadrage MOM/Kafka (etude de faisabilite, feature-gated par "messaging-kafka",
-// desactivee par defaut : ce module ne compile meme pas sans la feature, donc
-// zero impact sur le binaire/tests par defaut). Contient UNIQUEMENT le modele
-// de configuration et son parsing depuis l'environnement — aucune dependance
-// reseau/Kafka (rdkafka) n'est ajoutee dans cette passe, volontairement, pour
-// eviter d'alourdir le binaire/la chaine de build tant que le besoin n'est
-// pas confirme. Voir CLAUDE.md section "Support MOM / Messaging" pour le
-// design technique complet (architecture consumer/matching/publish prevue,
-// impact taille binaire, JMS non supporte, SMTP phase 2).
+// Support Kafka fonctionnel (feature-gated par "messaging-kafka", desactivee
+// par defaut : ce module ne compile meme pas sans la feature, donc zero
+// impact sur le binaire/tests par defaut). `KafkaConfig` + parsing env restent
+// ici ; le consumer/publisher et le journal des messages sont dans des
+// sous-modules dedies. Voir CLAUDE.md section "Support MOM / Messaging" pour
+// le design complet (adaptation du matcher, choix TTL/troncature, JMS non
+// supporte, SMTP phase 2).
+pub mod consumer;
+pub mod matcher;
+pub mod message_log;
+
+use message_log::MessageLog;
+
+/// Regroupe l'etat messaging expose a la couche HTTP (AppState) : le journal
+/// des messages (toujours present quand la feature est compilee, meme si
+/// Kafka est desactive a l'execution — un GET renvoie simplement une liste
+/// vide) + le reply_topic/publisher utilises par `POST /api/messaging/simulate`
+/// pour emprunter exactement le meme chemin de publication que le vrai
+/// consumer (voir consumer::process_message).
+#[derive(Clone)]
+pub struct MessagingState {
+    pub message_log: MessageLog,
+    pub reply_topic: Option<String>,
+    pub publisher: consumer::Publisher,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct KafkaConfig {
     pub enabled: bool,
@@ -50,6 +67,14 @@ impl KafkaConfig {
 mod tests {
     use super::*;
 
+    // Process-wide env vars (KAFKA_*) mutees par ces tests : cargo test lance
+    // les fns de test en parallele (threads OS), donc sans serialisation deux
+    // tests qui touchent les memes variables peuvent se marcher dessus de
+    // facon intermittente (meme pitfall documente dans CLAUDE.md pour
+    // BACKUP_MAX_COUNT/DATA_PATH/SHOW_RESET_BUTTON, cf src/store/mod.rs et
+    // src/auth/mod.rs). Chaque test tenant cette variable pour tout son corps.
+    static ENV_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     fn clear_env() {
         unsafe {
             std::env::remove_var("KAFKA_ENABLED");
@@ -62,6 +87,7 @@ mod tests {
 
     #[test]
     fn defaults_disabled_with_empty_brokers() {
+        let _guard = ENV_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
         clear_env();
         let cfg = KafkaConfig::from_env();
         assert!(!cfg.enabled);
@@ -73,6 +99,7 @@ mod tests {
 
     #[test]
     fn parses_broker_list_from_env() {
+        let _guard = ENV_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
         clear_env();
         unsafe { std::env::set_var("KAFKA_BROKERS", "broker1:9092, broker2:9092") };
         let cfg = KafkaConfig::from_env();
@@ -82,6 +109,7 @@ mod tests {
 
     #[test]
     fn enabled_true_from_env() {
+        let _guard = ENV_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
         clear_env();
         unsafe { std::env::set_var("KAFKA_ENABLED", "true") };
         let cfg = KafkaConfig::from_env();
@@ -91,6 +119,7 @@ mod tests {
 
     #[test]
     fn reply_topic_from_env() {
+        let _guard = ENV_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
         clear_env();
         unsafe { std::env::set_var("KAFKA_REPLY_TOPIC", "lightmock.replies") };
         let cfg = KafkaConfig::from_env();
@@ -100,6 +129,7 @@ mod tests {
 
     #[test]
     fn empty_reply_topic_env_var_is_none() {
+        let _guard = ENV_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
         clear_env();
         unsafe { std::env::set_var("KAFKA_REPLY_TOPIC", "") };
         let cfg = KafkaConfig::from_env();
@@ -109,6 +139,7 @@ mod tests {
 
     #[test]
     fn custom_consumer_group() {
+        let _guard = ENV_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
         clear_env();
         unsafe { std::env::set_var("KAFKA_CONSUMER_GROUP", "my-group") };
         let cfg = KafkaConfig::from_env();

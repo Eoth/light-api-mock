@@ -66,6 +66,28 @@ async fn main() {
         None
     };
 
+    #[cfg(feature = "messaging-kafka")]
+    let messaging = {
+        let kafka_config = crate::messaging::KafkaConfig::from_env();
+        let message_log = crate::messaging::message_log::MessageLog::new();
+        let publisher = if kafka_config.enabled {
+            tracing::info!(
+                topic = %kafka_config.listen_topic,
+                brokers = ?kafka_config.brokers,
+                "messaging: Kafka enabled, starting consumer"
+            );
+            crate::messaging::consumer::spawn(kafka_config.clone(), store.clone(), message_log.clone())
+        } else {
+            tracing::info!("messaging: Kafka disabled (KAFKA_ENABLED=false)");
+            crate::messaging::consumer::Publisher::None
+        };
+        crate::messaging::MessagingState {
+            message_log,
+            reply_topic: kafka_config.reply_topic,
+            publisher,
+        }
+    };
+
     let state = AppState {
         store,
         proxy: ProxyClient::new(),
@@ -75,6 +97,8 @@ async fn main() {
         keycloak,
         script_engine: ScriptEngine::new(),
         ping_cache: PingCache::new(),
+        #[cfg(feature = "messaging-kafka")]
+        messaging,
     };
 
     let store_for_shutdown = state.store.clone();

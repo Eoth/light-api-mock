@@ -52,12 +52,18 @@ rhai = { version = "1", features = ["sync"] }
 # URL parsing (form_urlencoded for condition extraction)
 url = "2"
 
+# Client Kafka (consumer + producer). Optionnel : compile UNIQUEMENT quand la
+# feature "messaging-kafka" est active (dep:rdkafka ci-dessous). "cmake-build"
+# compile librdkafka (C) depuis les sources via cmake — voir CLAUDE.md section
+# "Support MOM/Messaging" pour les prerequis de build (cmake + toolchain C).
+rdkafka = { version = "0.36", features = ["cmake-build"], optional = true }
+
 [features]
-# Cadrage MOM/Kafka (etude) : NON active par defaut, zero impact sur le
-# binaire/tests tant que non active. Ne contient que le modele de config
-# et son parsing (pas de dependance rdkafka dans cette passe). Voir
-# CLAUDE.md section "Support MOM/Messaging".
-messaging-kafka = []
+# Support Kafka fonctionnel (consumer + publisher + journal des messages) :
+# NON active par defaut, zero impact sur le binaire/tests tant que non
+# activee (dep:rdkafka n'est meme pas telechargee/compilee). Voir CLAUDE.md
+# section "Support MOM/Messaging".
+messaging-kafka = ["dep:rdkafka"]
 
 [profile.release]
 opt-level = 3

@@ -45,7 +45,11 @@ impl MatchEngine {
         }
     }
 
-    fn matches_group(group: &ConditionGroup, req: &RequestData) -> bool {
+    /// pub(crate) (plutot que privee) : reutilisee telle quelle par
+    /// `messaging::matcher` (feature "messaging-kafka") pour matcher un
+    /// message Kafka contre les conditions d'une regle, sans les notions
+    /// HTTP-only method/sub_path (voir commentaire dans messaging/matcher.rs).
+    pub(crate) fn matches_group(group: &ConditionGroup, req: &RequestData) -> bool {
         let all_ok = group.all_of.is_empty() || group.all_of.iter().all(|c| Self::eval(c, req));
         let any_ok = group.any_of.is_empty() || group.any_of.iter().any(|c| Self::eval(c, req));
         all_ok && any_ok

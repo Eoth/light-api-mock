@@ -13,7 +13,7 @@ use axum::routing::{delete as delete_route, get, post, put};
 use axum::{Json, Router};
 
 pub fn routes() -> Router<AppState> {
-    Router::new()
+    let router = Router::new()
         .route("/health", get(health))
         .route("/auth/status", get(auth_status))
         .route("/auth/login", post(login))
@@ -38,7 +38,15 @@ pub fn routes() -> Router<AppState> {
             "/groups/:name",
             get(get_group).put(update_group).delete(delete_group),
         )
-        .route("/groups/:name/members", put(update_group_members))
+        .route("/groups/:name/members", put(update_group_members));
+
+    #[cfg(feature = "messaging-kafka")]
+    let router = router
+        .route("/messaging/status", get(messaging_status))
+        .route("/messaging/logs", get(get_messaging_logs))
+        .route("/messaging/simulate", post(simulate_message));
+
+    router
 }
 
 // --------------- Health ---------------
@@ -293,6 +301,71 @@ async fn get_logs(
     Query(q): Query<LogsQuery>,
 ) -> Json<Vec<LogEntry>> {
     Json(state.request_log.recent(q.limit))
+}
+
+// --------------- Messaging (Kafka) ---------------
+// Feature-gated : ces routes n'existent meme pas dans un build par defaut
+// (cf routes() ci-dessus). Meme garde d'auth que /logs (utilisateur
+// authentifie, pas de restriction super-admin — lecture seule + simulation,
+// pas d'operation destructive).
+
+#[cfg(feature = "messaging-kafka")]
+#[derive(serde::Serialize)]
+struct MessagingStatusResponse {
+    /// Toujours `true` ici : l'existence meme de la reponse (200, pas 404)
+    /// suffit au frontend a detecter que le binaire a ete compile avec la
+    /// feature "messaging-kafka" — c'est ce champ qui distingue "route
+    /// absente" (binaire sans la feature) de "fonctionnalite compilee".
+    available: bool,
+}
+
+#[cfg(feature = "messaging-kafka")]
+async fn messaging_status() -> Json<MessagingStatusResponse> {
+    Json(MessagingStatusResponse { available: true })
+}
+
+#[cfg(feature = "messaging-kafka")]
+async fn get_messaging_logs(
+    State(state): State<AppState>,
+    Extension(_user): Extension<AuthUser>,
+    Query(q): Query<LogsQuery>,
+) -> Json<Vec<crate::messaging::message_log::MessageLogEntry>> {
+    Json(state.messaging.message_log.recent(q.limit))
+}
+
+/// Simule la reception d'un message sur le topic d'ecoute : declenche
+/// exactement le meme pipeline (match -> rendu -> journal -> publication
+/// eventuelle sur reply_topic) que le vrai consumer Kafka
+/// (messaging::consumer::process_message), sans dependre d'un producteur
+/// Kafka externe. Utile pour tester une regle de messaging depuis l'UI
+/// (bouton "Simuler un message") et pour les tests E2E dans un environnement
+/// sans broker Kafka reel.
+#[cfg(feature = "messaging-kafka")]
+#[derive(serde::Deserialize)]
+struct SimulateMessageRequest {
+    topic: String,
+    #[serde(default)]
+    headers: std::collections::HashMap<String, String>,
+    payload: String,
+}
+
+#[cfg(feature = "messaging-kafka")]
+async fn simulate_message(
+    State(state): State<AppState>,
+    Extension(_user): Extension<AuthUser>,
+    Json(req): Json<SimulateMessageRequest>,
+) -> StatusCode {
+    crate::messaging::consumer::process_message(
+        &state.store,
+        &state.messaging.message_log,
+        state.messaging.reply_topic.as_deref(),
+        &state.messaging.publisher,
+        &req.topic,
+        req.payload.as_bytes(),
+        req.headers,
+    )
+    .await;
+    StatusCode::NO_CONTENT
 }
 
 // --------------- Services ---------------
