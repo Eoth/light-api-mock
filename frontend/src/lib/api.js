@@ -110,6 +110,14 @@ export function getLogs(limit = 50) {
   return request('GET', `/logs?limit=${limit}`);
 }
 
+// Testeur de regle : rejeu en lecture seule d'un brouillon de regle (pas
+// necessairement sauvegarde) contre une requete deja capturee dans les logs.
+// Endpoint stateless, non scope par service (aucun service n'est charge cote
+// backend) — pas de servicePath() ici.
+export function testRule(payload) {
+  return request('POST', '/rule-test', payload);
+}
+
 // Messaging (Kafka) — routes absentes (404) sur un binaire compile sans la
 // feature "messaging-kafka" ; les appelants doivent gerer cet echec (voir
 // App.svelte, verification au demarrage).

@@ -1,6 +1,12 @@
-import { render, fireEvent } from '@testing-library/svelte';
+import { render, fireEvent, waitFor } from '@testing-library/svelte';
 import { describe, it, expect, vi } from 'vitest';
 import RuleForm from '../lib/components/RuleForm.svelte';
+import { getLogs } from '../lib/api.js';
+
+vi.mock('../lib/api.js', () => ({
+  validateScript: vi.fn(),
+  getLogs: vi.fn(),
+}));
 
 async function setInput(el, value) {
   el.value = value;
@@ -128,5 +134,29 @@ describe('RuleForm: pre_script / post_script', () => {
 
     const [payload] = onSave.mock.calls[0];
     expect(payload.pre_script).toBeNull();
+  });
+});
+
+describe('RuleForm: assistance de saisie path/query param', () => {
+  it('ne rend pas le testeur de regle sans serviceName (retrocompat)', () => {
+    const { queryByText } = render(RuleForm);
+    expect(queryByText('Tester contre une requête réelle')).not.toBeInTheDocument();
+  });
+
+  it('rend le testeur de regle quand serviceName est fourni', async () => {
+    getLogs.mockResolvedValue([]);
+    const { getByText } = render(RuleForm, { props: { serviceName: 'svc-a' } });
+    await waitFor(() => expect(getByText('Tester contre une requête réelle')).toBeInTheDocument());
+  });
+
+  it('combine les path params du service et du sous-chemin de la regle', async () => {
+    getLogs.mockResolvedValue([]);
+    const { getByLabelText, getByRole } = render(RuleForm, {
+      props: { serviceName: 'svc-a', listenPath: '/orders/{id}' },
+    });
+    await setInput(getByLabelText('Sous-chemin (optionnel)'), '/items/{itemId}');
+    await fireEvent.click(getByRole('button', { name: '+ Condition ET' }));
+    const sourceSelect = getByLabelText('Source');
+    expect(sourceSelect.querySelector('option[value="PathParam"]')).toBeInTheDocument();
   });
 });
