@@ -2,6 +2,7 @@
   import { getGroups, createGroup, deleteGroup, updateGroupMembers, updateService } from '../api.js';
   import ConfirmDialog from './ConfirmDialog.svelte';
   import RemovableList from './RemovableList.svelte';
+  import FormField from './FormField.svelte';
 
   let {
     services = [],
@@ -16,7 +17,6 @@
   let loading = $state(true);
   let showForm = $state(false);
   let newGroupName = $state('');
-  let newGroupCode = $state('');
   let editingGroup = $state(null);
   let newMember = $state('');
   let newAdmin = $state('');
@@ -53,10 +53,9 @@
     if (!name) { formError = 'Le nom du groupe est requis.'; return; }
 
     try {
-      const created = await createGroup({ name, code: newGroupCode.trim(), admins: [], members: [] });
+      const created = await createGroup({ name, code: '', admins: [], members: [] });
       setGroups([...groups, created]);
       newGroupName = '';
-      newGroupCode = '';
       showForm = false;
       onNotify(`Groupe "${name}" cree`, 'success');
     } catch (e) {
@@ -183,15 +182,28 @@
 
   {#if showForm}
     <form class="group-create-form" onsubmit={handleCreateGroup}>
-      {#if formError}
-        <div class="form-error" role="alert">{formError}</div>
-      {/if}
-      <div class="inline-form">
-        <input type="text" bind:value={newGroupName} placeholder="Nom du groupe (ex: API Internes)" required />
-        <input type="text" bind:value={newGroupCode} placeholder="Code 5 chars (auto si vide)" maxlength="5" class="code-input" />
+      <FormField
+        id="new-group-name"
+        label="Nom du groupe"
+        required
+        error={formError}
+        hint="Un code URL de 5 caracteres est genere automatiquement a partir du nom."
+      >
+        {#snippet children({ id, describedBy, invalid })}
+          <input
+            type="text"
+            {id}
+            aria-describedby={describedBy}
+            aria-invalid={invalid}
+            bind:value={newGroupName}
+            placeholder="ex: API Internes"
+            required
+          />
+        {/snippet}
+      </FormField>
+      <div class="form-actions">
         <button type="submit" class="btn btn-primary btn-sm">Creer</button>
       </div>
-      <span class="field-hint">Le code (5 caracteres) sert de prefixe URL : /{'{code}'}/{'{service}'}/...</span>
     </form>
   {/if}
 
@@ -300,7 +312,8 @@
   .list-header h2 { margin: 0; }
   .header-actions { display: flex; gap: 0.5rem; }
 
-  .group-create-form { margin-bottom: 1rem; }
+  .group-create-form { margin-bottom: 1rem; max-width: 24rem; }
+  .group-create-form .form-actions { margin-top: 0; justify-content: flex-start; }
   .inline-form { display: flex; gap: 0.5rem; align-items: center; }
   .inline-form input { flex: 1; padding: 0.375rem 0.75rem; border: 1px solid var(--color-border); border-radius: var(--radius); font-size: 0.875rem; background: var(--color-bg); color: var(--color-text); }
 
@@ -311,7 +324,6 @@
   .group-header-row h3 { margin: 0; font-size: 1rem; }
   .group-code-badge { font-family: monospace; font-size: 0.8125rem; font-weight: 700; color: var(--color-primary); background: var(--color-focus); padding: 0.1rem 0.375rem; border-radius: 3px; }
   .group-count { color: var(--color-text-muted); font-size: 0.8125rem; }
-  .code-input { max-width: 8rem; text-transform: lowercase; font-family: monospace; }
   .group-actions { margin-left: auto; display: flex; gap: 0.375rem; }
 
   .service-chips { list-style: none; padding: 0; margin: 0.75rem 0 0; display: flex; flex-wrap: wrap; gap: 0.375rem; }
