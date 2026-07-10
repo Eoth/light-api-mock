@@ -1,10 +1,10 @@
 <script>
   import ServiceGroup from './ServiceGroup.svelte';
+  import { getExpandedGroupKeys, setGroupExpanded, toggleGroupExpanded } from '../group-expansion-state.svelte.js';
 
   let { services = [], groups = [], onToggle = () => {}, onSelect = () => {}, onClone = () => {} } = $props();
 
   let search = $state('');
-  let expandedGroups = $state(new Set());
   let initialized = $state(false);
 
   let filtered = $derived(
@@ -42,17 +42,21 @@
   let effectiveExpanded = $derived(
     search.trim()
       ? new Set(grouped().map(([key]) => key))
-      : expandedGroups
+      : getExpandedGroupKeys()
   );
 
-  function toggleGroup(key) {
-    const next = new Set(expandedGroups);
-    if (next.has(key)) {
-      next.delete(key);
-    } else {
-      next.add(key);
-    }
-    expandedGroups = next;
+  // Force le groupe cible a deplie au moment de quitter la liste vers
+  // l'edition/le clonage : garantit que le contexte reste visible au retour
+  // (cf CLAUDE.md), meme si le groupe n'etait visible que via l'expansion
+  // ephemere de la recherche (jamais ecrite dans le store partage).
+  function handleSelect(name, groupName) {
+    setGroupExpanded(groupName || '__ungrouped__', true);
+    onSelect(name, groupName);
+  }
+
+  function handleClone(service) {
+    setGroupExpanded(service.group_name || '__ungrouped__', true);
+    onClone(service);
   }
 
   function groupDisplayName(key) {
@@ -106,10 +110,10 @@
             groupCode={groupCodeFor(key)}
             services={groupServices}
             expanded={effectiveExpanded.has(key)}
-            onToggleGroup={() => toggleGroup(key)}
+            onToggleGroup={() => toggleGroupExpanded(key)}
             {onToggle}
-            {onSelect}
-            {onClone}
+            onSelect={handleSelect}
+            onClone={handleClone}
           />
         {/each}
       </div>
