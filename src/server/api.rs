@@ -43,8 +43,17 @@ pub fn routes() -> Router<AppState> {
 
 // --------------- Health ---------------
 
-async fn health() -> StatusCode {
-    StatusCode::OK
+#[derive(serde::Serialize)]
+struct HealthResponse {
+    status: &'static str,
+    write_queue: crate::store::WriteQueueStatus,
+}
+
+async fn health(State(state): State<AppState>) -> Json<HealthResponse> {
+    Json(HealthResponse {
+        status: "ok",
+        write_queue: state.store.writer_status(),
+    })
 }
 
 // --------------- Auth ---------------

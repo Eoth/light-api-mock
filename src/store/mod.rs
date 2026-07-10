@@ -1,15 +1,24 @@
 // Persistance de la config (services + groupes) en YAML sur disque.
 // Architecture : Arc<RwLock<Arc<MockConfig>>> pour lectures O(1) sans clone.
 // snapshot() retourne un Arc (clone du pointeur, pas des donnees).
-// Les ecritures (update/replace) clonent les donnees, les modifient,
-// puis font un atomic write (ecriture tmp + rename) pour eviter la corruption.
+// Les mutations (update/replace) clonent les donnees, les modifient, mettent
+// a jour l'Arc en memoire INSTANTANEMENT, puis delegent l'ecriture disque
+// effective (tmp write + rename) a une tache de fond via un channel
+// (write-behind, cf WriterHandle plus bas) — le thread de requete HTTP n'est
+// donc plus jamais bloque par l'I/O disque elle-meme.
 //
 // Backup/rollback : avant chaque ecrasement du fichier de config, l'ancien
 // contenu est copie dans {data_dir}/backups/. C'est event-driven (declenche
-// par l'ecriture elle-meme), PAS une tache de fond/cron — coherent avec le
+// par la mutation elle-meme), PAS une tache de fond/cron — coherent avec le
 // choix fait pour le ping (src/server/ping.rs). Rotation immediate apres
 // coup pour ne garder que BACKUP_MAX_COUNT fichiers (defaut 5), necessaire
 // vu la contrainte PVC 64Mi en K8s (cf CLAUDE.md).
+//
+// IMPORTANT (write-behind) : le backup reste SYNCHRONE et s'execute AVANT la
+// mise en queue de l'ecriture asynchrone (voir prepare_and_backup(), appelee
+// sous le verrou d'ecriture avant tout appel a WriterHandle::send_write()).
+// Une mutation ne passe donc jamais sans sauvegarde prealable — casser cet
+// ordre viderait le mecanisme de rollback (cf CLAUDE.md) de son utilite.
 //
 // Backup pre-reset protege : avant un reset complet (DELETE /api/config/reset),
 // backup_before_reset() copie la config courante dans backups/protected/. Ce
@@ -26,16 +35,174 @@ use crate::models::MockConfig;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use tokio::sync::RwLock;
+use tokio::sync::{RwLock, mpsc, oneshot};
 
 static BACKUP_SEQ: AtomicU64 = AtomicU64::new(0);
 
 const PROTECTED_BACKUP_MAX_AGE_MS: u128 = 30 * 24 * 60 * 60 * 1000;
 
+// Capacite du channel d'ecriture asynchrone (write-behind). Bornee
+// volontairement : le but de cette evolution est de ne plus bloquer le
+// thread de requete sur l'I/O disque, PAS d'autoriser une file d'attente
+// illimitee qui grossirait sans controle en cas de pic d'ecritures (sobriete
+// ressources, cf CLAUDE.md). Chaque mutation flush individuellement (pas de
+// vrai batching, voir WriteJob et le commentaire sur run()) : avec ce
+// pattern, une capacite de 64 absorbe largement les pics realistes. Au-dela,
+// send_write().await applique un backpressure naturel (le call site attend
+// qu'une place se libere) plutot que de perdre des ecritures ou de laisser
+// la memoire grossir indefiniment — c'est un choix delibere, pas une limite
+// subie. Constante fixe (pas de variable d'env comme BACKUP_MAX_COUNT) : il
+// s'agit d'une soupape de securite interne, pas d'un reglage utilisateur.
+const WRITE_QUEUE_CAPACITY: usize = 64;
+
+/// Un job pousse dans le channel du writer asynchrone.
+/// - `Write` : contenu YAML deja serialise a persister sur `path`.
+/// - `Barrier` : ne fait aucune ecriture, signale juste au demandeur (via le
+///   oneshot) que tous les jobs pousses AVANT lui ont ete traites. Utilise par
+///   `flush()` (tests deterministes sans sleep, et drain a l'arret gracieux
+///   du serveur) — jamais par le chemin de mutation normal.
+enum WriteJob {
+    Write { path: PathBuf, yaml: String },
+    Barrier(oneshot::Sender<()>),
+}
+
+#[derive(Default)]
+struct WriterStats {
+    last_write_ok_ms: AtomicU64,
+    last_error: std::sync::RwLock<Option<WriterError>>,
+}
+
+/// Derniere erreur d'ecriture disque rencontree par la tache de fond.
+/// Expose via GET /api/health pour la detection d'un backlog/probleme
+/// disque en observabilite K8s (cf CLAUDE.md).
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct WriterError {
+    pub message: String,
+    pub at_ms: u64,
+}
+
+/// Etat observable du write-behind, expose via GET /api/health.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct WriteQueueStatus {
+    pub pending: usize,
+    pub capacity: usize,
+    pub last_write_ok_ms: Option<u64>,
+    pub last_error: Option<WriterError>,
+}
+
+/// Handle cote "producteur" du write-behind : chaque `MockStore` en detient
+/// un clone (Sender + stats partages), la tache de fond en detient le
+/// `Receiver` correspondant (voir `WriterHandle::spawn`).
+#[derive(Clone)]
+struct WriterHandle {
+    tx: mpsc::Sender<WriteJob>,
+    stats: Arc<WriterStats>,
+}
+
+impl WriterHandle {
+    fn spawn() -> Self {
+        let (tx, rx) = mpsc::channel(WRITE_QUEUE_CAPACITY);
+        let stats = Arc::new(WriterStats::default());
+        tokio::spawn(Self::run(rx, stats.clone()));
+        Self { tx, stats }
+    }
+
+    /// Boucle de la tache de fond : consomme le channel jusqu'a sa
+    /// fermeture. PAS de polling/timer — purement event-driven (un `recv()`
+    /// qui attend le prochain message), coherent avec le reste du projet
+    /// (ping, backups). Choix assume : flush par mutation individuelle
+    /// plutot qu'un vrai batching (regrouper plusieurs jobs avant d'ecrire)
+    /// — un batching reduirait le nombre d'ecritures mais elargirait la
+    /// fenetre de risque en cas de crash (plus de mutations en memoire sans
+    /// contrepartie sur disque). Le gain recherche ici est de ne plus
+    /// bloquer le thread de requete, pas de reduire le nombre d'IO.
+    ///
+    /// Une erreur d'ecriture est loguee (niveau error) et enregistree dans
+    /// `stats.last_error`, MAIS ne fait pas paniquer la tache : le call site
+    /// HTTP a deja repondu succes a ce stade (la mutation est appliquee en
+    /// memoire), donc la tache continue de traiter les jobs suivants plutot
+    /// que d'abandonner tout write-behind futur pour une erreur transitoire.
+    async fn run(mut rx: mpsc::Receiver<WriteJob>, stats: Arc<WriterStats>) {
+        while let Some(job) = rx.recv().await {
+            match job {
+                WriteJob::Write { path, yaml } => match MockStore::write_to_disk(&path, &yaml) {
+                    Ok(()) => {
+                        stats
+                            .last_write_ok_ms
+                            .store(MockStore::now_ms() as u64, Ordering::Relaxed);
+                    }
+                    Err(e) => {
+                        tracing::error!(
+                            path = %path.display(),
+                            error = %e,
+                            "write-behind: echec de la persistance disque — l'etat en memoire est en avance sur le disque, perte possible si le processus s'arrete avant la prochaine ecriture reussie"
+                        );
+                        *stats.last_error.write().unwrap() = Some(WriterError {
+                            message: e.to_string(),
+                            at_ms: MockStore::now_ms() as u64,
+                        });
+                    }
+                },
+                WriteJob::Barrier(done) => {
+                    let _ = done.send(());
+                }
+            }
+        }
+        tracing::warn!("write-behind: tache d'ecriture arretee (channel ferme)");
+    }
+
+    /// Pousse une ecriture dans la file. `send().await` applique un
+    /// backpressure naturel si la file est pleine (voir WRITE_QUEUE_CAPACITY)
+    /// — c'est le seul cas ou une mutation peut de nouveau attendre sur le
+    /// write-behind, et c'est volontaire (soupape de securite plutot qu'une
+    /// file illimitee). Si le Receiver a ete abandonne (tache de fond morte,
+    /// ne devrait pas arriver en fonctionnement normal), on logue au lieu de
+    /// paniquer : la mutation reste appliquee en memoire.
+    async fn send_write(&self, path: PathBuf, yaml: String) {
+        if self
+            .tx
+            .send(WriteJob::Write { path, yaml })
+            .await
+            .is_err()
+        {
+            tracing::error!(
+                "write-behind: tache d'ecriture indisponible, mutation appliquee en memoire uniquement (pas persistee)"
+            );
+        }
+    }
+
+    /// Attend que tous les jobs pousses AVANT cet appel aient ete traites
+    /// (succes ou echec). Utilise par les tests (assertions deterministes
+    /// sans sleep) et par l'arret gracieux du serveur (drainer la file avant
+    /// de quitter, cf main.rs).
+    async fn flush(&self) {
+        let (tx, rx) = oneshot::channel();
+        if self.tx.send(WriteJob::Barrier(tx)).await.is_ok() {
+            let _ = rx.await;
+        }
+    }
+
+    fn status(&self) -> WriteQueueStatus {
+        let pending = WRITE_QUEUE_CAPACITY.saturating_sub(self.tx.capacity());
+        let last_write_ok_ms = match self.stats.last_write_ok_ms.load(Ordering::Relaxed) {
+            0 => None,
+            v => Some(v),
+        };
+        let last_error = self.stats.last_error.read().unwrap().clone();
+        WriteQueueStatus {
+            pending,
+            capacity: WRITE_QUEUE_CAPACITY,
+            last_write_ok_ms,
+            last_error,
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct MockStore {
     config: Arc<RwLock<Arc<MockConfig>>>,
     path: PathBuf,
+    writer: WriterHandle,
 }
 
 impl MockStore {
@@ -43,6 +210,7 @@ impl MockStore {
         Self {
             config: Arc::new(RwLock::new(Arc::new(MockConfig::empty()))),
             path,
+            writer: WriterHandle::spawn(),
         }
     }
 
@@ -67,13 +235,19 @@ impl MockStore {
         let file = Self::config_file(data_dir);
         std::fs::create_dir_all(data_dir).map_err(|e| StoreError::Io(e.to_string()))?;
 
+        // Bootstrap : ecriture synchrone (pas de write-behind ici). C'est le
+        // seul chemin d'ecriture qui reste bloquant intentionnellement — il
+        // s'execute avant que le serveur ne commence a accepter du trafic,
+        // donc aucune requete HTTP n'attend dessus, et le contrat "le fichier
+        // existe des le retour de load_or_init" doit rester vrai sans flush().
         let config = if file.exists() {
             let content =
                 std::fs::read_to_string(&file).map_err(|e| StoreError::Io(e.to_string()))?;
             serde_yaml::from_str(&content).map_err(|e| StoreError::Yaml(e.to_string()))?
         } else {
             let empty = MockConfig::empty();
-            Self::atomic_write(&file, &empty)?;
+            let yaml = serde_yaml::to_string(&empty).map_err(|e| StoreError::Yaml(e.to_string()))?;
+            Self::write_to_disk(&file, &yaml)?;
             empty
         };
 
@@ -82,6 +256,7 @@ impl MockStore {
         Ok(Self {
             config: Arc::new(RwLock::new(Arc::new(config))),
             path: file,
+            writer: WriterHandle::spawn(),
         })
     }
 
@@ -89,9 +264,18 @@ impl MockStore {
         self.config.read().await.clone()
     }
 
+    /// Applique la mutation instantanement en memoire, puis delegue
+    /// l'ecriture disque a la tache de fond (write-behind). Le verrou
+    /// d'ecriture est tenu du debut (backup synchrone) jusqu'a la mise en
+    /// queue incluse : ca serialise les mutations concurrentes dans le meme
+    /// ordre que les jobs arrivent dans le channel (FIFO, un seul
+    /// consommateur), donc l'ordre des ecritures sur disque respecte
+    /// toujours l'ordre des mutations.
     pub async fn replace(&self, config: MockConfig) -> Result<(), StoreError> {
-        Self::atomic_write(&self.path, &config)?;
-        *self.config.write().await = Arc::new(config);
+        let mut guard = self.config.write().await;
+        let yaml = Self::prepare_and_backup(&self.path, &config)?;
+        *guard = Arc::new(config);
+        self.writer.send_write(self.path.clone(), yaml).await;
         Ok(())
     }
 
@@ -102,9 +286,25 @@ impl MockStore {
         let mut guard = self.config.write().await;
         let mut cfg = (**guard).clone();
         f(&mut cfg);
-        Self::atomic_write(&self.path, &cfg)?;
+        let yaml = Self::prepare_and_backup(&self.path, &cfg)?;
         *guard = Arc::new(cfg);
+        self.writer.send_write(self.path.clone(), yaml).await;
         Ok(guard.clone())
+    }
+
+    /// Attend que toutes les mutations deja soumises aient ete persistees
+    /// sur disque (succes ou echec). A utiliser pour des assertions de test
+    /// deterministes, ou a l'arret gracieux du serveur pour drainer la file
+    /// avant de quitter (cf main.rs). Ne fait PAS partie du chemin de
+    /// mutation normal — les handlers HTTP ne l'appellent jamais.
+    pub async fn flush(&self) {
+        self.writer.flush().await;
+    }
+
+    /// Etat observable du write-behind (taille de file, derniere ecriture
+    /// reussie, derniere erreur), expose par GET /api/health.
+    pub fn writer_status(&self) -> WriteQueueStatus {
+        self.writer.status()
     }
 
     /// Liste les backups disponibles (backups/ + backups/protected/), triees
@@ -233,7 +433,12 @@ impl MockStore {
         Ok(())
     }
 
-    fn atomic_write(path: &Path, config: &MockConfig) -> Result<(), StoreError> {
+    /// Partie SYNCHRONE de l'ecriture : serialise en YAML, purge les backups
+    /// proteges expires, puis sauvegarde le fichier existant AVANT tout
+    /// remplacement. Appelee sous le verrou d'ecriture, avant la mise en
+    /// queue de l'ecriture asynchrone — voir le commentaire en tete de
+    /// fichier sur la contrainte "backup avant write-behind".
+    fn prepare_and_backup(path: &Path, config: &MockConfig) -> Result<String, StoreError> {
         let yaml = serde_yaml::to_string(config).map_err(|e| StoreError::Yaml(e.to_string()))?;
 
         let parent = path.parent().ok_or_else(|| {
@@ -242,6 +447,19 @@ impl MockStore {
 
         Self::purge_expired_protected_backups(parent)?;
         Self::backup_before_overwrite(path, parent)?;
+
+        Ok(yaml)
+    }
+
+    /// Partie ASYNCHRONE (write-behind) : ecrit le YAML deja serialise sur
+    /// disque via tmp write + rename. Appelee uniquement par la tache de
+    /// fond du writer (WriterHandle::run) — sauf pour l'ecriture de bootstrap
+    /// dans load_or_init(), qui reste volontairement synchrone (cf commentaire
+    /// sur load_or_init).
+    fn write_to_disk(path: &Path, yaml: &str) -> Result<(), StoreError> {
+        let parent = path.parent().ok_or_else(|| {
+            StoreError::Io("config path has no parent directory".into())
+        })?;
 
         let tmp_path = parent.join(".mock-config.yaml.tmp");
         std::fs::write(&tmp_path, yaml.as_bytes()).map_err(|e| StoreError::Io(e.to_string()))?;
@@ -369,6 +587,14 @@ mod tests {
     use super::*;
     use crate::models::{*, WsdlMode};
 
+    // Process-wide env vars (BACKUP_MAX_COUNT, DATA_PATH) are mutated by
+    // several tests below; cargo test runs test fns in parallel OS threads,
+    // so without serialization one test's set_var/remove_var can leak into
+    // another's assertion window (pre-existing flakiness, unrelated to
+    // write-behind). Any test touching these env vars must hold this lock
+    // for its whole body.
+    static ENV_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     fn temp_dir() -> PathBuf {
         let dir = std::env::temp_dir().join(format!("lightmock-test-{}", fastrand::u64(..)));
         std::fs::create_dir_all(&dir).unwrap();
@@ -441,6 +667,8 @@ mod tests {
 
         let cfg = sample_config();
         store.replace(cfg.clone()).await.unwrap();
+        // write-behind: wait for the queued disk write before reading the file.
+        store.flush().await;
 
         let on_disk: MockConfig = serde_yaml::from_str(
             &std::fs::read_to_string(MockStore::config_file(&dir)).unwrap(),
@@ -481,6 +709,8 @@ mod tests {
         assert!(!updated.services[0].is_mocked);
         assert_eq!(updated.services[1].name, "svc-b");
 
+        // write-behind: wait for the queued disk write before reading the file.
+        store.flush().await;
         let on_disk: MockConfig = serde_yaml::from_str(
             &std::fs::read_to_string(MockStore::config_file(&dir)).unwrap(),
         )
@@ -494,6 +724,7 @@ mod tests {
         let dir = temp_dir();
         let store = MockStore::load_or_init(&dir).await.unwrap();
         store.replace(sample_config()).await.unwrap();
+        store.flush().await;
 
         let tmp_path = dir.join(".mock-config.yaml.tmp");
         assert!(!tmp_path.exists(), "temp file should be cleaned up after rename");
@@ -515,6 +746,7 @@ mod tests {
 
     #[tokio::test]
     async fn backup_rotation_keeps_max_n() {
+        let _guard = ENV_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
         let dir = temp_dir();
         unsafe { std::env::set_var("BACKUP_MAX_COUNT", "3") };
 
@@ -549,6 +781,7 @@ mod tests {
 
     #[tokio::test]
     async fn protected_backup_exempt_from_normal_rotation() {
+        let _guard = ENV_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
         let dir = temp_dir();
         unsafe { std::env::set_var("BACKUP_MAX_COUNT", "2") };
 
@@ -627,12 +860,14 @@ mod tests {
 
     #[test]
     fn backup_max_count_default() {
+        let _guard = ENV_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
         unsafe { std::env::remove_var("BACKUP_MAX_COUNT") };
         assert_eq!(MockStore::backup_max_count(), 5);
     }
 
     #[test]
     fn backup_max_count_from_env() {
+        let _guard = ENV_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
         unsafe { std::env::set_var("BACKUP_MAX_COUNT", "12") };
         assert_eq!(MockStore::backup_max_count(), 12);
         unsafe { std::env::remove_var("BACKUP_MAX_COUNT") };
@@ -699,6 +934,10 @@ mod tests {
         let dir = temp_dir();
         let store = MockStore::load_or_init(&dir).await.unwrap();
         store.replace(sample_config()).await.unwrap();
+        // write-behind: flush so "svc-a" actually lands on disk before the
+        // next replace() backs up "whatever is currently on disk" — without
+        // this, the backup below could capture the stale bootstrap content.
+        store.flush().await;
 
         let mut other = sample_config();
         other.services[0].name = "restored-svc".into();
@@ -722,6 +961,11 @@ mod tests {
         let dir = temp_dir();
         let store = MockStore::load_or_init(&dir).await.unwrap();
         store.replace(sample_config()).await.unwrap();
+        // write-behind: flush so "svc-a" actually lands on disk before
+        // backup_before_reset() copies "whatever is currently on disk" into
+        // backups/protected/ — otherwise it would copy the stale bootstrap
+        // content instead.
+        store.flush().await;
         store.backup_before_reset().await.unwrap();
         store.replace(MockConfig::empty()).await.unwrap();
 
@@ -773,9 +1017,9 @@ mod tests {
 
         store.restore_from_backup(&target).await.unwrap();
 
-        // restore_from_backup() -> replace() -> atomic_write() must have backed up
-        // "before-restore" (the state overwritten by the restore) before writing
-        // the restored content — never lose the pre-restore state.
+        // restore_from_backup() -> replace() -> prepare_and_backup() must have backed
+        // up "before-restore" (the state overwritten by the restore) before queuing
+        // the restored content for write-behind — never lose the pre-restore state.
         let backups_after = store.list_backups().await.unwrap();
         assert!(backups_after.iter().filter(|b| !b.protected).count() > backups_before.iter().filter(|b| !b.protected).count());
         std::fs::remove_dir_all(&dir).ok();
@@ -783,6 +1027,7 @@ mod tests {
 
     #[test]
     fn data_path_default() {
+        let _guard = ENV_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
         unsafe { std::env::remove_var("DATA_PATH") };
         let p = MockStore::data_path();
         assert_eq!(p, PathBuf::from("./data"));
@@ -790,6 +1035,7 @@ mod tests {
 
     #[test]
     fn data_path_from_env() {
+        let _guard = ENV_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
         unsafe { std::env::set_var("DATA_PATH", "/mnt/pvc/lightmock") };
         let p = MockStore::data_path();
         assert_eq!(p, PathBuf::from("/mnt/pvc/lightmock"));
@@ -806,6 +1052,136 @@ mod tests {
         let s2 = store.clone();
         let (r1, r2) = tokio::join!(s1.snapshot(), s2.snapshot());
         assert_eq!(r1, r2);
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    // --------------- Write-behind ---------------
+
+    #[tokio::test]
+    async fn write_behind_flush_persists_to_disk() {
+        let dir = temp_dir();
+        let store = MockStore::load_or_init(&dir).await.unwrap();
+
+        store.replace(sample_config()).await.unwrap();
+        store.flush().await;
+
+        let on_disk: MockConfig = serde_yaml::from_str(
+            &std::fs::read_to_string(MockStore::config_file(&dir)).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(on_disk.services.len(), 1);
+        let status = store.writer_status();
+        assert!(status.last_write_ok_ms.is_some());
+        assert!(status.last_error.is_none());
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// Le backup de l'etat ecrase doit exister sur disque immediatement apres
+    /// replace(), MEME SANS flush() — il est cree de facon synchrone par
+    /// prepare_and_backup() avant que l'ecriture ne soit seulement mise en
+    /// queue. Ne pas confondre avec la persistance du NOUVEAU contenu
+    /// (mock-config.yaml lui-meme), qui elle est asynchrone.
+    #[tokio::test]
+    async fn backup_is_synchronous_before_write_is_queued() {
+        let dir = temp_dir();
+        let store = MockStore::load_or_init(&dir).await.unwrap();
+
+        store.replace(sample_config()).await.unwrap();
+        // Deliberement PAS de flush() ici : on verifie que le backup de
+        // l'etat precedent est deja sur disque independamment de l'etat
+        // d'avancement de la tache de fond.
+        let backups = store.list_backups().await.unwrap();
+        assert_eq!(
+            backups.iter().filter(|b| !b.protected).count(),
+            1,
+            "backup must be created synchronously, before the async write is even queued"
+        );
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test]
+    async fn concurrent_updates_preserve_order_and_match_disk() {
+        let dir = temp_dir();
+        let store = MockStore::load_or_init(&dir).await.unwrap();
+        store.replace(sample_config()).await.unwrap();
+
+        let mut handles = Vec::new();
+        for i in 0..10 {
+            let s = store.clone();
+            handles.push(tokio::spawn(async move {
+                s.update(move |cfg| {
+                    cfg.services.push(Service {
+                        name: format!("concurrent-{i}"),
+                        listen_path: format!("/concurrent-{i}/*"),
+                        real_target_url: "http://x:8080".into(),
+                        is_mocked: true,
+                        rewrite_directory_urls: false,
+                        group_name: None,
+                        wsdl_mode: WsdlMode::default(),
+                        rules: vec![],
+                    });
+                })
+                .await
+                .unwrap();
+            }));
+        }
+        for h in handles {
+            h.await.unwrap();
+        }
+        store.flush().await;
+
+        let on_disk: MockConfig = serde_yaml::from_str(
+            &std::fs::read_to_string(MockStore::config_file(&dir)).unwrap(),
+        )
+        .unwrap();
+        let in_mem = store.snapshot().await;
+        assert_eq!(*in_mem, on_disk, "disk must match memory once flushed");
+        assert_eq!(on_disk.services.len(), 11, "the original service + all 10 concurrent updates");
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test]
+    async fn write_queue_status_reports_bounded_capacity() {
+        let dir = temp_dir();
+        let store = MockStore::load_or_init(&dir).await.unwrap();
+
+        let status = store.writer_status();
+        assert_eq!(status.capacity, WRITE_QUEUE_CAPACITY);
+
+        for i in 0..20 {
+            let mut cfg = sample_config();
+            cfg.services[0].name = format!("svc-{i}");
+            store.replace(cfg).await.unwrap();
+            assert!(store.writer_status().pending <= WRITE_QUEUE_CAPACITY);
+        }
+        store.flush().await;
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// Une erreur d'ecriture disque (chemin invalide) est loguee et exposee
+    /// via writer_status(), mais ne fait PAS mourir la tache de fond : une
+    /// mutation ulterieure vers un chemin redevenu valide doit toujours
+    /// aboutir.
+    #[tokio::test]
+    async fn write_error_is_reported_and_task_keeps_running() {
+        let dir = temp_dir();
+        let bogus_path = dir.join("missing-subdir").join("mock-config.yaml");
+        let store = MockStore::new(bogus_path.clone());
+
+        store.replace(sample_config()).await.unwrap();
+        store.flush().await;
+
+        let status = store.writer_status();
+        assert!(status.last_error.is_some(), "write to a missing directory must be reported as an error");
+        assert!(status.last_write_ok_ms.is_none());
+
+        std::fs::create_dir_all(bogus_path.parent().unwrap()).unwrap();
+        store.replace(sample_config()).await.unwrap();
+        store.flush().await;
+
+        let status2 = store.writer_status();
+        assert!(status2.last_write_ok_ms.is_some(), "task must keep processing jobs after a prior write error");
+        assert!(bogus_path.exists());
         std::fs::remove_dir_all(&dir).ok();
     }
 }
