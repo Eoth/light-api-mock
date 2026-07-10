@@ -1,0 +1,291 @@
+{
+  "_comment": "SOURCE UNIQUE des selecteurs pour les scenarios E2E data-driven (frontend/e2e/scenarios/*.json). Genere a partir des data-testid poses sur les composants Svelte au sujet 9a (cf CLAUDE.md). Un objet par composant/page, cle logique -> selecteur CSS [data-testid=...]. Les entrees comportant un discriminant (element repete dans une boucle) utilisent un template avec des placeholders {nom} resolus par scenario-runner.js a partir de step.params -- voir frontend/e2e/README.md.",
+
+  "app": {
+    "titleButton": "[data-testid=\"app-title-button\"]",
+    "navLogsButton": "[data-testid=\"app-nav-logs-button\"]",
+    "navMessagingButton": "[data-testid=\"app-nav-messaging-button\"]",
+    "navGroupsButton": "[data-testid=\"app-nav-groups-button\"]",
+    "exportButton": "[data-testid=\"app-export-button\"]",
+    "importButton": "[data-testid=\"app-import-button\"]",
+    "navBackupsButton": "[data-testid=\"app-nav-backups-button\"]",
+    "resetButton": "[data-testid=\"app-reset-button\"]",
+    "themeToggleButton": "[data-testid=\"app-theme-toggle-button\"]",
+    "userBadge": "[data-testid=\"app-user-badge\"]",
+    "logoutButton": "[data-testid=\"app-logout-button\"]",
+    "importFileInput": "[data-testid=\"app-import-file-input\"]",
+    "breadcrumbServicesLink": "[data-testid=\"app-breadcrumb-services-link\"]",
+    "importModal": "[data-testid=\"app-import-modal\"]",
+    "importModalCloseButton": "[data-testid=\"app-import-modal-close-button\"]",
+    "importReplaceButton": "[data-testid=\"app-import-replace-button\"]",
+    "importMergeButton": "[data-testid=\"app-import-merge-button\"]",
+    "importCancelButton": "[data-testid=\"app-import-cancel-button\"]",
+    "addServiceButton": "[data-testid=\"app-add-service-button\"]",
+    "loadDemoButton": "[data-testid=\"app-load-demo-button\"]"
+  },
+
+  "serviceList": {
+    "searchInput": "[data-testid=\"service-list-search-input\"]",
+    "searchCount": "[data-testid=\"service-list-search-count\"]"
+  },
+
+  "serviceGroup": {
+    "header": "[data-testid=\"service-group-header-{groupId}\"]",
+    "panel": "[data-testid=\"service-group-panel-{groupId}\"]"
+  },
+
+  "serviceCard": {
+    "card": "[data-testid=\"service-card-{name}\"]",
+    "configureButton": "[data-testid=\"service-card-configure-button-{name}\"]",
+    "cloneButton": "[data-testid=\"service-card-clone-button-{name}\"]"
+  },
+
+  "serviceForm": {
+    "error": "[data-testid=\"service-form-error\"]",
+    "nameInput": "[data-testid=\"service-form-name-input\"]",
+    "pathInput": "[data-testid=\"service-form-path-input\"]",
+    "targetInput": "[data-testid=\"service-form-target-input\"]",
+    "typeSelect": "[data-testid=\"service-form-type-select\"]",
+    "groupSelect": "[data-testid=\"service-form-group-select\"]",
+    "urlPreview": "[data-testid=\"service-form-url-preview\"]",
+    "submitButton": "[data-testid=\"service-form-submit-button\"]",
+    "cancelButton": "[data-testid=\"service-form-cancel-button\"]"
+  },
+
+  "serviceDetail": {
+    "backButton": "[data-testid=\"service-detail-back-button\"]",
+    "editButton": "[data-testid=\"service-detail-edit-button\"]",
+    "deleteButton": "[data-testid=\"service-detail-delete-button\"]"
+  },
+
+  "ruleList": {
+    "addButton": "[data-testid=\"rule-list-add-button\"]",
+    "emptyMessage": "[data-testid=\"rule-list-empty-message\"]",
+    "item": "[data-testid=\"rule-list-item-{name}\"]",
+    "moveUpButton": "[data-testid=\"rule-list-moveup-button-{name}\"]",
+    "moveDownButton": "[data-testid=\"rule-list-movedown-button-{name}\"]",
+    "editButton": "[data-testid=\"rule-list-edit-button-{name}\"]",
+    "cloneButton": "[data-testid=\"rule-list-clone-button-{name}\"]",
+    "deleteButton": "[data-testid=\"rule-list-delete-button-{name}\"]"
+  },
+
+  "ruleForm": {
+    "nameInput": "[data-testid=\"rule-form-name-input\"]",
+    "methodSelect": "[data-testid=\"rule-form-method-select\"]",
+    "subpathInput": "[data-testid=\"rule-form-subpath-input\"]",
+    "actionMockRadio": "[data-testid=\"rule-form-action-mock-radio\"]",
+    "actionProxyRadio": "[data-testid=\"rule-form-action-proxy-radio\"]",
+    "removeConditionAllOfButton": "[data-testid=\"rule-form-remove-condition-allof-button-{idx}\"]",
+    "addConditionAllOfButton": "[data-testid=\"rule-form-add-condition-allof-button\"]",
+    "removeConditionAnyOfButton": "[data-testid=\"rule-form-remove-condition-anyof-button-{idx}\"]",
+    "addConditionAnyOfButton": "[data-testid=\"rule-form-add-condition-anyof-button\"]",
+    "responseToggleButton": "[data-testid=\"rule-form-response-toggle-button\"]",
+    "modeButton": "[data-testid=\"rule-form-mode-button-{mode}\"]",
+    "modeSwitchConfirmButton": "[data-testid=\"rule-form-mode-switch-confirm-button\"]",
+    "modeSwitchCancelButton": "[data-testid=\"rule-form-mode-switch-cancel-button\"]",
+    "statusInput": "[data-testid=\"rule-form-status-input\"]",
+    "headerNameInput": "[data-testid=\"rule-form-header-name-input-{idx}\"]",
+    "headerValueInput": "[data-testid=\"rule-form-header-value-input-{idx}\"]",
+    "removeHeaderButton": "[data-testid=\"rule-form-remove-header-button-{idx}\"]",
+    "addHeaderButton": "[data-testid=\"rule-form-add-header-button\"]",
+    "textContentTextarea": "[data-testid=\"rule-form-text-content-textarea\"]",
+    "fragmentCard": "[data-testid=\"rule-form-fragment-card-{idx}\"]",
+    "fragmentTypeSelect": "[data-testid=\"rule-form-fragment-type-select-{idx}\"]",
+    "fragmentMoveUpButton": "[data-testid=\"rule-form-fragment-moveup-button-{idx}\"]",
+    "fragmentMoveDownButton": "[data-testid=\"rule-form-fragment-movedown-button-{idx}\"]",
+    "fragmentDeleteButton": "[data-testid=\"rule-form-fragment-delete-button-{idx}\"]",
+    "fragmentLiteralTextarea": "[data-testid=\"rule-form-fragment-literal-textarea-{idx}\"]",
+    "fragmentPickInput": "[data-testid=\"rule-form-fragment-pick-input-{idx}-{vi}\"]",
+    "fragmentPickRemoveButton": "[data-testid=\"rule-form-fragment-pick-remove-button-{idx}-{vi}\"]",
+    "fragmentPickAddButton": "[data-testid=\"rule-form-fragment-pick-add-button-{idx}\"]",
+    "fragmentFakeSelect": "[data-testid=\"rule-form-fragment-fake-select-{idx}\"]",
+    "fragmentPathSegmentInput": "[data-testid=\"rule-form-fragment-pathsegment-input-{idx}\"]",
+    "fragmentTemplateTextarea": "[data-testid=\"rule-form-fragment-template-textarea-{idx}\"]",
+    "fragmentAddButton": "[data-testid=\"rule-form-fragment-add-button\"]",
+    "validateScriptButton": "[data-testid=\"rule-form-validate-script-button-{slot}\"]",
+    "scriptValid": "[data-testid=\"rule-form-script-valid-{slot}\"]",
+    "scriptInvalid": "[data-testid=\"rule-form-script-invalid-{slot}\"]",
+    "chaosDelayInput": "[data-testid=\"rule-form-chaos-delay-input\"]",
+    "chaosDelayMinInput": "[data-testid=\"rule-form-chaos-delay-min-input\"]",
+    "chaosDelayMaxInput": "[data-testid=\"rule-form-chaos-delay-max-input\"]",
+    "chaosErrorRateInput": "[data-testid=\"rule-form-chaos-error-rate-input\"]",
+    "chaosErrorStatusInput": "[data-testid=\"rule-form-chaos-error-status-input\"]",
+    "submitButton": "[data-testid=\"rule-form-submit-button\"]",
+    "cancelButton": "[data-testid=\"rule-form-cancel-button\"]"
+  },
+
+  "conditionForm": {
+    "sourceSelect": "[data-testid=\"condition-form-source-select\"]",
+    "keySelect": "[data-testid=\"condition-form-key-select\"]",
+    "keyInput": "[data-testid=\"condition-form-key-input\"]",
+    "operatorSelect": "[data-testid=\"condition-form-operator-select\"]",
+    "valueInput": "[data-testid=\"condition-form-value-input\"]",
+    "submitButton": "[data-testid=\"condition-form-submit-button\"]",
+    "cancelButton": "[data-testid=\"condition-form-cancel-button\"]"
+  },
+
+  "ruleTester": {
+    "logSelect": "[data-testid=\"rule-tester-log-select\"]",
+    "testButton": "[data-testid=\"rule-tester-test-button\"]",
+    "error": "[data-testid=\"rule-tester-error\"]",
+    "result": "[data-testid=\"rule-tester-result\"]"
+  },
+
+  "rhaiScriptEditor": {
+    "textarea": "[data-testid=\"rhai-script-editor-textarea-{id}\"]",
+    "suggestions": "[data-testid=\"rhai-script-editor-suggestions-{id}\"]",
+    "suggestion": "[data-testid=\"rhai-script-editor-suggestion-{id}-{fnName}\"]"
+  },
+
+  "jsonBuilder": {
+    "sourceSelect": "[data-testid=\"json-builder-source-select-{path}\"]",
+    "fakeSelect": "[data-testid=\"json-builder-fake-select-{path}\"]",
+    "valueInput": "[data-testid=\"json-builder-value-input-{path}\"]",
+    "pipeInput": "[data-testid=\"json-builder-pipe-input-{path}\"]",
+    "asNumberCheckbox": "[data-testid=\"json-builder-asnumber-checkbox-{path}\"]",
+    "keyInput": "[data-testid=\"json-builder-key-input-{path}\"]",
+    "typeSelect": "[data-testid=\"json-builder-type-select-{path}\"]",
+    "navigateButton": "[data-testid=\"json-builder-navigate-button-{path}\"]",
+    "moveUpButton": "[data-testid=\"json-builder-moveup-button-{path}\"]",
+    "moveDownButton": "[data-testid=\"json-builder-movedown-button-{path}\"]",
+    "deleteButton": "[data-testid=\"json-builder-delete-button-{path}\"]",
+    "addSubfieldButton": "[data-testid=\"json-builder-add-subfield-button-{path}\"]",
+    "deleteItemButton": "[data-testid=\"json-builder-delete-item-button-{path}-{itemIdx}\"]",
+    "addItemButton": "[data-testid=\"json-builder-add-item-button-{path}\"]",
+    "addTemplateFieldButton": "[data-testid=\"json-builder-add-template-field-button-{path}\"]",
+    "breadcrumbLink": "[data-testid=\"json-builder-breadcrumb-link-{idx}\"]",
+    "addFieldButton": "[data-testid=\"json-builder-add-field-button\"]"
+  },
+
+  "xmlBuilder": {
+    "rootTagInput": "[data-testid=\"xml-builder-root-tag-input\"]",
+    "sourceSelect": "[data-testid=\"xml-builder-source-select-{path}\"]",
+    "fakeSelect": "[data-testid=\"xml-builder-fake-select-{path}\"]",
+    "valueInput": "[data-testid=\"xml-builder-value-input-{path}\"]",
+    "pipeInput": "[data-testid=\"xml-builder-pipe-input-{path}\"]",
+    "tagInput": "[data-testid=\"xml-builder-tag-input-{path}\"]",
+    "typeSelect": "[data-testid=\"xml-builder-type-select-{path}\"]",
+    "moveUpButton": "[data-testid=\"xml-builder-moveup-button-{path}\"]",
+    "moveDownButton": "[data-testid=\"xml-builder-movedown-button-{path}\"]",
+    "deleteButton": "[data-testid=\"xml-builder-delete-button-{path}\"]",
+    "addSubnodeButton": "[data-testid=\"xml-builder-add-subnode-button-{path}\"]",
+    "addNodeButton": "[data-testid=\"xml-builder-add-node-button\"]"
+  },
+
+  "jsonPasteBuilder": {
+    "textarea": "[data-testid=\"json-paste-builder-textarea\"]",
+    "error": "[data-testid=\"json-paste-builder-error\"]",
+    "analyzeButton": "[data-testid=\"json-paste-builder-analyze-button\"]",
+    "resetButton": "[data-testid=\"json-paste-builder-reset-button\"]",
+    "sourceSelect": "[data-testid=\"json-paste-builder-source-select-{path}\"]",
+    "fakeSelect": "[data-testid=\"json-paste-builder-fake-select-{path}\"]",
+    "valueInput": "[data-testid=\"json-paste-builder-value-input-{path}\"]"
+  },
+
+  "responseEditor": {
+    "statusInput": "[data-testid=\"response-editor-status-input\"]",
+    "removeHeaderButton": "[data-testid=\"response-editor-remove-header-button-{idx}\"]",
+    "addHeaderButton": "[data-testid=\"response-editor-add-header-button\"]",
+    "addFragmentButton": "[data-testid=\"response-editor-add-fragment-button\"]",
+    "submitButton": "[data-testid=\"response-editor-submit-button\"]",
+    "cancelButton": "[data-testid=\"response-editor-cancel-button\"]"
+  },
+
+  "groupManager": {
+    "newGroupButton": "[data-testid=\"group-manager-new-group-button\"]",
+    "backButton": "[data-testid=\"group-manager-back-button\"]",
+    "createForm": "[data-testid=\"group-manager-create-form\"]",
+    "nameInput": "[data-testid=\"group-manager-name-input\"]",
+    "createSubmitButton": "[data-testid=\"group-manager-create-submit-button\"]",
+    "card": "[data-testid=\"group-manager-card-{name}\"]",
+    "manageButton": "[data-testid=\"group-manager-manage-button-{name}\"]",
+    "deleteButton": "[data-testid=\"group-manager-delete-button-{name}\"]",
+    "removeServiceButton": "[data-testid=\"group-manager-remove-service-button-{groupName}-{serviceName}\"]",
+    "assignServiceButton": "[data-testid=\"group-manager-assign-service-button-{groupName}-{serviceName}\"]",
+    "newAdminInput": "[data-testid=\"group-manager-new-admin-input-{groupName}\"]",
+    "addAdminButton": "[data-testid=\"group-manager-add-admin-button-{groupName}\"]",
+    "newMemberInput": "[data-testid=\"group-manager-new-member-input-{groupName}\"]",
+    "addMemberButton": "[data-testid=\"group-manager-add-member-button-{groupName}\"]"
+  },
+
+  "backupManager": {
+    "backButton": "[data-testid=\"backup-manager-back-button\"]",
+    "emptyMessage": "[data-testid=\"backup-manager-empty-message\"]",
+    "item": "[data-testid=\"backup-manager-item-{filename}\"]",
+    "restoreButton": "[data-testid=\"backup-manager-restore-button-{filename}\"]"
+  },
+
+  "messagingLog": {
+    "refreshButton": "[data-testid=\"messaging-log-refresh-button\"]",
+    "backButton": "[data-testid=\"messaging-log-back-button\"]",
+    "simTopicInput": "[data-testid=\"messaging-log-sim-topic-input\"]",
+    "simPayloadTextarea": "[data-testid=\"messaging-log-sim-payload-textarea\"]",
+    "simulateButton": "[data-testid=\"messaging-log-simulate-button\"]",
+    "filterDirection": "[data-testid=\"messaging-log-filter-direction\"]",
+    "filterMatched": "[data-testid=\"messaging-log-filter-matched\"]",
+    "filterSearch": "[data-testid=\"messaging-log-filter-search\"]",
+    "clearFiltersButton": "[data-testid=\"messaging-log-clear-filters-button\"]",
+    "row": "[data-testid=\"messaging-log-row-{idx}\"]",
+    "detailButton": "[data-testid=\"messaging-log-detail-button-{idx}\"]",
+    "detailModal": "[data-testid=\"messaging-log-detail-modal\"]",
+    "detailModalCloseButton": "[data-testid=\"messaging-log-detail-modal-close-button\"]"
+  },
+
+  "requestLog": {
+    "refreshButton": "[data-testid=\"request-log-refresh-button\"]",
+    "filterService": "[data-testid=\"request-log-filter-service\"]",
+    "filterMode": "[data-testid=\"request-log-filter-mode\"]",
+    "filterStatus": "[data-testid=\"request-log-filter-status\"]",
+    "filterTime": "[data-testid=\"request-log-filter-time\"]",
+    "filterSearch": "[data-testid=\"request-log-filter-search\"]",
+    "clearFiltersButton": "[data-testid=\"request-log-clear-filters-button\"]",
+    "row": "[data-testid=\"request-log-row-{idx}\"]",
+    "detailButton": "[data-testid=\"request-log-detail-button-{idx}\"]",
+    "detailModal": "[data-testid=\"request-log-detail-modal\"]",
+    "detailModalCloseButton": "[data-testid=\"request-log-detail-modal-close-button\"]"
+  },
+
+  "confirmDialog": {
+    "dialog": "[data-testid=\"confirm-dialog\"]",
+    "closeButton": "[data-testid=\"confirm-dialog-close-button\"]",
+    "keywordInput": "[data-testid=\"confirm-dialog-keyword-input\"]",
+    "cancelButton": "[data-testid=\"confirm-dialog-cancel-button\"]",
+    "confirmButton": "[data-testid=\"confirm-dialog-confirm-button\"]"
+  },
+
+  "loginForm": {
+    "error": "[data-testid=\"login-form-error\"]",
+    "usernameInput": "[data-testid=\"login-form-username-input\"]",
+    "passwordInput": "[data-testid=\"login-form-password-input\"]",
+    "submitButton": "[data-testid=\"login-form-submit-button\"]"
+  },
+
+  "removableList": {
+    "item": "[data-testid=\"removable-list-item-{key}\"]",
+    "removeButton": "[data-testid=\"removable-list-remove-button-{key}\"]"
+  },
+
+  "formField": {
+    "hint": "[data-testid=\"form-field-hint-{id}\"]",
+    "error": "[data-testid=\"form-field-error-{id}\"]"
+  },
+
+  "toggleSwitch": {
+    "switch": "[data-testid=\"toggle-switch-{label}\"]"
+  },
+
+  "urlHealthBadge": {
+    "status": "[data-testid=\"url-health-badge-status-{serviceName}\"]",
+    "testButton": "[data-testid=\"url-health-badge-test-button-{serviceName}\"]",
+    "error": "[data-testid=\"url-health-badge-error-{serviceName}\"]",
+    "warning": "[data-testid=\"url-health-badge-warning-{serviceName}\"]"
+  },
+
+  "statusBadge": {
+    "badge": "[data-testid=\"status-badge\"]"
+  },
+
+  "notification": {
+    "notification": "[data-testid=\"notification\"]"
+  }
+}

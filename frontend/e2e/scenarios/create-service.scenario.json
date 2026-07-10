@@ -1,0 +1,11 @@
+{
+  "scenario": "Creer un service via le formulaire",
+  "steps": [
+    { "action": "goto", "page": "services" },
+    { "action": "click", "target": "app.addServiceButton" },
+    { "action": "fill", "target": "serviceForm.nameInput", "value": "scenario-create-service" },
+    { "action": "fill", "target": "serviceForm.targetInput", "value": "http://scenario-create-service:80" },
+    { "action": "click", "target": "serviceForm.submitButton" },
+    { "action": "assertVisible", "target": "serviceDetail.editButton" }
+  ]
+}
