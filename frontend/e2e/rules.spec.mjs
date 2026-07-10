@@ -57,11 +57,8 @@ async function goToServiceDetail(page) {
   await page.waitForTimeout(300);
 }
 
-test('affiche les regles existantes', async ({ page }) => {
-  await goToServiceDetail(page);
-  await expect(page.getByText('rule-alpha')).toBeVisible();
-  await expect(page.getByText('rule-beta')).toBeVisible();
-});
+// "affiche les regles existantes" migre vers frontend/e2e/scenario-runner.spec.js
+// (scenario JSON view-existing-rules.scenario.json) -- cf CLAUDE.md §6, sujet 9c lot 1.
 
 test('bouton ajouter une regle fonctionne avec regles existantes', async ({ page }) => {
   await goToServiceDetail(page);
@@ -112,23 +109,8 @@ test('annuler le formulaire de regle revient a la liste', async ({ page }) => {
   await expect(page.getByText('rule-alpha')).toBeVisible();
 });
 
-test('creer une nouvelle regle via le formulaire', async ({ page }) => {
-  await goToServiceDetail(page);
-  await page.getByRole('button', { name: /Ajouter une regle/ }).click();
-  await page.locator('input#rule-name').fill('new-rule');
-  await page.getByRole('button', { name: /Ajouter la regle/ }).click();
-  await page.waitForTimeout(500);
-  await expect(page.getByText('new-rule', { exact: true })).toBeVisible();
-});
+// "creer une nouvelle regle via le formulaire" migre vers frontend/e2e/scenario-runner.spec.js
+// (scenario JSON create-simple-rule.scenario.json) -- cf CLAUDE.md §6, sujet 9c lot 1.
 
-test('ajouter un service via le formulaire', async ({ page }) => {
-  await page.goto('/');
-  await page.waitForLoadState('networkidle');
-  await page.getByRole('button', { name: /Ajouter un service/ }).click();
-  await page.locator('input#svc-name').fill('new-svc');
-  await page.locator('input#svc-target').clear();
-  await page.locator('input#svc-target').fill('http://new-svc:80');
-  await page.getByRole('button', { name: 'Ajouter' }).click();
-  await page.waitForTimeout(500);
-  await expect(page.getByRole('heading', { name: 'new-svc' })).toBeVisible();
-});
+// "ajouter un service via le formulaire" migre vers frontend/e2e/scenario-runner.spec.js
+// (scenario JSON create-service.scenario.json) -- cf CLAUDE.md §6, sujet 9c lot 1.
