@@ -120,9 +120,10 @@
     aria-autocomplete="list"
     aria-controls={showSuggestions ? listboxId : undefined}
     aria-activedescendant={showSuggestions ? `${listboxId}-opt-${activeIndex}` : undefined}
+    data-testid="rhai-script-editor-textarea-{id}"
   ></textarea>
   {#if showSuggestions}
-    <ul class="rhai-suggestions" id={listboxId} role="listbox" aria-label="Fonctions Rhai disponibles">
+    <ul class="rhai-suggestions" id={listboxId} role="listbox" aria-label="Fonctions Rhai disponibles" data-testid="rhai-script-editor-suggestions-{id}">
       {#each suggestions as fn, i (fn.name)}
         <li
           id="{listboxId}-opt-{i}"
@@ -132,6 +133,7 @@
           class:active={i === activeIndex}
           onmousedown={(e) => { e.preventDefault(); selectSuggestion(fn); }}
           onmouseenter={() => activeIndex = i}
+          data-testid="rhai-script-editor-suggestion-{id}-{fn.name}"
         >
           <code class="rhai-suggestion-sig">{fn.signature}</code>
           <span class="rhai-suggestion-desc">{fn.description}</span>

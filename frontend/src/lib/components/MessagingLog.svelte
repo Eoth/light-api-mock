@@ -99,8 +99,8 @@
   <div class="log-header">
     <h2>Messages Kafka</h2>
     <div class="log-controls">
-      <button type="button" class="btn btn-sm btn-outline" onclick={refresh}>Rafraichir</button>
-      <button type="button" class="btn btn-outline btn-sm" onclick={onBack}>Retour</button>
+      <button type="button" class="btn btn-sm btn-outline" onclick={refresh} data-testid="messaging-log-refresh-button">Rafraichir</button>
+      <button type="button" class="btn btn-outline btn-sm" onclick={onBack} data-testid="messaging-log-back-button">Retour</button>
     </div>
   </div>
 
@@ -110,26 +110,26 @@
     <div class="simulate-fields">
       <label class="form-field-inline">
         <span>Topic</span>
-        <input type="text" bind:value={simTopic} placeholder="orders.in" aria-label="Topic du message simule" />
+        <input type="text" bind:value={simTopic} placeholder="orders.in" aria-label="Topic du message simule" data-testid="messaging-log-sim-topic-input" />
       </label>
       <label class="form-field-inline form-field-inline-grow">
         <span>Payload</span>
-        <textarea bind:value={simPayload} rows="3" aria-label="Corps du message simule"></textarea>
+        <textarea bind:value={simPayload} rows="3" aria-label="Corps du message simule" data-testid="messaging-log-sim-payload-textarea"></textarea>
       </label>
-      <button type="button" class="btn btn-primary btn-sm" disabled={simulating} onclick={handleSimulate}>
+      <button type="button" class="btn btn-primary btn-sm" disabled={simulating} onclick={handleSimulate} data-testid="messaging-log-simulate-button">
         {simulating ? 'Envoi...' : 'Simuler'}
       </button>
     </div>
   </div>
 
   <div class="filters-bar">
-    <select class="filter-select" bind:value={filterDirection} aria-label="Filtrer par direction">
+    <select class="filter-select" bind:value={filterDirection} aria-label="Filtrer par direction" data-testid="messaging-log-filter-direction">
       <option value="">Toutes directions</option>
       <option value="in">Entrant</option>
       <option value="out">Sortant (reply)</option>
     </select>
 
-    <select class="filter-select" bind:value={filterMatched} aria-label="Filtrer par statut de match">
+    <select class="filter-select" bind:value={filterMatched} aria-label="Filtrer par statut de match" data-testid="messaging-log-filter-matched">
       <option value="">Tous les statuts</option>
       <option value="matched">Matches</option>
       <option value="unmatched">Non matches</option>
@@ -141,10 +141,11 @@
       bind:value={filterText}
       placeholder="Rechercher un topic..."
       aria-label="Recherche textuelle sur le topic"
+      data-testid="messaging-log-filter-search"
     />
 
     {#if activeFilterCount > 0}
-      <button type="button" class="btn btn-sm btn-outline btn-clear" onclick={clearFilters} title="Effacer tous les filtres">
+      <button type="button" class="btn btn-sm btn-outline btn-clear" onclick={clearFilters} title="Effacer tous les filtres" data-testid="messaging-log-clear-filters-button">
         Effacer ({activeFilterCount})
       </button>
     {/if}
@@ -176,8 +177,8 @@
           </tr>
         </thead>
         <tbody>
-          {#each filteredLogs() as log}
-            <tr>
+          {#each filteredLogs() as log, idx}
+            <tr data-testid="messaging-log-row-{idx}">
               <td class="col-time">{formatDateTime(log.timestamp)}</td>
               <td><span class="badge {directionBadge(log.direction)}">{directionLabel(log.direction)}</span></td>
               <td class="col-path"><code>{log.topic}</code></td>
@@ -192,7 +193,7 @@
               </td>
               <td class="col-size">{log.body_size_bytes} o</td>
               <td>
-                <button type="button" class="btn-detail" onclick={() => openDetail(log)} aria-label="Voir le detail du message {log.topic}" title="Detail">&#8942;</button>
+                <button type="button" class="btn-detail" onclick={() => openDetail(log)} aria-label="Voir le detail du message {log.topic}" title="Detail" data-testid="messaging-log-detail-button-{idx}">&#8942;</button>
               </td>
             </tr>
           {/each}
@@ -204,11 +205,11 @@
 
 {#if detailLog}
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-  <div class="modal-overlay" role="dialog" aria-modal="true" aria-label="Detail du message" tabindex="-1" onkeydown={handleKeydown} onclick={handleBackdrop}>
+  <div class="modal-overlay" role="dialog" aria-modal="true" aria-label="Detail du message" tabindex="-1" onkeydown={handleKeydown} onclick={handleBackdrop} data-testid="messaging-log-detail-modal">
     <div class="modal-content" role="document">
       <div class="modal-header">
         <h3>Detail du message</h3>
-        <button type="button" class="btn-close" onclick={closeDetail} aria-label="Fermer">&#10005;</button>
+        <button type="button" class="btn-close" onclick={closeDetail} aria-label="Fermer" data-testid="messaging-log-detail-modal-close-button">&#10005;</button>
       </div>
       <dl class="detail-list">
         <div class="detail-row">

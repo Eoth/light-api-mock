@@ -102,7 +102,7 @@
 
   <div class="form-field">
     <label for="resp-status">Code HTTP de réponse</label>
-    <input id="resp-status" type="number" bind:value={status} min="100" max="599" />
+    <input id="resp-status" type="number" bind:value={status} min="100" max="599" data-testid="response-editor-status-input" />
   </div>
 
   <fieldset class="editor-section">
@@ -117,10 +117,10 @@
           <label for="hdr-val-{idx}">Valeur</label>
           <input id="hdr-val-{idx}" type="text" bind:value={header.value} placeholder="application/json" />
         </div>
-        <button type="button" class="btn-icon btn-delete" onclick={() => removeHeader(idx)} aria-label="Supprimer l'en-tête {header.name || idx + 1}">&#10005;</button>
+        <button type="button" class="btn-icon btn-delete" onclick={() => removeHeader(idx)} aria-label="Supprimer l'en-tête {header.name || idx + 1}" data-testid="response-editor-remove-header-button-{idx}">&#10005;</button>
       </div>
     {/each}
-    <button type="button" class="btn btn-sm btn-secondary" onclick={addHeader}>+ En-tête</button>
+    <button type="button" class="btn btn-sm btn-secondary" onclick={addHeader} data-testid="response-editor-add-header-button">+ En-tête</button>
   </fieldset>
 
   <fieldset class="editor-section">
@@ -209,7 +209,7 @@
       </div>
     {/each}
 
-    <button type="button" class="btn btn-sm btn-primary" onclick={addFragment}>+ Ajouter un fragment</button>
+    <button type="button" class="btn btn-sm btn-primary" onclick={addFragment} data-testid="response-editor-add-fragment-button">+ Ajouter un fragment</button>
   </fieldset>
 
   <fieldset class="editor-section chaos-section">
@@ -251,8 +251,8 @@
   </fieldset>
 
   <div class="form-actions">
-    <button type="submit" class="btn btn-primary">Enregistrer la réponse</button>
-    <button type="button" class="btn btn-secondary" onclick={onCancel}>Annuler</button>
+    <button type="submit" class="btn btn-primary" data-testid="response-editor-submit-button">Enregistrer la réponse</button>
+    <button type="button" class="btn btn-secondary" onclick={onCancel} data-testid="response-editor-cancel-button">Annuler</button>
   </div>
 </form>
 

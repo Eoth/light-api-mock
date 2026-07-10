@@ -89,9 +89,10 @@
         bind:value={search}
         placeholder="Rechercher par nom, chemin, URL ou groupe..."
         aria-label="Rechercher un service"
+        data-testid="service-list-search-input"
       />
       {#if search.trim()}
-        <span class="search-count" role="status" aria-live="polite">
+        <span class="search-count" role="status" aria-live="polite" data-testid="service-list-search-count">
           {filtered.length} / {services.length} service{filtered.length !== 1 ? 's' : ''}
         </span>
       {/if}

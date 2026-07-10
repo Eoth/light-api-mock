@@ -16,7 +16,7 @@
 {:else}
   <ul class="removable-list">
     {#each items as item (getKey(item))}
-      <li class="removable-list-item">
+      <li class="removable-list-item" data-testid="removable-list-item-{getKey(item)}">
         <span>{getLabel(item)}</span>
         <button
           type="button"
@@ -24,6 +24,7 @@
           onclick={() => onRemove(item)}
           aria-label={`Retirer ${getLabel(item)}`}
           title="Retirer"
+          data-testid="removable-list-remove-button-{getKey(item)}"
         >
           &times;
         </button>

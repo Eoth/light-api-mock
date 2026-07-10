@@ -87,7 +87,7 @@
 
 <form class="service-form" onsubmit={handleSubmit} aria-label={isEdit ? `Modifier le service ${name}` : 'Ajouter un service'}>
   {#if error}
-    <div class="form-error" role="alert" aria-live="assertive">{error}</div>
+    <div class="form-error" role="alert" aria-live="assertive" data-testid="service-form-error">{error}</div>
   {/if}
 
   <FormField id="svc-name" label="Nom du service" hint="Identifiant unique, sert aussi de prefixe URL : /{`{nom}`}/...">
@@ -100,6 +100,7 @@
         disabled={isEdit}
         placeholder="ex: service-users"
         aria-describedby={describedBy}
+        data-testid="service-form-name-input"
       />
     {/snippet}
   </FormField>
@@ -112,6 +113,7 @@
         bind:value={listenPath}
         placeholder="Vide = intercepte tout sous le nom du service"
         aria-describedby={describedBy}
+        data-testid="service-form-path-input"
       />
     {/snippet}
   </FormField>
@@ -125,13 +127,14 @@
         required
         placeholder="ex: http://service-users.default.svc:8080"
         aria-describedby={describedBy}
+        data-testid="service-form-target-input"
       />
     {/snippet}
   </FormField>
 
   <FormField id="svc-type" label="Type de service" hint={serviceType === 'soap' ? 'Les requetes ?wsdl seront automatiquement proxyfiees vers le backend reel.' : 'API REST standard (JSON).'}>
     {#snippet children({ id, describedBy })}
-      <select {id} bind:value={serviceType} aria-describedby={describedBy}>
+      <select {id} bind:value={serviceType} aria-describedby={describedBy} data-testid="service-form-type-select">
         <option value="rest">REST</option>
         <option value="soap">SOAP / XML</option>
       </select>
@@ -141,7 +144,7 @@
   {#if availableGroups.length > 0}
     <FormField id="svc-group" label="Groupe" hint="Associe le service a un groupe pour gerer les droits d'acces">
       {#snippet children({ id, describedBy })}
-        <select {id} bind:value={groupName} aria-describedby={describedBy}>
+        <select {id} bind:value={groupName} aria-describedby={describedBy} data-testid="service-form-group-select">
           <option value="">-- Aucun groupe --</option>
           {#each availableGroups as g}
             <option value={g.name}>{g.name} (/{g.code})</option>
@@ -153,15 +156,15 @@
 
   {#if name.trim()}
     <div class="url-preview">
-      <strong>URL de test :</strong> <code>{testUrl()}</code>
+      <strong>URL de test :</strong> <code data-testid="service-form-url-preview">{testUrl()}</code>
     </div>
   {/if}
 
   <div class="form-actions">
-    <button type="submit" class="btn btn-primary" disabled={saving}>
+    <button type="submit" class="btn btn-primary" disabled={saving} data-testid="service-form-submit-button">
       {saving ? 'Enregistrement...' : isEdit ? 'Enregistrer' : 'Ajouter'}
     </button>
-    <button type="button" class="btn btn-secondary" onclick={onCancel} disabled={saving}>
+    <button type="button" class="btn btn-secondary" onclick={onCancel} disabled={saving} data-testid="service-form-cancel-button">
       Annuler
     </button>
   </div>

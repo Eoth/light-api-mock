@@ -73,7 +73,7 @@
           {availablePathParams.length} paramètre{availablePathParams.length > 1 ? 's' : ''} de chemin disponible{availablePathParams.length > 1 ? 's' : ''} : {availablePathParams.join(', ')}
         </span>
       {/if}
-      <select id="cond-source" bind:value={sourceType}>
+      <select id="cond-source" bind:value={sourceType} data-testid="condition-form-source-select">
         {#each sourceTypes as st}
           <option value={st.value}>{st.label}</option>
         {/each}
@@ -84,7 +84,7 @@
       <div class="form-field">
         {#if sourceType === 'PathParam'}
           <label for="cond-key">Paramètre de chemin</label>
-          <select id="cond-key" bind:value={sourceKey} required aria-describedby="cond-key-hint">
+          <select id="cond-key" bind:value={sourceKey} required aria-describedby="cond-key-hint" data-testid="condition-form-key-select">
             <option value="" disabled>Choisir un paramètre</option>
             {#each pathParamOptions as name}
               <option value={name}>{name}</option>
@@ -101,6 +101,7 @@
             required
             placeholder="nom"
             aria-describedby="cond-key-hint"
+            data-testid="condition-form-key-input"
           />
           <datalist id="cond-query-param-suggestions">
             {#each queryParamSuggestions as name}
@@ -119,6 +120,7 @@
             required
             placeholder={sourceType === 'JsonPointer' ? '/user/role' : sourceType === 'XPath' ? 'Envelope/Body/id' : 'nom'}
             aria-describedby="cond-key-hint"
+            data-testid="condition-form-key-input"
           />
           <span class="field-hint" id="cond-key-hint">
             {#if sourceType === 'JsonPointer'}Chemin JSON Pointer (ex: /user/role)
@@ -134,7 +136,7 @@
   <div class="form-row">
     <div class="form-field">
       <label for="cond-op">Opérateur</label>
-      <select id="cond-op" bind:value={operatorType}>
+      <select id="cond-op" bind:value={operatorType} data-testid="condition-form-operator-select">
         {#each operatorTypes as op}
           <option value={op.value}>{op.label}</option>
         {/each}
@@ -150,14 +152,15 @@
           bind:value={operatorValue}
           required
           placeholder={operatorType === 'Regex' ? '^\\d{3}$' : 'valeur'}
+          data-testid="condition-form-value-input"
         />
       </div>
     {/if}
   </div>
 
   <div class="form-actions">
-    <button type="submit" class="btn btn-sm btn-primary">Valider</button>
-    <button type="button" class="btn btn-sm btn-secondary" onclick={onCancel}>Annuler</button>
+    <button type="submit" class="btn btn-sm btn-primary" data-testid="condition-form-submit-button">Valider</button>
+    <button type="button" class="btn btn-sm btn-secondary" onclick={onCancel} data-testid="condition-form-cancel-button">Annuler</button>
   </div>
 </form>
 

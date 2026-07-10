@@ -54,11 +54,12 @@
     tabindex="-1"
     onkeydown={handleKeydown}
     onclick={handleBackdrop}
+    data-testid="confirm-dialog"
   >
     <div class="modal-content" role="document">
       <div class="modal-header">
         <h3 id="confirm-dialog-title">{title}</h3>
-        <button type="button" class="btn-close" onclick={onCancel} aria-label="Fermer">&#10005;</button>
+        <button type="button" class="btn-close" onclick={onCancel} aria-label="Fermer" data-testid="confirm-dialog-close-button">&#10005;</button>
       </div>
       <p>{message}</p>
       {#if confirmKeyword}
@@ -71,17 +72,19 @@
             bind:this={keywordInputEl}
             autocomplete="off"
             spellcheck="false"
+            data-testid="confirm-dialog-keyword-input"
           />
         </div>
       {/if}
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" onclick={onCancel}>{cancelLabel}</button>
+        <button type="button" class="btn btn-secondary" onclick={onCancel} data-testid="confirm-dialog-cancel-button">{cancelLabel}</button>
         <button
           type="button"
           class={danger ? 'btn btn-danger' : 'btn btn-primary'}
           bind:this={confirmBtn}
           onclick={handleConfirm}
           disabled={!canConfirm}
+          data-testid="confirm-dialog-confirm-button"
         >
           {confirmLabel}
         </button>

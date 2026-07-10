@@ -317,30 +317,30 @@
 {:else}
   <header class="app-header">
     <div class="header-content">
-      <button type="button" class="app-title-btn" onclick={handleBack}>
+      <button type="button" class="app-title-btn" onclick={handleBack} data-testid="app-title-button">
         <h1 class="app-title">lightMock</h1>
       </button>
       <p class="app-subtitle">Mock &amp; Proxy Intelligent</p>
       <div class="header-actions">
-        <button type="button" class="btn btn-sm btn-outline" onclick={() => view = 'logs'} title="Journal des requetes">Logs</button>
+        <button type="button" class="btn btn-sm btn-outline" onclick={() => view = 'logs'} title="Journal des requetes" data-testid="app-nav-logs-button">Logs</button>
         {#if messagingAvailable}
-          <button type="button" class="btn btn-sm btn-outline" onclick={() => view = 'messaging'} title="Journal des messages Kafka">Messages Kafka</button>
+          <button type="button" class="btn btn-sm btn-outline" onclick={() => view = 'messaging'} title="Journal des messages Kafka" data-testid="app-nav-messaging-button">Messages Kafka</button>
         {/if}
-        <button type="button" class="btn btn-sm btn-outline" onclick={() => view = 'groups'} title="Gestion des groupes">Groupes</button>
-        <button type="button" class="btn btn-sm btn-outline" onclick={exportConfig} title="Telecharger la configuration">Export</button>
-        <button type="button" class="btn btn-sm btn-outline" onclick={importConfig} title="Charger une configuration">Import</button>
-        <button type="button" class="btn btn-sm btn-outline" onclick={() => view = 'backups'} title="Restaurer une sauvegarde de configuration">Sauvegardes</button>
+        <button type="button" class="btn btn-sm btn-outline" onclick={() => view = 'groups'} title="Gestion des groupes" data-testid="app-nav-groups-button">Groupes</button>
+        <button type="button" class="btn btn-sm btn-outline" onclick={exportConfig} title="Telecharger la configuration" data-testid="app-export-button">Export</button>
+        <button type="button" class="btn btn-sm btn-outline" onclick={importConfig} title="Charger une configuration" data-testid="app-import-button">Import</button>
+        <button type="button" class="btn btn-sm btn-outline" onclick={() => view = 'backups'} title="Restaurer une sauvegarde de configuration" data-testid="app-nav-backups-button">Sauvegardes</button>
         {#if canShowReset}
-          <button type="button" class="btn btn-sm btn-outline btn-danger-outline" onclick={() => resetPending = true} title="Supprimer tous les services">Reset</button>
+          <button type="button" class="btn btn-sm btn-outline btn-danger-outline" onclick={() => resetPending = true} title="Supprimer tous les services" data-testid="app-reset-button">Reset</button>
         {/if}
-        <button type="button" class="btn btn-sm btn-outline" onclick={() => darkMode = !darkMode} title={darkMode ? 'Mode clair' : 'Mode sombre'} aria-label={darkMode ? 'Activer le mode clair' : 'Activer le mode sombre'}>
+        <button type="button" class="btn btn-sm btn-outline" onclick={() => darkMode = !darkMode} title={darkMode ? 'Mode clair' : 'Mode sombre'} aria-label={darkMode ? 'Activer le mode clair' : 'Activer le mode sombre'} data-testid="app-theme-toggle-button">
           {darkMode ? 'Clair' : 'Sombre'}
         </button>
         {#if auth.enabled}
-          <span class="user-badge" title={auth.isSuperAdmin ? 'Super-admin' : 'Utilisateur'}>{auth.username}</span>
-          <button type="button" class="btn btn-sm btn-outline" onclick={handleLogout}>Deconnexion</button>
+          <span class="user-badge" title={auth.isSuperAdmin ? 'Super-admin' : 'Utilisateur'} data-testid="app-user-badge">{auth.username}</span>
+          <button type="button" class="btn btn-sm btn-outline" onclick={handleLogout} data-testid="app-logout-button">Deconnexion</button>
         {/if}
-        <input type="file" accept=".json" style="display:none" bind:this={fileInput} onchange={handleFileImport} />
+        <input type="file" accept=".json" style="display:none" bind:this={fileInput} onchange={handleFileImport} data-testid="app-import-file-input" />
       </div>
     </div>
   </header>
@@ -348,7 +348,7 @@
   {#if view !== 'list'}
     <nav class="breadcrumb" aria-label="Fil d'Ariane">
       <ol>
-        <li><button type="button" class="breadcrumb-link" onclick={handleBack}>Services</button></li>
+        <li><button type="button" class="breadcrumb-link" onclick={handleBack} data-testid="app-breadcrumb-services-link">Services</button></li>
         <li aria-current="page">
           {#if view === 'logs'}Journal des requetes
           {:else if view === 'messaging'}Messages Kafka
@@ -363,21 +363,21 @@
   {/if}
 
   {#if importPending}
-    <div class="modal-overlay" role="dialog" aria-modal="true" aria-label="Mode d'import">
+    <div class="modal-overlay" role="dialog" aria-modal="true" aria-label="Mode d'import" data-testid="app-import-modal">
       <div class="modal-content">
         <div class="modal-header">
           <h3>Importer la configuration</h3>
-          <button type="button" class="btn-close" onclick={() => importPending = null} aria-label="Fermer">&#10005;</button>
+          <button type="button" class="btn-close" onclick={() => importPending = null} aria-label="Fermer" data-testid="app-import-modal-close-button">&#10005;</button>
         </div>
         <p>{importPending.services.length} service(s) et {importPending.groups?.length ?? 0} groupe(s) trouves dans le fichier.</p>
         <div class="import-actions">
-          <button type="button" class="btn btn-primary" onclick={() => doImportReplace(importPending)}>
+          <button type="button" class="btn btn-primary" onclick={() => doImportReplace(importPending)} data-testid="app-import-replace-button">
             Remplacer tout
           </button>
-          <button type="button" class="btn btn-outline" onclick={() => doImportMerge(importPending)}>
+          <button type="button" class="btn btn-outline" onclick={() => doImportMerge(importPending)} data-testid="app-import-merge-button">
             Fusionner (ajouter les manquants)
           </button>
-          <button type="button" class="btn btn-secondary" onclick={() => importPending = null}>
+          <button type="button" class="btn btn-secondary" onclick={() => importPending = null} data-testid="app-import-cancel-button">
             Annuler
           </button>
         </div>
@@ -420,12 +420,12 @@
     {:else}
       <div class="list-header">
         <h2>Services</h2>
-        <button type="button" class="btn btn-primary" onclick={() => view = 'add'}>+ Ajouter un service</button>
+        <button type="button" class="btn btn-primary" onclick={() => view = 'add'} data-testid="app-add-service-button">+ Ajouter un service</button>
       </div>
       <ServiceList {services} {groups} onToggle={handleToggle} onSelect={handleSelect} onClone={handleCloneService} />
       {#if services.length === 0}
         <div class="demo-section">
-          <button type="button" class="btn btn-outline btn-demo" onclick={loadDemo}>
+          <button type="button" class="btn btn-outline btn-demo" onclick={loadDemo} data-testid="app-load-demo-button">
             Charger un exemple
           </button>
           <span class="field-hint">Service users-api avec mock (fake data, script rhai ratio 4/5) et proxy conditionnel.</span>

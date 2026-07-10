@@ -79,13 +79,13 @@
 <section class="rule-list-section" aria-label="Liste des regles">
   <div class="rule-list-header">
     <h3>Regles de matching</h3>
-    <button type="button" class="btn btn-sm btn-primary" onclick={clickAdd}>
+    <button type="button" class="btn btn-sm btn-primary" onclick={clickAdd} data-testid="rule-list-add-button">
       + Ajouter une regle
     </button>
   </div>
 
   {#if rules.length === 0}
-    <p class="empty-rules" role="status">Aucune regle definie. Les requetes retourneront 404.</p>
+    <p class="empty-rules" role="status" data-testid="rule-list-empty-message">Aucune regle definie. Les requetes retourneront 404.</p>
   {:else}
     <p class="rule-hint" id="rule-order-hint">
       Premiere regle correspondante gagne. Reordonnez par glisser-deposer ou avec les boutons.
@@ -96,6 +96,7 @@
           class="rule-item"
           class:dragging={dragIdx === idx}
           class:drag-over={dragOverIdx === idx}
+          data-testid="rule-list-item-{rule.name}"
         >
           <div
             class="rule-grip"
@@ -125,11 +126,11 @@
           </div>
 
           <div class="rule-actions">
-            <button type="button" class="btn-icon" onclick={() => moveUp(idx)} disabled={idx === 0} aria-label="Monter la regle {rule.name}" title="Monter">&#9650;</button>
-            <button type="button" class="btn-icon" onclick={() => moveDown(idx)} disabled={idx === rules.length - 1} aria-label="Descendre la regle {rule.name}" title="Descendre">&#9660;</button>
-            <button type="button" class="btn-icon btn-edit" onclick={(e) => clickEdit(e, idx)} aria-label="Modifier la regle {rule.name}" title="Modifier">&#9998;</button>
-            <button type="button" class="btn-icon" onclick={(e) => { e.stopPropagation(); onCloneRule(idx); }} aria-label="Dupliquer la regle {rule.name}" title="Dupliquer">&#10697;</button>
-            <button type="button" class="btn-icon btn-delete" onclick={(e) => clickDelete(e, idx)} aria-label="Supprimer la regle {rule.name}" title="Supprimer">&#10005;</button>
+            <button type="button" class="btn-icon" onclick={() => moveUp(idx)} disabled={idx === 0} aria-label="Monter la regle {rule.name}" title="Monter" data-testid="rule-list-moveup-button-{rule.name}">&#9650;</button>
+            <button type="button" class="btn-icon" onclick={() => moveDown(idx)} disabled={idx === rules.length - 1} aria-label="Descendre la regle {rule.name}" title="Descendre" data-testid="rule-list-movedown-button-{rule.name}">&#9660;</button>
+            <button type="button" class="btn-icon btn-edit" onclick={(e) => clickEdit(e, idx)} aria-label="Modifier la regle {rule.name}" title="Modifier" data-testid="rule-list-edit-button-{rule.name}">&#9998;</button>
+            <button type="button" class="btn-icon" onclick={(e) => { e.stopPropagation(); onCloneRule(idx); }} aria-label="Dupliquer la regle {rule.name}" title="Dupliquer" data-testid="rule-list-clone-button-{rule.name}">&#10697;</button>
+            <button type="button" class="btn-icon btn-delete" onclick={(e) => clickDelete(e, idx)} aria-label="Supprimer la regle {rule.name}" title="Supprimer" data-testid="rule-list-delete-button-{rule.name}">&#10005;</button>
           </div>
         </li>
       {/each}

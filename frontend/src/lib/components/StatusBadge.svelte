@@ -7,6 +7,7 @@
   class:active
   role="status"
   aria-label={active ? 'Mode mock activé' : 'Mode proxy activé'}
+  data-testid="status-badge"
 >
   {active ? 'MOCK' : 'PROXY'}
 </span>

@@ -26,6 +26,7 @@
     {disabled}
     onclick={handleClick}
     onkeydown={handleKeydown}
+    data-testid="toggle-switch-{label.replace(/\s+/g, '-')}"
   >
     <span class="toggle-knob"></span>
     <span class="sr-only">{checked ? 'Activé' : 'Désactivé'}</span>
