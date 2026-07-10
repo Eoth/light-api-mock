@@ -8,7 +8,9 @@
 const BASE36: &[u8] = b"abcdefghijklmnopqrstuvwxyz0123456789";
 const CODE_LEN: usize = 5;
 
-fn fnv1a_hash(input: &str) -> u64 {
+// pub(crate) : reutilise tel quel par engine::script pour seeded_int/seeded_pick
+// (meme mecanisme de hash deterministe, pas de nouvelle dependance de hashing).
+pub(crate) fn fnv1a_hash(input: &str) -> u64 {
     let mut hash: u64 = 0xcbf29ce484222325;
     for byte in input.as_bytes() {
         hash ^= *byte as u64;

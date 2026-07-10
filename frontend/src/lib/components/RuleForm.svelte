@@ -715,9 +715,11 @@
                   <p><strong>Variables :</strong> <code>let x = 42;</code> <code>let s = "hello";</code></p>
                   <p><strong>Conditions :</strong> <code>if x &gt; 10 {"{"} "grand" {"}"} else {"{"} "petit" {"}"}</code></p>
                   <p><strong>Strings :</strong> <code>s.to_upper()</code> <code>s.len()</code> <code>s.contains("el")</code> <code>s.replace("a", "b")</code></p>
-                  <p><strong>Fonctions lightMock :</strong> <code>random_int(1, 5)</code> (entier aleatoire), <code>now_ms()</code> (timestamp ms)</p>
+                  <p><strong>Fonctions lightMock :</strong> <code>random_int(1, 5)</code> (entier aleatoire), <code>now_ms()</code> (timestamp ms), <code>date_now(format)</code>, <code>date_past(jours, format)</code>, <code>date_future(jours, format)</code> (format : <code>"iso"</code> par defaut, <code>"fr"</code>, <code>"en"</code>)</p>
+                  <p><strong>Valeurs deterministes par seed :</strong> <code>seeded_int(seed, min, max)</code>, <code>seeded_pick(seed, [liste])</code> — meme seed (ex. <code>request.path.siret</code>) → toujours le meme resultat</p>
                   <p><strong>Objet retour :</strong> <code>#{"{"} cle: "val", n: random_int(1,100) {"}"}</code> → accessible via <code>{"{{script.cle}}"}</code></p>
                   <p><strong>Ratio 4/5 :</strong> <code>if random_int(1,5) &lt;= 4 {"{"} #{"{"} status: "ok" {"}"} {"}"} else {"{"} #{"{"} status: "ko" {"}"} {"}"}</code></p>
+                  <p><strong>Nom fixe par SIRET :</strong> <code>seeded_pick(request.path.siret, ["Dupont SARL", "Martin SAS"])</code></p>
                   <p class="field-hint">Sandbox : pas d'acces fichier/reseau, 10K ops max. <a href="https://rhai.rs/book/" target="_blank" rel="noopener">Doc Rhai</a></p>
                 </div>
               </details>

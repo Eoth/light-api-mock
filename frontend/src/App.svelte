@@ -54,7 +54,7 @@
         sub_path: null,
         action: 'mock',
         pre_script: null,
-        script: 'let role = if random_int(1,5) <= 4 { "user" } else { "admin" };\n#{ role: role, since: date_past() }',
+        script: 'let role = if random_int(1,5) <= 4 { "user" } else { "admin" };\n#{ role: role, since: date_past(random_int(1, 1825)) }',
         post_script: null,
         conditions: { all_of: [], any_of: [] },
         response: {
