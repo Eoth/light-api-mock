@@ -3,6 +3,7 @@ use crate::engine::script::{ScriptContext, ScriptEngine, ScriptResult};
 use crate::engine::{apply_chaos_and_render, MatchEngine, RequestData, TemplateContext};
 use crate::models::{RuleAction, Service, WsdlMode};
 use crate::server::AppState;
+use crate::server::request_log::CapturedRequest;
 use crate::server::validation::is_internal_route;
 use axum::body::Body;
 use axum::extract::{Request, State};
@@ -92,6 +93,7 @@ async fn do_proxy(
     context: &str,
     group_code: Option<&str>,
     req: Request<Body>,
+    captured: Option<CapturedRequest>,
 ) -> Response {
     let prefix = match group_code {
         Some(code) => format!("/{}/{}", code, service.name),
@@ -121,13 +123,18 @@ async fn do_proxy(
             let status = resp.status().as_u16();
             state
                 .request_log
-                .log_proxy(&service.name, method_str, path, &target, status);
+                .log_proxy(&service.name, method_str, path, &target, status, captured);
             resp
         }
         Err(status) => {
-            state
-                .request_log
-                .log_proxy(&service.name, method_str, path, &target, status.as_u16());
+            state.request_log.log_proxy(
+                &service.name,
+                method_str,
+                path,
+                &target,
+                status.as_u16(),
+                captured,
+            );
             status.into_response()
         }
     }
@@ -147,7 +154,10 @@ async fn handle_service(
     let gc = group_code.as_deref();
 
     if !service.is_mocked {
-        return do_proxy(state, service, path, &method_str, "service-level", gc, req).await;
+        // Proxy niveau service : chemin streame sans buffering (aucun
+        // RequestData construit ici), donc aucun detail capturable pour le
+        // testeur de regle sur ce chemin — cf CLAUDE.md "Proxy streaming".
+        return do_proxy(state, service, path, &method_str, "service-level", gc, req, None).await;
     }
 
     if is_wsdl_request(req.uri().query()) {
@@ -164,7 +174,8 @@ async fn handle_service(
                     mode = "proxy", context = "wsdl-bypass",
                     "WSDL request, bypassing mock rules"
                 );
-                return do_proxy(state, service, path, &method_str, "wsdl-bypass", gc, req).await;
+                return do_proxy(state, service, path, &method_str, "wsdl-bypass", gc, req, None)
+                    .await;
             }
         }
     }
@@ -189,6 +200,12 @@ async fn handle_service(
         remaining_path: remaining,
     };
 
+    // Construit une seule fois : le corps/headers/query/path params sont deja
+    // entierement bufferises ci-dessus pour le matching (`request_data`), donc
+    // retenir ce detail pour le testeur de regle ne cree aucune nouvelle
+    // capture de trafic (cf CapturedRequest, src/server/request_log.rs).
+    let captured = Some(CapturedRequest::from_request_data(&request_data));
+
     let matched = MatchEngine::first_match(&service.rules, &request_data);
 
     let Some((rule, sub_params)) = matched else {
@@ -199,7 +216,7 @@ async fn handle_service(
         );
         state
             .request_log
-            .log_no_rule(&service.name, &method_str, path);
+            .log_no_rule(&service.name, &method_str, path, captured);
         return StatusCode::NOT_FOUND.into_response();
     };
 
@@ -218,6 +235,7 @@ async fn handle_service(
             &format!("rule:{}", rule.name),
             gc,
             proxy_req,
+            captured,
         )
         .await;
     }
@@ -270,6 +288,7 @@ async fn handle_service(
                 path,
                 &rule.name,
                 status.as_u16(),
+                captured,
             );
             let mut response = axum::http::Response::builder().status(status);
             for (name, value) in &resp_headers {
@@ -288,6 +307,7 @@ async fn handle_service(
                 path,
                 &rule.name,
                 status.as_u16(),
+                captured,
             );
             (status, "chaos error injected").into_response()
         }
@@ -350,7 +370,7 @@ fn extract_headers(headers: &axum::http::HeaderMap) -> HashMap<String, String> {
 mod tests {
     use super::*;
     use crate::engine::matcher::match_path;
-    use crate::models::{ConditionGroup, MockConfig, MockResponse, Rule};
+    use crate::models::{BodyFragment, ConditionGroup, MockConfig, MockResponse, Rule};
     use crate::store::MockStore;
 
     #[test]
@@ -732,6 +752,7 @@ mod tests {
             #[cfg(feature = "messaging-kafka")]
             messaging,
         };
+        let request_log_handle = state.request_log.clone();
         let app = crate::server::build_router(state, &data_dir);
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let server_port = listener.local_addr().unwrap().port();
@@ -771,6 +792,13 @@ mod tests {
             raw.contains("payload-body"),
             "corps de requete manquant dans la requete proxifiee:\n{raw}"
         );
+
+        // Proxy NIVEAU SERVICE : aucun RequestData n'est construit sur ce
+        // chemin (streaming zero-buffering, point 12 CLAUDE.md), donc aucun
+        // detail n'est capturable pour le testeur de regle.
+        let logged = request_log_handle.recent(1);
+        assert_eq!(logged.len(), 1);
+        assert!(logged[0].captured.is_none());
 
         std::fs::remove_dir_all(&data_dir).ok();
     }
@@ -839,6 +867,7 @@ mod tests {
             #[cfg(feature = "messaging-kafka")]
             messaging,
         };
+        let request_log_handle = state.request_log.clone();
         let app = crate::server::build_router(state, &data_dir);
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let server_port = listener.local_addr().unwrap().port();
@@ -876,6 +905,100 @@ mod tests {
             raw.contains("payload-body"),
             "corps de requete manquant (rule-level proxy):\n{raw}"
         );
+
+        // Proxy NIVEAU REGLE : RequestData est deja bufferise pour evaluer les
+        // regles avant ce branchement, donc le detail EST capturable ici,
+        // contrairement au proxy niveau service ci-dessus.
+        let logged = request_log_handle.recent(1);
+        assert_eq!(logged.len(), 1);
+        let captured = logged[0].captured.as_ref().expect("rule-level proxy doit capturer le detail de la requete");
+        assert_eq!(captured.query_params.get("a").unwrap(), "1");
+        assert_eq!(captured.headers.get("x-custom-header").unwrap(), "custom-value");
+        assert_eq!(captured.body, "payload-body");
+
+        std::fs::remove_dir_all(&data_dir).ok();
+    }
+
+    #[tokio::test]
+    async fn mock_response_captures_request_detail_in_log() {
+        // Verifie que le chemin mock (pas seulement proxy) capture bien le
+        // detail de la requete pour le testeur de regle (cf CLAUDE.md).
+        let data_dir = temp_dir_for_intercept_test();
+        let store = MockStore::new(data_dir.join("mock-config.yaml"));
+        store
+            .replace(MockConfig {
+                services: vec![Service {
+                    name: "mocksvc".into(),
+                    listen_path: "/{id}/*".into(),
+                    real_target_url: "http://unused.invalid".into(),
+                    is_mocked: true,
+                    rewrite_directory_urls: false,
+                    group_name: None,
+                    wsdl_mode: WsdlMode::default(),
+                    rules: vec![Rule {
+                        name: "mock-rule".into(),
+                        method: "GET".into(),
+                        sub_path: None,
+                        action: RuleAction::Mock,
+                        pre_script: None,
+                        script: None,
+                        post_script: None,
+                        conditions: ConditionGroup::default(),
+                        response: MockResponse {
+                            status: 200,
+                            headers: vec![],
+                            body: vec![BodyFragment::Literal { value: "ok".into() }],
+                            chaos: None,
+                        },
+                    }],
+                }],
+                groups: vec![],
+            })
+            .await
+            .unwrap();
+        store.flush().await;
+
+        #[cfg(feature = "messaging-kafka")]
+        let messaging = crate::messaging::MessagingState {
+            message_log: crate::messaging::message_log::MessageLog::new(),
+            reply_topic: None,
+            publisher: crate::messaging::consumer::Publisher::None,
+        };
+        let state = AppState {
+            store,
+            proxy: crate::engine::ProxyClient::new(),
+            seq_counters: std::sync::Arc::new(std::sync::RwLock::new(HashMap::new())),
+            request_log: crate::server::request_log::RequestLog::new(),
+            auth_config: disabled_auth_config(),
+            keycloak: None,
+            script_engine: ScriptEngine::new(),
+            ping_cache: crate::server::ping::PingCache::new(),
+            #[cfg(feature = "messaging-kafka")]
+            messaging,
+        };
+        let request_log_handle = state.request_log.clone();
+        let app = crate::server::build_router(state, &data_dir);
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let server_port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            axum::serve(listener, app).await.unwrap();
+        });
+
+        let client = reqwest::Client::new();
+        let resp = client
+            .get(format!("http://127.0.0.1:{server_port}/mocksvc/42/rest?foo=bar"))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let logged = request_log_handle.recent(1);
+        assert_eq!(logged.len(), 1);
+        assert_eq!(logged[0].mode, "mock");
+        let captured = logged[0].captured.as_ref().expect("le mock doit capturer le detail de la requete");
+        assert_eq!(captured.path_params.get("id").unwrap(), "42");
+        assert_eq!(captured.query_params.get("foo").unwrap(), "bar");
+        assert!(!captured.body_truncated);
 
         std::fs::remove_dir_all(&data_dir).ok();
     }

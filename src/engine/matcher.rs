@@ -1,9 +1,10 @@
 use crate::models::{Condition, ConditionGroup, ConditionSource, Operator, Rule};
+use serde::Serialize;
 use std::collections::HashMap;
 
 pub struct MatchEngine;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RequestData {
     pub query_params: HashMap<String, String>,
     pub headers: HashMap<String, String>,
@@ -12,6 +13,51 @@ pub struct RequestData {
     pub path_params: HashMap<String, String>,
     pub method: String,
     pub remaining_path: String,
+}
+
+/// Resultat detaille de l'evaluation d'UNE condition — utilise uniquement par le
+/// testeur de regle (UI), jamais par le chemin de production (`matches_group`,
+/// qui reste un simple booleen pour ne pas alourdir le hot path HTTP). Expose
+/// la valeur trouvee (ou son absence) et, si la condition echoue, un indice
+/// "cross-source" (`hint`) quand la meme cle existe dans une AUTRE source de
+/// la requete (ex. choix de source probablement errone : path param au lieu
+/// de query param).
+#[derive(Debug, Clone, Serialize)]
+pub struct ConditionEvaluation {
+    pub condition: Condition,
+    pub matched: bool,
+    pub found_value: Option<String>,
+    pub hint: Option<String>,
+}
+
+/// Resultat detaille de l'evaluation d'un `ConditionGroup` (all_of + any_of),
+/// miroir instrumente de `MatchEngine::matches_group`. Voir le commentaire sur
+/// `evaluate_group` pour le choix de dupliquer la glue all/any plutot que d'y
+/// faire deleguer `matches_group`.
+#[derive(Debug, Clone, Serialize)]
+pub struct GroupEvaluation {
+    pub all_of: Vec<ConditionEvaluation>,
+    pub any_of: Vec<ConditionEvaluation>,
+    pub matched: bool,
+}
+
+/// Entree du testeur de regle : le brouillon de regle en cours d'edition
+/// (pas necessairement sauvegarde), teste contre une requete deja capturee.
+pub struct RuleTestInput<'a> {
+    pub method: &'a str,
+    pub sub_path: &'a Option<String>,
+    pub conditions: &'a ConditionGroup,
+}
+
+/// Resultat complet du testeur de regle : method/sub_path/conditions, chacun
+/// avec son propre statut, plus le detail par condition.
+#[derive(Debug, Clone, Serialize)]
+pub struct RuleTestOutcome {
+    pub method_matches: bool,
+    pub sub_path_matches: bool,
+    pub path_params: HashMap<String, String>,
+    pub group: GroupEvaluation,
+    pub overall_matched: bool,
 }
 
 impl MatchEngine {
@@ -31,11 +77,14 @@ impl MatchEngine {
         })
     }
 
-    fn matches_method(rule_method: &str, request_method: &str) -> bool {
+    /// pub(crate) (plutot que privee) : reutilisee par `evaluate_rule_test`
+    /// (testeur de regle) en plus de `first_match` (chemin de production).
+    pub(crate) fn matches_method(rule_method: &str, request_method: &str) -> bool {
         rule_method.eq_ignore_ascii_case(request_method)
     }
 
-    fn matches_sub_path(
+    /// pub(crate) (plutot que privee) : idem, reutilisee par `evaluate_rule_test`.
+    pub(crate) fn matches_sub_path(
         sub_path: &Option<String>,
         remaining: &str,
     ) -> Option<HashMap<String, String>> {
@@ -58,6 +107,121 @@ impl MatchEngine {
     fn eval(condition: &Condition, req: &RequestData) -> bool {
         let extracted = Self::extract(&condition.source, req);
         Self::apply_op(&condition.operator, extracted.as_deref())
+    }
+
+    /// Variante instrumentee de `matches_group`, pour le testeur de regle
+    /// (UI) uniquement. Reutilise les MEMES primitives que le chemin de
+    /// production (`extract`/`apply_op`) : aucune logique de matching n'est
+    /// dupliquee, seule la glue "all/any" ci-dessous l'est (~5 lignes).
+    ///
+    /// Pourquoi ne pas faire deleguer `matches_group` a cette fonction : le
+    /// chemin HTTP de production appelle `matches_group` sur CHAQUE requete
+    /// recue (potentiellement un fort volume) ; construire ici le detail
+    /// complet (clone de `Condition`, calcul de hints, allocations de String)
+    /// pour un resultat immediatement jete ailleurs que dans ce testeur
+    /// alourdirait ce hot path sans aucun benefice. `matches_group` reste
+    /// donc un booleen pur, et un test dedie (`evaluate_group_matches_agree_with_matches_group`,
+    /// voir tests) garantit que les deux ne divergent jamais, plutot que de
+    /// s'appuyer sur une delegation qui masquerait ce cout de perf.
+    pub fn evaluate_group(group: &ConditionGroup, req: &RequestData) -> GroupEvaluation {
+        let all_of: Vec<ConditionEvaluation> =
+            group.all_of.iter().map(|c| Self::eval_detailed(c, req)).collect();
+        let any_of: Vec<ConditionEvaluation> =
+            group.any_of.iter().map(|c| Self::eval_detailed(c, req)).collect();
+        let all_ok = all_of.is_empty() || all_of.iter().all(|e| e.matched);
+        let any_ok = any_of.is_empty() || any_of.iter().any(|e| e.matched);
+        GroupEvaluation {
+            all_of,
+            any_of,
+            matched: all_ok && any_ok,
+        }
+    }
+
+    fn eval_detailed(condition: &Condition, req: &RequestData) -> ConditionEvaluation {
+        let found_value = Self::extract(&condition.source, req);
+        let matched = Self::apply_op(&condition.operator, found_value.as_deref());
+        let hint = if matched {
+            None
+        } else {
+            Self::cross_source_hint(&condition.source, req)
+        };
+        ConditionEvaluation {
+            condition: condition.clone(),
+            matched,
+            found_value,
+            hint,
+        }
+    }
+
+    /// Suggestion pedagogique quand une condition a cle simple (QueryParam,
+    /// Header, PathParam, FormField) ne matche pas : cherche si la MEME cle
+    /// existe dans une AUTRE source de la requete capturee, pour signaler un
+    /// choix de source probablement errone (ex. "je voulais PathParam, j'ai
+    /// mis QueryParam"). Pas de hint pour JsonPointer/XPath/BodyRaw : ce ne
+    /// sont pas de simples cles nommees comparables entre elles (chemin
+    /// structure ou corps entier, pas un nom de champ).
+    fn cross_source_hint(source: &ConditionSource, req: &RequestData) -> Option<String> {
+        let (key, current_label) = match source {
+            ConditionSource::QueryParam(k) => (k, "parametre de requete"),
+            ConditionSource::Header(k) => (k, "en-tete"),
+            ConditionSource::PathParam(k) => (k, "parametre de chemin"),
+            ConditionSource::FormField(k) => (k, "champ de formulaire"),
+            _ => return None,
+        };
+
+        let mut found_in = Vec::new();
+        if !matches!(source, ConditionSource::PathParam(_)) && req.path_params.contains_key(key) {
+            found_in.push("parametre de chemin");
+        }
+        if !matches!(source, ConditionSource::QueryParam(_)) && req.query_params.contains_key(key)
+        {
+            found_in.push("parametre de requete");
+        }
+        if !matches!(source, ConditionSource::Header(_))
+            && req.headers.keys().any(|h| h.eq_ignore_ascii_case(key))
+        {
+            found_in.push("en-tete");
+        }
+
+        if found_in.is_empty() {
+            None
+        } else {
+            Some(format!(
+                "'{key}' n'a pas ete trouve comme {current_label}, mais est present comme {} dans cette requete",
+                found_in.join(" et ")
+            ))
+        }
+    }
+
+    /// Point d'entree unique du testeur de regle (endpoint `POST /api/rule-test`) :
+    /// recalcule method/sub_path/conditions pour le brouillon de regle en
+    /// cours d'edition contre une requete deja capturee (`RequestLog`), sans
+    /// aucune mutation ni appel reseau. Reutilise `matches_method`/
+    /// `matches_sub_path`/`evaluate_group` — le meme trio que `first_match`,
+    /// zero logique de matching dupliquee.
+    pub fn evaluate_rule_test(input: RuleTestInput, req: &RequestData) -> RuleTestOutcome {
+        let method_matches = Self::matches_method(input.method, &req.method);
+        let sub_params = Self::matches_sub_path(input.sub_path, &req.remaining_path);
+        let sub_path_matches = sub_params.is_some();
+
+        let mut path_params = req.path_params.clone();
+        if let Some(p) = sub_params {
+            path_params.extend(p);
+        }
+
+        let merged_req = RequestData {
+            path_params: path_params.clone(),
+            ..req.clone()
+        };
+        let group = Self::evaluate_group(input.conditions, &merged_req);
+
+        RuleTestOutcome {
+            method_matches,
+            sub_path_matches,
+            overall_matched: method_matches && sub_path_matches && group.matched,
+            path_params,
+            group,
+        }
     }
 
     fn extract(source: &ConditionSource, req: &RequestData) -> Option<String> {
@@ -694,5 +858,258 @@ mod tests {
     fn match_path_empty_never_matches() {
         assert!(match_path("", "/").is_none());
         assert!(match_path("/", "/").is_none());
+    }
+
+    // --- evaluate_group / ConditionEvaluation tests (testeur de regle) ---
+
+    fn cg(all_of: Vec<Condition>, any_of: Vec<Condition>) -> ConditionGroup {
+        ConditionGroup { all_of, any_of }
+    }
+
+    #[test]
+    fn evaluate_group_reports_found_value_on_match() {
+        let group = cg(
+            vec![Condition {
+                source: ConditionSource::QueryParam("id".into()),
+                operator: Operator::Eq("42".into()),
+            }],
+            vec![],
+        );
+        let req = make_req(&[("id", "42")], &[], b"", None);
+        let result = MatchEngine::evaluate_group(&group, &req);
+        assert!(result.matched);
+        assert!(result.all_of[0].matched);
+        assert_eq!(result.all_of[0].found_value.as_deref(), Some("42"));
+        assert!(result.all_of[0].hint.is_none());
+    }
+
+    #[test]
+    fn evaluate_group_hint_query_param_found_as_path_param() {
+        // Cas exact du sujet : l'utilisateur voulait un path param mais a
+        // choisi query param par erreur.
+        let group = cg(
+            vec![Condition {
+                source: ConditionSource::QueryParam("foo".into()),
+                operator: Operator::Eq("bar".into()),
+            }],
+            vec![],
+        );
+        let mut req = make_req(&[], &[], b"", None);
+        req.path_params.insert("foo".into(), "bar".into());
+        let result = MatchEngine::evaluate_group(&group, &req);
+        assert!(!result.matched);
+        assert!(!result.all_of[0].matched);
+        assert!(result.all_of[0].found_value.is_none());
+        let hint = result.all_of[0].hint.as_deref().unwrap();
+        assert!(hint.contains("foo"));
+        assert!(hint.contains("parametre de chemin"));
+    }
+
+    #[test]
+    fn evaluate_group_hint_path_param_found_as_header() {
+        let group = cg(
+            vec![Condition {
+                source: ConditionSource::PathParam("token".into()),
+                operator: Operator::Exists,
+            }],
+            vec![],
+        );
+        let req = make_req(&[], &[("token", "abc")], b"", None);
+        let result = MatchEngine::evaluate_group(&group, &req);
+        assert!(!result.all_of[0].matched);
+        assert_eq!(
+            result.all_of[0].hint.as_deref(),
+            Some(
+                "'token' n'a pas ete trouve comme parametre de chemin, mais est present comme en-tete dans cette requete"
+            )
+        );
+    }
+
+    #[test]
+    fn evaluate_group_no_hint_when_key_nowhere_else() {
+        let group = cg(
+            vec![Condition {
+                source: ConditionSource::QueryParam("missing".into()),
+                operator: Operator::Exists,
+            }],
+            vec![],
+        );
+        let req = make_req(&[], &[], b"", None);
+        let result = MatchEngine::evaluate_group(&group, &req);
+        assert!(!result.all_of[0].matched);
+        assert!(result.all_of[0].hint.is_none());
+    }
+
+    #[test]
+    fn evaluate_group_no_hint_for_structured_sources() {
+        // JsonPointer/XPath/BodyRaw ne sont pas des cles nommees comparables :
+        // jamais de hint cross-source, meme en echec.
+        let group = cg(
+            vec![Condition {
+                source: ConditionSource::JsonPointer("/missing".into()),
+                operator: Operator::Exists,
+            }],
+            vec![],
+        );
+        let req = make_req(&[], &[], b"{}", Some("application/json"));
+        let result = MatchEngine::evaluate_group(&group, &req);
+        assert!(!result.all_of[0].matched);
+        assert!(result.all_of[0].hint.is_none());
+    }
+
+    #[test]
+    fn evaluate_group_matches_agree_with_matches_group() {
+        // Garde de non-regression : evaluate_group ne doit JAMAIS diverger du
+        // resultat booleen du chemin de production, sur toute une matrice de
+        // cas (match/no-match, all_of/any_of, differentes sources).
+        let cases: Vec<(ConditionGroup, RequestData)> = vec![
+            (
+                cg(
+                    vec![Condition {
+                        source: ConditionSource::Header("x-env".into()),
+                        operator: Operator::Eq("prod".into()),
+                    }],
+                    vec![],
+                ),
+                make_req(&[], &[("x-env", "prod")], b"", None),
+            ),
+            (
+                cg(
+                    vec![Condition {
+                        source: ConditionSource::Header("x-env".into()),
+                        operator: Operator::Eq("prod".into()),
+                    }],
+                    vec![],
+                ),
+                make_req(&[], &[("x-env", "dev")], b"", None),
+            ),
+            (
+                cg(
+                    vec![],
+                    vec![
+                        Condition {
+                            source: ConditionSource::QueryParam("debug".into()),
+                            operator: Operator::Exists,
+                        },
+                        Condition {
+                            source: ConditionSource::QueryParam("trace".into()),
+                            operator: Operator::Exists,
+                        },
+                    ],
+                ),
+                make_req(&[("trace", "1")], &[], b"", None),
+            ),
+            (ConditionGroup::default(), make_req(&[], &[], b"", None)),
+        ];
+
+        for (group, req) in cases {
+            let boolean_result = MatchEngine::matches_group(&group, &req);
+            let detailed_result = MatchEngine::evaluate_group(&group, &req).matched;
+            assert_eq!(
+                boolean_result, detailed_result,
+                "matches_group et evaluate_group doivent toujours s'accorder"
+            );
+        }
+    }
+
+    // --- evaluate_rule_test tests ---
+
+    #[test]
+    fn evaluate_rule_test_nominal_match() {
+        let conditions = cg(
+            vec![Condition {
+                source: ConditionSource::PathParam("id".into()),
+                operator: Operator::Eq("42".into()),
+            }],
+            vec![],
+        );
+        let sub_path = Some("/orders/{id}".into());
+        let mut req = make_req(&[], &[], b"", None);
+        req.method = "GET".into();
+        req.remaining_path = "/orders/42".into();
+
+        let outcome = MatchEngine::evaluate_rule_test(
+            RuleTestInput {
+                method: "GET",
+                sub_path: &sub_path,
+                conditions: &conditions,
+            },
+            &req,
+        );
+
+        assert!(outcome.method_matches);
+        assert!(outcome.sub_path_matches);
+        assert!(outcome.overall_matched);
+        assert_eq!(outcome.path_params.get("id").unwrap(), "42");
+        assert!(outcome.group.matched);
+    }
+
+    #[test]
+    fn evaluate_rule_test_method_mismatch() {
+        let conditions = ConditionGroup::default();
+        let sub_path = None;
+        let mut req = make_req(&[], &[], b"", None);
+        req.method = "POST".into();
+
+        let outcome = MatchEngine::evaluate_rule_test(
+            RuleTestInput {
+                method: "GET",
+                sub_path: &sub_path,
+                conditions: &conditions,
+            },
+            &req,
+        );
+
+        assert!(!outcome.method_matches);
+        assert!(!outcome.overall_matched);
+    }
+
+    #[test]
+    fn evaluate_rule_test_sub_path_mismatch_still_reports_conditions() {
+        let conditions = cg(
+            vec![Condition {
+                source: ConditionSource::Header("x-env".into()),
+                operator: Operator::Eq("prod".into()),
+            }],
+            vec![],
+        );
+        let sub_path = Some("/orders/{id}".into());
+        let mut req = make_req(&[], &[("x-env", "prod")], b"", None);
+        req.remaining_path = "/other/path".into();
+
+        let outcome = MatchEngine::evaluate_rule_test(
+            RuleTestInput {
+                method: "GET",
+                sub_path: &sub_path,
+                conditions: &conditions,
+            },
+            &req,
+        );
+
+        assert!(!outcome.sub_path_matches);
+        assert!(!outcome.overall_matched);
+        // Le detail des conditions reste calcule et exact meme si le
+        // sub_path lui-meme ne matche pas — utile pour le diagnostic UI.
+        assert!(outcome.group.matched);
+    }
+
+    #[test]
+    fn evaluate_rule_test_no_sub_path_matches_any_remaining() {
+        let conditions = ConditionGroup::default();
+        let sub_path = None;
+        let mut req = make_req(&[], &[], b"", None);
+        req.remaining_path = "/anything/at/all".into();
+
+        let outcome = MatchEngine::evaluate_rule_test(
+            RuleTestInput {
+                method: "GET",
+                sub_path: &sub_path,
+                conditions: &conditions,
+            },
+            &req,
+        );
+
+        assert!(outcome.sub_path_matches);
+        assert!(outcome.path_params.is_empty());
     }
 }

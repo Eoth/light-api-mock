@@ -1,7 +1,9 @@
 use crate::auth::middleware::AuthUser;
 use crate::auth::{can_access_service, can_manage_group, visible_services};
-use crate::models::{Group, MockConfig, Service};
+use crate::engine::matcher::{ConditionEvaluation, MatchEngine, RequestData, RuleTestInput};
+use crate::models::{ConditionGroup, Group, MockConfig, Service};
 use crate::server::AppState;
+use std::collections::HashMap;
 use std::sync::Arc;
 use crate::server::request_log::LogEntry;
 use crate::server::validation::{validate_backup_filename, validate_service};
@@ -39,6 +41,7 @@ pub fn routes() -> Router<AppState> {
         .route("/groups/:group/services/:name/ping", post(ping_service_grouped))
         .route("/groups/:group/services/:name/rules/reorder", put(reorder_rules_grouped))
         .route("/script/validate", post(validate_script))
+        .route("/rule-test", post(test_rule))
         .route("/logs", get(get_logs))
         .route("/groups", get(list_groups).post(create_group))
         .route(
@@ -1060,6 +1063,95 @@ async fn validate_script(
     }
 }
 
+// --------------- Testeur de regle (rejeu en lecture seule) ---------------
+//
+// Endpoint totalement stateless : aucun acces au store, aucune reference a un
+// service persiste. Le frontend envoie le brouillon de regle EN COURS
+// D'EDITION (pas necessairement sauvegarde) et le detail d'une requete deja
+// capturee (RequestLog::CapturedRequest, cf src/server/request_log.rs). Le
+// handler ne fait que deserialiser, reconstruire un RequestData, deleguer a
+// MatchEngine::evaluate_rule_test, puis serialiser le resultat — aucune
+// mutation, aucun appel reseau/proxy, un vrai rejeu local en lecture seule.
+//
+// Garde d'auth : utilisateur authentifie requis, MEME garde que /logs (pas de
+// can_access_service supplementaire) — /logs lui-meme n'est pas scope par
+// service aujourd'hui, on ne cree pas ici une incoherence de modele de
+// securite pour ce seul endpoint. Pas de variante flat/groupee non plus :
+// aucun service n'est charge depuis le store, donc pas d'identite de service
+// a desambiguiser (cf service_matches, points 40-41 CLAUDE.md).
+
+#[derive(serde::Deserialize)]
+struct RuleTestCapturedRequest {
+    method: String,
+    remaining_path: String,
+    #[serde(default)]
+    path_params: HashMap<String, String>,
+    #[serde(default)]
+    query_params: HashMap<String, String>,
+    #[serde(default)]
+    headers: HashMap<String, String>,
+    #[serde(default)]
+    body: String,
+    #[serde(default)]
+    body_truncated: bool,
+    #[serde(default)]
+    content_type: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct RuleTestRequest {
+    method: String,
+    sub_path: Option<String>,
+    conditions: ConditionGroup,
+    request: RuleTestCapturedRequest,
+}
+
+#[derive(serde::Serialize)]
+struct RuleTestResponse {
+    method_matches: bool,
+    sub_path_matches: bool,
+    path_params: HashMap<String, String>,
+    overall_matched: bool,
+    body_truncated: bool,
+    all_of: Vec<ConditionEvaluation>,
+    any_of: Vec<ConditionEvaluation>,
+}
+
+async fn test_rule(
+    Extension(_user): Extension<AuthUser>,
+    Json(payload): Json<RuleTestRequest>,
+) -> Json<RuleTestResponse> {
+    let body_truncated = payload.request.body_truncated;
+    let req = RequestData {
+        query_params: payload.request.query_params,
+        headers: payload.request.headers,
+        body: payload.request.body.into_bytes(),
+        content_type: payload.request.content_type,
+        path_params: payload.request.path_params,
+        method: payload.request.method,
+        remaining_path: payload.request.remaining_path,
+    };
+
+    let outcome = MatchEngine::evaluate_rule_test(
+        RuleTestInput {
+            method: &payload.method,
+            sub_path: &payload.sub_path,
+            conditions: &payload.conditions,
+        },
+        &req,
+    );
+
+    Json(RuleTestResponse {
+        method_matches: outcome.method_matches,
+        sub_path_matches: outcome.sub_path_matches,
+        path_params: outcome.path_params,
+        overall_matched: outcome.overall_matched,
+        body_truncated,
+        all_of: outcome.group.all_of,
+        any_of: outcome.group.any_of,
+    })
+}
+
 fn ensure_group_codes(groups: &mut Vec<Group>) {
     let mut existing_codes: Vec<String> = groups
         .iter()
@@ -1327,5 +1419,98 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(team_a.real_target_url, "http://example.com", "team-a ne doit pas avoir ete modifie par un PUT scope sans groupe");
+    }
+
+    // --- test_rule() : testeur de regle, endpoint stateless ---
+
+    fn anon_user() -> AuthUser {
+        AuthUser::anonymous()
+    }
+
+    fn empty_captured(method: &str, remaining_path: &str) -> RuleTestCapturedRequest {
+        RuleTestCapturedRequest {
+            method: method.into(),
+            remaining_path: remaining_path.into(),
+            path_params: HashMap::new(),
+            query_params: HashMap::new(),
+            headers: HashMap::new(),
+            body: String::new(),
+            body_truncated: false,
+            content_type: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_rule_nominal_match_via_path_param() {
+        let mut captured = empty_captured("GET", "/orders/42");
+        captured.path_params.clear();
+        let payload = RuleTestRequest {
+            method: "GET".into(),
+            sub_path: Some("/orders/{id}".into()),
+            conditions: ConditionGroup {
+                all_of: vec![crate::models::Condition {
+                    source: crate::models::ConditionSource::PathParam("id".into()),
+                    operator: crate::models::Operator::Eq("42".into()),
+                }],
+                any_of: vec![],
+            },
+            request: captured,
+        };
+        let Json(result) = test_rule(Extension(anon_user()), Json(payload)).await;
+        assert!(result.method_matches);
+        assert!(result.sub_path_matches);
+        assert!(result.overall_matched);
+        assert_eq!(result.path_params.get("id").unwrap(), "42");
+        assert!(result.all_of[0].matched);
+    }
+
+    #[tokio::test]
+    async fn test_rule_reports_cross_source_hint_for_misplaced_query_param() {
+        let mut captured = empty_captured("GET", "/orders/42");
+        captured.path_params.insert("id".into(), "42".into());
+        let payload = RuleTestRequest {
+            method: "GET".into(),
+            sub_path: None,
+            conditions: ConditionGroup {
+                all_of: vec![crate::models::Condition {
+                    source: crate::models::ConditionSource::QueryParam("id".into()),
+                    operator: crate::models::Operator::Eq("42".into()),
+                }],
+                any_of: vec![],
+            },
+            request: captured,
+        };
+        let Json(result) = test_rule(Extension(anon_user()), Json(payload)).await;
+        assert!(!result.overall_matched);
+        assert!(!result.all_of[0].matched);
+        let hint = result.all_of[0].hint.as_deref().unwrap();
+        assert!(hint.contains("parametre de chemin"));
+    }
+
+    #[tokio::test]
+    async fn test_rule_method_mismatch_reported() {
+        let payload = RuleTestRequest {
+            method: "GET".into(),
+            sub_path: None,
+            conditions: ConditionGroup::default(),
+            request: empty_captured("POST", "/anything"),
+        };
+        let Json(result) = test_rule(Extension(anon_user()), Json(payload)).await;
+        assert!(!result.method_matches);
+        assert!(!result.overall_matched);
+    }
+
+    #[tokio::test]
+    async fn test_rule_propagates_body_truncated_flag() {
+        let mut captured = empty_captured("GET", "/x");
+        captured.body_truncated = true;
+        let payload = RuleTestRequest {
+            method: "GET".into(),
+            sub_path: None,
+            conditions: ConditionGroup::default(),
+            request: captured,
+        };
+        let Json(result) = test_rule(Extension(anon_user()), Json(payload)).await;
+        assert!(result.body_truncated);
     }
 }

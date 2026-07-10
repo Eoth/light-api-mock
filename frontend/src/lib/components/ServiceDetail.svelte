@@ -167,6 +167,9 @@
     <RuleForm
       rule={service.rules[editingRuleIdx]}
       existingRuleNames={(service.rules ?? []).filter((_, i) => i !== editingRuleIdx).map(r => r.name)}
+      serviceName={service.name}
+      groupName={service.group_name}
+      listenPath={service.listen_path}
       onSave={handleSaveRule}
       onCancel={() => editingRuleIdx = null}
     />
@@ -174,6 +177,9 @@
     <RuleForm
       rule={clonedRule}
       existingRuleNames={(service.rules ?? []).map(r => r.name)}
+      serviceName={service.name}
+      groupName={service.group_name}
+      listenPath={service.listen_path}
       onSave={handleSaveRule}
       onCancel={() => { addingRule = false; clonedRule = null; }}
     />

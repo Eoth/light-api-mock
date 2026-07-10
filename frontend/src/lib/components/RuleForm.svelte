@@ -5,13 +5,23 @@
   import XmlResponseBuilder from './XmlResponseBuilder.svelte';
   import ToggleSwitch from './ToggleSwitch.svelte';
   import RhaiScriptEditor from './RhaiScriptEditor.svelte';
+  import RuleTester from './RuleTester.svelte';
   import { templateToTestJson, templateToFields, validateTemplateAsJson, validateTemplateAsXml, fieldsToTemplate, varNameToSource } from '../tpl-utils.js';
-  import { validateScript as apiValidateScript } from '../api.js';
+  import { validateScript as apiValidateScript, getLogs } from '../api.js';
   import { RHAI_FUNCTIONS } from '../rhai-functions.js';
+  import { combinePathParamNames } from '../path-params.js';
 
   import { untrack } from 'svelte';
 
-  let { rule = null, existingRuleNames = [], onSave = () => {}, onCancel = () => {} } = $props();
+  let {
+    rule = null,
+    existingRuleNames = [],
+    serviceName = null,
+    groupName = null,
+    listenPath = '',
+    onSave = () => {},
+    onCancel = () => {},
+  } = $props();
 
   const init = untrack(() => rule ? JSON.parse(JSON.stringify(rule)) : null);
   let name = $state(init?.name ?? '');
@@ -67,6 +77,29 @@
   let allOf = $state(init?.conditions?.all_of ?? []);
   let anyOf = $state(init?.conditions?.any_of ?? []);
   let addingConditionTo = $state(null);
+
+  // Assistance de saisie path/query param (voir CLAUDE.md) : liste fermee des
+  // path params reellement presents (service + regle en cours d'edition) et
+  // suggestions de query params vus dans le trafic reel du service — les deux
+  // derivent d'un seul chargement des logs (pas de nouvel appel reseau par
+  // champ).
+  let availablePathParams = $derived(combinePathParamNames([listenPath, subPath]));
+
+  let serviceLogs = $state([]);
+  async function loadServiceLogs() {
+    if (!serviceName) return;
+    try {
+      const logs = await getLogs(200);
+      serviceLogs = logs.filter((l) => l.service_name === serviceName);
+    } catch {
+      serviceLogs = [];
+    }
+  }
+  $effect(() => { loadServiceLogs(); });
+
+  let queryParamSuggestions = $derived(
+    [...new Set(serviceLogs.flatMap((l) => Object.keys(l.captured?.query_params ?? {})))].sort()
+  );
 
   let status = $state(init?.response?.status ?? 200);
   let respHeaders = $state(init?.response?.headers ?? []);
@@ -471,6 +504,16 @@
     </div>
   </fieldset>
 
+  <!-- TESTEUR DE REGLE -->
+  {#if serviceName}
+    <RuleTester
+      {serviceName}
+      {groupName}
+      logs={serviceLogs}
+      getDraftRule={() => ({ method: ruleMethod, subPath, allOf, anyOf })}
+    />
+  {/if}
+
   <!-- CONDITIONS -->
   <fieldset class="section">
     <legend>Conditions ET (toutes doivent correspondre)</legend>
@@ -486,7 +529,12 @@
       </ul>
     {/if}
     {#if addingConditionTo === 'all_of'}
-      <ConditionForm onSave={(c) => addCondition('all_of', c)} onCancel={() => addingConditionTo = null} />
+      <ConditionForm
+        {availablePathParams}
+        {queryParamSuggestions}
+        onSave={(c) => addCondition('all_of', c)}
+        onCancel={() => addingConditionTo = null}
+      />
     {:else}
       <button type="button" class="btn btn-sm btn-outline" onclick={() => addingConditionTo = 'all_of'}>+ Condition ET</button>
     {/if}
@@ -505,7 +553,12 @@
       </ul>
     {/if}
     {#if addingConditionTo === 'any_of'}
-      <ConditionForm onSave={(c) => addCondition('any_of', c)} onCancel={() => addingConditionTo = null} />
+      <ConditionForm
+        {availablePathParams}
+        {queryParamSuggestions}
+        onSave={(c) => addCondition('any_of', c)}
+        onCancel={() => addingConditionTo = null}
+      />
     {:else}
       <button type="button" class="btn btn-sm btn-outline" onclick={() => addingConditionTo = 'any_of'}>+ Condition OU</button>
     {/if}
