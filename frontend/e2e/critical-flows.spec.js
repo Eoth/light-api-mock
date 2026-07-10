@@ -162,6 +162,64 @@ test.describe('Groups', () => {
     });
     expect(dup.status()).toBe(409);
   });
+
+  test('UI: creation form only asks for a name, code is auto-generated', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+    await page.getByText('Groupes', { exact: true }).click();
+    await page.getByText('+ Nouveau groupe').click();
+
+    const form = page.locator('.group-create-form');
+    await expect(form.locator('input')).toHaveCount(1);
+    await expect(form.locator('#new-group-name')).toBeVisible();
+
+    await form.locator('#new-group-name').fill('ui-simple-group');
+    await form.getByRole('button', { name: 'Creer' }).click();
+
+    const card = page.locator('.group-card', { hasText: 'ui-simple-group' });
+    await expect(card).toBeVisible();
+    await expect(card.locator('.group-code-badge')).toHaveText(/^\/[a-z0-9]{5}$/);
+  });
+
+  test('UI: accented/spaced group name is accepted and still produces a valid URL code', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+    await page.getByText('Groupes', { exact: true }).click();
+    await page.getByText('+ Nouveau groupe').click();
+
+    await page.locator('#new-group-name').fill('Équipe Café Paris');
+    await page.locator('.group-create-form').getByRole('button', { name: 'Creer' }).click();
+
+    const card = page.locator('.group-card', { hasText: 'Équipe Café Paris' });
+    await expect(card).toBeVisible();
+    await expect(card.locator('.group-code-badge')).toHaveText(/^\/[a-z0-9]{5}$/);
+  });
+
+  // NB: le backend resout les collisions de code auto-genere en interne
+  // (discriminant incremental dans generate_code, cf codegen.rs) sans jamais
+  // renvoyer d'erreur a l'utilisateur pour un code auto-genere — contrairement
+  // a une collision sur un code saisi manuellement (test API ci-dessus,
+  // "group code uniqueness", qui reste le seul chemin ou un 409 est possible).
+  // Ce test verifie donc le contrat reellement observable depuis l'UI :
+  // creer plusieurs groupes a la suite ne produit jamais d'erreur et chaque
+  // groupe obtient un code distinct, jamais un ecrasement silencieux.
+  test('UI: creating several groups in a row never surfaces a code-collision error', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+    await page.getByText('Groupes', { exact: true }).click();
+
+    const names = ['collision-a', 'collision-b', 'collision-c'];
+    for (const name of names) {
+      await page.getByText('+ Nouveau groupe').click();
+      await page.locator('#new-group-name').fill(name);
+      await page.locator('.group-create-form').getByRole('button', { name: 'Creer' }).click();
+      await expect(page.locator('.group-card', { hasText: name })).toBeVisible();
+      await expect(page.locator('.form-error')).toHaveCount(0);
+    }
+
+    const codes = await page.locator('.group-code-badge').allTextContents();
+    expect(new Set(codes).size).toBe(codes.length);
+  });
 });
 
 test.describe('Import/Export', () => {
