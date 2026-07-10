@@ -999,6 +999,16 @@ mod tests {
 
     #[tokio::test]
     async fn restore_from_backup_creates_safety_backup_of_current_state_first() {
+        // Ce test compte les backups non-proteges dans backups/ (soumis a
+        // rotation par BACKUP_MAX_COUNT) : sans tenir ENV_MUTEX, une mutation
+        // concurrente de cette variable par un autre test (ex.
+        // backup_rotation_keeps_max_n, protected_backup_exempt_from_normal_rotation,
+        // backup_max_count_from_env) peut plafonner le nombre de backups a une
+        // valeur trop basse pendant la fenetre du test, rendant la comparaison
+        // avant/apres fausse de facon intermittente (voir CLAUDE.md, pitfall
+        // "Tests Rust qui mutent un env var process-wide").
+        let _guard = ENV_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
+        unsafe { std::env::remove_var("BACKUP_MAX_COUNT") };
         let dir = temp_dir();
         let store = MockStore::load_or_init(&dir).await.unwrap();
         store.replace(sample_config()).await.unwrap();
