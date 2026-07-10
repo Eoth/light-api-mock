@@ -35,6 +35,8 @@ pub struct AppState {
     pub keycloak: Option<KeycloakClient>,
     pub script_engine: ScriptEngine,
     pub ping_cache: PingCache,
+    #[cfg(feature = "messaging-kafka")]
+    pub messaging: crate::messaging::MessagingState,
 }
 
 impl AppState {

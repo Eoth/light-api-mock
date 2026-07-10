@@ -133,6 +133,13 @@ curl http://localhost:7342/demo/v1/anything
 | `RUST_LOG` | `light_mock=info` | Filtre de logs (ex: `light_mock=debug`) |
 | `BACKUP_MAX_COUNT` | `5` | Nombre de sauvegardes conservees dans `{DATA_PATH}/backups/` avant rotation |
 | `SHOW_RESET_BUTTON` | `false` | Affiche le bouton "Reset complet" dans l'UI quand `AUTH_ENABLED=false` (sinon toujours cache par defaut). **N'est pas une mesure de securite** : quand l'auth est activee, seuls les super-admins peuvent reinitialiser (verifie cote serveur) ; quand elle est desactivee, l'API reste ouverte independamment de ce flag, qui ne pilote que l'affichage. |
+| `KAFKA_ENABLED` | `false` | Active le consumer Kafka au demarrage. Sans effet si le binaire n'est pas compile avec `--features messaging-kafka`. |
+| `KAFKA_BROKERS` | *(vide)* | Liste de brokers Kafka separes par des virgules (ex: `broker1:9092,broker2:9092`). |
+| `KAFKA_CONSUMER_GROUP` | `lightmock` | Consumer group Kafka utilise pour ecouter `KAFKA_LISTEN_TOPIC`. |
+| `KAFKA_LISTEN_TOPIC` | *(vide)* | Topic Kafka ecoute par le consumer. |
+| `KAFKA_REPLY_TOPIC` | *(vide, optionnel)* | Topic sur lequel publier la reponse mockee rendue. Si absent, aucune publication n'est tentee. |
+| `MESSAGE_LOG_TTL_MS` | `86400000` (24h) | Duree de retention des entrees du journal des messages Kafka avant purge. |
+| `MESSAGE_LOG_MAX_BODY_SIZE` | `16384` (16 Ko) | Taille au-dela de laquelle le corps d'un message est tronque dans le journal (les metadonnees restent completes). |
 
 ## Sauvegardes et rollback
 

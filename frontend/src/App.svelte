@@ -1,11 +1,12 @@
 <script>
-  import { getServices, getConfig, putConfig, toggleService, createService, updateService, resetConfig, getAuthStatus, validateToken, getGroups, createGroup } from './lib/api.js';
+  import { getServices, getConfig, putConfig, toggleService, createService, updateService, resetConfig, getAuthStatus, validateToken, getGroups, createGroup, getMessagingStatus } from './lib/api.js';
   import { auth, isLoggedIn, setAuth, logout, restoreAuth } from './lib/auth.svelte.js';
   import ServiceList from './lib/components/ServiceList.svelte';
   import ServiceDetail from './lib/components/ServiceDetail.svelte';
   import ServiceForm from './lib/components/ServiceForm.svelte';
   import Notification from './lib/components/Notification.svelte';
   import RequestLog from './lib/components/RequestLog.svelte';
+  import MessagingLog from './lib/components/MessagingLog.svelte';
   import LoginForm from './lib/components/LoginForm.svelte';
   import GroupManager from './lib/components/GroupManager.svelte';
   import BackupManager from './lib/components/BackupManager.svelte';
@@ -14,6 +15,9 @@
   let services = $state([]);
   let resetPending = $state(false);
   let groups = $state([]);
+  // Absent (binaire compile sans la feature "messaging-kafka") -> le bouton
+  // "Messages Kafka" reste cache plutot que de mener a une vue en echec (404).
+  let messagingAvailable = $state(false);
   let notification = $state({ message: '', type: 'info', visible: false });
   let selectedService = $state(null);
   let view = $state('list');
@@ -78,6 +82,15 @@
     } catch {
       auth.enabled = false;
       auth.showResetButton = false;
+    }
+
+    try {
+      const messagingStatus = await getMessagingStatus();
+      messagingAvailable = !!messagingStatus?.available;
+    } catch {
+      // 404 sur un binaire compile sans la feature "messaging-kafka" : c'est
+      // l'etat par defaut attendu, pas une erreur a notifier a l'utilisateur.
+      messagingAvailable = false;
     }
 
     const params = new URLSearchParams(window.location.search);
@@ -285,6 +298,9 @@
       <p class="app-subtitle">Mock &amp; Proxy Intelligent</p>
       <div class="header-actions">
         <button type="button" class="btn btn-sm btn-outline" onclick={() => view = 'logs'} title="Journal des requetes">Logs</button>
+        {#if messagingAvailable}
+          <button type="button" class="btn btn-sm btn-outline" onclick={() => view = 'messaging'} title="Journal des messages Kafka">Messages Kafka</button>
+        {/if}
         <button type="button" class="btn btn-sm btn-outline" onclick={() => view = 'groups'} title="Gestion des groupes">Groupes</button>
         <button type="button" class="btn btn-sm btn-outline" onclick={exportConfig} title="Telecharger la configuration">Export</button>
         <button type="button" class="btn btn-sm btn-outline" onclick={importConfig} title="Charger une configuration">Import</button>
@@ -310,6 +326,7 @@
         <li><button type="button" class="breadcrumb-link" onclick={handleBack}>Services</button></li>
         <li aria-current="page">
           {#if view === 'logs'}Journal des requetes
+          {:else if view === 'messaging'}Messages Kafka
           {:else if view === 'groups'}Groupes de services
           {:else if view === 'backups'}Sauvegardes de configuration
           {:else if view === 'add'}Ajouter un service
@@ -358,6 +375,8 @@
 
     {#if view === 'logs'}
       <RequestLog />
+    {:else if view === 'messaging'}
+      <MessagingLog onNotify={showNotification} onBack={handleBack} />
     {:else if view === 'groups'}
       <GroupManager {services} authEnabled={auth.enabled} onNotify={showNotification} onBack={handleBack} onServiceUpdate={handleServiceUpdate} onGroupsChange={(g) => groups = g} />
     {:else if view === 'backups'}

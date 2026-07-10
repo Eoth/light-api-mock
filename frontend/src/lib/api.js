@@ -97,6 +97,21 @@ export function getLogs(limit = 50) {
   return request('GET', `/logs?limit=${limit}`);
 }
 
+// Messaging (Kafka) — routes absentes (404) sur un binaire compile sans la
+// feature "messaging-kafka" ; les appelants doivent gerer cet echec (voir
+// App.svelte, verification au demarrage).
+export function getMessagingStatus() {
+  return request('GET', '/messaging/status');
+}
+
+export function getMessagingLogs(limit = 200) {
+  return request('GET', `/messaging/logs?limit=${limit}`);
+}
+
+export function simulateMessage(topic, payload, headers = {}) {
+  return request('POST', '/messaging/simulate', { topic, payload, headers });
+}
+
 export function validateScript(script) {
   return request('POST', '/script/validate', { script });
 }
