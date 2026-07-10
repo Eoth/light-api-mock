@@ -222,6 +222,94 @@ test.describe('Groups', () => {
   });
 });
 
+// Diagnostic (voir CLAUDE.md) : un service n'est identifie sans ambiguite que
+// par (group_name, name) — le nom seul ne suffit pas puisque deux groupes
+// peuvent avoir un service de meme nom. Ces tests couvrent, via de vraies
+// interactions UI, les 3 symptomes constates : URL de test divergente entre
+// la vue liste et le formulaire d'edition, suppression croisee entre groupes,
+// et fausse erreur affichee lors d'une suppression reussie.
+test.describe('Service identity across groups', () => {
+  test.beforeEach(async ({ request }) => {
+    await request.delete(`${API}/config/reset`);
+  });
+
+  async function expandGroup(page, groupName) {
+    const header = page.locator('.group-header', { hasText: groupName });
+    if (await header.getAttribute('aria-expanded') === 'false') {
+      await header.click();
+    }
+  }
+
+  test('l URL de test affichee en edition correspond a celle de la vue liste pour un service groupe', async ({ page, request }) => {
+    const grp = await (await request.post(`${API}/groups`, {
+      data: { name: 'url-parity-grp', code: '', admins: [], members: [] },
+    })).json();
+    await request.post(`${API}/services`, {
+      data: validService('url-parity-svc', { listen_path: '/v1/*', group_name: 'url-parity-grp' }),
+    });
+
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+    await expandGroup(page, 'url-parity-grp');
+
+    const card = page.locator('.service-card', { hasText: 'url-parity-svc' });
+    const listUrl = await card.locator('.detail-row', { hasText: 'URL test' }).locator('code').textContent();
+    expect(listUrl).toBe(`/${grp.code}/url-parity-svc/v1/*`);
+
+    await card.getByRole('button', { name: 'Configurer le service url-parity-svc' }).click();
+    await page.getByRole('button', { name: 'Modifier le service' }).click();
+
+    const editUrl = page.locator('.url-preview code');
+    await expect(editUrl).toContainText(`/${grp.code}/url-parity-svc/v1/*`);
+  });
+
+  test('supprimer un service dans un groupe ne supprime pas le service homonyme d un autre groupe', async ({ page, request }) => {
+    await request.post(`${API}/groups`, { data: { name: 'ambig-grp-a', code: '', admins: [], members: [] } });
+    await request.post(`${API}/groups`, { data: { name: 'ambig-grp-b', code: '', admins: [], members: [] } });
+    await request.post(`${API}/services`, { data: validService('ambig-svc', { group_name: 'ambig-grp-a' }) });
+    await request.post(`${API}/services`, { data: validService('ambig-svc', { group_name: 'ambig-grp-b' }) });
+
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+    await expandGroup(page, 'ambig-grp-a');
+
+    const cardA = page.locator('.service-group', { hasText: 'ambig-grp-a' }).locator('.service-card', { hasText: 'ambig-svc' });
+    await cardA.getByRole('button', { name: 'Configurer le service ambig-svc' }).click();
+    await page.getByRole('button', { name: 'Supprimer' }).click();
+    await page.getByRole('button', { name: 'Oui, supprimer' }).click();
+
+    await expect(async () => {
+      const stillB = await request.get(`${API}/groups/ambig-grp-b/services/ambig-svc`);
+      expect(stillB.status()).toBe(200);
+      const goneA = await request.get(`${API}/groups/ambig-grp-a/services/ambig-svc`);
+      expect(goneA.status()).toBe(404);
+    }).toPass();
+
+    await page.waitForLoadState('networkidle');
+    await expandGroup(page, 'ambig-grp-b');
+    await expect(
+      page.locator('.service-group', { hasText: 'ambig-grp-b' }).locator('.service-card', { hasText: 'ambig-svc' })
+    ).toBeVisible();
+  });
+
+  test('la suppression d un service n affiche pas de fausse erreur "Cannot read properties of null"', async ({ page, request }) => {
+    await request.post(`${API}/services`, { data: validService('no-crash-svc') });
+
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+    await expandGroup(page, 'Sans groupe');
+
+    const card = page.locator('.service-card', { hasText: 'no-crash-svc' });
+    await card.getByRole('button', { name: 'Configurer le service no-crash-svc' }).click();
+    await page.getByRole('button', { name: 'Supprimer' }).click();
+    await page.getByRole('button', { name: 'Oui, supprimer' }).click();
+
+    const notif = page.locator('.notification.error');
+    await expect(page.locator('.notification.success')).toContainText('supprimé');
+    await expect(notif).toHaveCount(0);
+  });
+});
+
 test.describe('Import/Export', () => {
   test.beforeEach(async ({ request }) => {
     await request.delete(`${API}/config/reset`);

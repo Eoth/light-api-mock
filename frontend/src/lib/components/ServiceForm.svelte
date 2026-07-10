@@ -1,6 +1,7 @@
 <script>
   import { untrack } from 'svelte';
   import FormField from './FormField.svelte';
+  import { buildServiceTestUrl } from '../service-url.js';
 
   let {
     service = null,
@@ -24,12 +25,8 @@
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
 
   let testUrl = $derived(() => {
-    const n = name.trim() || '...';
-    const p = listenPath.trim();
     const g = availableGroups.find(gr => gr.name === groupName);
-    const prefix = g ? `/${g.code}/${n}` : `/${n}`;
-    const path = p ? (p.startsWith('/') ? p : '/' + p) : '/*';
-    return `${baseUrl}${prefix}${path}`;
+    return buildServiceTestUrl({ name, listenPath, groupCode: g?.code ?? '', baseUrl });
   });
   let saving = $state(false);
   let error = $state('');

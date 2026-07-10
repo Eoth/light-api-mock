@@ -6,7 +6,7 @@
   // dedie juste pour lire la TTL : c'est une simple constante d'affichage.
   const PING_TTL_MS = 120_000;
 
-  let { serviceName } = $props();
+  let { serviceName, groupName = null } = $props();
 
   let status = $state(null);
   let loading = $state(false);
@@ -25,7 +25,7 @@
     loading = true;
     error = '';
     try {
-      status = await pingService(serviceName);
+      status = await pingService(serviceName, groupName);
       nowTick = Date.now();
     } catch (e) {
       error = e.message;
