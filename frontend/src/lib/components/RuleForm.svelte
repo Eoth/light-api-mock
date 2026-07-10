@@ -4,8 +4,10 @@
   import JsonPasteBuilder from './JsonPasteBuilder.svelte';
   import XmlResponseBuilder from './XmlResponseBuilder.svelte';
   import ToggleSwitch from './ToggleSwitch.svelte';
+  import RhaiScriptEditor from './RhaiScriptEditor.svelte';
   import { templateToTestJson, templateToFields, validateTemplateAsJson, validateTemplateAsXml, fieldsToTemplate, varNameToSource } from '../tpl-utils.js';
   import { validateScript as apiValidateScript } from '../api.js';
+  import { RHAI_FUNCTIONS } from '../rhai-functions.js';
 
   import { untrack } from 'svelte';
 
@@ -652,14 +654,7 @@
           {#if enabled}
             <div class="script-editor">
               <label for={id}>Code Rhai</label>
-              <textarea
-                {id}
-                value={code}
-                oninput={(e) => onCodeInput(e.target.value)}
-                rows="5"
-                class="script-textarea"
-                aria-describedby="{id}-hint"
-              ></textarea>
+              <RhaiScriptEditor {id} value={code} onInput={onCodeInput} rows={5} ariaDescribedby="{id}-hint" />
               <div class="script-actions">
                 <button type="button" class="btn btn-outline btn-sm" onclick={onValidate} disabled={validation.status === 'pending'}>
                   {validation.status === 'pending' ? 'Validation...' : 'Valider le script'}
@@ -695,7 +690,14 @@
         {#if scriptEnabled}
           <div class="script-editor">
             <label for="rule-script">Code Rhai</label>
-            <textarea id="rule-script" bind:value={scriptCode} rows="8" class="script-textarea" placeholder={'// Exemples Rhai :\n// Retourner une valeur simple :\nlet id = request.path.id;\n`user_${id}`\n\n// Retourner un objet (accessible via {{script.champ}}) :\n#{ nom: "Alice", age: "30" }'} aria-describedby="script-hint"></textarea>
+            <RhaiScriptEditor
+              id="rule-script"
+              value={scriptCode}
+              onInput={(v) => scriptCode = v}
+              rows={8}
+              placeholder={'// Exemples Rhai :\n// Retourner une valeur simple :\nlet id = request.path.id;\n`user_${id}`\n\n// Retourner un objet (accessible via {{script.champ}}) :\n#{ nom: "Alice", age: "30" }'}
+              ariaDescribedby="script-hint"
+            />
             <div class="script-actions">
               <button type="button" class="btn btn-outline btn-sm" onclick={handleValidateScript} disabled={scriptValidation.status === 'pending'}>
                 {scriptValidation.status === 'pending' ? 'Validation...' : 'Valider le script'}
@@ -715,8 +717,12 @@
                   <p><strong>Variables :</strong> <code>let x = 42;</code> <code>let s = "hello";</code></p>
                   <p><strong>Conditions :</strong> <code>if x &gt; 10 {"{"} "grand" {"}"} else {"{"} "petit" {"}"}</code></p>
                   <p><strong>Strings :</strong> <code>s.to_upper()</code> <code>s.len()</code> <code>s.contains("el")</code> <code>s.replace("a", "b")</code></p>
-                  <p><strong>Fonctions lightMock :</strong> <code>random_int(1, 5)</code> (entier aleatoire), <code>now_ms()</code> (timestamp ms), <code>date_now(format)</code>, <code>date_past(jours, format)</code>, <code>date_future(jours, format)</code> (format : <code>"iso"</code> par defaut, <code>"fr"</code>, <code>"en"</code>)</p>
-                  <p><strong>Valeurs deterministes par seed :</strong> <code>seeded_int(seed, min, max)</code>, <code>seeded_pick(seed, [liste])</code> — meme seed (ex. <code>request.path.siret</code>) → toujours le meme resultat</p>
+                  <p><strong>Fonctions lightMock disponibles</strong> (autocompletion dans l'editeur : tapez le debut d'un nom, ou <kbd>Ctrl</kbd>+<kbd>Espace</kbd>) :</p>
+                  <ul class="script-fn-list">
+                    {#each RHAI_FUNCTIONS as fn}
+                      <li><code>{fn.signature}</code> — {fn.description}</li>
+                    {/each}
+                  </ul>
                   <p><strong>Objet retour :</strong> <code>#{"{"} cle: "val", n: random_int(1,100) {"}"}</code> → accessible via <code>{"{{script.cle}}"}</code></p>
                   <p><strong>Ratio 4/5 :</strong> <code>if random_int(1,5) &lt;= 4 {"{"} #{"{"} status: "ok" {"}"} {"}"} else {"{"} #{"{"} status: "ko" {"}"} {"}"}</code></p>
                   <p><strong>Nom fixe par SIRET :</strong> <code>seeded_pick(request.path.siret, ["Dupont SARL", "Martin SAS"])</code></p>
@@ -821,7 +827,6 @@
   .script-section { border-top-color: var(--color-primary); }
   .script-editor { margin-top: 0.75rem; }
   .script-editor label { display: block; font-weight: 600; font-size: 0.875rem; margin-bottom: 0.25rem; }
-  .script-textarea { width: 100%; font-family: 'Cascadia Code', 'Fira Code', monospace; font-size: 0.8125rem; padding: 0.5rem; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-bg); color: var(--color-text); resize: vertical; font-variant-ligatures: none; }
   .script-actions { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.375rem; }
   .script-valid { font-size: 0.8125rem; color: var(--color-success); font-weight: 600; }
   .script-invalid { font-size: 0.8125rem; color: var(--color-danger); }
@@ -833,6 +838,8 @@
   .script-examples-content { padding: 0.5rem; background: var(--color-bg); border-radius: var(--radius); margin-top: 0.25rem; font-size: 0.8125rem; }
   .script-examples-content p { margin: 0.25rem 0; }
   .script-examples-content a { color: var(--color-primary); }
+  .script-fn-list { margin: 0.25rem 0 0.5rem; padding-left: 1.125rem; }
+  .script-fn-list li { margin: 0.125rem 0; }
   .chaos-section { border-top-color: var(--color-warning); }
 
   .chaos-fields { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 0.5rem; }
