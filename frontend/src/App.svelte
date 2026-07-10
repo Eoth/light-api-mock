@@ -8,6 +8,7 @@
   import RequestLog from './lib/components/RequestLog.svelte';
   import LoginForm from './lib/components/LoginForm.svelte';
   import GroupManager from './lib/components/GroupManager.svelte';
+  import BackupManager from './lib/components/BackupManager.svelte';
   import ConfirmDialog from './lib/components/ConfirmDialog.svelte';
 
   let services = $state([]);
@@ -287,6 +288,7 @@
         <button type="button" class="btn btn-sm btn-outline" onclick={() => view = 'groups'} title="Gestion des groupes">Groupes</button>
         <button type="button" class="btn btn-sm btn-outline" onclick={exportConfig} title="Telecharger la configuration">Export</button>
         <button type="button" class="btn btn-sm btn-outline" onclick={importConfig} title="Charger une configuration">Import</button>
+        <button type="button" class="btn btn-sm btn-outline" onclick={() => view = 'backups'} title="Restaurer une sauvegarde de configuration">Sauvegardes</button>
         {#if canShowReset}
           <button type="button" class="btn btn-sm btn-outline btn-danger-outline" onclick={() => resetPending = true} title="Supprimer tous les services">Reset</button>
         {/if}
@@ -309,6 +311,7 @@
         <li aria-current="page">
           {#if view === 'logs'}Journal des requetes
           {:else if view === 'groups'}Groupes de services
+          {:else if view === 'backups'}Sauvegardes de configuration
           {:else if view === 'add'}Ajouter un service
           {:else if view === 'detail' && currentService}Detail : {currentService.name}
           {/if}
@@ -357,6 +360,8 @@
       <RequestLog />
     {:else if view === 'groups'}
       <GroupManager {services} authEnabled={auth.enabled} onNotify={showNotification} onBack={handleBack} onServiceUpdate={handleServiceUpdate} onGroupsChange={(g) => groups = g} />
+    {:else if view === 'backups'}
+      <BackupManager onNotify={showNotification} onBack={handleBack} />
     {:else if view === 'add'}
       <ServiceForm
         service={clonedService}

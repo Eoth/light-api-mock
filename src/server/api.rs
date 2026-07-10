@@ -4,7 +4,7 @@ use crate::models::{Group, MockConfig, Service};
 use crate::server::AppState;
 use std::sync::Arc;
 use crate::server::request_log::LogEntry;
-use crate::server::validation::validate_service;
+use crate::server::validation::{validate_backup_filename, validate_service};
 use axum::Extension;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
@@ -21,6 +21,8 @@ pub fn routes() -> Router<AppState> {
         .route("/auth/me", get(get_me))
         .route("/config", get(get_config).put(put_config))
         .route("/config/reset", delete_route(reset_config))
+        .route("/config/backups", get(list_backups))
+        .route("/config/restore/:filename", post(restore_backup))
         .route("/services", get(list_services).post(create_service))
         .route(
             "/services/:name",
@@ -229,6 +231,39 @@ async fn reset_config(
         .replace(MockConfig::empty())
         .await
         .map_err(AppError::Store)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn list_backups(
+    State(state): State<AppState>,
+    Extension(user): Extension<AuthUser>,
+) -> Result<Json<Vec<crate::store::BackupInfo>>, AppError> {
+    require_super_admin(&user)?;
+    let backups = state.store.list_backups().await.map_err(AppError::Store)?;
+    Ok(Json(backups))
+}
+
+async fn restore_backup(
+    State(state): State<AppState>,
+    Extension(user): Extension<AuthUser>,
+    Path(filename): Path<String>,
+) -> Result<StatusCode, AppError> {
+    require_super_admin(&user)?;
+
+    if let Err(e) = validate_backup_filename(&filename) {
+        tracing::warn!(filename = %filename, reason = %e.message, "restore rejected: invalid filename");
+        return Err(AppError::Validation(e.message));
+    }
+
+    tracing::info!(user = %user.username, filename = %filename, "config restore requested");
+    state
+        .store
+        .restore_from_backup(&filename)
+        .await
+        .map_err(|e| match e {
+            crate::store::StoreError::NotFound(_) => AppError::NotFound,
+            other => AppError::Store(other),
+        })?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -853,5 +888,26 @@ impl IntoResponse for AppError {
             )
                 .into_response(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // require_super_admin() est le seul garde-fou reel derriere reset_config
+    // ET restore_backup (cf CLAUDE.md) : verifie directement ici plutot que
+    // via un test HTTP bout-en-bout (pas d'infra de test router dans ce
+    // fichier a ce jour).
+    #[test]
+    fn require_super_admin_rejects_non_admin() {
+        let user = AuthUser { username: "bob".into(), is_super_admin: false };
+        assert!(matches!(require_super_admin(&user), Err(AppError::Forbidden)));
+    }
+
+    #[test]
+    fn require_super_admin_accepts_admin() {
+        let user = AuthUser { username: "alice".into(), is_super_admin: true };
+        assert!(require_super_admin(&user).is_ok());
     }
 }
