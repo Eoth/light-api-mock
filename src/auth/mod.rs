@@ -105,6 +105,12 @@ mod tests {
     use super::*;
     use crate::models::{Group, MockConfig, Service, WsdlMode};
 
+    // SHOW_RESET_BUTTON/AUTH_ENABLED are process-wide env vars mutated by the
+    // two show_reset_button_* tests below; cargo test runs test fns in
+    // parallel OS threads, so without serialization one test's
+    // set_var/remove_var can leak into the other's assertion window.
+    static ENV_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     fn test_config() -> AuthConfig {
         AuthConfig {
             enabled: true,
@@ -232,6 +238,7 @@ mod tests {
 
     #[test]
     fn show_reset_button_defaults_to_false() {
+        let _guard = ENV_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
         unsafe { std::env::remove_var("SHOW_RESET_BUTTON") };
         unsafe { std::env::remove_var("AUTH_ENABLED") };
         let cfg = AuthConfig::from_env();
@@ -240,6 +247,7 @@ mod tests {
 
     #[test]
     fn show_reset_button_true_from_env() {
+        let _guard = ENV_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
         unsafe { std::env::remove_var("AUTH_ENABLED") };
         unsafe { std::env::set_var("SHOW_RESET_BUTTON", "true") };
         let cfg = AuthConfig::from_env();

@@ -77,6 +77,7 @@ async fn main() {
         ping_cache: PingCache::new(),
     };
 
+    let store_for_shutdown = state.store.clone();
     let app = build_router(state, &static_dir);
     let addr = format!("0.0.0.0:{port}");
 
@@ -90,6 +91,13 @@ async fn main() {
         .with_graceful_shutdown(shutdown_signal())
         .await
         .expect("server error");
+
+    // Arret gracieux (SIGTERM K8s) : draine la file d'ecriture write-behind
+    // avant de quitter, pour reduire la fenetre de risque de perte des
+    // dernieres mutations en cas d'arret normal du pod (cf CLAUDE.md,
+    // "write-behind"). Ne protege pas contre un SIGKILL/crash brutal.
+    tracing::info!("draining pending config writes before exit");
+    store_for_shutdown.flush().await;
 }
 
 async fn shutdown_signal() {
