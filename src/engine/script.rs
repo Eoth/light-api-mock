@@ -62,35 +62,28 @@ impl ScriptEngine {
             iso[..4].parse().unwrap_or(2026)
         });
 
-        engine.register_fn("date", || -> String {
-            let secs = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs();
-            let iso = crate::engine::template::epoch_to_iso(secs);
-            iso[..10].to_string()
+        // date_now/date_past/date_future : format configurable ("iso" par defaut,
+        // "fr" = JJ/MM/AAAA, "en" = MM/JJ/AAAA). Remplace les anciennes date()/
+        // date_past()/date_future() (sortie ISO figee, sans parametre) : pas de
+        // contrainte de retrocompatibilite sur ces fonctions (peu d'utilisateurs a
+        // date), l'occasion d'assainir plutot que d'empiler un 2e nom. days<=0 pour
+        // date_past/date_future est traite comme "aujourd'hui" (borne a 0), un choix
+        // deterministe plutot qu'une inversion silencieuse vers le futur/passe.
+        engine.register_fn("date_now", || -> String { format_date_offset(0, "iso") });
+        engine.register_fn("date_now", |format: &str| -> String {
+            format_date_offset(0, format)
         });
-
-        engine.register_fn("date_past", || -> String {
-            let days_back = fastrand::i64(1..=1825);
-            let secs = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs()
-                - (days_back as u64 * 86400);
-            let iso = crate::engine::template::epoch_to_iso(secs);
-            iso[..10].to_string()
+        engine.register_fn("date_past", |days: i64| -> String {
+            format_date_offset(-days.max(0), "iso")
         });
-
-        engine.register_fn("date_future", || -> String {
-            let days_fwd = fastrand::i64(1..=1825);
-            let secs = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs()
-                + (days_fwd as u64 * 86400);
-            let iso = crate::engine::template::epoch_to_iso(secs);
-            iso[..10].to_string()
+        engine.register_fn("date_past", |days: i64, format: &str| -> String {
+            format_date_offset(-days.max(0), format)
+        });
+        engine.register_fn("date_future", |days: i64| -> String {
+            format_date_offset(days.max(0), "iso")
+        });
+        engine.register_fn("date_future", |days: i64, format: &str| -> String {
+            format_date_offset(days.max(0), format)
         });
 
         engine.register_fn("uuid", || -> String {
@@ -100,6 +93,21 @@ impl ScriptEngine {
         engine.register_fn("fake", |kind: &str| -> String {
             crate::engine::template::resolve_fake_public(kind)
         });
+
+        // seeded_int/seeded_pick : tirage deterministe pour un meme seed (ex. un
+        // meme SIRET en path param retourne toujours le meme resultat). Reutilise
+        // le hash FNV-1a deja en place pour Group.code (src/server/codegen.rs) au
+        // lieu d'ajouter une dependance de hashing dediee. `seed` accepte n'importe
+        // quel type Rhai (string, int, bool...) via Dynamic::to_string().
+        engine.register_fn("seeded_int", |seed: rhai::Dynamic, min: i64, max: i64| -> i64 {
+            seeded_int_impl(&seed.to_string(), min, max)
+        });
+        engine.register_fn(
+            "seeded_pick",
+            |seed: rhai::Dynamic, list: rhai::Array| -> rhai::Dynamic {
+                seeded_pick_impl(&seed.to_string(), &list)
+            },
+        );
 
         Self {
             engine: Arc::new(engine),
@@ -164,6 +172,41 @@ impl ScriptEngine {
             })
         }
     }
+}
+
+// Formate epoch_secs + days_delta*86400 selon "iso" (defaut/fallback)/"fr"/"en".
+// Reutilise civil_from_days (deja ecrit pour epoch_to_iso, algorithme de Howard
+// Hinnant) plutot que d'ajouter une dependance de formatage de date.
+fn format_date_offset(days_delta: i64, format: &str) -> String {
+    let now_secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs() as i64;
+    let days = (now_secs + days_delta * 86400).div_euclid(86400);
+    let (y, mo, d) = crate::engine::template::civil_from_days(days);
+    match format {
+        "fr" => format!("{d:02}/{mo:02}/{y:04}"),
+        "en" => format!("{mo:02}/{d:02}/{y:04}"),
+        _ => format!("{y:04}-{mo:02}-{d:02}"),
+    }
+}
+
+fn seeded_int_impl(seed: &str, min: i64, max: i64) -> i64 {
+    if min >= max {
+        return min;
+    }
+    let hash = crate::server::codegen::fnv1a_hash(seed);
+    let range = (max - min + 1) as u64;
+    min + (hash % range) as i64
+}
+
+fn seeded_pick_impl(seed: &str, list: &rhai::Array) -> rhai::Dynamic {
+    if list.is_empty() {
+        return rhai::Dynamic::UNIT;
+    }
+    let hash = crate::server::codegen::fnv1a_hash(seed);
+    let idx = (hash % list.len() as u64) as usize;
+    list[idx].clone()
 }
 
 #[cfg(test)]
@@ -282,19 +325,224 @@ mod tests {
     }
 
     #[test]
-    fn date_returns_iso_date() {
+    fn date_now_returns_iso_date_by_default() {
         let engine = ScriptEngine::new();
-        let result = engine.execute("date()", &empty_ctx()).unwrap();
+        let result = engine.execute("date_now()", &empty_ctx()).unwrap();
         assert_eq!(result.value.len(), 10);
         assert!(result.value.contains('-'));
     }
 
     #[test]
+    fn date_now_explicit_iso_matches_default() {
+        let engine = ScriptEngine::new();
+        let default = engine.execute("date_now()", &empty_ctx()).unwrap().value;
+        let explicit = engine
+            .execute(r#"date_now("iso")"#, &empty_ctx())
+            .unwrap()
+            .value;
+        assert_eq!(default, explicit);
+    }
+
+    #[test]
+    fn date_now_fr_format() {
+        let engine = ScriptEngine::new();
+        let iso = engine.execute("date_now()", &empty_ctx()).unwrap().value;
+        let fr = engine
+            .execute(r#"date_now("fr")"#, &empty_ctx())
+            .unwrap()
+            .value;
+        let parts: Vec<&str> = iso.split('-').collect();
+        assert_eq!(fr, format!("{}/{}/{}", parts[2], parts[1], parts[0]));
+    }
+
+    #[test]
+    fn date_now_en_format() {
+        let engine = ScriptEngine::new();
+        let iso = engine.execute("date_now()", &empty_ctx()).unwrap().value;
+        let en = engine
+            .execute(r#"date_now("en")"#, &empty_ctx())
+            .unwrap()
+            .value;
+        let parts: Vec<&str> = iso.split('-').collect();
+        assert_eq!(en, format!("{}/{}/{}", parts[1], parts[2], parts[0]));
+    }
+
+    #[test]
+    fn date_now_unknown_format_falls_back_to_iso() {
+        let engine = ScriptEngine::new();
+        let iso = engine.execute("date_now()", &empty_ctx()).unwrap().value;
+        let unknown = engine
+            .execute(r#"date_now("klingon")"#, &empty_ctx())
+            .unwrap()
+            .value;
+        assert_eq!(iso, unknown);
+    }
+
+    #[test]
     fn date_past_is_before_today() {
         let engine = ScriptEngine::new();
-        let today = engine.execute("date()", &empty_ctx()).unwrap().value;
-        let past = engine.execute("date_past()", &empty_ctx()).unwrap().value;
+        let today = engine.execute("date_now()", &empty_ctx()).unwrap().value;
+        let past = engine.execute("date_past(10)", &empty_ctx()).unwrap().value;
         assert!(past < today);
+    }
+
+    #[test]
+    fn date_future_is_after_today() {
+        let engine = ScriptEngine::new();
+        let today = engine.execute("date_now()", &empty_ctx()).unwrap().value;
+        let future = engine
+            .execute("date_future(10)", &empty_ctx())
+            .unwrap()
+            .value;
+        assert!(future > today);
+    }
+
+    #[test]
+    fn date_past_zero_days_is_today() {
+        let engine = ScriptEngine::new();
+        let today = engine.execute("date_now()", &empty_ctx()).unwrap().value;
+        let past = engine.execute("date_past(0)", &empty_ctx()).unwrap().value;
+        assert_eq!(past, today);
+    }
+
+    #[test]
+    fn date_past_negative_days_clamped_to_today() {
+        let engine = ScriptEngine::new();
+        let today = engine.execute("date_now()", &empty_ctx()).unwrap().value;
+        let past = engine
+            .execute("date_past(-30)", &empty_ctx())
+            .unwrap()
+            .value;
+        assert_eq!(past, today);
+    }
+
+    #[test]
+    fn date_future_zero_days_is_today() {
+        let engine = ScriptEngine::new();
+        let today = engine.execute("date_now()", &empty_ctx()).unwrap().value;
+        let future = engine
+            .execute("date_future(0)", &empty_ctx())
+            .unwrap()
+            .value;
+        assert_eq!(future, today);
+    }
+
+    #[test]
+    fn date_future_negative_days_clamped_to_today() {
+        let engine = ScriptEngine::new();
+        let today = engine.execute("date_now()", &empty_ctx()).unwrap().value;
+        let future = engine
+            .execute("date_future(-30)", &empty_ctx())
+            .unwrap()
+            .value;
+        assert_eq!(future, today);
+    }
+
+    #[test]
+    fn date_past_with_format() {
+        let engine = ScriptEngine::new();
+        let result = engine
+            .execute(r#"date_past(5, "fr")"#, &empty_ctx())
+            .unwrap()
+            .value;
+        assert_eq!(result.len(), 10);
+        assert_eq!(result.chars().filter(|c| *c == '/').count(), 2);
+    }
+
+    #[test]
+    fn date_future_with_format() {
+        let engine = ScriptEngine::new();
+        let result = engine
+            .execute(r#"date_future(5, "en")"#, &empty_ctx())
+            .unwrap()
+            .value;
+        assert_eq!(result.len(), 10);
+        assert_eq!(result.chars().filter(|c| *c == '/').count(), 2);
+    }
+
+    #[test]
+    fn seeded_int_is_deterministic_for_same_seed() {
+        let engine = ScriptEngine::new();
+        let a = engine
+            .execute(r#"seeded_int("44306184100047", 0, 1000)"#, &empty_ctx())
+            .unwrap()
+            .value;
+        let b = engine
+            .execute(r#"seeded_int("44306184100047", 0, 1000)"#, &empty_ctx())
+            .unwrap()
+            .value;
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn seeded_int_respects_bounds() {
+        let engine = ScriptEngine::new();
+        for seed in ["a", "b", "c", "siret-123", "0", "-1"] {
+            let script = format!(r#"seeded_int("{seed}", 10, 20)"#);
+            let result = engine.execute(&script, &empty_ctx()).unwrap();
+            let val: i64 = result.value.parse().unwrap();
+            assert!((10..=20).contains(&val), "seeded_int out of bounds: {val}");
+        }
+    }
+
+    #[test]
+    fn seeded_int_different_seeds_can_differ() {
+        let engine = ScriptEngine::new();
+        let values: Vec<String> = (0..10)
+            .map(|i| {
+                let script = format!(r#"seeded_int("seed-{i}", 0, 1000000)"#);
+                engine.execute(&script, &empty_ctx()).unwrap().value
+            })
+            .collect();
+        let unique: std::collections::HashSet<_> = values.iter().collect();
+        assert!(
+            unique.len() > 1,
+            "expected different seeds to produce at least some different values"
+        );
+    }
+
+    #[test]
+    fn seeded_pick_is_deterministic_for_same_seed() {
+        let engine = ScriptEngine::new();
+        let script =
+            r#"seeded_pick(request.path.siret, ["Dupont SARL", "Martin SAS", "Petit EURL"])"#;
+        let mut path = HashMap::new();
+        path.insert("siret".into(), "44306184100047".into());
+        let ctx = ScriptContext {
+            path_params: path,
+            ..empty_ctx()
+        };
+        let a = engine.execute(script, &ctx).unwrap().value;
+        let b = engine.execute(script, &ctx).unwrap().value;
+        assert_eq!(a, b);
+        assert!(["Dupont SARL", "Martin SAS", "Petit EURL"].contains(&a.as_str()));
+    }
+
+    #[test]
+    fn seeded_pick_different_seed_can_pick_different_element() {
+        let engine = ScriptEngine::new();
+        let script = |siret: &str| -> String {
+            let mut path = HashMap::new();
+            path.insert("siret".into(), siret.into());
+            let ctx = ScriptContext {
+                path_params: path,
+                ..empty_ctx()
+            };
+            engine
+                .execute(
+                    r#"seeded_pick(request.path.siret, ["Dupont SARL", "Martin SAS", "Petit EURL", "Durand SA", "Leroy SCI"])"#,
+                    &ctx,
+                )
+                .unwrap()
+                .value
+        };
+        let picks: std::collections::HashSet<String> = (0..10)
+            .map(|i| script(&format!("siret-{i}")))
+            .collect();
+        assert!(
+            picks.len() > 1,
+            "expected different SIRET values to yield at least some different picks"
+        );
     }
 
     #[test]

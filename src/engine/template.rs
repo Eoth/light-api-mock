@@ -325,7 +325,9 @@ pub fn epoch_to_iso(epoch_secs: u64) -> String {
     format!("{y:04}-{mo:02}-{d:02}T{h:02}:{m:02}:{s:02}Z")
 }
 
-fn civil_from_days(days: i64) -> (i64, u32, u32) {
+// pub(crate) : reutilise tel quel par engine::script pour formater date_now/
+// date_past/date_future sans dupliquer le calcul calendaire (Howard Hinnant).
+pub(crate) fn civil_from_days(days: i64) -> (i64, u32, u32) {
     let z = days + 719468;
     let era = z.div_euclid(146097);
     let doe = z.rem_euclid(146097) as u64;
