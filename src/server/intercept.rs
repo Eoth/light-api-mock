@@ -350,6 +350,8 @@ fn extract_headers(headers: &axum::http::HeaderMap) -> HashMap<String, String> {
 mod tests {
     use super::*;
     use crate::engine::matcher::match_path;
+    use crate::models::{ConditionGroup, MockConfig, MockResponse, Rule};
+    use crate::store::MockStore;
 
     #[test]
     fn effective_pattern() {
@@ -608,5 +610,273 @@ mod tests {
         assert_eq!(pre_result.unwrap().value, "PRE");
         assert_eq!(post_result.unwrap().value, "POST");
         assert!(script_result.is_none());
+    }
+
+    // --- Test de non-regression bout-en-bout : proxy transmet query params,
+    // headers custom, methode et corps intacts (cf CLAUDE.md §5, point 39).
+    // Capture la requete BRUTE recue par une fausse cible TCP en aval du vrai
+    // serveur Axum (build_router), pour prouver que rien n'est perdu entre
+    // l'entree HTTP et la sortie proxy — pas seulement au niveau de
+    // ProxyClient::forward() en isolation (couvert separement dans
+    // engine/proxy.rs), mais a travers tout le pipeline intercept_layer /
+    // do_proxy / handle_service.
+
+    fn temp_dir_for_intercept_test() -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!("lightmock-intercept-test-{}", fastrand::u64(..)));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    async fn capture_one_raw_request(
+        ready_tx: tokio::sync::oneshot::Sender<u16>,
+    ) -> String {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        ready_tx.send(addr.port()).unwrap();
+
+        let (mut stream, _) = listener.accept().await.unwrap();
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let mut buf = Vec::new();
+        let mut chunk = [0u8; 4096];
+        loop {
+            let n = tokio::time::timeout(
+                std::time::Duration::from_millis(1000),
+                stream.read(&mut chunk),
+            )
+            .await
+            .unwrap_or(Ok(0))
+            .unwrap_or(0);
+            if n == 0 {
+                break;
+            }
+            buf.extend_from_slice(&chunk[..n]);
+            // Une fois les en-tetes recus, on laisse une derniere fenetre
+            // courte pour le corps (chunked) avant de considerer la requete
+            // complete.
+            if buf.windows(4).any(|w| w == b"\r\n\r\n") {
+                let n2 = tokio::time::timeout(
+                    std::time::Duration::from_millis(200),
+                    stream.read(&mut chunk),
+                )
+                .await
+                .unwrap_or(Ok(0))
+                .unwrap_or(0);
+                if n2 > 0 {
+                    buf.extend_from_slice(&chunk[..n2]);
+                }
+                break;
+            }
+        }
+        let _ = stream
+            .write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n")
+            .await;
+        String::from_utf8_lossy(&buf).into_owned()
+    }
+
+    fn disabled_auth_config() -> crate::auth::AuthConfig {
+        crate::auth::AuthConfig {
+            enabled: false,
+            keycloak_url: String::new(),
+            realm: String::new(),
+            client_id: String::new(),
+            super_admins: vec![],
+            show_reset_button: false,
+        }
+    }
+
+    #[tokio::test]
+    async fn proxy_end_to_end_preserves_query_headers_method_and_body() {
+        // 1. Fausse cible reelle (capture la requete brute recue).
+        let (target_ready_tx, target_ready_rx) = tokio::sync::oneshot::channel();
+        let target_server = tokio::spawn(capture_one_raw_request(target_ready_tx));
+        let target_port = target_ready_rx.await.unwrap();
+
+        // 2. Service en mode proxy pur (is_mocked=false : do_proxy direct,
+        // sans passer par l'evaluation des regles).
+        let data_dir = temp_dir_for_intercept_test();
+        let store = MockStore::new(data_dir.join("mock-config.yaml"));
+        store
+            .replace(MockConfig {
+                services: vec![Service {
+                    name: "upstream".into(),
+                    listen_path: "".into(),
+                    real_target_url: format!("http://127.0.0.1:{target_port}"),
+                    is_mocked: false,
+                    rewrite_directory_urls: false,
+                    group_name: None,
+                    wsdl_mode: WsdlMode::default(),
+                    rules: vec![],
+                }],
+                groups: vec![],
+            })
+            .await
+            .unwrap();
+        store.flush().await;
+
+        // 3. Vrai serveur Axum complet (meme routeur qu'en production).
+        #[cfg(feature = "messaging-kafka")]
+        let messaging = crate::messaging::MessagingState {
+            message_log: crate::messaging::message_log::MessageLog::new(),
+            reply_topic: None,
+            publisher: crate::messaging::consumer::Publisher::None,
+        };
+        let state = AppState {
+            store,
+            proxy: crate::engine::ProxyClient::new(),
+            seq_counters: std::sync::Arc::new(std::sync::RwLock::new(HashMap::new())),
+            request_log: crate::server::request_log::RequestLog::new(),
+            auth_config: disabled_auth_config(),
+            keycloak: None,
+            script_engine: ScriptEngine::new(),
+            ping_cache: crate::server::ping::PingCache::new(),
+            #[cfg(feature = "messaging-kafka")]
+            messaging,
+        };
+        let app = crate::server::build_router(state, &data_dir);
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let server_port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            axum::serve(listener, app).await.unwrap();
+        });
+
+        // 4. Requete reelle avec query params + header custom + methode POST
+        // + corps, envoyee au serveur lightMock (pas directement a la cible).
+        let client = reqwest::Client::new();
+        let resp = client
+            .post(format!(
+                "http://127.0.0.1:{server_port}/upstream/foo/bar?a=1&b=two"
+            ))
+            .header("x-custom-header", "custom-value")
+            .body("payload-body")
+            .send()
+            .await
+            .unwrap();
+        assert!(resp.status().is_success() || resp.status().as_u16() == 200);
+
+        let raw = target_server.await.unwrap();
+        let request_line = raw.lines().next().unwrap_or("");
+        assert!(
+            request_line.starts_with("POST "),
+            "methode HTTP non preservee: {request_line}"
+        );
+        assert!(
+            request_line.contains("/foo/bar?a=1&b=two"),
+            "query params/chemin non preserves dans la requete proxifiee: {request_line}"
+        );
+        assert!(
+            raw.to_lowercase().contains("x-custom-header: custom-value"),
+            "header custom manquant dans la requete proxifiee:\n{raw}"
+        );
+        assert!(
+            raw.contains("payload-body"),
+            "corps de requete manquant dans la requete proxifiee:\n{raw}"
+        );
+
+        std::fs::remove_dir_all(&data_dir).ok();
+    }
+
+    #[tokio::test]
+    async fn rule_level_proxy_action_preserves_query_headers_method_and_body() {
+        // Meme verification que le test precedent, mais pour l'AUTRE chemin
+        // de code proxy : service is_mocked=true avec une regle
+        // action=proxy, qui passe par rebuild_request_for_proxy() plutot que
+        // par le Request original tel quel. Les deux chemins doivent se
+        // comporter de facon identique du point de vue de la cible.
+        let (target_ready_tx, target_ready_rx) = tokio::sync::oneshot::channel();
+        let target_server = tokio::spawn(capture_one_raw_request(target_ready_tx));
+        let target_port = target_ready_rx.await.unwrap();
+
+        let data_dir = temp_dir_for_intercept_test();
+        let store = MockStore::new(data_dir.join("mock-config.yaml"));
+        store
+            .replace(MockConfig {
+                services: vec![Service {
+                    name: "upstream2".into(),
+                    listen_path: "".into(),
+                    real_target_url: format!("http://127.0.0.1:{target_port}"),
+                    is_mocked: true,
+                    rewrite_directory_urls: false,
+                    group_name: None,
+                    wsdl_mode: WsdlMode::default(),
+                    rules: vec![Rule {
+                        name: "proxy-rule".into(),
+                        method: "POST".into(),
+                        sub_path: None,
+                        action: RuleAction::Proxy,
+                        pre_script: None,
+                        script: None,
+                        post_script: None,
+                        conditions: ConditionGroup::default(),
+                        response: MockResponse {
+                            status: 200,
+                            headers: vec![],
+                            body: vec![],
+                            chaos: None,
+                        },
+                    }],
+                }],
+                groups: vec![],
+            })
+            .await
+            .unwrap();
+        store.flush().await;
+
+        #[cfg(feature = "messaging-kafka")]
+        let messaging = crate::messaging::MessagingState {
+            message_log: crate::messaging::message_log::MessageLog::new(),
+            reply_topic: None,
+            publisher: crate::messaging::consumer::Publisher::None,
+        };
+        let state = AppState {
+            store,
+            proxy: crate::engine::ProxyClient::new(),
+            seq_counters: std::sync::Arc::new(std::sync::RwLock::new(HashMap::new())),
+            request_log: crate::server::request_log::RequestLog::new(),
+            auth_config: disabled_auth_config(),
+            keycloak: None,
+            script_engine: ScriptEngine::new(),
+            ping_cache: crate::server::ping::PingCache::new(),
+            #[cfg(feature = "messaging-kafka")]
+            messaging,
+        };
+        let app = crate::server::build_router(state, &data_dir);
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let server_port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            axum::serve(listener, app).await.unwrap();
+        });
+
+        let client = reqwest::Client::new();
+        let resp = client
+            .post(format!(
+                "http://127.0.0.1:{server_port}/upstream2/foo/bar?a=1&b=two"
+            ))
+            .header("x-custom-header", "custom-value")
+            .body("payload-body")
+            .send()
+            .await
+            .unwrap();
+        assert!(resp.status().is_success() || resp.status().as_u16() == 200);
+
+        let raw = target_server.await.unwrap();
+        let request_line = raw.lines().next().unwrap_or("");
+        assert!(
+            request_line.starts_with("POST "),
+            "methode HTTP non preservee (rule-level proxy): {request_line}"
+        );
+        assert!(
+            request_line.contains("/foo/bar?a=1&b=two"),
+            "query params/chemin non preserves (rule-level proxy): {request_line}"
+        );
+        assert!(
+            raw.to_lowercase().contains("x-custom-header: custom-value"),
+            "header custom manquant (rule-level proxy):\n{raw}"
+        );
+        assert!(
+            raw.contains("payload-body"),
+            "corps de requete manquant (rule-level proxy):\n{raw}"
+        );
+
+        std::fs::remove_dir_all(&data_dir).ok();
     }
 }

@@ -304,4 +304,89 @@ mod tests {
         );
         assert_eq!(combined, "http://svc:8080/api/v1");
     }
+
+    /// Capture la requete brute recue par une fausse cible TCP, pour
+    /// verifier au plus pres du fil ce que `forward()` transmet reellement
+    /// (methode, chemin+query, en-tetes, corps) sans dependre du parsing
+    /// HTTP d'un client. Voir aussi les tests bout-en-bout dans
+    /// `server::intercept::tests` (CLAUDE.md §5, point 39) qui couvrent le
+    /// meme invariant a travers tout le pipeline (intercept_layer/do_proxy),
+    /// pas seulement ProxyClient::forward() en isolation.
+    async fn capture_raw_request(port_rx: tokio::sync::oneshot::Sender<u16>) -> String {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        port_rx.send(addr.port()).unwrap();
+
+        let (mut stream, _) = listener.accept().await.unwrap();
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let mut buf = Vec::new();
+        let mut chunk = [0u8; 4096];
+        loop {
+            let n = tokio::time::timeout(Duration::from_millis(500), stream.read(&mut chunk))
+                .await
+                .unwrap_or(Ok(0))
+                .unwrap_or(0);
+            if n == 0 {
+                break;
+            }
+            buf.extend_from_slice(&chunk[..n]);
+            if buf.windows(4).any(|w| w == b"\r\n\r\n") {
+                // corps eventuel : on tente une derniere lecture courte
+                let n2 = tokio::time::timeout(Duration::from_millis(100), stream.read(&mut chunk))
+                    .await
+                    .unwrap_or(Ok(0))
+                    .unwrap_or(0);
+                if n2 > 0 {
+                    buf.extend_from_slice(&chunk[..n2]);
+                }
+                break;
+            }
+        }
+        let _ = stream
+            .write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n")
+            .await;
+        String::from_utf8_lossy(&buf).into_owned()
+    }
+
+    #[tokio::test]
+    async fn forward_preserves_query_headers_method_and_body() {
+        let (port_tx, port_rx) = tokio::sync::oneshot::channel();
+        let server = tokio::spawn(capture_raw_request(port_tx));
+        let port = port_rx.await.unwrap();
+
+        let client = ProxyClient::new();
+        let req = Request::builder()
+            .method("POST")
+            .uri("/svc/foo?a=1&b=two")
+            .header("x-custom-header", "custom-value")
+            .body(Body::from("payload-body"))
+            .unwrap();
+
+        let target_base = format!("http://127.0.0.1:{port}");
+        let _ = client.forward(&target_base, "/foo", req).await;
+
+        let raw = server.await.unwrap();
+
+        let request_line = raw.lines().next().unwrap_or("");
+        assert!(
+            request_line.starts_with("POST "),
+            "method not preserved: {request_line}"
+        );
+        assert!(
+            request_line.contains("?a=1&b=two"),
+            "query params missing from request line: {request_line}"
+        );
+        assert!(
+            raw.to_lowercase().contains("x-custom-header: custom-value"),
+            "custom header missing:\n{raw}"
+        );
+        // Corps transmis en chunked transfer-encoding (streaming, cf CLAUDE.md
+        // §5 point 12) : on verifie sa presence par sous-chaine, pas par
+        // egalite/suffixe exact, puisque la trame chunked ajoute une taille
+        // hexadecimale et un terminateur autour de la charge utile.
+        assert!(
+            raw.contains("payload-body"),
+            "body missing/incomplete:\n{raw}"
+        );
+    }
 }
