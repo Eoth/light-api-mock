@@ -163,63 +163,22 @@ test.describe('Groups', () => {
     expect(dup.status()).toBe(409);
   });
 
-  test('UI: creation form only asks for a name, code is auto-generated', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
-    await page.getByText('Groupes', { exact: true }).click();
-    await page.getByText('+ Nouveau groupe').click();
+  // "UI: creation form only asks for a name, code is auto-generated" migre vers
+  // frontend/e2e/scenario-runner.spec.js (scenario JSON group-create-simple-name-only.scenario.json)
+  // -- cf CLAUDE.md §6, sujet 9c lot 4.
 
-    const form = page.locator('.group-create-form');
-    await expect(form.locator('input')).toHaveCount(1);
-    await expect(form.locator('#new-group-name')).toBeVisible();
-
-    await form.locator('#new-group-name').fill('ui-simple-group');
-    await form.getByRole('button', { name: 'Creer' }).click();
-
-    const card = page.locator('.group-card', { hasText: 'ui-simple-group' });
-    await expect(card).toBeVisible();
-    await expect(card.locator('.group-code-badge')).toHaveText(/^\/[a-z0-9]{5}$/);
-  });
-
-  test('UI: accented/spaced group name is accepted and still produces a valid URL code', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
-    await page.getByText('Groupes', { exact: true }).click();
-    await page.getByText('+ Nouveau groupe').click();
-
-    await page.locator('#new-group-name').fill('Équipe Café Paris');
-    await page.locator('.group-create-form').getByRole('button', { name: 'Creer' }).click();
-
-    const card = page.locator('.group-card', { hasText: 'Équipe Café Paris' });
-    await expect(card).toBeVisible();
-    await expect(card.locator('.group-code-badge')).toHaveText(/^\/[a-z0-9]{5}$/);
-  });
+  // "UI: accented/spaced group name is accepted and still produces a valid URL code" migre vers
+  // frontend/e2e/scenario-runner.spec.js (scenario JSON group-create-accented-name.scenario.json)
+  // -- cf CLAUDE.md §6, sujet 9c lot 4.
 
   // NB: le backend resout les collisions de code auto-genere en interne
   // (discriminant incremental dans generate_code, cf codegen.rs) sans jamais
   // renvoyer d'erreur a l'utilisateur pour un code auto-genere — contrairement
   // a une collision sur un code saisi manuellement (test API ci-dessus,
   // "group code uniqueness", qui reste le seul chemin ou un 409 est possible).
-  // Ce test verifie donc le contrat reellement observable depuis l'UI :
-  // creer plusieurs groupes a la suite ne produit jamais d'erreur et chaque
-  // groupe obtient un code distinct, jamais un ecrasement silencieux.
-  test('UI: creating several groups in a row never surfaces a code-collision error', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
-    await page.getByText('Groupes', { exact: true }).click();
-
-    const names = ['collision-a', 'collision-b', 'collision-c'];
-    for (const name of names) {
-      await page.getByText('+ Nouveau groupe').click();
-      await page.locator('#new-group-name').fill(name);
-      await page.locator('.group-create-form').getByRole('button', { name: 'Creer' }).click();
-      await expect(page.locator('.group-card', { hasText: name })).toBeVisible();
-      await expect(page.locator('.form-error')).toHaveCount(0);
-    }
-
-    const codes = await page.locator('.group-code-badge').allTextContents();
-    expect(new Set(codes).size).toBe(codes.length);
-  });
+  // "UI: creating several groups in a row never surfaces a code-collision error" migre vers
+  // frontend/e2e/scenario-runner.spec.js (scenario JSON group-create-several-in-a-row.scenario.json)
+  // -- cf CLAUDE.md §6, sujet 9c lot 4.
 });
 
 // Diagnostic (voir CLAUDE.md) : un service n'est identifie sans ambiguite que
@@ -263,51 +222,13 @@ test.describe('Service identity across groups', () => {
     await expect(editUrl).toContainText(`/${grp.code}/url-parity-svc/v1/*`);
   });
 
-  test('supprimer un service dans un groupe ne supprime pas le service homonyme d un autre groupe', async ({ page, request }) => {
-    await request.post(`${API}/groups`, { data: { name: 'ambig-grp-a', code: '', admins: [], members: [] } });
-    await request.post(`${API}/groups`, { data: { name: 'ambig-grp-b', code: '', admins: [], members: [] } });
-    await request.post(`${API}/services`, { data: validService('ambig-svc', { group_name: 'ambig-grp-a' }) });
-    await request.post(`${API}/services`, { data: validService('ambig-svc', { group_name: 'ambig-grp-b' }) });
+  // "supprimer un service dans un groupe ne supprime pas le service homonyme d un autre groupe"
+  // migre vers frontend/e2e/scenario-runner.spec.js (scenario JSON
+  // delete-service-does-not-affect-namesake-group.scenario.json) -- cf CLAUDE.md §6, sujet 9c lot 4.
 
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
-    await expandGroup(page, 'ambig-grp-a');
-
-    const cardA = page.locator('.service-group', { hasText: 'ambig-grp-a' }).locator('.service-card', { hasText: 'ambig-svc' });
-    await cardA.getByRole('button', { name: 'Configurer le service ambig-svc' }).click();
-    await page.getByRole('button', { name: 'Supprimer' }).click();
-    await page.getByRole('button', { name: 'Oui, supprimer' }).click();
-
-    await expect(async () => {
-      const stillB = await request.get(`${API}/groups/ambig-grp-b/services/ambig-svc`);
-      expect(stillB.status()).toBe(200);
-      const goneA = await request.get(`${API}/groups/ambig-grp-a/services/ambig-svc`);
-      expect(goneA.status()).toBe(404);
-    }).toPass();
-
-    await page.waitForLoadState('networkidle');
-    await expandGroup(page, 'ambig-grp-b');
-    await expect(
-      page.locator('.service-group', { hasText: 'ambig-grp-b' }).locator('.service-card', { hasText: 'ambig-svc' })
-    ).toBeVisible();
-  });
-
-  test('la suppression d un service n affiche pas de fausse erreur "Cannot read properties of null"', async ({ page, request }) => {
-    await request.post(`${API}/services`, { data: validService('no-crash-svc') });
-
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
-    await expandGroup(page, 'Sans groupe');
-
-    const card = page.locator('.service-card', { hasText: 'no-crash-svc' });
-    await card.getByRole('button', { name: 'Configurer le service no-crash-svc' }).click();
-    await page.getByRole('button', { name: 'Supprimer' }).click();
-    await page.getByRole('button', { name: 'Oui, supprimer' }).click();
-
-    const notif = page.locator('.notification.error');
-    await expect(page.locator('.notification.success')).toContainText('supprimé');
-    await expect(notif).toHaveCount(0);
-  });
+  // "la suppression d un service n affiche pas de fausse erreur ..." migre vers
+  // frontend/e2e/scenario-runner.spec.js (scenario JSON delete-service-no-false-error.scenario.json)
+  // -- cf CLAUDE.md §6, sujet 9c lot 4.
 });
 
 test.describe('Import/Export', () => {

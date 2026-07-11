@@ -1,0 +1,12 @@
+{
+  "scenario": "Le formulaire de creation de groupe ne demande qu'un nom, le code est auto-genere",
+  "steps": [
+    { "action": "goto", "page": "services" },
+    { "action": "click", "target": "app.navGroupsButton" },
+    { "action": "click", "target": "groupManager.newGroupButton" },
+    { "action": "assertVisible", "target": "groupManager.nameInput" },
+    { "action": "fill", "target": "groupManager.nameInput", "value": "ui-simple-group" },
+    { "action": "click", "target": "groupManager.createSubmitButton" },
+    { "action": "assertVisible", "target": "groupManager.card", "params": { "name": "ui-simple-group" } }
+  ]
+}
