@@ -1,0 +1,9 @@
+{
+  "scenario": "Charger le service de demo depuis la liste vide",
+  "steps": [
+    { "action": "goto", "page": "services" },
+    { "action": "click", "target": "app.loadDemoButton" },
+    { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
+    { "action": "assertVisible", "target": "serviceCard.card", "params": { "name": "users-api" } }
+  ]
+}

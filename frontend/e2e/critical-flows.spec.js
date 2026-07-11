@@ -481,28 +481,14 @@ test.describe('UI critical paths', () => {
     await request.delete(`${API}/config/reset`);
   });
 
-  test('homepage loads with breadcrumb navigation', async ({ page }) => {
-    await page.goto('/');
-    await expect(page.locator('h1')).toContainText('lightMock');
-  });
+  // "homepage loads with breadcrumb navigation" migre vers frontend/e2e/scenario-runner.spec.js
+  // (scenario JSON homepage-loads.scenario.json) -- cf CLAUDE.md §6, sujet 9c lot 2.
 
-  test('service list shows created services in group', async ({ page, request }) => {
-    await request.post(`${API}/services`, { data: validService('ui-test-svc') });
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
-    const group = page.locator('button[aria-expanded]').first();
-    if (await group.getAttribute('aria-expanded') === 'false') {
-      await group.click();
-    }
-    await expect(page.getByText('ui-test-svc').first()).toBeVisible();
-  });
+  // "service list shows created services in group" migre vers frontend/e2e/scenario-runner.spec.js
+  // (scenario JSON service-list-shows-created-service.scenario.json) -- cf CLAUDE.md §6, sujet 9c lot 2.
 
-  test('groups page is accessible to all', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
-    await page.getByText('Groupes', { exact: true }).click();
-    await expect(page.getByRole('heading', { name: 'Groupes de services' })).toBeVisible();
-  });
+  // "groups page is accessible to all" migre vers frontend/e2e/scenario-runner.spec.js
+  // (scenario JSON groups-page-accessible.scenario.json) -- cf CLAUDE.md §6, sujet 9c lot 2.
 });
 
 test.describe('Health endpoint', () => {

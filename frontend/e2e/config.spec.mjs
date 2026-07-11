@@ -20,18 +20,8 @@ test.beforeEach(async ({ request }) => {
   await request.delete(`${API}/config/reset`);
 });
 
-test('bouton demo charge le service quand liste vide', async ({ page }) => {
-  await page.goto('/');
-  await page.waitForLoadState('networkidle');
-  await expect(page.getByText('Aucun service configure')).toBeVisible();
-  await page.getByRole('button', { name: /Charger un exemple/ }).click();
-  await page.waitForTimeout(500);
-  const group = page.locator('button[aria-expanded]').first();
-  if (await group.getAttribute('aria-expanded') === 'false') {
-    await group.click();
-  }
-  await expect(page.getByText('users-api').first()).toBeVisible();
-});
+// "bouton demo charge le service quand liste vide" migre vers frontend/e2e/scenario-runner.spec.js
+// (scenario JSON load-demo-service.scenario.json) -- cf CLAUDE.md §6, sujet 9c lot 2.
 
 test('demo service repond avec les path params', async ({ page, request }) => {
   await page.goto('/');

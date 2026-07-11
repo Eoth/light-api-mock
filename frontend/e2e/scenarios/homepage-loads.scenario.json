@@ -1,0 +1,7 @@
+{
+  "scenario": "La page d'accueil se charge avec le titre lightMock",
+  "steps": [
+    { "action": "goto", "page": "services" },
+    { "action": "assertText", "target": "app.titleButton", "value": "lightMock" }
+  ]
+}
