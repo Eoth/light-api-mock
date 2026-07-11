@@ -1,0 +1,8 @@
+{
+  "scenario": "Le toggle mock/proxy d'un service fonctionne",
+  "steps": [
+    { "action": "goto", "page": "services" },
+    { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
+    { "action": "click", "target": "toggleSwitch.switch", "params": { "label": "Mock-e2e-svc" } }
+  ]
+}

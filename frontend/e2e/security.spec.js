@@ -21,10 +21,8 @@ test.describe('Security: route protection', () => {
     await request.delete(`${API}/config/reset`);
   });
 
-  test('UI is served on / even with no services', async ({ page }) => {
-    await page.goto('/');
-    await expect(page.locator('h1')).toContainText('lightMock');
-  });
+  // "UI is served on / even with no services" migre vers frontend/e2e/scenario-runner.spec.js
+  // (reutilise homepage-loads.scenario.json) -- cf CLAUDE.md §6, sujet 9c lot 3.
 
   test('API accepts service with empty listen_path (catch-all)', async ({ request }) => {
     const res = await request.post(`${API}/services`, {
@@ -47,13 +45,8 @@ test.describe('Security: route protection', () => {
     expect(res.status()).toBe(400);
   });
 
-  test('UI remains accessible after creating a valid service', async ({ page, request }) => {
-    await request.post(`${API}/services`, {
-      data: validService('test-svc', { listen_path: '/v1/data/{id}' }),
-    });
-    await page.goto('/');
-    await expect(page.locator('h1')).toContainText('lightMock');
-  });
+  // "UI remains accessible after creating a valid service" migre vers frontend/e2e/scenario-runner.spec.js
+  // (reutilise homepage-loads.scenario.json) -- cf CLAUDE.md §6, sujet 9c lot 3.
 
   test('internal API routes remain accessible with services registered', async ({ request }) => {
     await request.post(`${API}/services`, {
