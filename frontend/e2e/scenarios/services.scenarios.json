@@ -1,0 +1,79 @@
+{
+  "domain": "services",
+  "scenarios": [
+    {
+      "scenario": "Creer un service via le formulaire",
+      "steps": [
+        { "action": "goto", "page": "services" },
+        { "action": "click", "target": "app.addServiceButton" },
+        { "action": "fill", "target": "serviceForm.nameInput", "value": "scenario-create-service" },
+        { "action": "fill", "target": "serviceForm.targetInput", "value": "http://scenario-create-service:80" },
+        { "action": "click", "target": "serviceForm.submitButton" },
+        { "action": "assertVisible", "target": "serviceDetail.editButton" }
+      ]
+    },
+    {
+      "scenario": "La liste affiche un service cree via l'API dans son groupe",
+      "steps": [
+        { "action": "goto", "page": "services" },
+        { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
+        { "action": "assertVisible", "target": "serviceCard.card", "params": { "name": "ui-test-svc" } }
+      ]
+    },
+    {
+      "scenario": "La recherche filtre les services et affiche un message si aucun resultat",
+      "steps": [
+        { "action": "goto", "page": "services" },
+        { "action": "fill", "target": "serviceList.searchInput", "value": "xyz-unique" },
+        { "action": "assertVisible", "target": "serviceList.noResultsMessage" }
+      ]
+    },
+    {
+      "scenario": "Le toggle mock/proxy d'un service fonctionne",
+      "steps": [
+        { "action": "goto", "page": "services" },
+        { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
+        { "action": "click", "target": "toggleSwitch.switch", "params": { "label": "Mock-e2e-svc" } }
+      ]
+    },
+    {
+      "scenario": "Basculer le mode mock/proxy d'un service via l'UI",
+      "steps": [
+        { "action": "goto", "page": "services" },
+        { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
+        { "action": "click", "target": "toggleSwitch.switch", "params": { "label": "Mock-write-behind-svc" } }
+      ]
+    },
+    {
+      "scenario": "Supprimer un service dans un groupe ne supprime pas son homonyme d'un autre groupe",
+      "steps": [
+        { "action": "goto", "page": "services" },
+        { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ambig-grp-a" } },
+        { "action": "click", "target": "serviceCard.configureButton", "params": { "name": "ambig-svc" } },
+        { "action": "click", "target": "serviceDetail.deleteButton" },
+        { "action": "click", "target": "confirmDialog.confirmButton" },
+        { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ambig-grp-b" } },
+        { "action": "assertVisible", "target": "serviceCard.card", "params": { "name": "ambig-svc" } }
+      ]
+    },
+    {
+      "scenario": "Supprimer un service n'affiche pas de fausse erreur apres le succes",
+      "steps": [
+        { "action": "goto", "page": "services" },
+        { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
+        { "action": "click", "target": "serviceCard.configureButton", "params": { "name": "no-crash-svc" } },
+        { "action": "click", "target": "serviceDetail.deleteButton" },
+        { "action": "click", "target": "confirmDialog.confirmButton" },
+        { "action": "assertText", "target": "notification.notification", "value": "supprimé" }
+      ]
+    },
+    {
+      "scenario": "Le service mocke type INSEE est visible dans la liste UI",
+      "steps": [
+        { "action": "goto", "page": "services" },
+        { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
+        { "action": "assertVisible", "target": "serviceCard.card", "params": { "name": "tpl-test" } }
+      ]
+    }
+  ]
+}

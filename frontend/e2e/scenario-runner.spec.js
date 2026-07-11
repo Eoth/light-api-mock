@@ -2,7 +2,13 @@
 // scenario-runner.js, cf frontend/e2e/README.md et CLAUDE.md §5 points
 // 53-55). Chaque test ici REMPLACE un test equivalent qui existait
 // auparavant dans un fichier *.spec.js/*.spec.mjs classique (migration
-// sujet 9c -- voir CLAUDE.md §6 pour la liste complete et la progression) :
+// sujet 9c -- voir CLAUDE.md §6 pour la liste complete et la progression).
+//
+// Les scenarios eux-memes sont regroupes par domaine fonctionnel dans
+// frontend/e2e/scenarios/{home,groups,rules,services}.scenarios.json
+// (un fichier par domaine, un tableau de scenarios par fichier -- pas un
+// fichier par scenario individuel, cf CLAUDE.md sujet 9c "regroupement par
+// domaine"). `loadScenario(domainFile, scenarioName)` en extrait un seul.
 //
 // Lot 1 :
 //   - "creer un service"               <- ex rules.spec.mjs "ajouter un service via le formulaire"
@@ -95,7 +101,7 @@ test.describe('Runner data-driven (scenarios JSON)', () => {
   });
 
   test('creer un service (scenario JSON)', async ({ page }) => {
-    await runScenario(page, loadScenario('create-service.scenario.json'));
+    await runScenario(page, loadScenario('services.scenarios.json', 'Creer un service via le formulaire'));
   });
 
   test('creer une regle simple (scenario JSON)', async ({ page, request }) => {
@@ -104,7 +110,7 @@ test.describe('Runner data-driven (scenarios JSON)', () => {
     // dans le champ des actions minimales (goto/click/fill/assert...),
     // pas de nouvelle action "apiRequest" ajoutee par anticipation.
     await request.post(`${API}/services`, { data: validService('scenario-rule-svc') });
-    await runScenario(page, loadScenario('create-simple-rule.scenario.json'));
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Creer une regle simple sur un service existant'));
   });
 
   test('afficher les regles existantes (scenario JSON)', async ({ page, request }) => {
@@ -116,7 +122,7 @@ test.describe('Runner data-driven (scenarios JSON)', () => {
         }),
       ],
     }) });
-    await runScenario(page, loadScenario('view-existing-rules.scenario.json'));
+    await runScenario(page, loadScenario('rules.scenarios.json', "Afficher les regles existantes d'un service"));
   });
 });
 
@@ -136,32 +142,32 @@ test.describe('Runner data-driven (scenarios JSON) - lot 2', () => {
   // complet de la page (F5), limite volontaire.
 
   test('charge le service de demo (scenario JSON)', async ({ page }) => {
-    await runScenario(page, loadScenario('load-demo-service.scenario.json'));
+    await runScenario(page, loadScenario('home.scenarios.json', 'Charger le service de demo depuis la liste vide'));
   });
 
   test('page d accueil affiche le titre (scenario JSON)', async ({ page }) => {
-    await runScenario(page, loadScenario('homepage-loads.scenario.json'));
+    await runScenario(page, loadScenario('home.scenarios.json', "La page d'accueil se charge avec le titre lightMock"));
   });
 
   test('liste affiche un service cree via l API (scenario JSON)', async ({ page, request }) => {
     await request.post(`${API}/services`, { data: validService('ui-test-svc') });
-    await runScenario(page, loadScenario('service-list-shows-created-service.scenario.json'));
+    await runScenario(page, loadScenario('services.scenarios.json', "La liste affiche un service cree via l'API dans son groupe"));
   });
 
   test('page groupes accessible depuis la nav (scenario JSON)', async ({ page }) => {
-    await runScenario(page, loadScenario('groups-page-accessible.scenario.json'));
+    await runScenario(page, loadScenario('groups.scenarios.json', 'La page Groupes est accessible depuis la nav principale'));
   });
 
   test('groupe deplie persiste apres retour d edition (scenario JSON)', async ({ page, request }) => {
     await request.post(`${API}/groups`, { data: { name: 'persist-grp', code: '', admins: [], members: [] } });
     await request.post(`${API}/services`, { data: validService('persist-svc', { group_name: 'persist-grp' }) });
-    await runScenario(page, loadScenario('group-expansion-persists-after-edit.scenario.json'));
+    await runScenario(page, loadScenario('groups.scenarios.json', "Un groupe deplie reste visible apres retour depuis l'edition d'un service"));
   });
 
   test('groupe deplie reinitialise apres rechargement (scenario JSON)', async ({ page, request }) => {
     await request.post(`${API}/groups`, { data: { name: 'reload-grp', code: '', admins: [], members: [] } });
     await request.post(`${API}/services`, { data: validService('reload-svc', { group_name: 'reload-grp' }) });
-    await runScenario(page, loadScenario('group-expansion-resets-after-reload.scenario.json'));
+    await runScenario(page, loadScenario('groups.scenarios.json', "Un rechargement complet de la page reinitialise l'etat deplie d'un groupe"));
   });
 });
 
@@ -190,42 +196,42 @@ test.describe('Runner data-driven (scenarios JSON) - lot 3', () => {
 
   test('regle: bouton ajouter fonctionne avec regles existantes (scenario JSON)', async ({ page, request }) => {
     await request.post(`${API}/services`, { data: ruleTestService('e2e-svc') });
-    await runScenario(page, loadScenario('rule-form-add-with-existing-rules.scenario.json'));
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Le bouton Ajouter une regle fonctionne quand des regles existent deja'));
   });
 
   test('regle: bouton modifier ouvre le formulaire (scenario JSON)', async ({ page, request }) => {
     await request.post(`${API}/services`, { data: ruleTestService('e2e-svc') });
-    await runScenario(page, loadScenario('rule-edit-opens-form.scenario.json'));
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Le bouton Modifier (crayon) ouvre le formulaire de la regle'));
   });
 
   test('regle: bouton supprimer retire la regle (scenario JSON)', async ({ page, request }) => {
     await request.post(`${API}/services`, { data: ruleTestService('e2e-svc') });
-    await runScenario(page, loadScenario('rule-delete-removes-rule.scenario.json'));
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Le bouton Supprimer retire la regle de la liste'));
   });
 
   test('service: toggle mock/proxy fonctionne (scenario JSON)', async ({ page, request }) => {
     await request.post(`${API}/services`, { data: ruleTestService('e2e-svc') });
-    await runScenario(page, loadScenario('service-toggle-mock-proxy.scenario.json'));
+    await runScenario(page, loadScenario('services.scenarios.json', "Le toggle mock/proxy d'un service fonctionne"));
   });
 
   test('liste: recherche filtre les services (scenario JSON)', async ({ page, request }) => {
     await request.post(`${API}/services`, { data: ruleTestService('e2e-svc') });
     await request.post(`${API}/services`, { data: validService('other-svc') });
-    await runScenario(page, loadScenario('search-filters-services.scenario.json'));
+    await runScenario(page, loadScenario('services.scenarios.json', 'La recherche filtre les services et affiche un message si aucun resultat'));
   });
 
   test('regle: annuler le formulaire revient a la liste (scenario JSON)', async ({ page, request }) => {
     await request.post(`${API}/services`, { data: ruleTestService('e2e-svc') });
-    await runScenario(page, loadScenario('rule-form-cancel-returns-to-list.scenario.json'));
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Annuler le formulaire de regle revient a la liste'));
   });
 
   test('UI servie sans aucun service (scenario JSON)', async ({ page }) => {
-    await runScenario(page, loadScenario('homepage-loads.scenario.json'));
+    await runScenario(page, loadScenario('home.scenarios.json', "La page d'accueil se charge avec le titre lightMock"));
   });
 
   test('UI accessible apres creation d un service (scenario JSON)', async ({ page, request }) => {
     await request.post(`${API}/services`, { data: validService('security-svc') });
-    await runScenario(page, loadScenario('homepage-loads.scenario.json'));
+    await runScenario(page, loadScenario('home.scenarios.json', "La page d'accueil se charge avec le titre lightMock"));
   });
 });
 
@@ -235,15 +241,15 @@ test.describe('Runner data-driven (scenarios JSON) - lot 4', () => {
   });
 
   test('groupe: formulaire ne demande que le nom (scenario JSON)', async ({ page }) => {
-    await runScenario(page, loadScenario('group-create-simple-name-only.scenario.json'));
+    await runScenario(page, loadScenario('groups.scenarios.json', "Le formulaire de creation de groupe ne demande qu'un nom, le code est auto-genere"));
   });
 
   test('groupe: nom accentue accepte (scenario JSON)', async ({ page }) => {
-    await runScenario(page, loadScenario('group-create-accented-name.scenario.json'));
+    await runScenario(page, loadScenario('groups.scenarios.json', 'Un nom de groupe accentue/espace est accepte'));
   });
 
   test('groupe: creer plusieurs groupes a la suite (scenario JSON)', async ({ page }) => {
-    await runScenario(page, loadScenario('group-create-several-in-a-row.scenario.json'));
+    await runScenario(page, loadScenario('groups.scenarios.json', 'Creer plusieurs groupes a la suite ne bloque jamais sur une collision de code'));
   });
 
   test('identite: suppression ne supprime pas l homonyme (scenario JSON)', async ({ page, request }) => {
@@ -252,7 +258,7 @@ test.describe('Runner data-driven (scenarios JSON) - lot 4', () => {
     await request.post(`${API}/services`, { data: validService('ambig-svc', { group_name: 'ambig-grp-a' }) });
     await request.post(`${API}/services`, { data: validService('ambig-svc', { group_name: 'ambig-grp-b' }) });
 
-    await runScenario(page, loadScenario('delete-service-does-not-affect-namesake-group.scenario.json'));
+    await runScenario(page, loadScenario('services.scenarios.json', "Supprimer un service dans un groupe ne supprime pas son homonyme d'un autre groupe"));
 
     await expect(async () => {
       const stillB = await request.get(`${API}/groups/ambig-grp-b/services/ambig-svc`);
@@ -264,17 +270,17 @@ test.describe('Runner data-driven (scenarios JSON) - lot 4', () => {
 
   test('identite: suppression sans fausse erreur (scenario JSON)', async ({ page, request }) => {
     await request.post(`${API}/services`, { data: validService('no-crash-svc') });
-    await runScenario(page, loadScenario('delete-service-no-false-error.scenario.json'));
+    await runScenario(page, loadScenario('services.scenarios.json', "Supprimer un service n'affiche pas de fausse erreur apres le succes"));
   });
 
   test('insee: service visible dans l UI (scenario JSON)', async ({ page, request }) => {
     await request.post(`${API}/services`, { data: validService('tpl-test', { listen_path: '/items/{id}' }) });
-    await runScenario(page, loadScenario('insee-service-visible-in-ui.scenario.json'));
+    await runScenario(page, loadScenario('services.scenarios.json', 'Le service mocke type INSEE est visible dans la liste UI'));
   });
 
   test('write-behind: toggle mock persiste sur disque (scenario JSON)', async ({ page, request }) => {
     await request.post(`${API}/services`, { data: validService('write-behind-svc') });
-    await runScenario(page, loadScenario('toggle-service-mock-write-behind.scenario.json'));
+    await runScenario(page, loadScenario('services.scenarios.json', "Basculer le mode mock/proxy d'un service via l'UI"));
 
     // Assertion filesystem hors runner (pas une interaction UI, cf
     // README.md) : l'ecriture disque est asynchrone (write-behind, cf

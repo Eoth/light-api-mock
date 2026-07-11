@@ -1,9 +1,11 @@
 # Infrastructure E2E data-driven
 
 Cette page documente l'infrastructure ajoutee au sujet 9b (JSON de selecteurs + runner de
-scenarios). Elle vit **a cote** de la suite Playwright existante (81 tests dans les fichiers
-`*.spec.js`/`*.spec.mjs` de ce dossier) sans la remplacer — la migration complete de ces tests
-vers ce nouveau format est prevue pour un sujet ulterieur (9c), pas encore faite.
+scenarios) et son format de regroupement par domaine (sujet 9c). Elle vit **a cote** de la
+suite Playwright classique (fichiers `*.spec.js`/`*.spec.mjs` de ce dossier) sans la remplacer
+entierement — seuls les parcours qui pilotent reellement l'UI sont candidats a la migration
+(cf CLAUDE.md, "Migration progressive", pour l'etat exact et les tests API-only volontairement
+non-candidats).
 
 ## Vue d'ensemble
 
@@ -13,9 +15,11 @@ frontend/e2e/
   scenario-runner.js        <- interpreteur JSON minimal (pas de cucumber/parseur Gherkin)
   scenario-runner.spec.js   <- fichier Playwright qui charge et rejoue les scenarios ci-dessous
   scenarios/
-    create-service.scenario.json
-    create-simple-rule.scenario.json
-  *.spec.js / *.spec.mjs    <- suite Playwright existante (81 tests), inchangee
+    home.scenarios.json      <- domaine "home" (accueil, service de demo)
+    groups.scenarios.json    <- domaine "groups" (creation, accordeon deplie/replie)
+    rules.scenarios.json     <- domaine "rules" (CRUD de regle sur un service)
+    services.scenarios.json  <- domaine "services" (CRUD, recherche, toggle, identite)
+  *.spec.js / *.spec.mjs    <- suite Playwright classique, non migree
 ```
 
 Un scenario JSON decrit une suite d'etapes ordonnees ("esprit Gherkin lisible", sans dependance
@@ -23,19 +27,31 @@ BDD). Chaque etape cible un element par un **nom logique** (`"composant.cle"`), 
 selecteur en dur — le nom logique est resolu vers un vrai selecteur CSS `[data-testid=...]` via
 `selectors.json`.
 
-## Ecrire un nouveau scenario JSON
+## Format d'un fichier de domaine (`*.scenarios.json`)
 
-Format :
+**Un fichier par domaine fonctionnel, PAS un fichier par scenario individuel** (revu au sujet
+9c — l'ancien format "un scenario = un fichier" a produit ~24 petits fichiers difficiles a
+retrouver a l'echelle ; la lecon a ete tiree). Chaque fichier de domaine contient un objet
+`{domain, scenarios: [...]}` :
 
 ```json
 {
-  "scenario": "Nom lisible du scenario",
-  "steps": [
-    { "action": "goto", "page": "services" },
-    { "action": "click", "target": "app.addServiceButton" },
-    { "action": "fill", "target": "serviceForm.nameInput", "value": "mon-service" },
-    { "action": "click", "target": "serviceForm.submitButton" },
-    { "action": "assertVisible", "target": "serviceDetail.editButton" }
+  "domain": "services",
+  "scenarios": [
+    {
+      "scenario": "Creer un service via le formulaire",
+      "steps": [
+        { "action": "goto", "page": "services" },
+        { "action": "click", "target": "app.addServiceButton" },
+        { "action": "fill", "target": "serviceForm.nameInput", "value": "mon-service" },
+        { "action": "click", "target": "serviceForm.submitButton" },
+        { "action": "assertVisible", "target": "serviceDetail.editButton" }
+      ]
+    },
+    {
+      "scenario": "Un autre scenario du meme domaine",
+      "steps": [ ... ]
+    }
   ]
 }
 ```
@@ -58,13 +74,33 @@ Format :
     aujourd'hui dans `PAGE_PATHS` (`scenario-runner.js`). Les autres vues (logs, groupes,
     sauvegardes...) se rejoignent par un `click` sur le bouton de nav correspondant
     (`app.navLogsButton`, `app.navGroupsButton`, ...), pas par `goto`.
-- Placer le fichier dans `frontend/e2e/scenarios/*.scenario.json`.
 - Un scenario JSON ne fait QUE des interactions UI. La preparation de donnees (creer un service
   prealable via l'API pour tester une regle dessus, reset de la config...) reste du cote du
   fichier Playwright qui charge le scenario (`test.beforeEach`/`request.post(...)` avant
   `runScenario(...)`), pas une nouvelle action du runner — voir `scenario-runner.spec.js` pour
   un exemple (`creer une regle simple` prepare le service support via `request.post` avant de
   rejouer le scenario).
+
+## Ajouter un nouveau scenario
+
+**Ajouter au fichier de domaine existant qui correspond, ne JAMAIS creer un nouveau fichier par
+scenario.** Choisir le domaine par ce que le parcours teste fonctionnellement (pas par le
+fichier `*.spec.js` d'origine) :
+
+- `home.scenarios.json` : accueil, service de demo.
+- `groups.scenarios.json` : creation de groupe, page Groupes, accordeon deplie/replie.
+- `rules.scenarios.json` : CRUD de regle (ajout/modification/suppression/annulation) sur un
+  service existant.
+- `services.scenarios.json` : CRUD de service, recherche, toggle mock/proxy, identite
+  inter-groupes.
+
+Si aucun domaine existant ne convient a un nouveau lot de migration (sujet 9c, lots futurs),
+c'est une decision explicite a documenter dans CLAUDE.md — ne pas trancher silencieusement en
+ajoutant un 5e fichier sans mettre a jour cette liste.
+
+Ajouter l'entree `{scenario, steps}` dans le tableau `scenarios` du fichier de domaine choisi,
+avec un nom de scenario (`scenario`) unique DANS ce fichier — `loadScenario(filename,
+scenarioName)` le recherche par ce nom exact.
 
 ## Executer un scenario dans un test Playwright
 
@@ -73,20 +109,31 @@ import { test } from '@playwright/test';
 import { runScenario, loadScenario } from './scenario-runner.js';
 
 test('mon scenario', async ({ page }) => {
-  await runScenario(page, loadScenario('mon-scenario.scenario.json'));
+  await runScenario(page, loadScenario('services.scenarios.json', 'Creer un service via le formulaire'));
 });
 ```
 
-`loadScenario(filename)` lit `frontend/e2e/scenarios/<filename>`. `runScenario(page, scenario)`
-rejoue les etapes dans l'ordre ; si une etape echoue, l'erreur precise le nom du scenario, le
-numero de l'etape et son contenu JSON complet — pas besoin de deviner quelle etape a echoue dans
-un scenario long.
+`loadScenario(filename, scenarioName)` lit `frontend/e2e/scenarios/<filename>` (un fichier de
+domaine) et en extrait le scenario dont le champ `scenario` correspond exactement a
+`scenarioName` — erreur explicite si le fichier ou le nom n'existe pas. `loadDomain(filename)`
+charge le fichier de domaine complet (`{domain, scenarios: [...]}`) sans filtrer, utile pour
+un test qui voudrait rejouer tous les scenarios d'un domaine (aucun test actuel ne le fait,
+mais l'API le permet). `runScenario(page, scenario)` rejoue les etapes d'UN scenario dans
+l'ordre ; si une etape echoue, l'erreur precise le nom du scenario, le numero de l'etape et son
+contenu JSON complet — pas besoin de deviner quelle etape a echoue dans un scenario long.
+
+Un meme scenario peut etre reutilise par plusieurs tests Playwright quand seule la PREPARATION
+de donnees differe (ex. le scenario "La page d'accueil se charge avec le titre lightMock" est
+rejoue par 3 tests distincts dans `scenario-runner.spec.js`, chacun avec un `beforeEach`/prealable
+different) — verifier avant de creer un nouveau scenario si un existant du meme domaine ne
+convient pas deja tel quel.
 
 ## Ajouter un nouveau selecteur
 
 `selectors.json` est un objet par composant/page (cle = nom du composant en camelCase, ex.
 `serviceForm`, `ruleList`, `groupManager`), chaque entree mappant un nom logique vers
-`[data-testid="..."]`.
+`[data-testid="..."]`. **Non concerne par le regroupement par domaine ci-dessus** — un seul
+fichier `selectors.json`, quel que soit le nombre de fichiers de domaine.
 
 1. Verifier que le `data-testid` existe deja sur le composant (cf sujet 9a, convention
    documentee dans `CLAUDE.md` §3/§5 point 52 : `{composant-kebab}-{role-element}[-{discriminant}]`).
@@ -119,10 +166,10 @@ grep -rhoE 'data-testid="[^"]*"' frontend/src --include="*.svelte" | sort -u
 
 ## Suite existante vs infrastructure data-driven
 
-Les 81 tests Playwright existants (`*.spec.js`/`*.spec.mjs`, hors ce README) ne sont PAS
-modifies par cette infrastructure : ils continuent d'utiliser leurs selecteurs actuels
-(role/texte/CSS), qui restent valides. `scenario-runner.spec.js` et les 2 scenarios
-d'exemple (`create-service.scenario.json`, `create-simple-rule.scenario.json`) couvrent des
-parcours deja testes autrement (cf `rules.spec.mjs`), volontairement en double, pour prouver que
-l'infrastructure fonctionne avant de s'engager sur une migration complete — sujet 9c, non
-commence.
+De nombreux tests Playwright restent des fichiers `*.spec.js`/`*.spec.mjs` classiques
+(role/texte/CSS), en particulier tous les tests **API-only** (aucune interaction `page`,
+uniquement `request.get/post/put/delete` avec assertions sur le code HTTP/JSON) : migrer un
+test API-only vers `scenario-runner.js` produirait un scenario JSON vide de sens (l'outil ne
+fait QUE des interactions UI) et casserait la coherence du format — ce ne sont pas des
+candidats de migration, decision assumee (cf CLAUDE.md, "Migration progressive", pour le detail
+et la liste des tests restants).

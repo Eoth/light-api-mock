@@ -1,0 +1,70 @@
+{
+  "domain": "rules",
+  "scenarios": [
+    {
+      "scenario": "Creer une regle simple sur un service existant",
+      "steps": [
+        { "action": "goto", "page": "services" },
+        { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
+        { "action": "click", "target": "serviceCard.configureButton", "params": { "name": "scenario-rule-svc" } },
+        { "action": "click", "target": "ruleList.addButton" },
+        { "action": "fill", "target": "ruleForm.nameInput", "value": "scenario-simple-rule" },
+        { "action": "click", "target": "ruleForm.submitButton" },
+        { "action": "assertVisible", "target": "ruleList.item", "params": { "name": "scenario-simple-rule" } }
+      ]
+    },
+    {
+      "scenario": "Afficher les regles existantes d'un service",
+      "steps": [
+        { "action": "goto", "page": "services" },
+        { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
+        { "action": "click", "target": "serviceCard.configureButton", "params": { "name": "e2e-svc" } },
+        { "action": "assertVisible", "target": "ruleList.item", "params": { "name": "rule-alpha" } },
+        { "action": "assertVisible", "target": "ruleList.item", "params": { "name": "rule-beta" } }
+      ]
+    },
+    {
+      "scenario": "Le bouton Ajouter une regle fonctionne quand des regles existent deja",
+      "steps": [
+        { "action": "goto", "page": "services" },
+        { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
+        { "action": "click", "target": "serviceCard.configureButton", "params": { "name": "e2e-svc" } },
+        { "action": "click", "target": "ruleList.addButton" },
+        { "action": "assertVisible", "target": "ruleForm.nameInput" }
+      ]
+    },
+    {
+      "scenario": "Le bouton Modifier (crayon) ouvre le formulaire de la regle",
+      "steps": [
+        { "action": "goto", "page": "services" },
+        { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
+        { "action": "click", "target": "serviceCard.configureButton", "params": { "name": "e2e-svc" } },
+        { "action": "click", "target": "ruleList.editButton", "params": { "name": "rule-alpha" } },
+        { "action": "assertVisible", "target": "ruleForm.nameInput" }
+      ]
+    },
+    {
+      "scenario": "Le bouton Supprimer retire la regle de la liste",
+      "steps": [
+        { "action": "goto", "page": "services" },
+        { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
+        { "action": "click", "target": "serviceCard.configureButton", "params": { "name": "e2e-svc" } },
+        { "action": "click", "target": "ruleList.deleteButton", "params": { "name": "rule-alpha" } },
+        { "action": "assertHidden", "target": "ruleList.item", "params": { "name": "rule-alpha" } },
+        { "action": "assertVisible", "target": "ruleList.item", "params": { "name": "rule-beta" } }
+      ]
+    },
+    {
+      "scenario": "Annuler le formulaire de regle revient a la liste",
+      "steps": [
+        { "action": "goto", "page": "services" },
+        { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
+        { "action": "click", "target": "serviceCard.configureButton", "params": { "name": "e2e-svc" } },
+        { "action": "click", "target": "ruleList.addButton" },
+        { "action": "assertVisible", "target": "ruleForm.nameInput" },
+        { "action": "click", "target": "ruleForm.cancelButton" },
+        { "action": "assertVisible", "target": "ruleList.item", "params": { "name": "rule-alpha" } }
+      ]
+    }
+  ]
+}

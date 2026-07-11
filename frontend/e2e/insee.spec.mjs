@@ -140,4 +140,5 @@ test('seq counter increments', async ({ request }) => {
 });
 
 // "service visible in UI" migre vers frontend/e2e/scenario-runner.spec.js
-// (scenario JSON insee-service-visible-in-ui.scenario.json) -- cf CLAUDE.md §6, sujet 9c lot 4.
+// (scenario "Le service mocke type INSEE est visible dans la liste UI" dans
+// frontend/e2e/scenarios/services.scenarios.json) -- cf CLAUDE.md §6, sujet 9c lot 4.
