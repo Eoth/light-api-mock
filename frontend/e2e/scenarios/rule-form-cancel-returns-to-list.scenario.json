@@ -1,0 +1,12 @@
+{
+  "scenario": "Annuler le formulaire de regle revient a la liste",
+  "steps": [
+    { "action": "goto", "page": "services" },
+    { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
+    { "action": "click", "target": "serviceCard.configureButton", "params": { "name": "e2e-svc" } },
+    { "action": "click", "target": "ruleList.addButton" },
+    { "action": "assertVisible", "target": "ruleForm.nameInput" },
+    { "action": "click", "target": "ruleForm.cancelButton" },
+    { "action": "assertVisible", "target": "ruleList.item", "params": { "name": "rule-alpha" } }
+  ]
+}

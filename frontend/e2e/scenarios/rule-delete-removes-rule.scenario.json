@@ -1,0 +1,11 @@
+{
+  "scenario": "Le bouton Supprimer retire la regle de la liste",
+  "steps": [
+    { "action": "goto", "page": "services" },
+    { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
+    { "action": "click", "target": "serviceCard.configureButton", "params": { "name": "e2e-svc" } },
+    { "action": "click", "target": "ruleList.deleteButton", "params": { "name": "rule-alpha" } },
+    { "action": "assertHidden", "target": "ruleList.item", "params": { "name": "rule-alpha" } },
+    { "action": "assertVisible", "target": "ruleList.item", "params": { "name": "rule-beta" } }
+  ]
+}

@@ -99,7 +99,7 @@
     </div>
 
     {#if filtered.length === 0}
-      <div class="no-results" role="status">
+      <div class="no-results" role="status" data-testid="service-list-no-results">
         <p>Aucun service ne correspond a &laquo; {search} &raquo;</p>
       </div>
     {:else}

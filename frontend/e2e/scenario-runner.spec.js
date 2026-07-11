@@ -17,6 +17,17 @@
 //   - "groupe deplie persiste apres retour d edition" <- ex group-expansion-persistence.spec.js "un groupe deplie reste visible apres retour depuis l edition d un service"
 //   - "groupe deplie reinitialise apres rechargement" <- ex group-expansion-persistence.spec.js "un rechargement complet de la page (F5) reinitialise l etat deplie"
 //
+// Lot 3 (rules.spec.mjs migre integralement -> fichier supprime + 2 tests
+// security.spec.js reutilisant homepage-loads.scenario.json) :
+//   - "regle: bouton ajouter fonctionne avec regles existantes" <- ex rules.spec.mjs "bouton ajouter une regle fonctionne avec regles existantes"
+//   - "regle: bouton modifier ouvre le formulaire"               <- ex rules.spec.mjs "bouton modifier (crayon) ouvre le formulaire"
+//   - "regle: bouton supprimer retire la regle"                  <- ex rules.spec.mjs "bouton supprimer retire la regle"
+//   - "service: toggle mock/proxy fonctionne"                    <- ex rules.spec.mjs "toggle mock/proxy fonctionne"
+//   - "liste: recherche filtre les services"                     <- ex rules.spec.mjs "recherche filtre les services"
+//   - "regle: annuler le formulaire revient a la liste"          <- ex rules.spec.mjs "annuler le formulaire de regle revient a la liste"
+//   - "UI servie sans aucun service (scenario JSON)"              <- ex security.spec.js "UI is served on / even with no services"
+//   - "UI accessible apres creation d un service (scenario JSON)" <- ex security.spec.js "UI remains accessible after creating a valid service"
+//
 // Les tests d'origine sont supprimes du fichier source une fois leur
 // equivalent JSON valide vert (pas de doublon testant deux fois le meme
 // parcours).
@@ -127,5 +138,69 @@ test.describe('Runner data-driven (scenarios JSON) - lot 2', () => {
     await request.post(`${API}/groups`, { data: { name: 'reload-grp', code: '', admins: [], members: [] } });
     await request.post(`${API}/services`, { data: validService('reload-svc', { group_name: 'reload-grp' }) });
     await runScenario(page, loadScenario('group-expansion-resets-after-reload.scenario.json'));
+  });
+});
+
+// frontend/e2e/rules.spec.mjs a ete SUPPRIME entierement au lot 3 (comme
+// group-expansion-persistence.spec.js au lot 2) : ses 6 derniers tests
+// (les 3 premiers etaient deja migres au lot 1) sont tous migres ici, un
+// fichier source vide de tests n'avait plus de raison d'exister.
+//
+// Fixture partagee lot 3 : un service avec 2 regles (rule-alpha, rule-beta),
+// identique a l'ancien svcPayload de rules.spec.mjs.
+function ruleTestService(name) {
+  return validService(name, {
+    rules: [
+      validRule('rule-alpha'),
+      validRule('rule-beta', {
+        conditions: { all_of: [{ source: { type: 'QueryParam', key: 'id' }, operator: { type: 'Eq', value: '42' } }], any_of: [] },
+      }),
+    ],
+  });
+}
+
+test.describe('Runner data-driven (scenarios JSON) - lot 3', () => {
+  test.beforeEach(async ({ request }) => {
+    await request.delete(`${API}/config/reset`);
+  });
+
+  test('regle: bouton ajouter fonctionne avec regles existantes (scenario JSON)', async ({ page, request }) => {
+    await request.post(`${API}/services`, { data: ruleTestService('e2e-svc') });
+    await runScenario(page, loadScenario('rule-form-add-with-existing-rules.scenario.json'));
+  });
+
+  test('regle: bouton modifier ouvre le formulaire (scenario JSON)', async ({ page, request }) => {
+    await request.post(`${API}/services`, { data: ruleTestService('e2e-svc') });
+    await runScenario(page, loadScenario('rule-edit-opens-form.scenario.json'));
+  });
+
+  test('regle: bouton supprimer retire la regle (scenario JSON)', async ({ page, request }) => {
+    await request.post(`${API}/services`, { data: ruleTestService('e2e-svc') });
+    await runScenario(page, loadScenario('rule-delete-removes-rule.scenario.json'));
+  });
+
+  test('service: toggle mock/proxy fonctionne (scenario JSON)', async ({ page, request }) => {
+    await request.post(`${API}/services`, { data: ruleTestService('e2e-svc') });
+    await runScenario(page, loadScenario('service-toggle-mock-proxy.scenario.json'));
+  });
+
+  test('liste: recherche filtre les services (scenario JSON)', async ({ page, request }) => {
+    await request.post(`${API}/services`, { data: ruleTestService('e2e-svc') });
+    await request.post(`${API}/services`, { data: validService('other-svc') });
+    await runScenario(page, loadScenario('search-filters-services.scenario.json'));
+  });
+
+  test('regle: annuler le formulaire revient a la liste (scenario JSON)', async ({ page, request }) => {
+    await request.post(`${API}/services`, { data: ruleTestService('e2e-svc') });
+    await runScenario(page, loadScenario('rule-form-cancel-returns-to-list.scenario.json'));
+  });
+
+  test('UI servie sans aucun service (scenario JSON)', async ({ page }) => {
+    await runScenario(page, loadScenario('homepage-loads.scenario.json'));
+  });
+
+  test('UI accessible apres creation d un service (scenario JSON)', async ({ page, request }) => {
+    await request.post(`${API}/services`, { data: validService('security-svc') });
+    await runScenario(page, loadScenario('homepage-loads.scenario.json'));
   });
 });

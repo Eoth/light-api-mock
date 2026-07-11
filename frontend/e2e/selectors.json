@@ -26,7 +26,8 @@
 
   "serviceList": {
     "searchInput": "[data-testid=\"service-list-search-input\"]",
-    "searchCount": "[data-testid=\"service-list-search-count\"]"
+    "searchCount": "[data-testid=\"service-list-search-count\"]",
+    "noResultsMessage": "[data-testid=\"service-list-no-results\"]"
   },
 
   "serviceGroup": {
