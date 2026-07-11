@@ -1,0 +1,8 @@
+{
+  "scenario": "Basculer le mode mock/proxy d'un service via l'UI",
+  "steps": [
+    { "action": "goto", "page": "services" },
+    { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
+    { "action": "click", "target": "toggleSwitch.switch", "params": { "label": "Mock-write-behind-svc" } }
+  ]
+}

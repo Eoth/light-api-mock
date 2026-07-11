@@ -1,0 +1,11 @@
+{
+  "scenario": "Un nom de groupe accentue/espace est accepte",
+  "steps": [
+    { "action": "goto", "page": "services" },
+    { "action": "click", "target": "app.navGroupsButton" },
+    { "action": "click", "target": "groupManager.newGroupButton" },
+    { "action": "fill", "target": "groupManager.nameInput", "value": "Équipe Café Paris" },
+    { "action": "click", "target": "groupManager.createSubmitButton" },
+    { "action": "assertVisible", "target": "groupManager.card", "params": { "name": "Équipe Café Paris" } }
+  ]
+}

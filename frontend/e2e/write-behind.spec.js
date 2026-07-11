@@ -39,41 +39,14 @@ function validService(name, overrides = {}) {
   };
 }
 
-async function openFirstGroup(page) {
-  const group = page.locator('button[aria-expanded]').first();
-  if (await group.getAttribute('aria-expanded') === 'false') {
-    await group.click();
-    await page.waitForTimeout(200);
-  }
-}
-
 test.describe('Write-behind: persistence after a simulated store restart', () => {
   test.beforeEach(async ({ request }) => {
     await request.delete(`${API}/config/reset`);
   });
 
-  test('a service mutation made through the UI survives a re-read of the on-disk config', async ({ page, request }) => {
-    await request.post(`${API}/services`, { data: validService('write-behind-svc') });
-
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
-    await openFirstGroup(page);
-
-    const toggle = page.getByRole('switch', { name: 'Mock write-behind-svc' });
-    await expect(toggle).toHaveAttribute('aria-checked', 'true');
-    await toggle.click();
-    await expect(toggle).toHaveAttribute('aria-checked', 'false');
-
-    // L'ecriture disque est asynchrone (write-behind) : on attend que le
-    // contenu apparaisse reellement sur le fichier plutot que de supposer
-    // un delai fixe (le flush n'est pas expose cote HTTP, volontairement —
-    // ce n'est pas un mecanisme que les handlers appellent).
-    await expect(async () => {
-      const yaml = readConfigFromDisk();
-      expect(yaml).toContain('name: write-behind-svc');
-      expect(yaml).toMatch(/name: write-behind-svc\n(?:.*\n)*?\s*is_mocked: false/);
-    }).toPass({ timeout: 5000 });
-  });
+  // "a service mutation made through the UI survives a re-read of the on-disk config" migre vers
+  // frontend/e2e/scenario-runner.spec.js (scenario JSON toggle-service-mock-write-behind.scenario.json)
+  // -- cf CLAUDE.md §6, sujet 9c lot 4.
 
   test('a service deleted through the API disappears from the on-disk config once persisted', async ({ request }) => {
     await request.post(`${API}/services`, { data: validService('write-behind-delete-svc') });

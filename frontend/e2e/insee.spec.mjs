@@ -139,12 +139,5 @@ test('seq counter increments', async ({ request }) => {
   expect(j2.seq).toBeGreaterThan(j1.seq);
 });
 
-test('service visible in UI', async ({ page }) => {
-  await page.goto('/');
-  await page.waitForLoadState('networkidle');
-  const group = page.locator('button[aria-expanded]').first();
-  if (await group.getAttribute('aria-expanded') === 'false') {
-    await group.click();
-  }
-  await expect(page.getByText('tpl-test').first()).toBeVisible();
-});
+// "service visible in UI" migre vers frontend/e2e/scenario-runner.spec.js
+// (scenario JSON insee-service-visible-in-ui.scenario.json) -- cf CLAUDE.md §6, sujet 9c lot 4.

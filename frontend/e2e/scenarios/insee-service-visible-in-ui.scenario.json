@@ -1,0 +1,8 @@
+{
+  "scenario": "Le service mocke type INSEE est visible dans la liste UI",
+  "steps": [
+    { "action": "goto", "page": "services" },
+    { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
+    { "action": "assertVisible", "target": "serviceCard.card", "params": { "name": "tpl-test" } }
+  ]
+}

@@ -28,13 +28,37 @@
 //   - "UI servie sans aucun service (scenario JSON)"              <- ex security.spec.js "UI is served on / even with no services"
 //   - "UI accessible apres creation d un service (scenario JSON)" <- ex security.spec.js "UI remains accessible after creating a valid service"
 //
+// Lot 4 (critical-flows.spec.js Groups/Service identity + insee.spec.mjs +
+// write-behind.spec.js, partiel -- cf CLAUDE.md §3 pour la clarification de
+// perimetre UI-only qui a guide ce choix) :
+//   - "groupe: formulaire ne demande que le nom"            <- ex critical-flows.spec.js "UI: creation form only asks for a name, code is auto-generated"
+//   - "groupe: nom accentue accepte"                        <- ex critical-flows.spec.js "UI: accented/spaced group name is accepted and still produces a valid URL code"
+//   - "groupe: creer plusieurs groupes a la suite"           <- ex critical-flows.spec.js "UI: creating several groups in a row never surfaces a code-collision error"
+//   - "identite: suppression ne supprime pas l homonyme"     <- ex critical-flows.spec.js "supprimer un service dans un groupe ne supprime pas le service homonyme d un autre groupe"
+//   - "identite: suppression sans fausse erreur"             <- ex critical-flows.spec.js "la suppression d un service n affiche pas de fausse erreur ..."
+//   - "insee: service visible dans l UI"                     <- ex insee.spec.mjs "service visible in UI"
+//   - "write-behind: toggle mock persiste sur disque"        <- ex write-behind.spec.js "a service mutation made through the UI survives a re-read of the on-disk config"
+// Note : "l URL de test affichee en edition correspond a celle de la vue
+// liste..." (critical-flows.spec.js) N'A PAS ete migre -- compare une URL
+// affichee a une valeur dynamique (code de groupe) connue seulement a
+// l'execution, pas modelisable avec des assertions JSON statiques sans
+// nouvelle capacite de valeur dynamique dans le runner. Reste un test
+// Playwright classique.
+//
 // Les tests d'origine sont supprimes du fichier source une fois leur
 // equivalent JSON valide vert (pas de doublon testant deux fois le meme
 // parcours).
-import { test } from '@playwright/test';
+import { test, expect } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { runScenario, loadScenario } from './scenario-runner.js';
 
 const API = 'http://localhost:7342/api';
+const dataDir = process.env.DATA_PATH || resolve(process.cwd(), '../data');
+const CONFIG_FILE = resolve(dataDir, 'mock-config.yaml');
+function readConfigFromDisk() {
+  return readFileSync(CONFIG_FILE, 'utf-8');
+}
 
 function validService(name, overrides = {}) {
   return {
@@ -202,5 +226,63 @@ test.describe('Runner data-driven (scenarios JSON) - lot 3', () => {
   test('UI accessible apres creation d un service (scenario JSON)', async ({ page, request }) => {
     await request.post(`${API}/services`, { data: validService('security-svc') });
     await runScenario(page, loadScenario('homepage-loads.scenario.json'));
+  });
+});
+
+test.describe('Runner data-driven (scenarios JSON) - lot 4', () => {
+  test.beforeEach(async ({ request }) => {
+    await request.delete(`${API}/config/reset`);
+  });
+
+  test('groupe: formulaire ne demande que le nom (scenario JSON)', async ({ page }) => {
+    await runScenario(page, loadScenario('group-create-simple-name-only.scenario.json'));
+  });
+
+  test('groupe: nom accentue accepte (scenario JSON)', async ({ page }) => {
+    await runScenario(page, loadScenario('group-create-accented-name.scenario.json'));
+  });
+
+  test('groupe: creer plusieurs groupes a la suite (scenario JSON)', async ({ page }) => {
+    await runScenario(page, loadScenario('group-create-several-in-a-row.scenario.json'));
+  });
+
+  test('identite: suppression ne supprime pas l homonyme (scenario JSON)', async ({ page, request }) => {
+    await request.post(`${API}/groups`, { data: { name: 'ambig-grp-a', code: '', admins: [], members: [] } });
+    await request.post(`${API}/groups`, { data: { name: 'ambig-grp-b', code: '', admins: [], members: [] } });
+    await request.post(`${API}/services`, { data: validService('ambig-svc', { group_name: 'ambig-grp-a' }) });
+    await request.post(`${API}/services`, { data: validService('ambig-svc', { group_name: 'ambig-grp-b' }) });
+
+    await runScenario(page, loadScenario('delete-service-does-not-affect-namesake-group.scenario.json'));
+
+    await expect(async () => {
+      const stillB = await request.get(`${API}/groups/ambig-grp-b/services/ambig-svc`);
+      expect(stillB.status()).toBe(200);
+      const goneA = await request.get(`${API}/groups/ambig-grp-a/services/ambig-svc`);
+      expect(goneA.status()).toBe(404);
+    }).toPass();
+  });
+
+  test('identite: suppression sans fausse erreur (scenario JSON)', async ({ page, request }) => {
+    await request.post(`${API}/services`, { data: validService('no-crash-svc') });
+    await runScenario(page, loadScenario('delete-service-no-false-error.scenario.json'));
+  });
+
+  test('insee: service visible dans l UI (scenario JSON)', async ({ page, request }) => {
+    await request.post(`${API}/services`, { data: validService('tpl-test', { listen_path: '/items/{id}' }) });
+    await runScenario(page, loadScenario('insee-service-visible-in-ui.scenario.json'));
+  });
+
+  test('write-behind: toggle mock persiste sur disque (scenario JSON)', async ({ page, request }) => {
+    await request.post(`${API}/services`, { data: validService('write-behind-svc') });
+    await runScenario(page, loadScenario('toggle-service-mock-write-behind.scenario.json'));
+
+    // Assertion filesystem hors runner (pas une interaction UI, cf
+    // README.md) : l'ecriture disque est asynchrone (write-behind, cf
+    // CLAUDE.md), on attend que le contenu apparaisse reellement.
+    await expect(async () => {
+      const yaml = readConfigFromDisk();
+      expect(yaml).toContain('name: write-behind-svc');
+      expect(yaml).toMatch(/name: write-behind-svc\n(?:.*\n)*?\s*is_mocked: false/);
+    }).toPass({ timeout: 5000 });
   });
 });
