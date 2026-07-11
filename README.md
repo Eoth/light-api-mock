@@ -10,6 +10,7 @@ Un seul binaire Rust qui intercepte les requetes HTTP, les mock ou les proxifie 
 - **Methode HTTP par regle** : chaque regle d'un service definit sa propre methode (GET, POST, PUT, ...) et un `sub_path` optionnel — le service lui-meme matche sur le path seul
 - **Bascule Mock / Proxy** : au niveau service (toggle ON/OFF) et/ou au niveau regle (`action: mock|proxy`, mock partiel)
 - **Moteur de regles** : conditions combinables (ET/OU) sur path params, query, headers, body JSON/XML/form
+- **Testeur de regle et detecteur de conflits** : `POST /api/rule-test` rejoue un brouillon de regle contre une requete deja capturee (detail par condition, hints cross-source) ; `POST /api/rule-conflicts` avertit (non-bloquant) si une regle chevauche une regle existante a la sauvegarde
 - **Templates dynamiques** : expressions `{{path.siret}}`, `{{fake.CompanyName}}`, `{{now_ms}}`, pipes `| first(9)`, `| upper`, `| replace("a","b")`, `| capitalize`, `| substr(0,5)`, `| length`, `| prepend("x")`, `| append("x")`
 - **Scripts Rhai** : jusqu'a 3 blocs par regle (`pre_script`/`script`/`post_script`, independants), fonctions natives dont des generateurs deterministes par seed (`seeded_int`, `seeded_pick`) et des dates formattables (`date_now`, `date_past`, `date_future`) — voir [Scripts Rhai](#scripts-rhai)
 - **Groupes de services** : regroupement visuel (accordeons) + prefixe d'URL optionnel (`/{code}/...`), gestion des permissions (admins/membres)
@@ -104,6 +105,8 @@ En mode proxy, le prefixe `/{name}` (et `/{group_code}` le cas echeant) est stri
 | POST | `/api/services/:name/ping` (ou variante groupee) | Test de connexion TCP vers `real_target_url` |
 | PUT | `/api/services/:name/rules/reorder` (ou variante groupee) | Reordonner les regles |
 | POST | `/api/script/validate` | Valider la syntaxe d'un script Rhai (script/pre_script/post_script) |
+| POST | `/api/rule-test` | Tester un brouillon de regle contre une requete deja capturee (stateless, detail par condition) |
+| POST | `/api/rule-conflicts` | Detecter un chevauchement entre un brouillon de regle et les autres regles du service (stateless, avertissement non-bloquant) |
 | GET | `/api/logs?limit=50` | Journal des requetes |
 | GET / POST | `/api/groups` | Liste / creation d'un groupe de services |
 | GET / PUT / DELETE | `/api/groups/:name` | Detail / modification / suppression d'un groupe |
