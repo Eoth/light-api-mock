@@ -112,7 +112,11 @@
     "chaosErrorRateInput": "[data-testid=\"rule-form-chaos-error-rate-input\"]",
     "chaosErrorStatusInput": "[data-testid=\"rule-form-chaos-error-status-input\"]",
     "submitButton": "[data-testid=\"rule-form-submit-button\"]",
-    "cancelButton": "[data-testid=\"rule-form-cancel-button\"]"
+    "cancelButton": "[data-testid=\"rule-form-cancel-button\"]",
+    "conflictWarning": "[data-testid=\"rule-form-conflict-warning\"]",
+    "conflictWarningItem": "[data-testid=\"rule-form-conflict-warning-item-{name}\"]",
+    "conflictSaveAnywayButton": "[data-testid=\"rule-form-conflict-save-anyway-button\"]",
+    "conflictCancelButton": "[data-testid=\"rule-form-conflict-cancel-button\"]"
   },
 
   "conditionForm": {

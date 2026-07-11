@@ -166,7 +166,8 @@
   {#if editingRuleIdx !== null}
     <RuleForm
       rule={service.rules[editingRuleIdx]}
-      existingRuleNames={(service.rules ?? []).filter((_, i) => i !== editingRuleIdx).map(r => r.name)}
+      existingRules={(service.rules ?? []).filter((_, i) => i !== editingRuleIdx)}
+      draftPosition={editingRuleIdx}
       serviceName={service.name}
       groupName={service.group_name}
       listenPath={service.listen_path}
@@ -176,7 +177,8 @@
   {:else if addingRule}
     <RuleForm
       rule={clonedRule}
-      existingRuleNames={(service.rules ?? []).map(r => r.name)}
+      existingRules={service.rules ?? []}
+      draftPosition={(service.rules ?? []).length}
       serviceName={service.name}
       groupName={service.group_name}
       listenPath={service.listen_path}

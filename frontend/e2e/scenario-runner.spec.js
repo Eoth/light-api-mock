@@ -292,3 +292,31 @@ test.describe('Runner data-driven (scenarios JSON) - lot 4', () => {
     }).toPass({ timeout: 5000 });
   });
 });
+
+// Lot 5 : couverture E2E neuve (pas une migration) pour le detecteur de
+// conflit entre regles a la sauvegarde (POST /api/rule-conflicts, cf
+// CLAUDE.md). "conflict-rule-one" (GET, sans sous-chemin, sans condition —
+// la regle la plus generale possible) sert de base : toute autre regle GET
+// sans sous-chemin ni condition creee ensuite sur ce meme service la
+// chevauche trivialement (ensembles de conditions vides identiques,
+// cf MatchEngine::find_rule_conflicts).
+test.describe('Runner data-driven (scenarios JSON) - lot 5 (detecteur de conflit)', () => {
+  test.beforeEach(async ({ request }) => {
+    await request.delete(`${API}/config/reset`);
+    await request.post(`${API}/services`, {
+      data: validService('conflict-svc', { rules: [validRule('conflict-rule-one')] }),
+    });
+  });
+
+  test('regle en conflit: avertissement affiche (scenario JSON)', async ({ page }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Une regle qui chevauche une regle existante declenche un avertissement de conflit'));
+  });
+
+  test('regle sans conflit: aucun avertissement (scenario JSON)', async ({ page }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Une regle qui ne chevauche aucune regle existante ne declenche aucun avertissement'));
+  });
+
+  test('regle en conflit: enregistrer quand meme fonctionne (scenario JSON)', async ({ page }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', "Enregistrer quand meme malgre l'avertissement de conflit fonctionne"));
+  });
+});

@@ -7,7 +7,7 @@
   import RhaiScriptEditor from './RhaiScriptEditor.svelte';
   import RuleTester from './RuleTester.svelte';
   import { templateToTestJson, templateToFields, validateTemplateAsJson, validateTemplateAsXml, fieldsToTemplate, varNameToSource } from '../tpl-utils.js';
-  import { validateScript as apiValidateScript, getLogs } from '../api.js';
+  import { validateScript as apiValidateScript, getLogs, checkRuleConflicts } from '../api.js';
   import { RHAI_FUNCTIONS } from '../rhai-functions.js';
   import { combinePathParamNames } from '../path-params.js';
 
@@ -15,13 +15,28 @@
 
   let {
     rule = null,
-    existingRuleNames = [],
+    existingRules = [],
+    // Position ou cette regle se retrouvera une fois sauvegardee (index
+    // d'edition inchange, ou service.rules.length pour un ajout — toujours
+    // en fin de liste, cf ServiceDetail.svelte::handleSaveRule). Sert
+    // uniquement au detecteur de conflit pour determiner laquelle des deux
+    // regles en cause s'appliquerait reellement (cf CLAUDE.md). Par defaut
+    // (composant utilise sans ce contexte, ex. tests unitaires isoles) on
+    // suppose un ajout en fin de liste.
+    draftPosition = null,
     serviceName = null,
     groupName = null,
     listenPath = '',
     onSave = () => {},
     onCancel = () => {},
   } = $props();
+
+  // Source unique : existingRuleNames (utilisee pour l'unicite du nom) est
+  // toujours derivee de existingRules (utilisee aussi pour la detection de
+  // conflit), jamais une prop separee — evite deux listes qui pourraient
+  // diverger (cf CLAUDE.md, meme principe que tpl-utils.js).
+  let existingRuleNames = $derived(existingRules.map((r) => r.name));
+  let effectiveDraftPosition = $derived(draftPosition ?? existingRules.length);
 
   const init = untrack(() => rule ? JSON.parse(JSON.stringify(rule)) : null);
   let name = $state(init?.name ?? '');
@@ -174,22 +189,18 @@
     { value: 'IbanFR', label: 'IBAN francais' },
   ];
 
-  function handleSubmit(e) {
-    e.preventDefault();
-    formError = '';
+  // Detecteur de conflit (a la sauvegarde uniquement, cf CLAUDE.md) : quand
+  // le brouillon chevauche une autre regle du service, un avertissement
+  // NON BLOQUANT s'affiche avec deux issues possibles — "Enregistrer quand
+  // meme" (sauvegarde immediatement) ou "Modifier la regle" (referme
+  // l'avertissement, l'utilisateur reste sur le formulaire). Meme pattern
+  // que l'avertissement de changement de mode de reponse ci-dessous
+  // (pendingMode/mode-warning).
+  let pendingConflicts = $state([]);
+  let pendingRulePayload = $state(null);
+  let checkingConflicts = $state(false);
 
-    const trimmedName = name.trim();
-    if (!trimmedName) { formError = 'Le nom de la regle est requis.'; return; }
-    if (existingRuleNames.some(n => n.toLowerCase() === trimmedName.toLowerCase())) {
-      formError = `Une regle avec le nom "${trimmedName}" existe deja dans ce service.`;
-      return;
-    }
-
-    if (ruleAction === 'mock') {
-      const validationErr = validateResponseContent();
-      if (validationErr) { formError = validationErr; return; }
-    }
-
+  function buildRulePayload() {
     const finalStatus = responseMode === 'empty' ? 204 : status;
     const finalHeaders = responseMode === 'empty' ? [] : respHeaders.filter(h => h.name.trim());
     if ((responseMode === 'json-guided' || responseMode === 'json-paste') && !finalHeaders.some(h => h.name.toLowerCase() === 'content-type')) {
@@ -199,7 +210,7 @@
       finalHeaders.push({ name: 'Content-Type', value: 'application/xml' });
     }
     const finalBody = buildFragmentsFromMode();
-    onSave({
+    return {
       name: name.trim(),
       method: ruleMethod,
       sub_path: subPath.trim() || null,
@@ -214,7 +225,71 @@
         body: finalBody,
         chaos: chaosEnabled ? chaos : null,
       },
-    });
+    };
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    formError = '';
+    pendingConflicts = [];
+    pendingRulePayload = null;
+
+    const trimmedName = name.trim();
+    if (!trimmedName) { formError = 'Le nom de la regle est requis.'; return; }
+    if (existingRuleNames.some(n => n.toLowerCase() === trimmedName.toLowerCase())) {
+      formError = `Une regle avec le nom "${trimmedName}" existe deja dans ce service.`;
+      return;
+    }
+
+    if (ruleAction === 'mock') {
+      const validationErr = validateResponseContent();
+      if (validationErr) { formError = validationErr; return; }
+    }
+
+    const builtRule = buildRulePayload();
+
+    checkingConflicts = true;
+    try {
+      const result = await checkRuleConflicts({
+        draft: {
+          method: builtRule.method,
+          sub_path: builtRule.sub_path,
+          conditions: builtRule.conditions,
+        },
+        other_rules: existingRules.map((r) => ({
+          name: r.name,
+          method: r.method,
+          sub_path: r.sub_path,
+          conditions: r.conditions,
+        })),
+        draft_position: effectiveDraftPosition,
+      });
+      const conflicts = result.conflicts ?? [];
+      if (conflicts.length === 0) {
+        onSave(builtRule);
+      } else {
+        pendingConflicts = conflicts;
+        pendingRulePayload = builtRule;
+      }
+    } catch {
+      // Fail-open : une detection de conflit indisponible ne doit jamais
+      // empecher la sauvegarde reelle de la regle (fonctionnalite purement
+      // informative, cf CLAUDE.md).
+      onSave(builtRule);
+    } finally {
+      checkingConflicts = false;
+    }
+  }
+
+  function confirmSaveDespiteConflicts() {
+    if (pendingRulePayload) onSave(pendingRulePayload);
+    pendingConflicts = [];
+    pendingRulePayload = null;
+  }
+
+  function dismissConflictWarning() {
+    pendingConflicts = [];
+    pendingRulePayload = null;
   }
 
   function addCondition(group, condition) {
@@ -811,9 +886,35 @@
   </fieldset>
   {/if}
 
+  {#if pendingConflicts.length > 0}
+    <div class="conflict-warning" role="alert" data-testid="rule-form-conflict-warning">
+      <p class="conflict-warning-title">
+        &#9888; Cette règle pourrait entrer en conflit avec {pendingConflicts.length > 1 ? 'ces règles existantes' : 'une règle existante'} de ce service :
+      </p>
+      <ul class="conflict-warning-list">
+        {#each pendingConflicts as c (c.other_rule_name)}
+          <li data-testid="rule-form-conflict-warning-item-{c.other_rule_name}">
+            {#if c.winner === 'other'}
+              La règle « {c.other_rule_name} » a des conditions identiques ou incluses — avec l'ordre actuel, c'est « {c.other_rule_name} » qui s'appliquera, cette règle-ci ne se déclenchera jamais pour les requêtes concernées.
+            {:else}
+              La règle « {c.other_rule_name} » a des conditions identiques ou incluses — avec l'ordre actuel, c'est cette règle-ci qui s'appliquera en premier, la règle « {c.other_rule_name} » sera ignorée pour les requêtes concernées.
+            {/if}
+          </li>
+        {/each}
+      </ul>
+      <p class="field-hint">Ce conflit peut être volontaire (ex. règle générale + règle plus spécifique en repli). Vous restez libre d'enregistrer quand même.</p>
+      <div class="mode-warning-actions">
+        <button type="button" class="btn btn-sm btn-primary" onclick={confirmSaveDespiteConflicts} data-testid="rule-form-conflict-save-anyway-button">Enregistrer quand même</button>
+        <button type="button" class="btn btn-sm btn-secondary" onclick={dismissConflictWarning} data-testid="rule-form-conflict-cancel-button">Modifier la règle</button>
+      </div>
+    </div>
+  {/if}
+
   <!-- ACTIONS -->
   <div class="form-actions">
-    <button type="submit" class="btn btn-primary" data-testid="rule-form-submit-button">{init ? 'Enregistrer la regle' : 'Ajouter la regle'}</button>
+    <button type="submit" class="btn btn-primary" disabled={checkingConflicts} data-testid="rule-form-submit-button">
+      {#if checkingConflicts}Vérification…{:else}{init ? 'Enregistrer la regle' : 'Ajouter la regle'}{/if}
+    </button>
     <button type="button" class="btn btn-secondary" onclick={onCancel} data-testid="rule-form-cancel-button">Annuler</button>
   </div>
 </form>
@@ -837,7 +938,13 @@
   .mode-warning { background: #fff3cd; border: 1px solid #ffc107; color: #664d03; padding: 0.75rem; border-radius: var(--radius); margin-bottom: 0.75rem; }
   :global([data-theme="dark"]) .mode-warning { background: #332701; border-color: #e5a50a; color: #ffe082; }
   .mode-warning p { margin: 0 0 0.5rem; font-size: 0.875rem; }
-  .mode-warning-actions { display: flex; gap: 0.5rem; }
+  .mode-warning-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+  .conflict-warning { background: #fff3cd; border: 1px solid #ffc107; color: #664d03; padding: 0.75rem; border-radius: var(--radius); margin-bottom: 0.75rem; }
+  :global([data-theme="dark"]) .conflict-warning { background: #332701; border-color: #e5a50a; color: #ffe082; }
+  .conflict-warning-title { margin: 0 0 0.5rem; font-weight: 600; font-size: 0.875rem; }
+  .conflict-warning-list { margin: 0 0 0.5rem; padding-left: 1.25rem; display: flex; flex-direction: column; gap: 0.375rem; }
+  .conflict-warning-list li { font-size: 0.875rem; word-break: break-word; }
 
   .section { border: 1px solid var(--color-border); border-radius: var(--radius); padding: 0.75rem; margin-bottom: 1rem; }
   .section legend { font-weight: 600; font-size: 0.875rem; padding: 0 0.375rem; }
