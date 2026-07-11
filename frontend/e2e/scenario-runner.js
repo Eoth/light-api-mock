@@ -8,11 +8,14 @@
 // logique "composant.cle" resolu via selectors.json (SOURCE UNIQUE des
 // selecteurs, cf CLAUDE.md et frontend/e2e/README.md). Voir
 // frontend/e2e/README.md pour le format complet et comment ajouter un
-// nouveau scenario/selecteur.
+// nouveau scenario/selecteur. L'action "screenshot" (sujet 13b, docs/
+// screenshots) est un no-op sauf regeneration explicite -- voir
+// docs-screenshot.js et frontend/e2e/README.md, section captures.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect } from '@playwright/test';
+import { docsScreenshot } from './docs-screenshot.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const selectors = JSON.parse(fs.readFileSync(path.join(__dirname, 'selectors.json'), 'utf8'));
@@ -86,8 +89,16 @@ async function runStep(page, step) {
       await expect(page.locator(resolveTarget(target, params))).toContainText(value);
       return;
     }
+    case 'screenshot': {
+      // No-op sauf regeneration explicite des captures docs/ (sujet 13b, cf
+      // docs-screenshot.js) -- ne ralentit jamais la suite E2E standard.
+      // `step.file` est un nom de fichier simple (pas un chemin), ecrit dans
+      // docs/screenshots/.
+      await docsScreenshot(page, step.file);
+      return;
+    }
     default:
-      throw new Error(`Action non supportee "${action}". Actions disponibles : goto, click, fill, selectOption, assertVisible, assertHidden, assertText.`);
+      throw new Error(`Action non supportee "${action}". Actions disponibles : goto, click, fill, selectOption, assertVisible, assertHidden, assertText, screenshot.`);
   }
 }
 

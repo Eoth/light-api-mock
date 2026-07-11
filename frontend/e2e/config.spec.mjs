@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { docsScreenshot } from './docs-screenshot.js';
 
 const API = 'http://localhost:7342/api';
 
@@ -43,6 +44,7 @@ test('export telecharge un fichier JSON valide', async ({ page, request }) => {
 
   await page.goto('/');
   await page.waitForLoadState('networkidle');
+  await docsScreenshot(page, 'administration-bouton-export.png');
 
   const [download] = await Promise.all([
     page.waitForEvent('download'),

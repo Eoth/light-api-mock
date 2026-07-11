@@ -24,7 +24,9 @@ aucun ne peut lire le résultat d'un autre. Le nommage "pré/post" est une conve
 aider à organiser votre logique (par exemple séparer "préparer des données" et "les mettre en
 forme"), pas un enchaînement réel.
 
-<!-- SCREENSHOT: les 3 zones de script d'une règle (pré-script / script / post-script) -->
+*(Capture manquante — aucun scénario E2E existant n'active simultanément les 3 zones de script
+[pré-script/script/post-script sont des blocs repliés indépendamment, activés un par un dans les
+tests actuels] ; à réaliser manuellement, cf `frontend/e2e/README.md` section captures.)*
 
 Chaque bloc peut retourner :
 - une **valeur simple** (texte, nombre) → utilisable comme `{{script}}` / `{{pre_script}}` /
@@ -52,7 +54,7 @@ L'éditeur affiche ces fonctions dans une liste déroulante dès que vous commen
 (ou en appuyant sur `Ctrl+Espace` pour voir la liste complète), avec leur signature et leur
 description — pas besoin de mémoriser ce tableau.
 
-<!-- SCREENSHOT: autocomplétion des fonctions Rhai pendant la frappe dans l'éditeur -->
+![Autocomplétion des fonctions Rhai pendant la frappe dans l'éditeur](screenshots/rhai-autocompletion.png)
 
 ## Cas d'usage : réponse toujours identique pour une même clé
 
@@ -79,7 +81,10 @@ Résultat : `GET /seeded-test/entreprise/44306184100047` renverra systématiquem
 et le même `score` pour ce SIRET précis, et des valeurs différentes (mais toujours stables) pour
 un autre SIRET.
 
-<!-- SCREENSHOT: exemple de script seeded_pick/seeded_int et son résultat testé -->
+*(Capture manquante — les tests E2E existants pour `seeded_pick`/`seeded_int`
+[`frontend/e2e/insee.spec.mjs`] vérifient le résultat via de vraies requêtes HTTP, pas via une
+capture d'écran de l'éditeur de script combiné au testeur de règle ; à réaliser manuellement, cf
+`frontend/e2e/README.md` section captures.)*
 
 ## Prérequis et limites
 

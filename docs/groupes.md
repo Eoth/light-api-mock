@@ -14,7 +14,7 @@ Un groupe rassemble plusieurs [services](services.md) sous :
 - Une **gestion de droits dédiée** (admins et membres du groupe) si l'[authentification](authentification.md)
   est activée.
 
-<!-- SCREENSHOT: liste des services avec plusieurs groupes repliés/dépliés -->
+![Liste des services avec plusieurs groupes repliés/dépliés](screenshots/groupes-liste-plies-deplies.png)
 
 ## Créer un groupe
 
@@ -23,7 +23,7 @@ Depuis le bouton "Groupes" de la barre de navigation, un formulaire simple deman
 nom (toujours le même code pour un même nom) — c'est ce code qui préfixe les URL des services du
 groupe. Il n'y a rien à saisir manuellement pour ce code.
 
-<!-- SCREENSHOT: formulaire de création d'un groupe (champ Nom uniquement) -->
+![Formulaire de création d'un groupe (champ Nom uniquement)](screenshots/groupe-formulaire-creation.png)
 
 **Qui peut créer un groupe ?** N'importe quel utilisateur. La personne qui crée le groupe en
 devient automatiquement administratrice.
@@ -43,7 +43,8 @@ le groupe.
 > Si l'authentification n'est pas activée sur votre instance de lightMock, tout le monde a accès
 > à tout — les notions d'admin/membre de groupe deviennent surtout indicatives.
 
-<!-- SCREENSHOT: écran de gestion des membres d'un groupe -->
+*(Capture manquante — aucun scénario E2E existant n'ouvre l'écran de gestion des membres d'un
+groupe ; à réaliser manuellement, cf `frontend/e2e/README.md` section captures.)*
 
 ## L'état "déplié/replié" est mémorisé pendant votre session
 

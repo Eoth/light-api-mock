@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { docsScreenshot } from './docs-screenshot.js';
 
 const API = 'http://localhost:7342/api';
 
@@ -68,17 +69,20 @@ test.describe('Messaging (Kafka) — journal des messages via simulation UI', ()
 
     await page.goto('/');
     await page.waitForLoadState('networkidle');
+    await docsScreenshot(page, 'messaging-bouton-nav.png');
     await page.getByTitle('Journal des messages Kafka').click();
     await expect(page.getByRole('heading', { name: 'Messages Kafka' })).toBeVisible();
 
     await page.getByLabel('Topic du message simule').fill('orders.in');
     await page.getByLabel('Corps du message simule').fill('{"type":"order.created"}');
+    await docsScreenshot(page, 'messaging-formulaire-simulation.png');
     await page.getByRole('button', { name: 'Simuler' }).click();
 
     const row = page.locator('tr', { hasText: 'orders.in' });
     await expect(row).toBeVisible();
     await expect(row).toContainText('kafka-svc / order-created');
     await expect(row).toContainText('Matche');
+    await docsScreenshot(page, 'messaging-journal-statuts.png');
   });
 
   test('un message sans regle correspondante est journalise comme non matche', async ({ page, request }) => {

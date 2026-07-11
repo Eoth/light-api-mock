@@ -18,7 +18,7 @@ de l'URL (`{cle}`) — sans cette aide, la règle ne matchait tout simplement pa
 Le testeur détecte ce genre de confusion et l'indique explicitement ("`cle` n'a pas été trouvé
 comme paramètre de requête, mais est présent comme paramètre de chemin dans cette requête").
 
-<!-- SCREENSHOT: testeur de règle avec le détail condition par condition, hint affiché -->
+![Testeur de règle avec le détail condition par condition, hint affiché](screenshots/testeur-regle-hint.png)
 
 ## Le détecteur de conflits : être averti à la sauvegarde
 
@@ -32,7 +32,7 @@ brouillon aux autres règles du même service et affiche un avertissement si un 
 plausible est détecté, en précisant **laquelle des deux règles s'appliquerait réellement** avec
 l'ordre actuel.
 
-<!-- SCREENSHOT: avertissement de conflit de règles affiché à la sauvegarde -->
+![Avertissement de conflit de règles affiché à la sauvegarde](screenshots/regle-avertissement-conflit.png)
 
 Cet avertissement n'est **jamais bloquant** : deux choix sont toujours proposés,
 

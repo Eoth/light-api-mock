@@ -22,7 +22,8 @@ Pour naviguer dans une structure profondément imbriquée sans se perdre, un fil
 cliquable, ex. `racine > adresse > ville`) au-dessus de l'éditeur permet de "rentrer" dans un
 sous-niveau et d'en ressortir en un clic.
 
-<!-- SCREENSHOT: builder guidé JSON avec fil d'Ariane de navigation -->
+*(Capture manquante — aucun scénario E2E existant ne navigue dans le builder JSON guidé avec le
+fil d'Ariane ; à réaliser manuellement, cf `frontend/e2e/README.md` section captures.)*
 
 ### 2. Le mode "exemple d'abord" (coller un exemple existant)
 
@@ -31,7 +32,8 @@ réponse (par exemple, une réponse déjà obtenue du vrai backend) : lightMock 
 automatiquement tous les champs et vous permet ensuite de remplacer certaines valeurs par des
 variables ou des données factices, champ par champ.
 
-<!-- SCREENSHOT: mode "exemple d'abord", collage d'un JSON puis détection des champs -->
+*(Capture manquante — aucun scénario E2E existant n'utilise le mode "exemple d'abord"
+(`JsonPasteBuilder`) ; à réaliser manuellement, cf `frontend/e2e/README.md` section captures.)*
 
 > Ce mode "coller un exemple" n'est disponible que pour le JSON pour le moment ; le XML se
 > construit uniquement via le builder guidé.
@@ -81,7 +83,8 @@ SIREN/SIRET, adresse complète, date passée/future, horodatage, booléen aléat
 remplissage ("lorem"), pays, IBAN français, et un entier dans une plage donnée
 (`Integer{min,max}`).
 
-<!-- SCREENSHOT: sélection d'un type de donnée factice dans un champ -->
+*(Capture manquante — aucun scénario E2E existant ne sélectionne un type `fake.*` dans un champ
+du builder ; à réaliser manuellement, cf `frontend/e2e/README.md` section captures.)*
 
 ## Mode Chaos : simuler des pannes et des lenteurs
 
@@ -93,7 +96,9 @@ peut activer un "mode chaos" :
 - **Taux d'erreur** : un pourcentage de requêtes qui reçoivent, à la place de la réponse normale,
   une erreur HTTP (code configurable, `500` par défaut).
 
-<!-- SCREENSHOT: configuration du mode Chaos (latence + taux d'erreur) sur une règle -->
+*(Capture manquante — aucun scénario E2E existant ne configure le mode Chaos via l'interface (les
+tests existants postent `chaos: null` directement via l'API) ; à réaliser manuellement, cf
+`frontend/e2e/README.md` section captures.)*
 
 ## Prérequis et limites
 

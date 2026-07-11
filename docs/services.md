@@ -21,7 +21,7 @@ Depuis l'écran d'accueil, le bouton **"+ Ajouter un service"** ouvre un formula
 - **Type de service** : REST (par défaut) ou SOAP — voir la section dédiée plus bas.
 - **Groupe** (optionnel) : rattache le service à un [groupe de services](groupes.md).
 
-<!-- SCREENSHOT: formulaire de création d'un nouveau service -->
+![Formulaire de création d'un nouveau service](screenshots/service-formulaire-creation.png)
 
 ## Comment l'URL est construite
 
@@ -47,7 +47,7 @@ ou, si le service appartient à un groupe :
 L'URL exacte à utiliser pour tester un service est toujours affichée dans sa fiche détail — pas
 besoin de la recalculer à la main.
 
-<!-- SCREENSHOT: fiche détail d'un service avec l'URL de test affichée -->
+![Fiche détail d'un service avec l'URL de test affichée](screenshots/service-fiche-detail-url.png)
 
 ## Mock ou Proxy : deux modes, à deux niveaux
 

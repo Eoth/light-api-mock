@@ -9,6 +9,7 @@
         { "action": "click", "target": "serviceCard.configureButton", "params": { "name": "scenario-rule-svc" } },
         { "action": "click", "target": "ruleList.addButton" },
         { "action": "fill", "target": "ruleForm.nameInput", "value": "scenario-simple-rule" },
+        { "action": "screenshot", "file": "regle-formulaire-creation.png" },
         { "action": "click", "target": "ruleForm.submitButton" },
         { "action": "assertVisible", "target": "ruleList.item", "params": { "name": "scenario-simple-rule" } }
       ]
@@ -76,7 +77,8 @@
         { "action": "fill", "target": "ruleForm.nameInput", "value": "conflict-rule-two" },
         { "action": "click", "target": "ruleForm.submitButton" },
         { "action": "assertVisible", "target": "ruleForm.conflictWarning" },
-        { "action": "assertVisible", "target": "ruleForm.conflictWarningItem", "params": { "name": "conflict-rule-one" } }
+        { "action": "assertVisible", "target": "ruleForm.conflictWarningItem", "params": { "name": "conflict-rule-one" } },
+        { "action": "screenshot", "file": "regle-avertissement-conflit.png" }
       ]
     },
     {
