@@ -55,7 +55,7 @@ export function getMe() {
 //
 // Un service est identifie sans ambiguite par (group_name, name) : le backend
 // autorise deux services du meme nom dans des groupes differents (le nom
-// seul ne suffit pas, cf CLAUDE.md). `servicePath` est la source unique de
+// seul ne suffit pas). `servicePath` est la source unique de
 // verite pour construire le bon chemin : `/groups/:group/services/:name...`
 // quand `groupName` est fourni (service groupe), `/services/:name...` sinon
 // (perimetre "sans groupe").

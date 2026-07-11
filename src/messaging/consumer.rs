@@ -2,7 +2,8 @@
 //
 // Boucle event-driven pure : `StreamConsumer::recv().await` bloque jusqu'au
 // prochain message — rdkafka gere nativement l'attente sur le socket, il n'y
-// a AUCUN polling/sleep dans cette boucle (coherent avec CLAUDE.md #22).
+// a AUCUN polling/sleep dans cette boucle (coherent avec le reste du projet,
+// qui evite systematiquement les taches de fond de type "poll periodique").
 //
 // `process_message()` concentre toute la logique metier (match -> rendu ->
 // journal -> publication eventuelle) independamment de la source du message :
@@ -32,7 +33,7 @@ use std::time::Duration;
 /// (production) ; `Fake` (tests uniquement) enregistre les appels en memoire
 /// pour verifier le comportement "publication sur reply_topic" sans broker
 /// reel — impossible a exercer autrement dans cet environnement de
-/// developpement (pas de Kafka/Docker disponible, cf CLAUDE.md).
+/// developpement (pas de Kafka/Docker disponible).
 #[derive(Clone)]
 pub enum Publisher {
     Kafka(Arc<FutureProducer>),
@@ -265,8 +266,8 @@ mod tests {
             groups: vec![],
         };
         // replace() applique la mutation en memoire de facon synchrone (le
-        // write-behind ne retarde que l'ecriture DISQUE, cf CLAUDE.md) : pas
-        // besoin de flush()/sleep pour que snapshot() la voie juste apres.
+        // write-behind ne retarde que l'ecriture DISQUE) : pas besoin de
+        // flush()/sleep pour que snapshot() la voie juste apres.
         store.replace(config).await.unwrap();
         store
     }

@@ -71,8 +71,8 @@ test.describe('Config backups & restore', () => {
   // AUTH_ENABLED=false (par defaut), auquel cas AuthUser::anonymous() a
   // is_super_admin=true et require_super_admin() passe toujours — il n'existe
   // pas de session "utilisateur non-admin" reelle a produire sans backend
-  // Keycloak (meme limitation deja acceptee pour /api/config/reset, cf
-  // CLAUDE.md). Le garde-fou lui-meme est couvert par un test unitaire Rust
+  // Keycloak (meme limitation deja acceptee pour /api/config/reset). Le
+  // garde-fou lui-meme est couvert par un test unitaire Rust
   // (server::api::tests::require_super_admin_rejects_non_admin) et le
   // comportement UI en cas de 403 par un test Vitest simulant le rejet
   // (BackupManager.test.js : "notifie une erreur quand le backend refuse").

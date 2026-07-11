@@ -5,7 +5,7 @@
   // dans App.svelte) — aucun pattern de confirmation maison. Reserve aux
   // super-admins cote backend (require_super_admin sur les deux routes) ;
   // ce composant n'est monte par App.svelte que si canShowReset est vrai
-  // (meme garde que le bouton Reset, cf CLAUDE.md).
+  // (meme garde que le bouton Reset).
   import { getBackups, restoreBackup } from '../api.js';
   import ConfirmDialog from './ConfirmDialog.svelte';
 

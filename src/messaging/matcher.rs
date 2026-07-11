@@ -10,7 +10,7 @@
 // Adaptation : on saute deliberement `matches_method`/`matches_sub_path`. Un
 // message Kafka n'a ni verbe HTTP ni chemin — `Rule.method`/`Rule.sub_path`
 // restent des champs obligatoires du modele (partage avec les regles HTTP,
-// cf CLAUDE.md #16 : pas de champ optionnel a la legere), mais ils sont
+// pas de champ optionnel a la legere), mais ils sont
 // simplement ignores lors du matching de message : seules `Rule.conditions`
 // comptent. `query_params`/`path_params` sont toujours vides dans le
 // `RequestData` synthetique construit ici (pas d'equivalent Kafka), donc une

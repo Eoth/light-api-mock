@@ -4,8 +4,8 @@ import { docsScreenshot } from './docs-screenshot.js';
 const API = 'http://localhost:7342/api';
 
 // Ces tests ne s'executent que contre un backend compile avec
-// `--features messaging-kafka` (sinon /api/messaging/* renvoie 404 partout,
-// cf CLAUDE.md). Aucun broker Kafka reel n'est requis : le scenario passe
+// `--features messaging-kafka` (sinon /api/messaging/* renvoie 404 partout).
+// Aucun broker Kafka reel n'est requis : le scenario passe
 // par "Simuler un message" (POST /api/messaging/simulate), qui declenche le
 // meme pipeline (match -> rendu -> journal) qu'un vrai message Kafka sans
 // dependre d'un producteur externe — voir src/messaging/consumer.rs.

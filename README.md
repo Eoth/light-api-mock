@@ -346,7 +346,8 @@ kubectl apply -k k8s/
 | Frontend ne s'affiche pas | Verifier `STATIC_DIR` pointe vers `frontend/dist` (chemin absolu recommande sur Windows) |
 | Requete mock retourne 404 | Verifier l'URL inclut le namespace : `/{service_name}/{path}` (et `/{group_code}/...` si le service est groupe) |
 | Requete sur une methode/sous-chemin non couvert | La methode est definie par regle, pas par service : verifier qu'une regle existe pour cette methode/`sub_path` |
-| `cargo build --features messaging-kafka` echoue (linker, cmake, chemin trop long) | Voir la section "Support MOM / Messaging" de [CLAUDE.md](CLAUDE.md) pour les contournements Windows connus |
+| `cargo build --features messaging-kafka` sur Windows : `link.exe`/`cl.exe` introuvables malgre VS installe | Git Bash place `C:\Program Files\Git\usr\bin\link.exe` (coreutils) avant le linker MSVC dans le PATH herite ; `vcvarsall.bat`/`vcvars64.bat` sont eux-memes peu fiables ici. Construire l'environnement MSVC a la main (PATH/INCLUDE/LIB pointant directement vers `VC\Tools\MSVC\<ver>\bin\Hostx64\x64` + le Windows SDK) plutot que de compter sur `vcvarsall.bat` |
+| `cargo build --features messaging-kafka` : `cmake` erreur `Failed to run MSBuild ... path exceeds the OS max path length limit` | Le generateur cmake par defaut produit un arbre de build tres imbrique qui depasse 260 caracteres si le repo est deja profondement niche (ex. OneDrive). Fixer `CARGO_TARGET_DIR` sur un chemin court (ex. `C:\lm-target`) via variable d'env avant de builder |
 
 ## Licence
 

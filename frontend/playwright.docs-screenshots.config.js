@@ -6,8 +6,8 @@
 // specifique), garantit que la suite standard ne prend jamais de capture --
 // `docs-screenshot.js` est un no-op tant que cette variable n'est pas
 // positionnee. Ne cible que les fichiers ou des etapes/appels
-// `docsScreenshot()`/`{"action":"screenshot"}` ont ete ajoutes (cf CLAUDE.md
-// et frontend/e2e/README.md) ; les autres fichiers de la suite ne produisent
+// `docsScreenshot()`/`{"action":"screenshot"}` ont ete ajoutes (voir
+// frontend/e2e/README.md) ; les autres fichiers de la suite ne produisent
 // aucune capture et n'ont pas besoin d'etre executes ici.
 import { defineConfig } from '@playwright/test';
 

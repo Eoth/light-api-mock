@@ -5,7 +5,7 @@
 // l'edition d'un service puis retour a la liste), contrairement a un $state
 // local au composant qui serait recree a chaque montage.
 //
-// Niveau 1 assume (cf CLAUDE.md) : cet etat est un Set en memoire uniquement,
+// Niveau 1 assume : cet etat est un Set en memoire uniquement,
 // jamais ecrit dans localStorage/sessionStorage. Un rechargement complet de
 // la page (F5) recharge ce module a zero et reinitialise donc l'etat -- c'est
 // le comportement voulu, pas une limitation a corriger. Un futur "niveau 2"

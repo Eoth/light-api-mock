@@ -6,9 +6,8 @@
 //
 // Desactive par defaut (no-op) : ne prend une vraie capture que si
 // DOCS_SCREENSHOTS est positionne (fait par playwright.docs-screenshots.config.js,
-// jamais par playwright.config.js standard) -- cf CLAUDE.md et
-// frontend/e2e/README.md pour ne jamais ralentir/declencher la suite E2E
-// standard (`npm run test:e2e`).
+// jamais par playwright.config.js standard) -- voir frontend/e2e/README.md
+// pour ne jamais ralentir/declencher la suite E2E standard (`npm run test:e2e`).
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

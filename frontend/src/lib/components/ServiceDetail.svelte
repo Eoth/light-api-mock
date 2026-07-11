@@ -26,7 +26,7 @@
   // vol, ce qui rend `service` null en cours de route. Lire une valeur
   // capturee au debut de la fonction, plutot que relire la prop apres un
   // await, evite cette course — pas un simple garde `if (!service)` qui
-  // masquerait le symptome sans corriger la cause (cf CLAUDE.md).
+  // masquerait le symptome sans corriger la cause.
   async function handleSaveService(updated) {
     const name = service.name;
     const groupName = service.group_name;

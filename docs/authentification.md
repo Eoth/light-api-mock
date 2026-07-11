@@ -12,9 +12,9 @@ Quand l'authentification est activée, lightMock délègue la vérification de l
 organisation, le cas échéant) : un écran de connexion apparaît, et l'accès est ensuite lié à
 l'utilisateur connecté.
 
-*(Capture manquante — l'environnement E2E tourne avec `AUTH_ENABLED=false` [cf CLAUDE.md,
-`backups.spec.js`], l'écran de connexion Keycloak n'y apparaît jamais ; nécessite un serveur
-Keycloak réel pour être capturée, à réaliser manuellement.)*
+*(Capture manquante — l'environnement de tests automatisés tourne avec `AUTH_ENABLED=false`,
+l'écran de connexion Keycloak n'y apparaît jamais ; nécessite un serveur Keycloak réel pour être
+capturée, à réaliser manuellement.)*
 
 Les droits d'accès dépendent alors :
 

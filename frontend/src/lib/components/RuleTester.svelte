@@ -10,7 +10,7 @@
   // courant — on ne fait ici que filtrer celles qui ont un detail capture
   // (`captured` non-null). Les requetes en proxy direct (service
   // is_mocked=false) n'en ont jamais : le chemin de streaming zero-buffering
-  // ne bufferise pas le corps, donc rien n'est capturable (cf CLAUDE.md).
+  // ne bufferise pas le corps, donc rien n'est capturable.
   import { testRule } from '../api.js';
   import FormField from './FormField.svelte';
 

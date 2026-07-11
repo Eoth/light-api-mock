@@ -118,8 +118,8 @@ async fn main() {
 
     // Arret gracieux (SIGTERM K8s) : draine la file d'ecriture write-behind
     // avant de quitter, pour reduire la fenetre de risque de perte des
-    // dernieres mutations en cas d'arret normal du pod (cf CLAUDE.md,
-    // "write-behind"). Ne protege pas contre un SIGKILL/crash brutal.
+    // dernieres mutations en cas d'arret normal du pod. Ne protege pas
+    // contre un SIGKILL/crash brutal.
     tracing::info!("draining pending config writes before exit");
     store_for_shutdown.flush().await;
 }
