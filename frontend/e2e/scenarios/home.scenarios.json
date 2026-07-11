@@ -14,7 +14,8 @@
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "app.loadDemoButton" },
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
-        { "action": "assertVisible", "target": "serviceCard.card", "params": { "name": "users-api" } }
+        { "action": "assertVisible", "target": "serviceCard.card", "params": { "name": "users-api" } },
+        { "action": "screenshot", "file": "accueil-liste-services.png" }
       ]
     }
   ]

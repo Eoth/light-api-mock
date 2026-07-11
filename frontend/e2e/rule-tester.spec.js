@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { docsScreenshot } from './docs-screenshot.js';
 
 const API = 'http://localhost:7342/api';
 const BASE = 'http://localhost:7342';
@@ -89,6 +90,7 @@ test.describe('Testeur de regle : condition mal choisie contre une vraie requete
     await expect(page.getByText(/ne matcherait pas cette requête/)).toBeVisible();
     await expect(page.getByText(/valeur trouvée : absente/)).toBeVisible();
     await expect(page.getByText(/present comme parametre de chemin/)).toBeVisible();
+    await docsScreenshot(page, 'testeur-regle-hint.png');
   });
 
   test('la selection du path param est stricte (select ferme, pas de saisie libre)', async ({ page, request }) => {

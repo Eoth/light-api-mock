@@ -18,12 +18,12 @@ conservées (les plus anciennes sont retirées automatiquement au fil du temps).
 Le bouton **"Sauvegardes"** de la barre de navigation liste toutes les sauvegardes disponibles,
 avec leur date, leur taille, et permet de restaurer l'une d'entre elles **en un clic**.
 
-<!-- SCREENSHOT: liste des sauvegardes avec bouton de restauration -->
+![Liste des sauvegardes avec bouton de restauration](screenshots/sauvegardes-liste-restauration.png)
 
 Une restauration crée elle-même automatiquement une nouvelle sauvegarde de l'état qui vient d'être
 écrasé — même une restauration reste donc réversible.
 
-<!-- SCREENSHOT: confirmation avant restauration d'une sauvegarde -->
+![Confirmation avant restauration d'une sauvegarde](screenshots/sauvegardes-confirmation-restauration.png)
 
 ## Sauvegarde spéciale avant une réinitialisation complète
 

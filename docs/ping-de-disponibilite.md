@@ -3,7 +3,9 @@
 Sur la fiche d'un [service](services.md), un bouton **"Tester la cible (réseau uniquement)"**
 permet de vérifier rapidement si le vrai backend (`real_target_url`) est joignable sur le réseau.
 
-<!-- SCREENSHOT: badge de statut du ping sur une fiche service -->
+*(Capture manquante — aucun scénario E2E existant ne déclenche le bouton "Tester la cible" [ce
+comportement n'est couvert que par des tests unitaires Vitest sur `UrlHealthBadge.svelte`] ; à
+réaliser manuellement, cf `frontend/e2e/README.md` section captures.)*
 
 ## Ce que fait (et ne fait pas) ce test
 

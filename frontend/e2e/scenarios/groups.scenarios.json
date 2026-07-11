@@ -16,6 +16,7 @@
         { "action": "click", "target": "app.navGroupsButton" },
         { "action": "click", "target": "groupManager.newGroupButton" },
         { "action": "assertVisible", "target": "groupManager.nameInput" },
+        { "action": "screenshot", "file": "groupe-formulaire-creation.png" },
         { "action": "fill", "target": "groupManager.nameInput", "value": "ui-simple-group" },
         { "action": "click", "target": "groupManager.createSubmitButton" },
         { "action": "assertVisible", "target": "groupManager.card", "params": { "name": "ui-simple-group" } }

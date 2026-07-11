@@ -11,7 +11,12 @@ Le bouton **"Messages Kafka"** n'apparaît dans la barre de navigation **que si*
 lightMock qui tourne a été compilé avec le support Kafka. S'il est absent, cette fonctionnalité
 n'est simplement pas incluse dans votre installation — ce n'est pas une erreur.
 
-<!-- SCREENSHOT: bouton "Messages Kafka" visible dans la barre de navigation -->
+![Bouton "Messages Kafka" visible dans la barre de navigation](screenshots/messaging-bouton-nav.png)
+
+*(Capture générée automatiquement par `npm run docs:screenshots`, mais uniquement contre un
+binaire compilé avec `--features messaging-kafka` — `frontend/e2e/messaging.spec.js` est
+`test.skip` sinon, cf CLAUDE.md. Le binaire de développement par défaut ne l'a pas : régénérer
+contre un binaire avec la feature activée si cette image manque encore.)*
 
 ## Fonctionnement
 
@@ -25,7 +30,9 @@ Un **journal des messages**, avec la même logique que le
 [journal des requêtes](journal-des-requetes.md) HTTP, permet de consulter les messages reçus, ceux
 qui ont matché ou non, et leur réponse.
 
-<!-- SCREENSHOT: journal des messages Kafka avec statut matché/non-matché -->
+![Journal des messages Kafka avec statut matché/non-matché](screenshots/messaging-journal-statuts.png)
+
+*(Même remarque que ci-dessus : nécessite un binaire compilé avec `--features messaging-kafka`.)*
 
 ## Simuler un message sans serveur Kafka réel
 
@@ -33,7 +40,9 @@ Un panneau "Simuler un message entrant" permet de tester le comportement d'une r
 directement depuis l'interface, sans avoir besoin d'un vrai serveur Kafka qui envoie le message —
 pratique pour valider une règle avant de la brancher sur un flux réel.
 
-<!-- SCREENSHOT: formulaire de simulation d'un message Kafka -->
+![Formulaire de simulation d'un message Kafka](screenshots/messaging-formulaire-simulation.png)
+
+*(Même remarque que ci-dessus : nécessite un binaire compilé avec `--features messaging-kafka`.)*
 
 ## Prérequis et limites
 

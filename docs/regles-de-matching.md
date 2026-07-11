@@ -20,7 +20,7 @@ service mocké ne sait répondre à rien de précis.
   [Réponses dynamiques et templates](reponses-et-templates.md)) ou `proxy` (relayer cette requête
   précise vers le vrai backend, pour un mock partiel — voir [Services et routage](services.md)).
 
-<!-- SCREENSHOT: formulaire de création d'une règle (méthode, sous-chemin, action) -->
+![Formulaire de création d'une règle (méthode, sous-chemin, action)](screenshots/regle-formulaire-creation.png)
 
 ## Les conditions : cibler une requête précisément
 
@@ -49,7 +49,9 @@ Plusieurs conditions peuvent être combinées :
 - **Toutes ces conditions** (ET) : la règle ne matche que si chaque condition est vraie.
 - **Au moins une de ces conditions** (OU) : la règle matche dès qu'une seule condition est vraie.
 
-<!-- SCREENSHOT: éditeur de conditions avec plusieurs critères combinés -->
+*(Capture manquante — aucun scénario E2E existant ne construit une règle avec plusieurs
+conditions combinées via l'interface ; à réaliser manuellement, cf `frontend/e2e/README.md`
+section captures.)*
 
 ### Aide à la saisie
 
@@ -72,7 +74,9 @@ mauvaises surprises liées à l'ordre, utilisez le
 sauvegarde si une nouvelle règle risque d'être masquée par une règle existante (ou l'inverse),
 sans vous empêcher de sauvegarder si c'est un choix volontaire.
 
-<!-- SCREENSHOT: liste des règles d'un service réordonnée par glisser-déposer -->
+*(Capture manquante — aucun scénario E2E existant ne réordonne des règles par glisser-déposer
+[le seul test de ce comportement est un test unitaire Vitest, pas un test E2E piloté navigateur] ;
+à réaliser manuellement, cf `frontend/e2e/README.md` section captures.)*
 
 ## Prérequis et limites
 

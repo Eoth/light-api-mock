@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { docsScreenshot } from './docs-screenshot.js';
 
 const API = 'http://localhost:7342/api';
 
@@ -45,6 +46,7 @@ test('autocompletion : la selection au clic insere la fonction avec ses parametr
 
   const option = page.getByRole('option', { name: /seeded_pick/ });
   await expect(option).toBeVisible();
+  await docsScreenshot(page, 'rhai-autocompletion.png');
   await option.click();
 
   await expect(scriptField).toHaveValue('seeded_pick(seed, ["a", "b"])');

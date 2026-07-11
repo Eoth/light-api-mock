@@ -9,7 +9,7 @@ Le bouton **"Export"** télécharge un fichier contenant l'intégralité de la c
 (tous les services, groupes et règles) — pratique pour partager une configuration avec un
 collègue, la versionner, ou en garder une copie avant une manipulation risquée.
 
-<!-- SCREENSHOT: bouton Export dans la barre de navigation -->
+![Bouton Export dans la barre de navigation](screenshots/administration-bouton-export.png)
 
 ## Import : recharger une configuration depuis un fichier
 
@@ -20,7 +20,9 @@ proposés au moment de l'import :
 - **Fusionner** : la configuration importée est ajoutée à l'existant, sans supprimer ce qui est
   déjà présent.
 
-<!-- SCREENSHOT: choix entre "Remplacer" et "Fusionner" à l'import -->
+*(Capture manquante — aucun scénario E2E existant n'ouvre la modale d'import via l'interface
+[`config.spec.mjs` importe uniquement via l'API] ; à réaliser manuellement, cf
+`frontend/e2e/README.md` section captures.)*
 
 > Comme pour toute modification, une [sauvegarde automatique](sauvegardes-et-restauration.md) de
 > l'état précédent est créée avant l'import — une erreur de manipulation reste réversible.
@@ -35,7 +37,9 @@ opération destructrice, protégée par une double sécurité :
 - Une [sauvegarde spéciale](sauvegardes-et-restauration.md), à l'abri de la purge automatique
   pendant 30 jours, est créée juste avant, pour permettre un retour en arrière si besoin.
 
-<!-- SCREENSHOT: boîte de confirmation du reset avec saisie du mot-clé -->
+*(Capture manquante — aucun scénario E2E existant n'ouvre la confirmation du bouton "Reset" via
+l'interface [le reset est déclenché uniquement via l'API dans les tests existants] ; à réaliser
+manuellement, cf `frontend/e2e/README.md` section captures.)*
 
 ## Mode sombre
 

@@ -20,6 +20,8 @@ frontend/e2e/
     rules.scenarios.json     <- domaine "rules" (CRUD de regle sur un service)
     services.scenarios.json  <- domaine "services" (CRUD, recherche, toggle, identite)
   *.spec.js / *.spec.mjs    <- suite Playwright classique, non migree
+  docs-screenshot.js         <- capture docs/screenshots/*.png (no-op sauf DOCS_SCREENSHOTS=1)
+frontend/playwright.docs-screenshots.config.js  <- config dediee, cf "Captures d'ecran" plus bas
 ```
 
 Un scenario JSON decrit une suite d'etapes ordonnees ("esprit Gherkin lisible", sans dependance
@@ -163,6 +165,56 @@ coherence humaine est la garde-fou, pas une CI dediee). En cas de doute sur un d
 ```bash
 grep -rhoE 'data-testid="[^"]*"' frontend/src --include="*.svelte" | sort -u
 ```
+
+## Captures d'écran pour docs/ (sujet 13b)
+
+`docs/` (sujet 13a) contient des marqueurs `<!-- SCREENSHOT: ... -->` remplacés par de vraies
+images générées à partir de la suite E2E existante, pour qu'une capture reste à jour
+automatiquement au lieu de se périmer au premier changement d'UI.
+
+- **`docs-screenshot.js`** exporte `docsScreenshot(page, filename)` : no-op tant que la variable
+  d'environnement `DOCS_SCREENSHOTS` n'est pas positionnée (donc **zéro coût sur la suite E2E
+  standard**, `npm run test:e2e`), sinon écrit `docs/screenshots/<filename>.png`.
+- Dans un scénario JSON (`scenarios/*.scenarios.json`), une étape
+  `{ "action": "screenshot", "file": "nom.png" }` déclenche une capture au point exact du
+  parcours — ajoutée comme n'importe quelle autre étape, entre deux étapes déjà existantes.
+  Ne JAMAIS ajouter une capture en créant un nouveau parcours UI seulement pour l'illustrer
+  (cf CLAUDE.md, "Captures d'écran de documentation") — seuls des points déjà traversés par un
+  scénario existant sont capturés.
+- Dans un fichier `*.spec.js`/`*.spec.mjs` classique, un appel direct
+  `await docsScreenshot(page, 'nom.png');` est inséré entre deux lignes de test déjà existantes
+  (jamais en ajoutant une interaction UI supplémentaire) — voir `backups.spec.js`,
+  `rule-tester.spec.js`, `messaging.spec.js`, `config.spec.mjs`, `rhai-autocomplete.spec.js`.
+- **`playwright.docs-screenshots.config.js`** (racine `frontend/`) est une config Playwright
+  SÉPARÉE de `playwright.config.js` : elle positionne `DOCS_SCREENSHOTS=1` (dans le module de
+  config, donc valable identiquement sous PowerShell/cmd/bash sans syntaxe shell spécifique) et
+  restreint `testMatch` aux seuls fichiers contenant des captures — les autres fichiers de la
+  suite n'ont besoin d'aucune capture et ne sont pas exécutés par cette commande.
+
+### Régénérer les captures
+
+```bash
+npm run docs:screenshots
+```
+
+(depuis `frontend/`, backend lightMock déjà démarré sur `http://localhost:7342` — même prérequis
+que `npm run test:e2e`). Les images sont écrites dans `docs/screenshots/`, sous les noms déjà
+référencés par les `docs/*.md` — regénérer écrase les fichiers existants, aucune étape manuelle
+supplémentaire n'est nécessaire après coup.
+
+Le bouton "Messages Kafka" et les captures qui en dépendent (`messaging-bouton-nav.png`,
+`messaging-journal-statuts.png`, `messaging-formulaire-simulation.png`) ne sont produits que
+contre un binaire compilé avec `--features messaging-kafka` (sinon `messaging.spec.js` est
+`test.skip`, cf CLAUDE.md) — régénérer contre un tel binaire si ces 3 images manquent.
+
+### Captures manquantes (à faire manuellement)
+
+Certains marqueurs `docs/*.md` n'ont aucun scénario E2E existant capable de les produire (état
+très spécifique non couvert par un test actuel) — plutôt que de complexifier la suite de tests
+pour un besoin purement illustratif, ces cas sont documentés dans le `.md` concerné par une note
+`*(Capture manquante — ...)*` expliquant pourquoi, et listés dans CLAUDE.md. Ne pas créer de
+nouveau test E2E dans le seul but de produire une de ces captures sans un besoin de test réel
+sous-jacent.
 
 ## Suite existante vs infrastructure data-driven
 

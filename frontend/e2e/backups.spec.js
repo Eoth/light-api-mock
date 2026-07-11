@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { docsScreenshot } from './docs-screenshot.js';
 
 const API = 'http://localhost:7342/api';
 
@@ -93,10 +94,12 @@ test.describe('Config backups & restore', () => {
 
     const row = page.locator('.backup-card', { hasText: targetFilename });
     await expect(row).toBeVisible();
+    await docsScreenshot(page, 'sauvegardes-liste-restauration.png');
     await row.getByText('Restaurer').click();
 
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
+    await docsScreenshot(page, 'sauvegardes-confirmation-restauration.png');
     await dialog.locator('#confirm-keyword-input').fill('RESTAURER');
     await dialog.getByRole('button', { name: 'Restaurer' }).click();
 

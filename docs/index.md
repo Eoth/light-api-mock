@@ -15,7 +15,7 @@ détaillées au besoin.
 > du dépôt — cette doc-ci ne les duplique pas, elle explique **ce que le produit permet de faire**
 > et **comment s'en servir**.
 
-<!-- SCREENSHOT: écran d'accueil de lightMock avec la liste des services -->
+![Écran d'accueil de lightMock avec la liste des services](screenshots/accueil-liste-services.png)
 
 ## Services & routage
 
