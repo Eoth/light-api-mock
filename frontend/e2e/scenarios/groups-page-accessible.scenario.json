@@ -1,8 +1,0 @@
-{
-  "scenario": "La page Groupes est accessible depuis la nav principale",
-  "steps": [
-    { "action": "goto", "page": "services" },
-    { "action": "click", "target": "app.navGroupsButton" },
-    { "action": "assertVisible", "target": "groupManager.newGroupButton" }
-  ]
-}

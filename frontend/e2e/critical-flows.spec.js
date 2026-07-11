@@ -164,12 +164,14 @@ test.describe('Groups', () => {
   });
 
   // "UI: creation form only asks for a name, code is auto-generated" migre vers
-  // frontend/e2e/scenario-runner.spec.js (scenario JSON group-create-simple-name-only.scenario.json)
+  // frontend/e2e/scenario-runner.spec.js (scenario "Le formulaire de creation de
+  // groupe ne demande qu'un nom..." dans frontend/e2e/scenarios/groups.scenarios.json)
   // -- cf CLAUDE.md §6, sujet 9c lot 4.
 
   // "UI: accented/spaced group name is accepted and still produces a valid URL code" migre vers
-  // frontend/e2e/scenario-runner.spec.js (scenario JSON group-create-accented-name.scenario.json)
-  // -- cf CLAUDE.md §6, sujet 9c lot 4.
+  // frontend/e2e/scenario-runner.spec.js (scenario "Un nom de groupe accentue/espace
+  // est accepte" dans frontend/e2e/scenarios/groups.scenarios.json) -- cf CLAUDE.md §6,
+  // sujet 9c lot 4.
 
   // NB: le backend resout les collisions de code auto-genere en interne
   // (discriminant incremental dans generate_code, cf codegen.rs) sans jamais
@@ -177,8 +179,9 @@ test.describe('Groups', () => {
   // a une collision sur un code saisi manuellement (test API ci-dessus,
   // "group code uniqueness", qui reste le seul chemin ou un 409 est possible).
   // "UI: creating several groups in a row never surfaces a code-collision error" migre vers
-  // frontend/e2e/scenario-runner.spec.js (scenario JSON group-create-several-in-a-row.scenario.json)
-  // -- cf CLAUDE.md §6, sujet 9c lot 4.
+  // frontend/e2e/scenario-runner.spec.js (scenario "Creer plusieurs groupes a la
+  // suite..." dans frontend/e2e/scenarios/groups.scenarios.json) -- cf CLAUDE.md §6,
+  // sujet 9c lot 4.
 });
 
 // Diagnostic (voir CLAUDE.md) : un service n'est identifie sans ambiguite que
@@ -223,12 +226,14 @@ test.describe('Service identity across groups', () => {
   });
 
   // "supprimer un service dans un groupe ne supprime pas le service homonyme d un autre groupe"
-  // migre vers frontend/e2e/scenario-runner.spec.js (scenario JSON
-  // delete-service-does-not-affect-namesake-group.scenario.json) -- cf CLAUDE.md §6, sujet 9c lot 4.
+  // migre vers frontend/e2e/scenario-runner.spec.js (scenario "Supprimer un service
+  // dans un groupe ne supprime pas son homonyme d'un autre groupe" dans
+  // frontend/e2e/scenarios/services.scenarios.json) -- cf CLAUDE.md §6, sujet 9c lot 4.
 
   // "la suppression d un service n affiche pas de fausse erreur ..." migre vers
-  // frontend/e2e/scenario-runner.spec.js (scenario JSON delete-service-no-false-error.scenario.json)
-  // -- cf CLAUDE.md §6, sujet 9c lot 4.
+  // frontend/e2e/scenario-runner.spec.js (scenario "Supprimer un service n'affiche
+  // pas de fausse erreur apres le succes" dans
+  // frontend/e2e/scenarios/services.scenarios.json) -- cf CLAUDE.md §6, sujet 9c lot 4.
 });
 
 test.describe('Import/Export', () => {
@@ -403,13 +408,16 @@ test.describe('UI critical paths', () => {
   });
 
   // "homepage loads with breadcrumb navigation" migre vers frontend/e2e/scenario-runner.spec.js
-  // (scenario JSON homepage-loads.scenario.json) -- cf CLAUDE.md §6, sujet 9c lot 2.
+  // (scenario "La page d'accueil se charge avec le titre lightMock" dans
+  // frontend/e2e/scenarios/home.scenarios.json) -- cf CLAUDE.md §6, sujet 9c lot 2.
 
   // "service list shows created services in group" migre vers frontend/e2e/scenario-runner.spec.js
-  // (scenario JSON service-list-shows-created-service.scenario.json) -- cf CLAUDE.md §6, sujet 9c lot 2.
+  // (scenario "La liste affiche un service cree via l'API dans son groupe" dans
+  // frontend/e2e/scenarios/services.scenarios.json) -- cf CLAUDE.md §6, sujet 9c lot 2.
 
   // "groups page is accessible to all" migre vers frontend/e2e/scenario-runner.spec.js
-  // (scenario JSON groups-page-accessible.scenario.json) -- cf CLAUDE.md §6, sujet 9c lot 2.
+  // (scenario "La page Groupes est accessible depuis la nav principale" dans
+  // frontend/e2e/scenarios/groups.scenarios.json) -- cf CLAUDE.md §6, sujet 9c lot 2.
 });
 
 test.describe('Health endpoint', () => {

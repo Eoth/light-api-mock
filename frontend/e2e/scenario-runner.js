@@ -1,11 +1,14 @@
 // Petit interpreteur JSON pour des scenarios E2E "esprit Gherkin lisible"
 // (une suite d'etapes dans l'ordre), sans dependance BDD lourde (pas de
-// cucumber, pas de parseur Gherkin reel) : juste un objet JSON {scenario,
-// steps[]} rejoue via Playwright. Les selecteurs ne sont JAMAIS en dur dans
-// un scenario : `target` est un nom logique "composant.cle" resolu via
-// selectors.json (SOURCE UNIQUE des selecteurs, cf CLAUDE.md et
-// frontend/e2e/README.md). Voir frontend/e2e/README.md pour le format
-// complet et comment ajouter un nouveau scenario/selecteur.
+// cucumber, pas de parseur Gherkin reel). Les scenarios sont regroupes par
+// domaine fonctionnel dans frontend/e2e/scenarios/*.scenarios.json : un
+// fichier de domaine est {domain, scenarios: [{scenario, steps[]}, ...]}
+// (pas un fichier par scenario individuel, cf CLAUDE.md sujet 9c). Les
+// selecteurs ne sont JAMAIS en dur dans un scenario : `target` est un nom
+// logique "composant.cle" resolu via selectors.json (SOURCE UNIQUE des
+// selecteurs, cf CLAUDE.md et frontend/e2e/README.md). Voir
+// frontend/e2e/README.md pour le format complet et comment ajouter un
+// nouveau scenario/selecteur.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -103,7 +106,20 @@ export async function runScenario(page, scenario) {
   }
 }
 
-export function loadScenario(filename) {
+// Charge un fichier de domaine complet ({domain, scenarios: [...]}).
+export function loadDomain(filename) {
   const p = path.join(__dirname, 'scenarios', filename);
   return JSON.parse(fs.readFileSync(p, 'utf8'));
+}
+
+// Charge UN scenario nomme depuis un fichier de domaine. Erreur explicite
+// si le nom ne correspond a aucun scenario du fichier -- erreur d'auteur de
+// test, pas un echec a masquer.
+export function loadScenario(filename, scenarioName) {
+  const domain = loadDomain(filename);
+  const found = domain.scenarios.find((s) => s.scenario === scenarioName);
+  if (!found) {
+    throw new Error(`"${filename}" (domaine "${domain.domain}") ne contient aucun scenario nomme "${scenarioName}"`);
+  }
+  return found;
 }

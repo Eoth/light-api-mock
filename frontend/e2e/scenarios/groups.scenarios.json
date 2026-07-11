@@ -1,0 +1,77 @@
+{
+  "domain": "groups",
+  "scenarios": [
+    {
+      "scenario": "La page Groupes est accessible depuis la nav principale",
+      "steps": [
+        { "action": "goto", "page": "services" },
+        { "action": "click", "target": "app.navGroupsButton" },
+        { "action": "assertVisible", "target": "groupManager.newGroupButton" }
+      ]
+    },
+    {
+      "scenario": "Le formulaire de creation de groupe ne demande qu'un nom, le code est auto-genere",
+      "steps": [
+        { "action": "goto", "page": "services" },
+        { "action": "click", "target": "app.navGroupsButton" },
+        { "action": "click", "target": "groupManager.newGroupButton" },
+        { "action": "assertVisible", "target": "groupManager.nameInput" },
+        { "action": "fill", "target": "groupManager.nameInput", "value": "ui-simple-group" },
+        { "action": "click", "target": "groupManager.createSubmitButton" },
+        { "action": "assertVisible", "target": "groupManager.card", "params": { "name": "ui-simple-group" } }
+      ]
+    },
+    {
+      "scenario": "Un nom de groupe accentue/espace est accepte",
+      "steps": [
+        { "action": "goto", "page": "services" },
+        { "action": "click", "target": "app.navGroupsButton" },
+        { "action": "click", "target": "groupManager.newGroupButton" },
+        { "action": "fill", "target": "groupManager.nameInput", "value": "Équipe Café Paris" },
+        { "action": "click", "target": "groupManager.createSubmitButton" },
+        { "action": "assertVisible", "target": "groupManager.card", "params": { "name": "Équipe Café Paris" } }
+      ]
+    },
+    {
+      "scenario": "Creer plusieurs groupes a la suite ne bloque jamais sur une collision de code",
+      "steps": [
+        { "action": "goto", "page": "services" },
+        { "action": "click", "target": "app.navGroupsButton" },
+        { "action": "click", "target": "groupManager.newGroupButton" },
+        { "action": "fill", "target": "groupManager.nameInput", "value": "collision-a" },
+        { "action": "click", "target": "groupManager.createSubmitButton" },
+        { "action": "assertVisible", "target": "groupManager.card", "params": { "name": "collision-a" } },
+        { "action": "click", "target": "groupManager.newGroupButton" },
+        { "action": "fill", "target": "groupManager.nameInput", "value": "collision-b" },
+        { "action": "click", "target": "groupManager.createSubmitButton" },
+        { "action": "assertVisible", "target": "groupManager.card", "params": { "name": "collision-b" } },
+        { "action": "click", "target": "groupManager.newGroupButton" },
+        { "action": "fill", "target": "groupManager.nameInput", "value": "collision-c" },
+        { "action": "click", "target": "groupManager.createSubmitButton" },
+        { "action": "assertVisible", "target": "groupManager.card", "params": { "name": "collision-c" } }
+      ]
+    },
+    {
+      "scenario": "Un groupe deplie reste visible apres retour depuis l'edition d'un service",
+      "steps": [
+        { "action": "goto", "page": "services" },
+        { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "persist-grp" } },
+        { "action": "assertVisible", "target": "serviceCard.card", "params": { "name": "persist-svc" } },
+        { "action": "click", "target": "serviceCard.configureButton", "params": { "name": "persist-svc" } },
+        { "action": "assertVisible", "target": "serviceDetail.editButton" },
+        { "action": "click", "target": "serviceDetail.backButton" },
+        { "action": "assertVisible", "target": "serviceCard.card", "params": { "name": "persist-svc" } }
+      ]
+    },
+    {
+      "scenario": "Un rechargement complet de la page reinitialise l'etat deplie d'un groupe",
+      "steps": [
+        { "action": "goto", "page": "services" },
+        { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "reload-grp" } },
+        { "action": "assertVisible", "target": "serviceCard.card", "params": { "name": "reload-svc" } },
+        { "action": "goto", "page": "services" },
+        { "action": "assertHidden", "target": "serviceCard.card", "params": { "name": "reload-svc" } }
+      ]
+    }
+  ]
+}

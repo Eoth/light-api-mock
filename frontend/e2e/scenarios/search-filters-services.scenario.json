@@ -1,8 +1,0 @@
-{
-  "scenario": "La recherche filtre les services et affiche un message si aucun resultat",
-  "steps": [
-    { "action": "goto", "page": "services" },
-    { "action": "fill", "target": "serviceList.searchInput", "value": "xyz-unique" },
-    { "action": "assertVisible", "target": "serviceList.noResultsMessage" }
-  ]
-}
