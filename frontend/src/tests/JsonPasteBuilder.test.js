@@ -20,7 +20,7 @@ describe('JsonPasteBuilder (exampleJsonToFields via tpl-utils.js)', () => {
     expect(onUpdate).toHaveBeenCalled();
   });
 
-  it('supporte un tableau racine (deja documente dans CLAUDE.md)', async () => {
+  it('supporte un tableau racine', async () => {
     const onUpdate = vi.fn();
     const { getByLabelText, getByText } = render(JsonPasteBuilder, { props: { onUpdate } });
 

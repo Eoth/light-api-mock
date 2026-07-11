@@ -16,8 +16,7 @@ pub struct AuthConfig {
     /// cache tant qu'il n'est pas explicitement active. Ce n'est PAS une
     /// mesure de securite — reset_config() reste protege server-side par
     /// require_super_admin(), qui n'apporte aucune protection reelle quand
-    /// AUTH_ENABLED=false puisque anonymous() a is_super_admin=true. Voir
-    /// CLAUDE.md pour la limite honnete de ce garde-fou.
+    /// AUTH_ENABLED=false puisque anonymous() a is_super_admin=true.
     pub show_reset_button: bool,
 }
 

@@ -54,15 +54,15 @@ url = "2"
 
 # Client Kafka (consumer + producer). Optionnel : compile UNIQUEMENT quand la
 # feature "messaging-kafka" est active (dep:rdkafka ci-dessous). "cmake-build"
-# compile librdkafka (C) depuis les sources via cmake — voir CLAUDE.md section
-# "Support MOM/Messaging" pour les prerequis de build (cmake + toolchain C).
+# compile librdkafka (C) depuis les sources via cmake — voir la section
+# "Messaging Kafka" de README.md pour les prerequis de build (cmake + toolchain C).
 rdkafka = { version = "0.36", features = ["cmake-build"], optional = true }
 
 [features]
 # Support Kafka fonctionnel (consumer + publisher + journal des messages) :
 # NON active par defaut, zero impact sur le binaire/tests tant que non
-# activee (dep:rdkafka n'est meme pas telechargee/compilee). Voir CLAUDE.md
-# section "Support MOM/Messaging".
+# activee (dep:rdkafka n'est meme pas telechargee/compilee). Voir la section
+# "Messaging Kafka" de README.md.
 messaging-kafka = ["dep:rdkafka"]
 
 [profile.release]

@@ -32,7 +32,7 @@ pub fn max_body_size() -> usize {
 /// detail ne cree AUCUNE nouvelle capture de trafic — on ne fait que
 /// conserver ce qui est deja en memoire a cet instant. Reste `None` pour le
 /// proxy niveau service (`is_mocked=false`) : ce chemin est volontairement
-/// streame sans buffering (cf CLAUDE.md, "Proxy streaming"), et le construire
+/// streame sans buffering ("Proxy streaming"), et le construire
 /// la introduirait un `to_bytes()` qui n'existe pas aujourd'hui.
 #[derive(Debug, Clone, Serialize)]
 pub struct CapturedRequest {

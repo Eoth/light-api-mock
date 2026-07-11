@@ -1,13 +1,13 @@
 // Tests E2E migres vers l'infrastructure data-driven (selectors.json +
-// scenario-runner.js, cf frontend/e2e/README.md et CLAUDE.md §5 points
-// 53-55). Chaque test ici REMPLACE un test equivalent qui existait
-// auparavant dans un fichier *.spec.js/*.spec.mjs classique (migration
-// sujet 9c -- voir CLAUDE.md §6 pour la liste complete et la progression).
+// scenario-runner.js, cf frontend/e2e/README.md). Chaque test ici REMPLACE
+// un test equivalent qui existait auparavant dans un fichier
+// *.spec.js/*.spec.mjs classique (migration sujet 9c, voir le detail par
+// lot ci-dessous).
 //
 // Les scenarios eux-memes sont regroupes par domaine fonctionnel dans
 // frontend/e2e/scenarios/{home,groups,rules,services}.scenarios.json
 // (un fichier par domaine, un tableau de scenarios par fichier -- pas un
-// fichier par scenario individuel, cf CLAUDE.md sujet 9c "regroupement par
+// fichier par scenario individuel, sujet 9c "regroupement par
 // domaine"). `loadScenario(domainFile, scenarioName)` en extrait un seul.
 //
 // Lot 1 :
@@ -35,8 +35,8 @@
 //   - "UI accessible apres creation d un service (scenario JSON)" <- ex security.spec.js "UI remains accessible after creating a valid service"
 //
 // Lot 4 (critical-flows.spec.js Groups/Service identity + insee.spec.mjs +
-// write-behind.spec.js, partiel -- cf CLAUDE.md §3 pour la clarification de
-// perimetre UI-only qui a guide ce choix) :
+// write-behind.spec.js, partiel -- seuls les parcours qui pilotent
+// reellement l'UI sont candidats, cf frontend/e2e/README.md) :
 //   - "groupe: formulaire ne demande que le nom"            <- ex critical-flows.spec.js "UI: creation form only asks for a name, code is auto-generated"
 //   - "groupe: nom accentue accepte"                        <- ex critical-flows.spec.js "UI: accented/spaced group name is accepted and still produces a valid URL code"
 //   - "groupe: creer plusieurs groupes a la suite"           <- ex critical-flows.spec.js "UI: creating several groups in a row never surfaces a code-collision error"
@@ -133,9 +133,9 @@ test.describe('Runner data-driven (scenarios JSON) - lot 2', () => {
 
   // Les 2 tests "groupe deplie ..." ci-dessous remplacent l'integralite de
   // l'ancien frontend/e2e/group-expansion-persistence.spec.js (supprime,
-  // ses 2 tests sont entierement migres ici -- cf CLAUDE.md §6). Contexte
+  // ses 2 tests sont entierement migres ici). Contexte
   // produit conserve de ce fichier : ils verifient le niveau 1 de
-  // persistance de l'etat "groupe deplie/replie" (cf CLAUDE.md,
+  // persistance de l'etat "groupe deplie/replie" (voir
   // group-expansion-state.svelte.js) -- l'etat doit survivre a une
   // navigation vers l'edition d'un service et retour (store partage hors
   // du cycle de vie de ServiceList.svelte), mais PAS a un rechargement
@@ -283,8 +283,8 @@ test.describe('Runner data-driven (scenarios JSON) - lot 4', () => {
     await runScenario(page, loadScenario('services.scenarios.json', "Basculer le mode mock/proxy d'un service via l'UI"));
 
     // Assertion filesystem hors runner (pas une interaction UI, cf
-    // README.md) : l'ecriture disque est asynchrone (write-behind, cf
-    // CLAUDE.md), on attend que le contenu apparaisse reellement.
+    // README.md) : l'ecriture disque est asynchrone (write-behind), on
+    // attend que le contenu apparaisse reellement.
     await expect(async () => {
       const yaml = readConfigFromDisk();
       expect(yaml).toContain('name: write-behind-svc');
@@ -294,8 +294,8 @@ test.describe('Runner data-driven (scenarios JSON) - lot 4', () => {
 });
 
 // Lot 5 : couverture E2E neuve (pas une migration) pour le detecteur de
-// conflit entre regles a la sauvegarde (POST /api/rule-conflicts, cf
-// CLAUDE.md). "conflict-rule-one" (GET, sans sous-chemin, sans condition —
+// conflit entre regles a la sauvegarde (POST /api/rule-conflicts).
+// "conflict-rule-one" (GET, sans sous-chemin, sans condition —
 // la regle la plus generale possible) sert de base : toute autre regle GET
 // sans sous-chemin ni condition creee ensuite sur ce meme service la
 // chevauche trivialement (ensembles de conditions vides identiques,

@@ -3,9 +3,9 @@ import { describe, it, expect } from 'vitest';
 import RhaiScriptEditorHarness from './helpers/RhaiScriptEditorHarness.svelte';
 
 // Simule une frappe qui ajoute du texte a la fin (cursor place en fin de
-// valeur, comme une vraie frappe clavier) — cf CLAUDE.md : fireEvent.input
-// ne met pas a jour $state en Svelte 5, on doit setter .value puis
-// declencher l'evenement natif nous-memes.
+// valeur, comme une vraie frappe clavier) : fireEvent.input ne met pas a
+// jour $state en Svelte 5, on doit setter .value puis declencher
+// l'evenement natif nous-memes.
 async function typeAtEnd(el, text) {
   el.value = text;
   el.selectionStart = el.selectionEnd = text.length;

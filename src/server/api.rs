@@ -1082,7 +1082,7 @@ async fn validate_script(
 // service aujourd'hui, on ne cree pas ici une incoherence de modele de
 // securite pour ce seul endpoint. Pas de variante flat/groupee non plus :
 // aucun service n'est charge depuis le store, donc pas d'identite de service
-// a desambiguiser (cf service_matches, points 40-41 CLAUDE.md).
+// a desambiguiser (cf service_matches).
 
 #[derive(serde::Deserialize)]
 struct RuleTestCapturedRequest {
@@ -1165,13 +1165,13 @@ async fn test_rule(
 // du service dans leur ordre actuel, et la position ou le brouillon se
 // retrouvera une fois sauvegarde. Le handler ne fait que deserialiser,
 // deleguer a MatchEngine::find_rule_conflicts, serialiser le resultat —
-// aucune mutation, purement informatif (cf CLAUDE.md pour le detail de
-// l'algorithme et ses limites assumees).
+// aucune mutation, purement informatif (voir MatchEngine::find_rule_conflicts
+// pour le detail de l'algorithme et ses limites assumees).
 //
 // Garde d'auth : utilisateur authentifie requis, MEME garde que /rule-test
 // et /logs — pas de can_access_service supplementaire, cette route ne
 // charge aucun service depuis le store donc pas d'identite de service a
-// desambiguiser (cf service_matches, points 40-41 CLAUDE.md).
+// desambiguiser (cf service_matches).
 
 #[derive(serde::Deserialize)]
 struct RuleConflictDraftRequest {
@@ -1307,7 +1307,7 @@ mod tests {
     use super::*;
 
     // require_super_admin() est le seul garde-fou reel derriere reset_config
-    // ET restore_backup (cf CLAUDE.md) : verifie directement ici plutot que
+    // ET restore_backup : verifie directement ici plutot que
     // via un test HTTP bout-en-bout (pas d'infra de test router dans ce
     // fichier a ce jour).
     #[test]

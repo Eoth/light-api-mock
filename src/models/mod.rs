@@ -52,8 +52,8 @@ pub struct Service {
 // reellement separees. Resultats exposes independamment en template :
 // {{pre_script}}/{{pre_script.champ}}, {{post_script}}/{{post_script.champ}},
 // en plus de {{script}}/{{script.champ}} (inchange). Comme `script`, ces deux
-// champs n'ont PAS de #[serde(default)] (coherent avec le point 16 de
-// CLAUDE.md — pas de retrocompat serde) : tout YAML doit desormais fournir
+// champs n'ont PAS de #[serde(default)] (choix assume : pas de retrocompat
+// serde sur les champs obligatoires) : tout YAML doit desormais fournir
 // ces deux cles (a `~`/null si non utilisees). Les YAML existants doivent
 // etre re-sauvegardes via l'UI (qui reecrit toujours la config complete).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

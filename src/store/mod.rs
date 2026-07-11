@@ -12,13 +12,13 @@
 // par la mutation elle-meme), PAS une tache de fond/cron — coherent avec le
 // choix fait pour le ping (src/server/ping.rs). Rotation immediate apres
 // coup pour ne garder que BACKUP_MAX_COUNT fichiers (defaut 5), necessaire
-// vu la contrainte PVC 64Mi en K8s (cf CLAUDE.md).
+// vu la contrainte PVC 64Mi en K8s.
 //
 // IMPORTANT (write-behind) : le backup reste SYNCHRONE et s'execute AVANT la
 // mise en queue de l'ecriture asynchrone (voir prepare_and_backup(), appelee
 // sous le verrou d'ecriture avant tout appel a WriterHandle::send_write()).
 // Une mutation ne passe donc jamais sans sauvegarde prealable — casser cet
-// ordre viderait le mecanisme de rollback (cf CLAUDE.md) de son utilite.
+// ordre viderait le mecanisme de rollback de son utilite.
 //
 // Backup pre-reset protege : avant un reset complet (DELETE /api/config/reset),
 // backup_before_reset() copie la config courante dans backups/protected/. Ce
@@ -45,7 +45,7 @@ const PROTECTED_BACKUP_MAX_AGE_MS: u128 = 30 * 24 * 60 * 60 * 1000;
 // volontairement : le but de cette evolution est de ne plus bloquer le
 // thread de requete sur l'I/O disque, PAS d'autoriser une file d'attente
 // illimitee qui grossirait sans controle en cas de pic d'ecritures (sobriete
-// ressources, cf CLAUDE.md). Chaque mutation flush individuellement (pas de
+// ressources). Chaque mutation flush individuellement (pas de
 // vrai batching, voir WriteJob et le commentaire sur run()) : avec ce
 // pattern, une capacite de 64 absorbe largement les pics realistes. Au-dela,
 // send_write().await applique un backpressure naturel (le call site attend
@@ -74,7 +74,7 @@ struct WriterStats {
 
 /// Derniere erreur d'ecriture disque rencontree par la tache de fond.
 /// Expose via GET /api/health pour la detection d'un backlog/probleme
-/// disque en observabilite K8s (cf CLAUDE.md).
+/// disque en observabilite K8s.
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct WriterError {
     pub message: String,
@@ -1005,8 +1005,8 @@ mod tests {
         // backup_rotation_keeps_max_n, protected_backup_exempt_from_normal_rotation,
         // backup_max_count_from_env) peut plafonner le nombre de backups a une
         // valeur trop basse pendant la fenetre du test, rendant la comparaison
-        // avant/apres fausse de facon intermittente (voir CLAUDE.md, pitfall
-        // "Tests Rust qui mutent un env var process-wide").
+        // avant/apres fausse de facon intermittente (meme pitfall que tout
+        // test Rust qui mute un env var process-wide sans serialisation).
         let _guard = ENV_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
         unsafe { std::env::remove_var("BACKUP_MAX_COUNT") };
         let dir = temp_dir();

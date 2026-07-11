@@ -273,8 +273,7 @@ impl MatchEngine {
     /// satisfaire les DEUX a la fois (meme method, sub_path compatible,
     /// conditions qui se recoupent) — auquel cas seule la premiere dans
     /// l'ordre du tableau `rules` s'applique reellement (`first_match`
-    /// itere dans l'ordre et s'arrete au premier match, cf tete de fichier
-    /// et CLAUDE.md).
+    /// itere dans l'ordre et s'arrete au premier match, cf tete de fichier).
     ///
     /// `other_rules` est la liste des AUTRES regles du service dans leur
     /// ordre ACTUEL (celle en cours d'edition exclue par l'appelant).
@@ -288,7 +287,7 @@ impl MatchEngine {
     /// est evaluee avant lui), et vice-versa.
     ///
     /// **Detection PRAGMATIQUE, pas exhaustive** (limite assumee et
-    /// documentee, cf CLAUDE.md) :
+    /// documentee) :
     /// - `method` : doit etre strictement egale (case-insensitive) — deux
     ///   regles sur des methodes differentes ne peuvent jamais matcher la
     ///   meme requete, donc jamais de conflit entre elles.
@@ -307,8 +306,8 @@ impl MatchEngine {
     ///   evidents — ensembles `all_of`/`any_of` strictement identiques, OU
     ///   l'ensemble `all_of` d'une regle est un sous-ensemble STRICT de
     ///   l'autre ET les deux `any_of` sont vides (le cas "regle generale +
-    ///   regle plus specifique en fallback" explicitement legitime, cf
-    ///   CLAUDE.md). Toute combinaison impliquant un `any_of` non-vide et
+    ///   regle plus specifique en fallback" explicitement legitime).
+    ///   Toute combinaison impliquant un `any_of` non-vide et
     ///   non strictement identique aux deux n'est PAS analysee (la
     ///   semantique OR rend la detection de sous-ensemble non triviale sans
     ///   sur-ingenierie) — aucun conflit remonte dans ce cas : faux negatif

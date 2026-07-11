@@ -46,8 +46,8 @@
   );
 
   // Force le groupe cible a deplie au moment de quitter la liste vers
-  // l'edition/le clonage : garantit que le contexte reste visible au retour
-  // (cf CLAUDE.md), meme si le groupe n'etait visible que via l'expansion
+  // l'edition/le clonage : garantit que le contexte reste visible au retour,
+  // meme si le groupe n'etait visible que via l'expansion
   // ephemere de la recherche (jamais ecrite dans le store partage).
   function handleSelect(name, groupName) {
     setGroupExpanded(groupName || '__ungrouped__', true);

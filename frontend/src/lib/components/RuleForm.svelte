@@ -20,7 +20,7 @@
     // d'edition inchange, ou service.rules.length pour un ajout — toujours
     // en fin de liste, cf ServiceDetail.svelte::handleSaveRule). Sert
     // uniquement au detecteur de conflit pour determiner laquelle des deux
-    // regles en cause s'appliquerait reellement (cf CLAUDE.md). Par defaut
+    // regles en cause s'appliquerait reellement. Par defaut
     // (composant utilise sans ce contexte, ex. tests unitaires isoles) on
     // suppose un ajout en fin de liste.
     draftPosition = null,
@@ -34,7 +34,7 @@
   // Source unique : existingRuleNames (utilisee pour l'unicite du nom) est
   // toujours derivee de existingRules (utilisee aussi pour la detection de
   // conflit), jamais une prop separee — evite deux listes qui pourraient
-  // diverger (cf CLAUDE.md, meme principe que tpl-utils.js).
+  // diverger (meme principe que tpl-utils.js).
   let existingRuleNames = $derived(existingRules.map((r) => r.name));
   let effectiveDraftPosition = $derived(draftPosition ?? existingRules.length);
 
@@ -93,7 +93,7 @@
   let anyOf = $state(init?.conditions?.any_of ?? []);
   let addingConditionTo = $state(null);
 
-  // Assistance de saisie path/query param (voir CLAUDE.md) : liste fermee des
+  // Assistance de saisie path/query param : liste fermee des
   // path params reellement presents (service + regle en cours d'edition) et
   // suggestions de query params vus dans le trafic reel du service — les deux
   // derivent d'un seul chargement des logs (pas de nouvel appel reseau par
@@ -189,7 +189,7 @@
     { value: 'IbanFR', label: 'IBAN francais' },
   ];
 
-  // Detecteur de conflit (a la sauvegarde uniquement, cf CLAUDE.md) : quand
+  // Detecteur de conflit (a la sauvegarde uniquement) : quand
   // le brouillon chevauche une autre regle du service, un avertissement
   // NON BLOQUANT s'affiche avec deux issues possibles — "Enregistrer quand
   // meme" (sauvegarde immediatement) ou "Modifier la regle" (referme
@@ -274,7 +274,7 @@
     } catch {
       // Fail-open : une detection de conflit indisponible ne doit jamais
       // empecher la sauvegarde reelle de la regle (fonctionnalite purement
-      // informative, cf CLAUDE.md).
+      // informative).
       onSave(builtRule);
     } finally {
       checkingConflicts = false;

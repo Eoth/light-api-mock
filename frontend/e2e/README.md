@@ -3,9 +3,9 @@
 Cette page documente l'infrastructure ajoutee au sujet 9b (JSON de selecteurs + runner de
 scenarios) et son format de regroupement par domaine (sujet 9c). Elle vit **a cote** de la
 suite Playwright classique (fichiers `*.spec.js`/`*.spec.mjs` de ce dossier) sans la remplacer
-entierement — seuls les parcours qui pilotent reellement l'UI sont candidats a la migration
-(cf CLAUDE.md, "Migration progressive", pour l'etat exact et les tests API-only volontairement
-non-candidats).
+entierement — seuls les parcours qui pilotent reellement l'UI sont candidats a la migration (voir
+la section "Suite existante vs infrastructure data-driven" plus bas pour le detail des tests
+API-only volontairement non-candidats).
 
 ## Vue d'ensemble
 
@@ -97,8 +97,8 @@ fichier `*.spec.js` d'origine) :
   inter-groupes.
 
 Si aucun domaine existant ne convient a un nouveau lot de migration (sujet 9c, lots futurs),
-c'est une decision explicite a documenter dans CLAUDE.md — ne pas trancher silencieusement en
-ajoutant un 5e fichier sans mettre a jour cette liste.
+c'est une decision explicite a documenter en ajoutant une entree a la liste ci-dessus — ne pas
+trancher silencieusement en ajoutant un 5e fichier sans mettre a jour cette liste.
 
 Ajouter l'entree `{scenario, steps}` dans le tableau `scenarios` du fichier de domaine choisi,
 avec un nom de scenario (`scenario`) unique DANS ce fichier — `loadScenario(filename,
@@ -137,11 +137,10 @@ convient pas deja tel quel.
 `[data-testid="..."]`. **Non concerne par le regroupement par domaine ci-dessus** — un seul
 fichier `selectors.json`, quel que soit le nombre de fichiers de domaine.
 
-1. Verifier que le `data-testid` existe deja sur le composant (cf sujet 9a, convention
-   documentee dans `CLAUDE.md` §3/§5 point 52 : `{composant-kebab}-{role-element}[-{discriminant}]`).
-   S'il n'existe pas encore, l'ajouter au composant Svelte d'abord (en suivant la meme
-   convention), PUIS l'enregistrer ici — ne jamais inventer un selecteur qui ne correspond a
-   rien dans le DOM.
+1. Verifier que le `data-testid` existe deja sur le composant (convention :
+   `{composant-kebab}-{role-element}[-{discriminant}]`). S'il n'existe pas encore, l'ajouter au
+   composant Svelte d'abord (en suivant la meme convention), PUIS l'enregistrer ici — ne jamais
+   inventer un selecteur qui ne correspond a rien dans le DOM.
 2. Ajouter l'entree dans le bon groupe de `selectors.json`, avec une cle logique en camelCase
    (ex. `nameInput`, `submitButton`, `deleteButton`).
 3. Pour un element repete (discriminant dans le `data-testid`), utiliser un placeholder
@@ -178,9 +177,8 @@ automatiquement au lieu de se périmer au premier changement d'UI.
 - Dans un scénario JSON (`scenarios/*.scenarios.json`), une étape
   `{ "action": "screenshot", "file": "nom.png" }` déclenche une capture au point exact du
   parcours — ajoutée comme n'importe quelle autre étape, entre deux étapes déjà existantes.
-  Ne JAMAIS ajouter une capture en créant un nouveau parcours UI seulement pour l'illustrer
-  (cf CLAUDE.md, "Captures d'écran de documentation") — seuls des points déjà traversés par un
-  scénario existant sont capturés.
+  Ne JAMAIS ajouter une capture en créant un nouveau parcours UI seulement pour l'illustrer —
+  seuls des points déjà traversés par un scénario existant sont capturés.
 - Dans un fichier `*.spec.js`/`*.spec.mjs` classique, un appel direct
   `await docsScreenshot(page, 'nom.png');` est inséré entre deux lignes de test déjà existantes
   (jamais en ajoutant une interaction UI supplémentaire) — voir `backups.spec.js`,
@@ -205,16 +203,15 @@ supplémentaire n'est nécessaire après coup.
 Le bouton "Messages Kafka" et les captures qui en dépendent (`messaging-bouton-nav.png`,
 `messaging-journal-statuts.png`, `messaging-formulaire-simulation.png`) ne sont produits que
 contre un binaire compilé avec `--features messaging-kafka` (sinon `messaging.spec.js` est
-`test.skip`, cf CLAUDE.md) — régénérer contre un tel binaire si ces 3 images manquent.
+`test.skip`) — régénérer contre un tel binaire si ces 3 images manquent.
 
 ### Captures manquantes (à faire manuellement)
 
 Certains marqueurs `docs/*.md` n'ont aucun scénario E2E existant capable de les produire (état
 très spécifique non couvert par un test actuel) — plutôt que de complexifier la suite de tests
 pour un besoin purement illustratif, ces cas sont documentés dans le `.md` concerné par une note
-`*(Capture manquante — ...)*` expliquant pourquoi, et listés dans CLAUDE.md. Ne pas créer de
-nouveau test E2E dans le seul but de produire une de ces captures sans un besoin de test réel
-sous-jacent.
+`*(Capture manquante — ...)*` expliquant pourquoi. Ne pas créer de nouveau test E2E dans le seul
+but de produire une de ces captures sans un besoin de test réel sous-jacent.
 
 ## Suite existante vs infrastructure data-driven
 
@@ -223,5 +220,4 @@ De nombreux tests Playwright restent des fichiers `*.spec.js`/`*.spec.mjs` class
 uniquement `request.get/post/put/delete` avec assertions sur le code HTTP/JSON) : migrer un
 test API-only vers `scenario-runner.js` produirait un scenario JSON vide de sens (l'outil ne
 fait QUE des interactions UI) et casserait la coherence du format — ce ne sont pas des
-candidats de migration, decision assumee (cf CLAUDE.md, "Migration progressive", pour le detail
-et la liste des tests restants).
+candidats de migration, decision assumee.

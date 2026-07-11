@@ -2,9 +2,9 @@
 // les reponses publiees sur reply_topic) — meme principe que RequestLog
 // (src/server/request_log.rs, FIFO en memoire), adapte au domaine messaging.
 //
-// DOUBLE BORNE (voir CLAUDE.md, exigence #9 du sujet messaging) : nombre
-// d'entrees (MAX_ENTRIES, comme les 200 de RequestLog) ET age (TTL, defaut
-// 24h via MESSAGE_LOG_TTL_MS). Une seule des deux bornes ne suffit pas : un
+// DOUBLE BORNE : nombre d'entrees (MAX_ENTRIES, comme les 200 de RequestLog)
+// ET age (TTL, defaut 24h via MESSAGE_LOG_TTL_MS). Une seule des deux bornes
+// ne suffit pas : un
 // flux Kafka peut produire des messages plus vite que le TTL ne les expire
 // (la seule age ne bornerait pas la memoire dans ce cas), et inversement un
 // flux tres calme laisserait un vieux message dormir des jours sans purge de
@@ -14,7 +14,7 @@
 //
 // Purge opportuniste a l'ecriture (event-driven), jamais de tache de fond —
 // meme pattern que purge_expired_protected_backups (src/store/mod.rs) et
-// coherent avec le reste du projet (CLAUDE.md #22 : pas de polling/cron).
+// coherent avec le reste du projet (pas de polling/cron).
 //
 // Troncature du corps : au-dela de MESSAGE_LOG_MAX_BODY_SIZE (defaut 16Ko,
 // configurable), le corps stocke est tronque, mais les metadonnees (topic,

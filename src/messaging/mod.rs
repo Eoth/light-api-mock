@@ -2,7 +2,7 @@
 // par defaut : ce module ne compile meme pas sans la feature, donc zero
 // impact sur le binaire/tests par defaut). `KafkaConfig` + parsing env restent
 // ici ; le consumer/publisher et le journal des messages sont dans des
-// sous-modules dedies. Voir CLAUDE.md section "Support MOM / Messaging" pour
+// sous-modules dedies. Voir la section "Messaging Kafka" de README.md pour
 // le design complet (adaptation du matcher, choix TTL/troncature, JMS non
 // supporte, SMTP phase 2).
 pub mod consumer;
@@ -70,9 +70,9 @@ mod tests {
     // Process-wide env vars (KAFKA_*) mutees par ces tests : cargo test lance
     // les fns de test en parallele (threads OS), donc sans serialisation deux
     // tests qui touchent les memes variables peuvent se marcher dessus de
-    // facon intermittente (meme pitfall documente dans CLAUDE.md pour
-    // BACKUP_MAX_COUNT/DATA_PATH/SHOW_RESET_BUTTON, cf src/store/mod.rs et
-    // src/auth/mod.rs). Chaque test tenant cette variable pour tout son corps.
+    // facon intermittente (meme pitfall que BACKUP_MAX_COUNT/DATA_PATH/
+    // SHOW_RESET_BUTTON, cf src/store/mod.rs et src/auth/mod.rs). Chaque
+    // test tient cette variable pour tout son corps.
     static ENV_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
     fn clear_env() {

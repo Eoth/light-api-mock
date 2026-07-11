@@ -6,7 +6,7 @@ const API = 'http://localhost:7342/api';
 
 // Le store persiste desormais en write-behind : la mutation en memoire est
 // instantanee, l'ecriture sur mock-config.yaml est deleguee a une tache de
-// fond (cf CLAUDE.md, src/store/mod.rs). Ce fichier verifie ce mecanisme de
+// fond (voir src/store/mod.rs). Ce fichier verifie ce mecanisme de
 // bout en bout via une VRAIE interaction UI, en relisant directement le
 // fichier YAML sur disque plutot que l'API /api/services (qui ne lit que le
 // snapshot en memoire et ne prouverait donc rien sur la persistance reelle).
@@ -46,8 +46,7 @@ test.describe('Write-behind: persistence after a simulated store restart', () =>
 
   // "a service mutation made through the UI survives a re-read of the on-disk config" migre vers
   // frontend/e2e/scenario-runner.spec.js (scenario "Basculer le mode mock/proxy d'un
-  // service via l'UI" dans frontend/e2e/scenarios/services.scenarios.json) -- cf
-  // CLAUDE.md §6, sujet 9c lot 4.
+  // service via l'UI" dans frontend/e2e/scenarios/services.scenarios.json) -- sujet 9c lot 4.
 
   test('a service deleted through the API disappears from the on-disk config once persisted', async ({ request }) => {
     await request.post(`${API}/services`, { data: validService('write-behind-delete-svc') });

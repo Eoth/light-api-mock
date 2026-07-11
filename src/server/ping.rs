@@ -1,7 +1,7 @@
 // Cache du statut de disponibilite de la cible reelle (real_target_url) d'un
 // service. Le statut lui-meme (PingStatus) est produit par ProxyClient::ping()
-// (src/engine/proxy.rs) et n'est jamais persiste dans Service/YAML (cf
-// CLAUDE.md #16 : pas de retrocompat serde sur les champs obligatoires) — c'est
+// (src/engine/proxy.rs) et n'est jamais persiste dans Service/YAML (choix
+// assume : pas de retrocompat serde sur les champs obligatoires) — c'est
 // un etat transitoire en memoire, tenu par nom de service.
 //
 // Decision : test a la demande (bouton UI -> POST /api/services/:name/ping) +

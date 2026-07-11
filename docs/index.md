@@ -11,9 +11,9 @@ cette liste une première fois pour savoir ce qui existe, puis revenez piocher l
 détaillées au besoin.
 
 > Cette documentation est destinée aux utilisateurs et testeurs du produit (métier, QA). Pour les
-> détails techniques d'installation ou d'architecture, voir `README.md` et `CLAUDE.md` à la racine
-> du dépôt — cette doc-ci ne les duplique pas, elle explique **ce que le produit permet de faire**
-> et **comment s'en servir**.
+> détails techniques d'installation ou d'architecture, voir `README.md` à la racine du dépôt —
+> cette doc-ci ne le duplique pas, elle explique **ce que le produit permet de faire** et
+> **comment s'en servir**.
 
 ![Écran d'accueil de lightMock avec la liste des services](screenshots/accueil-liste-services.png)
 

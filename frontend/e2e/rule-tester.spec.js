@@ -5,7 +5,7 @@ const API = 'http://localhost:7342/api';
 const BASE = 'http://localhost:7342';
 
 // Verifie de bout en bout le testeur de regle (rejeu en lecture seule contre
-// un log reel) et l'assistance de saisie path/query param (cf CLAUDE.md) :
+// un log reel) et l'assistance de saisie path/query param :
 // - une condition mal choisie (query param au lieu de path param) testee
 //   contre une vraie requete du log affiche un detail explicite (pas juste
 //   "ca ne matche pas") ;
@@ -60,7 +60,7 @@ test.describe('Testeur de regle : condition mal choisie contre une vraie requete
     });
 
     // Requete reelle capturee (aucune regle encore definie -> "no-rule", mais
-    // le detail de la requete est quand meme retenu, cf CLAUDE.md).
+    // le detail de la requete est quand meme retenu).
     const captured = await request.get(`${BASE}/tester-svc/42/details`);
     expect(captured.status()).toBe(404);
 
@@ -150,8 +150,8 @@ test.describe('Testeur de regle : condition mal choisie contre une vraie requete
       data: validService('truncation-svc', { listen_path: '/*' }),
     });
 
-    // Corps > REQUEST_LOG_MAX_BODY_SIZE (16 Ko par defaut, cf CLAUDE.md) pour
-    // declencher une troncature reelle dans RequestLog.
+    // Corps > REQUEST_LOG_MAX_BODY_SIZE (16 Ko par defaut) pour declencher
+    // une troncature reelle dans RequestLog.
     const largeBody = 'x'.repeat(20000);
     await request.post(`${BASE}/truncation-svc/anything`, {
       data: largeBody,

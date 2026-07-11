@@ -156,7 +156,7 @@ async fn handle_service(
     if !service.is_mocked {
         // Proxy niveau service : chemin streame sans buffering (aucun
         // RequestData construit ici), donc aucun detail capturable pour le
-        // testeur de regle sur ce chemin — cf CLAUDE.md "Proxy streaming".
+        // testeur de regle sur ce chemin ("Proxy streaming").
         return do_proxy(state, service, path, &method_str, "service-level", gc, req, None).await;
     }
 
@@ -633,7 +633,7 @@ mod tests {
     }
 
     // --- Test de non-regression bout-en-bout : proxy transmet query params,
-    // headers custom, methode et corps intacts (cf CLAUDE.md §5, point 39).
+    // headers custom, methode et corps intacts.
     // Capture la requete BRUTE recue par une fausse cible TCP en aval du vrai
     // serveur Axum (build_router), pour prouver que rien n'est perdu entre
     // l'entree HTTP et la sortie proxy — pas seulement au niveau de
@@ -794,7 +794,7 @@ mod tests {
         );
 
         // Proxy NIVEAU SERVICE : aucun RequestData n'est construit sur ce
-        // chemin (streaming zero-buffering, point 12 CLAUDE.md), donc aucun
+        // chemin (streaming zero-buffering), donc aucun
         // detail n'est capturable pour le testeur de regle.
         let logged = request_log_handle.recent(1);
         assert_eq!(logged.len(), 1);
@@ -922,7 +922,7 @@ mod tests {
     #[tokio::test]
     async fn mock_response_captures_request_detail_in_log() {
         // Verifie que le chemin mock (pas seulement proxy) capture bien le
-        // detail de la requete pour le testeur de regle (cf CLAUDE.md).
+        // detail de la requete pour le testeur de regle.
         let data_dir = temp_dir_for_intercept_test();
         let store = MockStore::new(data_dir.join("mock-config.yaml"));
         store

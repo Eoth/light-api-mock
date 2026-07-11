@@ -8,7 +8,7 @@
   // le champ (pas de suivi pixel-precis du curseur, pas de coordonnees de
   // caret calculees). Aucun editeur de code (CodeMirror/Monaco) n'est
   // present ailleurs dans le projet ; en ajouter un uniquement pour ce
-  // besoin serait disproportionne (cf CLAUDE.md).
+  // besoin serait disproportionne.
   //
   // Accessibilite : le focus DOM reste toujours sur le <textarea> (role
   // implicite "textbox", qui supporte aria-autocomplete/aria-activedescendant
@@ -34,7 +34,7 @@
 
   // untrack() : `id` est fige par instance (nouvel id -> nouveau composant
   // via {#snippet}/{@render}, jamais mute en place), lecture unique
-  // volontaire — meme pattern que le reste du projet (cf CLAUDE.md).
+  // volontaire — meme pattern que le reste du projet.
   const listboxId = untrack(() => `${id}-rhai-suggestions`);
 
   function openSuggestionsFor(text, cursorPos, { allowEmpty = false } = {}) {

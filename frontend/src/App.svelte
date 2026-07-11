@@ -21,8 +21,8 @@
   let notification = $state({ message: '', type: 'info', visible: false });
   let selectedService = $state(null);
   // Le nom seul ne suffit pas a identifier un service (deux services
-  // peuvent partager un nom dans des groupes differents, cf CLAUDE.md) :
-  // on garde le groupe d'origine a cote du nom selectionne pour que
+  // peuvent partager un nom dans des groupes differents) : on garde le
+  // groupe d'origine a cote du nom selectionne pour que
   // currentService/handleServiceUpdate/handleServiceDelete resolvent le bon
   // service sans ambiguite.
   let selectedServiceGroup = $state(null);
@@ -266,8 +266,8 @@
       let added = 0;
       for (const svc of config.services) {
         // Scope par nom ET groupe : deux services du meme nom dans des
-        // groupes differents sont distincts (cf CLAUDE.md), sinon la fusion
-        // ignorerait a tort un service reellement nouveau.
+        // groupes differents sont distincts, sinon la fusion ignorerait a
+        // tort un service reellement nouveau.
         if (!services.some(s => s.name === svc.name && s.group_name === (svc.group_name ?? null))) {
           const result = await createService(svc);
           services = [...services, result];

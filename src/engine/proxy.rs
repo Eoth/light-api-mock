@@ -309,7 +309,7 @@ mod tests {
     /// verifier au plus pres du fil ce que `forward()` transmet reellement
     /// (methode, chemin+query, en-tetes, corps) sans dependre du parsing
     /// HTTP d'un client. Voir aussi les tests bout-en-bout dans
-    /// `server::intercept::tests` (CLAUDE.md §5, point 39) qui couvrent le
+    /// `server::intercept::tests` qui couvrent le
     /// meme invariant a travers tout le pipeline (intercept_layer/do_proxy),
     /// pas seulement ProxyClient::forward() en isolation.
     async fn capture_raw_request(port_rx: tokio::sync::oneshot::Sender<u16>) -> String {
@@ -380,8 +380,8 @@ mod tests {
             raw.to_lowercase().contains("x-custom-header: custom-value"),
             "custom header missing:\n{raw}"
         );
-        // Corps transmis en chunked transfer-encoding (streaming, cf CLAUDE.md
-        // §5 point 12) : on verifie sa presence par sous-chaine, pas par
+        // Corps transmis en chunked transfer-encoding (streaming) : on
+        // verifie sa presence par sous-chaine, pas par
         // egalite/suffixe exact, puisque la trame chunked ajoute une taille
         // hexadecimale et un terminateur autour de la charge utile.
         assert!(
