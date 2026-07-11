@@ -1,11 +1,12 @@
 import { render, fireEvent, waitFor } from '@testing-library/svelte';
 import { describe, it, expect, vi } from 'vitest';
 import RuleForm from '../lib/components/RuleForm.svelte';
-import { getLogs } from '../lib/api.js';
+import { getLogs, checkRuleConflicts } from '../lib/api.js';
 
 vi.mock('../lib/api.js', () => ({
   validateScript: vi.fn(),
   getLogs: vi.fn(),
+  checkRuleConflicts: vi.fn(),
 }));
 
 async function setInput(el, value) {
@@ -22,7 +23,7 @@ describe('RuleForm: rule name uniqueness', () => {
   it('refuse un nom de regle deja existant dans le service', async () => {
     const onSave = vi.fn();
     const { getByLabelText, container, getByRole } = render(RuleForm, {
-      props: { existingRuleNames: ['existing-rule'], onSave },
+      props: { existingRules: [{ name: 'existing-rule' }], onSave },
     });
 
     await setInput(getByLabelText('Nom de la regle'), 'existing-rule');
@@ -34,7 +35,7 @@ describe('RuleForm: rule name uniqueness', () => {
   it('refuse un doublon insensible a la casse', async () => {
     const onSave = vi.fn();
     const { getByLabelText, container, getByRole } = render(RuleForm, {
-      props: { existingRuleNames: ['My-Rule'], onSave },
+      props: { existingRules: [{ name: 'My-Rule' }], onSave },
     });
 
     await setInput(getByLabelText('Nom de la regle'), 'my-rule');
@@ -44,17 +45,19 @@ describe('RuleForm: rule name uniqueness', () => {
   });
 
   it('accepte un nom unique', async () => {
+    checkRuleConflicts.mockResolvedValue({ conflicts: [] });
     const onSave = vi.fn();
     const { getByLabelText, container } = render(RuleForm, {
-      props: { existingRuleNames: ['other-rule'], onSave },
+      props: { existingRules: [{ name: 'other-rule' }], onSave },
     });
 
     await setInput(getByLabelText('Nom de la regle'), 'new-rule');
     await submitForm(container);
-    expect(onSave).toHaveBeenCalled();
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
   });
 
   it('accepte le meme nom en edition (exclus de la liste)', async () => {
+    checkRuleConflicts.mockResolvedValue({ conflicts: [] });
     const onSave = vi.fn();
     const existingRule = {
       name: 'edit-me',
@@ -63,11 +66,11 @@ describe('RuleForm: rule name uniqueness', () => {
       response: { status: 200, headers: [], body: [{ type: 'Literal', value: 'ok' }], chaos: null },
     };
     const { container } = render(RuleForm, {
-      props: { rule: existingRule, existingRuleNames: [], onSave },
+      props: { rule: existingRule, existingRules: [], onSave },
     });
 
     await submitForm(container);
-    expect(onSave).toHaveBeenCalled();
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
   });
 
   it('refuse un nom de regle vide', async () => {
@@ -85,12 +88,14 @@ describe('RuleForm: rule name uniqueness', () => {
 
 describe('RuleForm: pre_script / post_script', () => {
   it('envoie pre_script et post_script a null quand les toggles restent desactives', async () => {
+    checkRuleConflicts.mockResolvedValue({ conflicts: [] });
     const onSave = vi.fn();
     const { getByLabelText, container } = render(RuleForm, { props: { onSave } });
 
     await setInput(getByLabelText('Nom de la regle'), 'r1');
     await submitForm(container);
 
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
     const [payload] = onSave.mock.calls[0];
     expect(payload.pre_script).toBeNull();
     expect(payload.post_script).toBeNull();
@@ -103,6 +108,7 @@ describe('RuleForm: pre_script / post_script', () => {
   });
 
   it('inclut pre_script et post_script dans le payload une fois actives et remplis', async () => {
+    checkRuleConflicts.mockResolvedValue({ conflicts: [] });
     const onSave = vi.fn();
     const { getByLabelText, getByRole, container } = render(RuleForm, { props: { onSave } });
 
@@ -119,12 +125,14 @@ describe('RuleForm: pre_script / post_script', () => {
     await setInput(postTextarea, '"post-result"');
     await submitForm(container);
 
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
     const [payload] = onSave.mock.calls[0];
     expect(payload.pre_script).toBe('"pre-result"');
     expect(payload.post_script).toBe('"post-result"');
   });
 
   it('n\'envoie pas pre_script si le champ reste vide meme toggle actif', async () => {
+    checkRuleConflicts.mockResolvedValue({ conflicts: [] });
     const onSave = vi.fn();
     const { getByLabelText, getByRole, container } = render(RuleForm, { props: { onSave } });
 
@@ -132,6 +140,7 @@ describe('RuleForm: pre_script / post_script', () => {
     await fireEvent.click(getByRole('switch', { name: 'Pré-script (préparation)' }));
     await submitForm(container);
 
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
     const [payload] = onSave.mock.calls[0];
     expect(payload.pre_script).toBeNull();
   });
@@ -158,5 +167,97 @@ describe('RuleForm: assistance de saisie path/query param', () => {
     await fireEvent.click(getByRole('button', { name: '+ Condition ET' }));
     const sourceSelect = getByLabelText('Source');
     expect(sourceSelect.querySelector('option[value="PathParam"]')).toBeInTheDocument();
+  });
+});
+
+describe('RuleForm: detecteur de conflit a la sauvegarde', () => {
+  const existingRules = [
+    {
+      name: 'existing-rule',
+      method: 'GET',
+      sub_path: null,
+      conditions: { all_of: [], any_of: [] },
+    },
+  ];
+
+  it('sauvegarde directement sans avertissement quand aucun conflit n\'est detecte', async () => {
+    checkRuleConflicts.mockResolvedValue({ conflicts: [] });
+    const onSave = vi.fn();
+    const { getByLabelText, container, queryByTestId } = render(RuleForm, {
+      props: { existingRules, draftPosition: 1, onSave },
+    });
+
+    await setInput(getByLabelText('Nom de la regle'), 'new-rule');
+    await submitForm(container);
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    expect(queryByTestId('rule-form-conflict-warning')).not.toBeInTheDocument();
+  });
+
+  it('affiche un avertissement non bloquant quand un conflit est detecte, sans appeler onSave', async () => {
+    checkRuleConflicts.mockResolvedValue({
+      conflicts: [{ other_rule_name: 'existing-rule', winner: 'other' }],
+    });
+    const onSave = vi.fn();
+    const { getByLabelText, container, findByTestId, getByRole } = render(RuleForm, {
+      props: { existingRules, draftPosition: 1, onSave },
+    });
+
+    await setInput(getByLabelText('Nom de la regle'), 'new-rule');
+    await submitForm(container);
+
+    const warning = await findByTestId('rule-form-conflict-warning');
+    expect(warning).toHaveTextContent('existing-rule');
+    expect(getByRole('alert')).toBe(warning);
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('permet de sauvegarder quand meme malgre l\'avertissement', async () => {
+    checkRuleConflicts.mockResolvedValue({
+      conflicts: [{ other_rule_name: 'existing-rule', winner: 'draft' }],
+    });
+    const onSave = vi.fn();
+    const { getByLabelText, container, findByTestId, getByTestId } = render(RuleForm, {
+      props: { existingRules, draftPosition: 0, onSave },
+    });
+
+    await setInput(getByLabelText('Nom de la regle'), 'new-rule');
+    await submitForm(container);
+    await findByTestId('rule-form-conflict-warning');
+
+    await fireEvent.click(getByTestId('rule-form-conflict-save-anyway-button'));
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(onSave.mock.calls[0][0].name).toBe('new-rule');
+  });
+
+  it('permet d\'annuler l\'avertissement pour continuer a modifier la regle', async () => {
+    checkRuleConflicts.mockResolvedValue({
+      conflicts: [{ other_rule_name: 'existing-rule', winner: 'other' }],
+    });
+    const onSave = vi.fn();
+    const { getByLabelText, container, findByTestId, getByTestId, queryByTestId } = render(RuleForm, {
+      props: { existingRules, draftPosition: 1, onSave },
+    });
+
+    await setInput(getByLabelText('Nom de la regle'), 'new-rule');
+    await submitForm(container);
+    await findByTestId('rule-form-conflict-warning');
+
+    await fireEvent.click(getByTestId('rule-form-conflict-cancel-button'));
+    expect(queryByTestId('rule-form-conflict-warning')).not.toBeInTheDocument();
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('sauvegarde quand meme si la verification de conflit echoue (fail-open)', async () => {
+    checkRuleConflicts.mockRejectedValue(new Error('reseau indisponible'));
+    const onSave = vi.fn();
+    const { getByLabelText, container } = render(RuleForm, {
+      props: { existingRules, draftPosition: 1, onSave },
+    });
+
+    await setInput(getByLabelText('Nom de la regle'), 'new-rule');
+    await submitForm(container);
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
   });
 });

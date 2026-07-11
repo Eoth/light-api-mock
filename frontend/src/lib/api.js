@@ -118,6 +118,16 @@ export function testRule(payload) {
   return request('POST', '/rule-test', payload);
 }
 
+// Detecteur de conflit entre regles, appele a la SAUVEGARDE d'une regle
+// (RuleForm) : compare le brouillon aux autres regles du service et signale
+// les chevauchements evidents (memes conditions, ou conditions incluses),
+// sans jamais bloquer la sauvegarde. Endpoint stateless comme /rule-test,
+// non scope par service (aucun service n'est charge cote backend) — pas de
+// servicePath() ici.
+export function checkRuleConflicts(payload) {
+  return request('POST', '/rule-conflicts', payload);
+}
+
 // Messaging (Kafka) — routes absentes (404) sur un binaire compile sans la
 // feature "messaging-kafka" ; les appelants doivent gerer cet echec (voir
 // App.svelte, verification au demarrage).

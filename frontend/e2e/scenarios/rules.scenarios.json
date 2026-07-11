@@ -65,6 +65,47 @@
         { "action": "click", "target": "ruleForm.cancelButton" },
         { "action": "assertVisible", "target": "ruleList.item", "params": { "name": "rule-alpha" } }
       ]
+    },
+    {
+      "scenario": "Une regle qui chevauche une regle existante declenche un avertissement de conflit",
+      "steps": [
+        { "action": "goto", "page": "services" },
+        { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
+        { "action": "click", "target": "serviceCard.configureButton", "params": { "name": "conflict-svc" } },
+        { "action": "click", "target": "ruleList.addButton" },
+        { "action": "fill", "target": "ruleForm.nameInput", "value": "conflict-rule-two" },
+        { "action": "click", "target": "ruleForm.submitButton" },
+        { "action": "assertVisible", "target": "ruleForm.conflictWarning" },
+        { "action": "assertVisible", "target": "ruleForm.conflictWarningItem", "params": { "name": "conflict-rule-one" } }
+      ]
+    },
+    {
+      "scenario": "Une regle qui ne chevauche aucune regle existante ne declenche aucun avertissement",
+      "steps": [
+        { "action": "goto", "page": "services" },
+        { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
+        { "action": "click", "target": "serviceCard.configureButton", "params": { "name": "conflict-svc" } },
+        { "action": "click", "target": "ruleList.addButton" },
+        { "action": "fill", "target": "ruleForm.nameInput", "value": "conflict-rule-different-method" },
+        { "action": "selectOption", "target": "ruleForm.methodSelect", "value": "POST" },
+        { "action": "click", "target": "ruleForm.submitButton" },
+        { "action": "assertHidden", "target": "ruleForm.conflictWarning" },
+        { "action": "assertVisible", "target": "ruleList.item", "params": { "name": "conflict-rule-different-method" } }
+      ]
+    },
+    {
+      "scenario": "Enregistrer quand meme malgre l'avertissement de conflit fonctionne",
+      "steps": [
+        { "action": "goto", "page": "services" },
+        { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
+        { "action": "click", "target": "serviceCard.configureButton", "params": { "name": "conflict-svc" } },
+        { "action": "click", "target": "ruleList.addButton" },
+        { "action": "fill", "target": "ruleForm.nameInput", "value": "conflict-rule-two" },
+        { "action": "click", "target": "ruleForm.submitButton" },
+        { "action": "assertVisible", "target": "ruleForm.conflictWarning" },
+        { "action": "click", "target": "ruleForm.conflictSaveAnywayButton" },
+        { "action": "assertVisible", "target": "ruleList.item", "params": { "name": "conflict-rule-two" } }
+      ]
     }
   ]
 }

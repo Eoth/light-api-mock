@@ -60,6 +60,47 @@ pub struct RuleTestOutcome {
     pub overall_matched: bool,
 }
 
+/// Brouillon de regle en cours de sauvegarde (createur ou edition), pour le
+/// detecteur de conflit (`find_rule_conflicts`). Meme forme que
+/// `RuleTestInput`, un type distinct car le point d'entree/l'usage differe
+/// (sauvegarde vs testeur de trafic reel).
+pub struct RuleConflictDraft<'a> {
+    pub method: &'a str,
+    pub sub_path: &'a Option<String>,
+    pub conditions: &'a ConditionGroup,
+}
+
+/// Une AUTRE regle du meme service, telle qu'elle existe deja (position
+/// implicite = son index dans le slice passe a `find_rule_conflicts`).
+pub struct OtherRuleConflictInput<'a> {
+    pub name: &'a str,
+    pub method: &'a str,
+    pub sub_path: &'a Option<String>,
+    pub conditions: &'a ConditionGroup,
+}
+
+/// Laquelle des deux regles en conflit s'appliquerait reellement, compte
+/// tenu de l'ordre ACTUEL du tableau `rules` (first-match, cf commentaire
+/// sur `find_rule_conflicts`). Purement informatif : ne change rien a la
+/// resolution reelle, juste explique a l'utilisateur ce qui se passerait.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ConflictWinner {
+    /// La regle en cours de sauvegarde s'appliquerait en premier — l'autre
+    /// regle citee serait masquee pour les requetes concernees.
+    Draft,
+    /// L'autre regle citee (deja existante, positionnee avant) s'appliquerait
+    /// en premier — la regle en cours de sauvegarde ne se declencherait
+    /// jamais pour les requetes concernees par ce conflit.
+    Other,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct RuleConflict {
+    pub other_rule_name: String,
+    pub winner: ConflictWinner,
+}
+
 impl MatchEngine {
     pub fn first_match<'a>(
         rules: &'a [Rule],
@@ -222,6 +263,131 @@ impl MatchEngine {
             path_params,
             group,
         }
+    }
+
+    /// Detecteur de conflit a la SAUVEGARDE d'une regle (POST
+    /// `/api/rule-conflicts`, endpoint stateless comme `/api/rule-test`) —
+    /// JAMAIS appele sur le chemin de matching HTTP de production
+    /// (`first_match`), qui reste totalement inchange par ce sujet. Deux
+    /// regles "pourraient entrer en conflit" si une meme requete pourrait
+    /// satisfaire les DEUX a la fois (meme method, sub_path compatible,
+    /// conditions qui se recoupent) — auquel cas seule la premiere dans
+    /// l'ordre du tableau `rules` s'applique reellement (`first_match`
+    /// itere dans l'ordre et s'arrete au premier match, cf tete de fichier
+    /// et CLAUDE.md).
+    ///
+    /// `other_rules` est la liste des AUTRES regles du service dans leur
+    /// ordre ACTUEL (celle en cours d'edition exclue par l'appelant).
+    /// `draft_position` est la position ou la regle en cours de sauvegarde
+    /// se retrouvera dans le tableau final : l'index d'edition inchange
+    /// pour une modification en place, ou `other_rules.len()` pour un ajout
+    /// (toujours ajoutee en fin de liste cote frontend, cf
+    /// ServiceDetail.svelte::handleSaveRule). Le gagnant se deduit
+    /// uniquement de cette position : toute autre regle a un index strict-
+    /// ement inferieur a `draft_position` gagnerait sur le brouillon (elle
+    /// est evaluee avant lui), et vice-versa.
+    ///
+    /// **Detection PRAGMATIQUE, pas exhaustive** (limite assumee et
+    /// documentee, cf CLAUDE.md) :
+    /// - `method` : doit etre strictement egale (case-insensitive) — deux
+    ///   regles sur des methodes differentes ne peuvent jamais matcher la
+    ///   meme requete, donc jamais de conflit entre elles.
+    /// - `sub_path` : compatible si les deux sont absents, si un seul est
+    ///   absent (`None` matche n'importe quel chemin restant, cf
+    ///   `matches_sub_path`), ou si les deux patterns ont la MEME FORME
+    ///   apres normalisation (`{nom}`/`:nom` reduits a un placeholder
+    ///   generique, segments litteraux et `*` inchanges) — donc `/a/{id}`
+    ///   et `/a/{orderId}` sont consideres compatibles (meme forme, noms de
+    ///   parametre differents), mais `/a/{id}` et `/b` ne le sont pas.
+    ///   Deux patterns de forme differente qui se chevauchent PARTIELLEMENT
+    ///   sans etre de meme forme (ex. `/a/*` vs `/a/{id}/b`) ne sont PAS
+    ///   detectes comme compatibles : faux negatif assume plutot que
+    ///   d'implementer un vrai moteur de recouvrement de patterns.
+    /// - `conditions` : chevauchement detecte uniquement pour les cas
+    ///   evidents — ensembles `all_of`/`any_of` strictement identiques, OU
+    ///   l'ensemble `all_of` d'une regle est un sous-ensemble STRICT de
+    ///   l'autre ET les deux `any_of` sont vides (le cas "regle generale +
+    ///   regle plus specifique en fallback" explicitement legitime, cf
+    ///   CLAUDE.md). Toute combinaison impliquant un `any_of` non-vide et
+    ///   non strictement identique aux deux n'est PAS analysee (la
+    ///   semantique OR rend la detection de sous-ensemble non triviale sans
+    ///   sur-ingenierie) — aucun conflit remonte dans ce cas : faux negatif
+    ///   assume, jamais de faux positif.
+    ///
+    /// Reutilise les types partages `Condition`/`ConditionGroup` (et leur
+    /// `PartialEq` derive, aucune reimplementation d'egalite de condition)
+    /// ainsi que `normalize_colon_syntax` (deja utilisee par `match_path`)
+    /// pour la canonicalisation de pattern — mais PAS `matches_group`/
+    /// `extract`/`apply_op` : ces primitives evaluent une condition contre
+    /// une requete CONCRETE (`RequestData`), alors qu'ici on compare deux
+    /// ensembles de conditions entre eux sans aucune requete — fabriquer
+    /// une requete factice pour reutiliser `matches_group` n'aurait aucun
+    /// sens semantique et ne serait pas une reutilisation fidele.
+    pub fn find_rule_conflicts(
+        draft: &RuleConflictDraft,
+        other_rules: &[OtherRuleConflictInput],
+        draft_position: usize,
+    ) -> Vec<RuleConflict> {
+        other_rules
+            .iter()
+            .enumerate()
+            .filter(|(_, other)| Self::rules_could_overlap(draft, other))
+            .map(|(i, other)| RuleConflict {
+                other_rule_name: other.name.to_string(),
+                winner: if i < draft_position {
+                    ConflictWinner::Other
+                } else {
+                    ConflictWinner::Draft
+                },
+            })
+            .collect()
+    }
+
+    fn rules_could_overlap(draft: &RuleConflictDraft, other: &OtherRuleConflictInput) -> bool {
+        draft.method.eq_ignore_ascii_case(other.method)
+            && Self::sub_paths_could_overlap(draft.sub_path, other.sub_path)
+            && Self::conditions_could_overlap(draft.conditions, other.conditions)
+    }
+
+    fn sub_paths_could_overlap(a: &Option<String>, b: &Option<String>) -> bool {
+        match (a, b) {
+            (None, _) | (_, None) => true,
+            (Some(pa), Some(pb)) => Self::canonicalize_sub_path(pa) == Self::canonicalize_sub_path(pb),
+        }
+    }
+
+    fn canonicalize_sub_path(pattern: &str) -> String {
+        normalize_colon_syntax(pattern)
+            .split('/')
+            .map(|seg| {
+                if seg.starts_with('{') && seg.ends_with('}') && seg.len() >= 2 {
+                    "{}"
+                } else {
+                    seg
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("/")
+    }
+
+    fn conditions_could_overlap(a: &ConditionGroup, b: &ConditionGroup) -> bool {
+        if Self::condition_sets_equal(&a.all_of, &b.all_of)
+            && Self::condition_sets_equal(&a.any_of, &b.any_of)
+        {
+            return true;
+        }
+        a.any_of.is_empty()
+            && b.any_of.is_empty()
+            && (Self::is_strict_subset(&a.all_of, &b.all_of)
+                || Self::is_strict_subset(&b.all_of, &a.all_of))
+    }
+
+    fn condition_sets_equal(a: &[Condition], b: &[Condition]) -> bool {
+        a.len() == b.len() && a.iter().all(|c| b.contains(c))
+    }
+
+    fn is_strict_subset(smaller: &[Condition], larger: &[Condition]) -> bool {
+        smaller.len() < larger.len() && smaller.iter().all(|c| larger.contains(c))
     }
 
     fn extract(source: &ConditionSource, req: &RequestData) -> Option<String> {
@@ -1111,5 +1277,235 @@ mod tests {
 
         assert!(outcome.sub_path_matches);
         assert!(outcome.path_params.is_empty());
+    }
+
+    // --- find_rule_conflicts tests ---
+
+    fn header_eq(key: &str, val: &str) -> Condition {
+        Condition {
+            source: ConditionSource::Header(key.into()),
+            operator: Operator::Eq(val.into()),
+        }
+    }
+
+    #[test]
+    fn find_rule_conflicts_identical_conditions_detected() {
+        let draft_conditions = cg(vec![header_eq("x-env", "prod")], vec![]);
+        let other_conditions = cg(vec![header_eq("x-env", "prod")], vec![]);
+        let draft = RuleConflictDraft {
+            method: "GET",
+            sub_path: &None,
+            conditions: &draft_conditions,
+        };
+        let other = OtherRuleConflictInput {
+            name: "existing",
+            method: "GET",
+            sub_path: &None,
+            conditions: &other_conditions,
+        };
+
+        let conflicts = MatchEngine::find_rule_conflicts(&draft, &[other], 1);
+        assert_eq!(conflicts.len(), 1);
+        assert_eq!(conflicts[0].other_rule_name, "existing");
+    }
+
+    #[test]
+    fn find_rule_conflicts_subset_conditions_detected() {
+        // draft: aucune condition (matche tout) ; other: une condition en
+        // plus (regle generale ajoutee APRES une regle plus specifique —
+        // cas "fallback" explicitement legitime, toujours signale).
+        let draft_conditions = ConditionGroup::default();
+        let other_conditions = cg(vec![header_eq("x-env", "prod")], vec![]);
+        let draft = RuleConflictDraft {
+            method: "POST",
+            sub_path: &None,
+            conditions: &draft_conditions,
+        };
+        let other = OtherRuleConflictInput {
+            name: "specific-rule",
+            method: "POST",
+            sub_path: &None,
+            conditions: &other_conditions,
+        };
+
+        let conflicts = MatchEngine::find_rule_conflicts(&draft, &[other], 1);
+        assert_eq!(conflicts.len(), 1);
+        assert_eq!(conflicts[0].other_rule_name, "specific-rule");
+    }
+
+    #[test]
+    fn find_rule_conflicts_no_false_positive_on_disjoint_conditions() {
+        let draft_conditions = cg(vec![header_eq("x-env", "prod")], vec![]);
+        let other_conditions = cg(vec![header_eq("x-env", "staging")], vec![]);
+        let draft = RuleConflictDraft {
+            method: "GET",
+            sub_path: &None,
+            conditions: &draft_conditions,
+        };
+        let other = OtherRuleConflictInput {
+            name: "staging-rule",
+            method: "GET",
+            sub_path: &None,
+            conditions: &other_conditions,
+        };
+
+        let conflicts = MatchEngine::find_rule_conflicts(&draft, &[other], 1);
+        assert!(conflicts.is_empty());
+    }
+
+    #[test]
+    fn find_rule_conflicts_no_conflict_on_different_method() {
+        let conditions = ConditionGroup::default();
+        let draft = RuleConflictDraft {
+            method: "GET",
+            sub_path: &None,
+            conditions: &conditions,
+        };
+        let other = OtherRuleConflictInput {
+            name: "post-rule",
+            method: "POST",
+            sub_path: &None,
+            conditions: &conditions,
+        };
+
+        let conflicts = MatchEngine::find_rule_conflicts(&draft, &[other], 1);
+        assert!(conflicts.is_empty());
+    }
+
+    #[test]
+    fn find_rule_conflicts_no_conflict_on_incompatible_sub_path_shape() {
+        let conditions = ConditionGroup::default();
+        let draft_sub = Some("/a/{id}".to_string());
+        let other_sub = Some("/b".to_string());
+        let draft = RuleConflictDraft {
+            method: "GET",
+            sub_path: &draft_sub,
+            conditions: &conditions,
+        };
+        let other = OtherRuleConflictInput {
+            name: "other-shape",
+            method: "GET",
+            sub_path: &other_sub,
+            conditions: &conditions,
+        };
+
+        let conflicts = MatchEngine::find_rule_conflicts(&draft, &[other], 1);
+        assert!(conflicts.is_empty());
+    }
+
+    #[test]
+    fn find_rule_conflicts_sub_path_same_shape_different_param_name_compatible() {
+        let conditions = ConditionGroup::default();
+        let draft_sub = Some("/orders/{id}".to_string());
+        let other_sub = Some("/orders/:orderId".to_string());
+        let draft = RuleConflictDraft {
+            method: "GET",
+            sub_path: &draft_sub,
+            conditions: &conditions,
+        };
+        let other = OtherRuleConflictInput {
+            name: "colon-syntax-rule",
+            method: "GET",
+            sub_path: &other_sub,
+            conditions: &conditions,
+        };
+
+        let conflicts = MatchEngine::find_rule_conflicts(&draft, &[other], 1);
+        assert_eq!(conflicts.len(), 1);
+    }
+
+    #[test]
+    fn find_rule_conflicts_missing_sub_path_matches_any_pattern() {
+        let conditions = ConditionGroup::default();
+        let other_sub = Some("/x/{id}".to_string());
+        let draft = RuleConflictDraft {
+            method: "GET",
+            sub_path: &None,
+            conditions: &conditions,
+        };
+        let other = OtherRuleConflictInput {
+            name: "specific-path-rule",
+            method: "GET",
+            sub_path: &other_sub,
+            conditions: &conditions,
+        };
+
+        let conflicts = MatchEngine::find_rule_conflicts(&draft, &[other], 1);
+        assert_eq!(conflicts.len(), 1);
+    }
+
+    #[test]
+    fn find_rule_conflicts_winner_other_when_positioned_before_draft() {
+        let conditions = ConditionGroup::default();
+        let draft = RuleConflictDraft {
+            method: "GET",
+            sub_path: &None,
+            conditions: &conditions,
+        };
+        let other = OtherRuleConflictInput {
+            name: "earlier-rule",
+            method: "GET",
+            sub_path: &None,
+            conditions: &conditions,
+        };
+
+        // other est a l'index 0, draft_position = 1 (ajout en fin de liste)
+        // -> other est evalue avant le brouillon, donc other gagne.
+        let conflicts = MatchEngine::find_rule_conflicts(&draft, &[other], 1);
+        assert_eq!(conflicts[0].winner, ConflictWinner::Other);
+    }
+
+    #[test]
+    fn find_rule_conflicts_winner_draft_when_positioned_after_draft() {
+        let conditions = ConditionGroup::default();
+        let draft = RuleConflictDraft {
+            method: "GET",
+            sub_path: &None,
+            conditions: &conditions,
+        };
+        let other = OtherRuleConflictInput {
+            name: "later-rule",
+            method: "GET",
+            sub_path: &None,
+            conditions: &conditions,
+        };
+
+        // draft_position = 0 (edition d'une regle deja en tete de liste) ->
+        // other est a l'index 0 >= draft_position, donc le brouillon gagne.
+        let conflicts = MatchEngine::find_rule_conflicts(&draft, &[other], 0);
+        assert_eq!(conflicts[0].winner, ConflictWinner::Draft);
+    }
+
+    #[test]
+    fn find_rule_conflicts_non_empty_any_of_skips_subset_detection() {
+        // Limite assumee et documentee : des que l'un des any_of est
+        // non-vide (et que les deux ne sont pas strictement identiques), la
+        // detection de sous-ensemble est desactivee plutot que de risquer
+        // un faux positif sur une semantique OR mal modelisee.
+        let draft_conditions = ConditionGroup::default();
+        let other_conditions = cg(
+            vec![],
+            vec![
+                header_eq("x-env", "prod"),
+                Condition {
+                    source: ConditionSource::QueryParam("debug".into()),
+                    operator: Operator::Exists,
+                },
+            ],
+        );
+        let draft = RuleConflictDraft {
+            method: "GET",
+            sub_path: &None,
+            conditions: &draft_conditions,
+        };
+        let other = OtherRuleConflictInput {
+            name: "any-of-rule",
+            method: "GET",
+            sub_path: &None,
+            conditions: &other_conditions,
+        };
+
+        let conflicts = MatchEngine::find_rule_conflicts(&draft, &[other], 1);
+        assert!(conflicts.is_empty());
     }
 }

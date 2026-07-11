@@ -1,6 +1,9 @@
 use crate::auth::middleware::AuthUser;
 use crate::auth::{can_access_service, can_manage_group, visible_services};
-use crate::engine::matcher::{ConditionEvaluation, MatchEngine, RequestData, RuleTestInput};
+use crate::engine::matcher::{
+    ConditionEvaluation, ConflictWinner, MatchEngine, OtherRuleConflictInput, RequestData,
+    RuleConflictDraft, RuleTestInput,
+};
 use crate::models::{ConditionGroup, Group, MockConfig, Service};
 use crate::server::AppState;
 use std::collections::HashMap;
@@ -42,6 +45,7 @@ pub fn routes() -> Router<AppState> {
         .route("/groups/:group/services/:name/rules/reorder", put(reorder_rules_grouped))
         .route("/script/validate", post(validate_script))
         .route("/rule-test", post(test_rule))
+        .route("/rule-conflicts", post(check_rule_conflicts))
         .route("/logs", get(get_logs))
         .route("/groups", get(list_groups).post(create_group))
         .route(
@@ -1152,6 +1156,89 @@ async fn test_rule(
     })
 }
 
+// --------------- Detecteur de conflit entre regles (a la sauvegarde) ---------------
+//
+// Endpoint stateless, meme famille que /api/rule-test ci-dessus : aucun acces
+// au store, aucune reference a un service persiste. Le frontend envoie le
+// brouillon de regle EN COURS DE SAUVEGARDE (RuleForm, avant l'appel PUT
+// /api/services/:name qui persiste reellement), la liste des AUTRES regles
+// du service dans leur ordre actuel, et la position ou le brouillon se
+// retrouvera une fois sauvegarde. Le handler ne fait que deserialiser,
+// deleguer a MatchEngine::find_rule_conflicts, serialiser le resultat —
+// aucune mutation, purement informatif (cf CLAUDE.md pour le detail de
+// l'algorithme et ses limites assumees).
+//
+// Garde d'auth : utilisateur authentifie requis, MEME garde que /rule-test
+// et /logs — pas de can_access_service supplementaire, cette route ne
+// charge aucun service depuis le store donc pas d'identite de service a
+// desambiguiser (cf service_matches, points 40-41 CLAUDE.md).
+
+#[derive(serde::Deserialize)]
+struct RuleConflictDraftRequest {
+    method: String,
+    sub_path: Option<String>,
+    conditions: ConditionGroup,
+}
+
+#[derive(serde::Deserialize)]
+struct OtherRuleConflictRequest {
+    name: String,
+    method: String,
+    sub_path: Option<String>,
+    conditions: ConditionGroup,
+}
+
+#[derive(serde::Deserialize)]
+struct RuleConflictsRequest {
+    draft: RuleConflictDraftRequest,
+    other_rules: Vec<OtherRuleConflictRequest>,
+    draft_position: usize,
+}
+
+#[derive(serde::Serialize)]
+struct RuleConflictResponseItem {
+    other_rule_name: String,
+    winner: ConflictWinner,
+}
+
+#[derive(serde::Serialize)]
+struct RuleConflictsResponse {
+    conflicts: Vec<RuleConflictResponseItem>,
+}
+
+async fn check_rule_conflicts(
+    Extension(_user): Extension<AuthUser>,
+    Json(payload): Json<RuleConflictsRequest>,
+) -> Json<RuleConflictsResponse> {
+    let draft = RuleConflictDraft {
+        method: &payload.draft.method,
+        sub_path: &payload.draft.sub_path,
+        conditions: &payload.draft.conditions,
+    };
+    let other_rules: Vec<OtherRuleConflictInput> = payload
+        .other_rules
+        .iter()
+        .map(|r| OtherRuleConflictInput {
+            name: &r.name,
+            method: &r.method,
+            sub_path: &r.sub_path,
+            conditions: &r.conditions,
+        })
+        .collect();
+
+    let conflicts = MatchEngine::find_rule_conflicts(&draft, &other_rules, payload.draft_position);
+
+    Json(RuleConflictsResponse {
+        conflicts: conflicts
+            .into_iter()
+            .map(|c| RuleConflictResponseItem {
+                other_rule_name: c.other_rule_name,
+                winner: c.winner,
+            })
+            .collect(),
+    })
+}
+
 fn ensure_group_codes(groups: &mut Vec<Group>) {
     let mut existing_codes: Vec<String> = groups
         .iter()
@@ -1512,5 +1599,94 @@ mod tests {
         };
         let Json(result) = test_rule(Extension(anon_user()), Json(payload)).await;
         assert!(result.body_truncated);
+    }
+
+    // --- check_rule_conflicts (POST /api/rule-conflicts) tests ---
+
+    fn header_eq_cond(key: &str, val: &str) -> crate::models::Condition {
+        crate::models::Condition {
+            source: crate::models::ConditionSource::Header(key.into()),
+            operator: crate::models::Operator::Eq(val.into()),
+        }
+    }
+
+    #[tokio::test]
+    async fn check_rule_conflicts_reports_identical_conditions() {
+        let payload = RuleConflictsRequest {
+            draft: RuleConflictDraftRequest {
+                method: "GET".into(),
+                sub_path: None,
+                conditions: ConditionGroup {
+                    all_of: vec![header_eq_cond("x-env", "prod")],
+                    any_of: vec![],
+                },
+            },
+            other_rules: vec![OtherRuleConflictRequest {
+                name: "existing-rule".into(),
+                method: "GET".into(),
+                sub_path: None,
+                conditions: ConditionGroup {
+                    all_of: vec![header_eq_cond("x-env", "prod")],
+                    any_of: vec![],
+                },
+            }],
+            draft_position: 1,
+        };
+        let Json(result) = check_rule_conflicts(Extension(anon_user()), Json(payload)).await;
+        assert_eq!(result.conflicts.len(), 1);
+        assert_eq!(result.conflicts[0].other_rule_name, "existing-rule");
+        assert_eq!(result.conflicts[0].winner, ConflictWinner::Other);
+    }
+
+    #[tokio::test]
+    async fn check_rule_conflicts_no_conflict_for_disjoint_conditions() {
+        let payload = RuleConflictsRequest {
+            draft: RuleConflictDraftRequest {
+                method: "GET".into(),
+                sub_path: None,
+                conditions: ConditionGroup {
+                    all_of: vec![header_eq_cond("x-env", "prod")],
+                    any_of: vec![],
+                },
+            },
+            other_rules: vec![OtherRuleConflictRequest {
+                name: "staging-rule".into(),
+                method: "GET".into(),
+                sub_path: None,
+                conditions: ConditionGroup {
+                    all_of: vec![header_eq_cond("x-env", "staging")],
+                    any_of: vec![],
+                },
+            }],
+            draft_position: 1,
+        };
+        let Json(result) = check_rule_conflicts(Extension(anon_user()), Json(payload)).await;
+        assert!(result.conflicts.is_empty());
+    }
+
+    #[tokio::test]
+    async fn check_rule_conflicts_reports_subset_conditions_with_draft_winner() {
+        // Le brouillon est repositionne AVANT l'autre regle (edition en
+        // place a l'index 0) : c'est donc le brouillon qui gagnerait.
+        let payload = RuleConflictsRequest {
+            draft: RuleConflictDraftRequest {
+                method: "POST".into(),
+                sub_path: None,
+                conditions: ConditionGroup::default(),
+            },
+            other_rules: vec![OtherRuleConflictRequest {
+                name: "more-specific-rule".into(),
+                method: "POST".into(),
+                sub_path: None,
+                conditions: ConditionGroup {
+                    all_of: vec![header_eq_cond("x-env", "prod")],
+                    any_of: vec![],
+                },
+            }],
+            draft_position: 0,
+        };
+        let Json(result) = check_rule_conflicts(Extension(anon_user()), Json(payload)).await;
+        assert_eq!(result.conflicts.len(), 1);
+        assert_eq!(result.conflicts[0].winner, ConflictWinner::Draft);
     }
 }
