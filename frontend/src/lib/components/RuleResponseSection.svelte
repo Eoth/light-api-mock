@@ -48,6 +48,21 @@
 
   let responseOpen = $state(true);
 
+  // Options avancees (pre_script/post_script) repliees par defaut (retour
+  // beta-testeur : ces deux blocs, peu utilises, ajoutaient de la charge
+  // visuelle permanente pour une fonctionnalite que la plupart des
+  // utilisateurs n'exploitent pas). Le script principal (`script`) reste
+  // toujours visible, jamais concerne par ce repli. Ouverture automatique
+  // si une regle EXISTANTE a deja du contenu dans l'un des deux (ne jamais
+  // cacher une configuration deja faite par l'utilisateur sans qu'il la
+  // voie) — calcule une seule fois a l'ouverture, comme `responseMode`
+  // ci-dessus. Le contenu de pre_script/post_script (preScriptCode/
+  // postScriptCode plus bas) vit dans CE composant, jamais dans
+  // RuleScriptSlot lui-meme : replier/deplier ne fait que masquer
+  // l'affichage (attribut `hidden`, jamais un `{#if}` qui demonterait
+  // RuleScriptSlot) et ne perd donc jamais de donnees deja saisies.
+  let advancedOpen = $state(!!init?.pre_script?.trim() || !!init?.post_script?.trim());
+
   function detectMode() {
     if (!init?.response?.body?.length) return 'json-paste';
     if (init.response.body.length === 1 && init.response.body[0].type === 'Template') return 'advanced';
@@ -571,16 +586,6 @@
     {/if}
 
     <RuleScriptSlot
-      id="rule-pre-script" toggleLabel="Pré-script (préparation)"
-      enabled={preScriptEnabled} code={preScriptCode}
-      onToggle={(v) => preScriptEnabled = v} onCodeInput={(v) => preScriptCode = v}
-      validation={preScriptValidation} onValidate={handleValidatePreScript}
-      rows={5}
-    >
-      {#snippet help()}{@render basicScriptHelp('pre_script')}{/snippet}
-    </RuleScriptSlot>
-
-    <RuleScriptSlot
       id="rule-script" toggleLabel="Script personnalise"
       enabled={scriptEnabled} code={scriptCode}
       onToggle={(v) => scriptEnabled = v} onCodeInput={(v) => scriptCode = v}
@@ -591,15 +596,39 @@
       {#snippet help()}{@render mainScriptHelp()}{/snippet}
     </RuleScriptSlot>
 
-    <RuleScriptSlot
-      id="rule-post-script" toggleLabel="Post-script (finalisation)"
-      enabled={postScriptEnabled} code={postScriptCode}
-      onToggle={(v) => postScriptEnabled = v} onCodeInput={(v) => postScriptCode = v}
-      validation={postScriptValidation} onValidate={handleValidatePostScript}
-      rows={5}
-    >
-      {#snippet help()}{@render basicScriptHelp('post_script')}{/snippet}
-    </RuleScriptSlot>
+    <div class="sub-section advanced-options-section">
+      <button
+        type="button"
+        class="legend-toggle"
+        onclick={() => advancedOpen = !advancedOpen}
+        aria-expanded={advancedOpen}
+        aria-controls="rule-form-advanced-options-panel"
+        data-testid="rule-form-advanced-options-toggle-button"
+      >
+        {advancedOpen ? '▼' : '▶'} Options avancées (pré-script / post-script)
+      </button>
+      <div id="rule-form-advanced-options-panel" class="advanced-options-panel" hidden={!advancedOpen} data-testid="rule-form-advanced-options-panel">
+        <RuleScriptSlot
+          id="rule-pre-script" toggleLabel="Pré-script (préparation)"
+          enabled={preScriptEnabled} code={preScriptCode}
+          onToggle={(v) => preScriptEnabled = v} onCodeInput={(v) => preScriptCode = v}
+          validation={preScriptValidation} onValidate={handleValidatePreScript}
+          rows={5}
+        >
+          {#snippet help()}{@render basicScriptHelp('pre_script')}{/snippet}
+        </RuleScriptSlot>
+
+        <RuleScriptSlot
+          id="rule-post-script" toggleLabel="Post-script (finalisation)"
+          enabled={postScriptEnabled} code={postScriptCode}
+          onToggle={(v) => postScriptEnabled = v} onCodeInput={(v) => postScriptCode = v}
+          validation={postScriptValidation} onValidate={handleValidatePostScript}
+          rows={5}
+        >
+          {#snippet help()}{@render basicScriptHelp('post_script')}{/snippet}
+        </RuleScriptSlot>
+      </div>
+    </div>
 
     <div class="sub-section chaos-section">
       <ToggleSwitch label="Mode Chaos" checked={chaosEnabled} onchange={(v) => chaosEnabled = v} />
@@ -636,6 +665,9 @@
 
   .sub-section { margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--color-border); }
   .sub-section strong { display: block; margin-bottom: 0.375rem; font-size: 0.875rem; }
+
+  .advanced-options-section { border-top-color: var(--color-border); }
+  .advanced-options-panel { margin-top: 0.5rem; }
 
   .header-row { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.375rem; }
   .header-row input { flex: 1; padding: 0.375rem 0.5rem; border: 1px solid var(--color-border); border-radius: var(--radius); font-size: 0.875rem; }

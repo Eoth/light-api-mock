@@ -77,3 +77,46 @@ describe('JsonResponseBuilder — breadcrumb de navigation', () => {
     expect(updated).toHaveLength(1);
   });
 });
+
+describe('JsonResponseBuilder — pliage/depliage des noeuds imbriques', () => {
+  it('tout est deplie par defaut (aucune regression sur le rendu existant)', () => {
+    const { getByLabelText, getByDisplayValue } = render(JsonResponseBuilder, { props: { fields: nestedFields } });
+    expect(getByLabelText('Replier unite_legale')).toHaveAttribute('aria-expanded', 'true');
+    expect(getByDisplayValue('nom')).toBeVisible();
+    expect(getByDisplayValue('adresse')).toBeVisible();
+    expect(getByDisplayValue('ville')).toBeVisible();
+  });
+
+  it('replier un noeud masque son contenu et affiche un indicateur, sans perdre les donnees', async () => {
+    const onUpdate = vi.fn();
+    const { getByLabelText, getByDisplayValue } = render(JsonResponseBuilder, { props: { fields: nestedFields, onUpdate } });
+
+    const toggle = getByLabelText('Replier unite_legale');
+    await fireEvent.click(toggle);
+
+    expect(getByLabelText('Deplier unite_legale')).toHaveAttribute('aria-expanded', 'false');
+    expect(getByDisplayValue('nom')).not.toBeVisible();
+    expect(getByDisplayValue('adresse')).not.toBeVisible();
+    expect(getByDisplayValue('ville')).not.toBeVisible();
+    // Rien n'a ete mute : replier est un pur affichage.
+    expect(onUpdate).not.toHaveBeenCalled();
+  });
+
+  it('depliage restaure le contenu masque, aucune donnee perdue', async () => {
+    const { getByLabelText, getByDisplayValue } = render(JsonResponseBuilder, { props: { fields: nestedFields } });
+
+    await fireEvent.click(getByLabelText('Replier unite_legale'));
+    await fireEvent.click(getByLabelText('Deplier unite_legale'));
+
+    expect(getByLabelText('Replier unite_legale')).toHaveAttribute('aria-expanded', 'true');
+    expect(getByDisplayValue('nom')).toBeVisible();
+    expect(getByDisplayValue('adresse')).toBeVisible();
+    expect(getByDisplayValue('ville')).toBeVisible();
+  });
+
+  it('un champ de type "valeur" (sans enfants) n\'a pas de chevron de pliage', () => {
+    const { queryByLabelText } = render(JsonResponseBuilder, { props: { fields: nestedFields } });
+    expect(queryByLabelText('Replier nom')).not.toBeInTheDocument();
+    expect(queryByLabelText('Deplier nom')).not.toBeInTheDocument();
+  });
+});

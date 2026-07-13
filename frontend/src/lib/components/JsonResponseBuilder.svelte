@@ -63,6 +63,35 @@
 
   let focusedFields = $derived(getByPathSafe(fields, focusPath) ?? []);
 
+  // Pliage/depliage des noeuds imbriques (objet/tableau), style IDE (retour
+  // beta-testeur : les arbres profonds fatiguent a parcourir sans pouvoir
+  // replier une branche deja comprise). Etat purement local a la session
+  // d'edition (un simple Set en memoire, jamais persiste — cf CLAUDE.md,
+  // meme sobriete que le niveau 1 de group-expansion-state.svelte.js mais
+  // sans meme le besoin de survivre a un demontage de composant ici). Cle
+  // par testPath (chemin positionnel, identique a celui deja utilise pour
+  // les data-testid) : comme le breadcrumb ci-dessus, ne suit pas un champ
+  // au-dela d'un reordonnancement/suppression — limitation mineure assumee,
+  // deja implicitement acceptee par le mecanisme de breadcrumb existant.
+  // Par defaut tout est deplie (Set vide) : comportement inchange tant que
+  // l'utilisateur ne replie rien explicitement.
+  let collapsedPaths = $state(new Set());
+
+  function isCollapsed(testPath) { return collapsedPaths.has(testPath); }
+
+  function toggleCollapse(testPath) {
+    const next = new Set(collapsedPaths);
+    if (next.has(testPath)) next.delete(testPath); else next.add(testPath);
+    collapsedPaths = next;
+  }
+
+  function nestedCount(field, ft) {
+    if (ft === 'object') return (field.children || []).length;
+    if (ft === 'array-values') return (field.items || []).length;
+    if (ft === 'array-objects') return (field.template || []).length;
+    return 0;
+  }
+
   function breadcrumbTrail(path) {
     const trail = [{ label: 'racine', path: [] }];
     let current = fields;
@@ -251,8 +280,22 @@
     {#each fieldList as field, idx}
       {@const ft = field.fieldType || 'value'}
       {@const testPath = [...path, idx].join('-')}
+      {@const hasNested = ft === 'object' || ft === 'array-values' || ft === 'array-objects'}
+      {@const collapsed = hasNested && isCollapsed(testPath)}
       <div class="field-row" style:margin-left="{depth * 1.25}rem">
         <div class="field-main">
+          {#if hasNested}
+            <button
+              type="button"
+              class="btn-icon collapse-toggle"
+              onclick={() => toggleCollapse(testPath)}
+              aria-expanded={!collapsed}
+              aria-controls="json-builder-children-{testPath}"
+              aria-label={collapsed ? `Deplier ${field.key || 'ce champ'}` : `Replier ${field.key || 'ce champ'}`}
+              title={collapsed ? 'Deplier' : 'Replier'}
+              data-testid="json-builder-collapse-button-{testPath}"
+            >{collapsed ? '▶' : '▼'}</button>
+          {/if}
           <input
             type="text"
             class="key-input"
@@ -276,6 +319,9 @@
           {#if ft === 'value'}
             {@render renderValueControls(field, path, idx)}
           {/if}
+          {#if collapsed}
+            <span class="collapsed-indicator" data-testid="json-builder-collapsed-indicator-{testPath}">({nestedCount(field, ft)} masque{nestedCount(field, ft) > 1 ? 's' : ''})</span>
+          {/if}
           <div class="field-actions">
             {#if ft === 'object' || ft === 'array-objects'}
               <button
@@ -294,12 +340,12 @@
         </div>
 
         {#if ft === 'object'}
-          <div class="nested-block">
+          <div class="nested-block" id="json-builder-children-{testPath}" hidden={collapsed}>
             {@render renderFields(field.children || [], [...path, idx, 'children'], depth + 1)}
             <button type="button" class="btn btn-xs btn-outline" onclick={() => addFieldAt([...path, idx, 'children'])} data-testid="json-builder-add-subfield-button-{testPath}">+ Sous-champ</button>
           </div>
         {:else if ft === 'array-values'}
-          <div class="nested-block">
+          <div class="nested-block" id="json-builder-children-{testPath}" hidden={collapsed}>
             {#each (field.items || []) as item, iidx}
               <div class="array-item">
                 <span class="item-index">{iidx + 1}</span>
@@ -310,7 +356,7 @@
             <button type="button" class="btn btn-xs btn-outline" onclick={() => addArrayItem([...path, idx, 'items'])} data-testid="json-builder-add-item-button-{testPath}">+ Element</button>
           </div>
         {:else if ft === 'array-objects'}
-          <div class="nested-block">
+          <div class="nested-block" id="json-builder-children-{testPath}" hidden={collapsed}>
             <span class="nested-hint">Schema d'un element du tableau :</span>
             {@render renderFields(field.template || [], [...path, idx, 'template'], depth + 1)}
             <button type="button" class="btn btn-xs btn-outline" onclick={() => addFieldAt([...path, idx, 'template'])} data-testid="json-builder-add-template-field-button-{testPath}">+ Champ</button>
@@ -388,6 +434,9 @@
 
   .nested-block { margin-top: 0.375rem; padding-left: 0.75rem; border-left: 2px solid var(--color-primary); }
   .nested-hint { font-size: 0.75rem; color: var(--color-text-muted); font-style: italic; display: block; margin-bottom: 0.25rem; }
+
+  .collapse-toggle { flex-shrink: 0; }
+  .collapsed-indicator { font-size: 0.75rem; color: var(--color-text-muted); font-style: italic; white-space: nowrap; }
 
   .array-item { display: flex; gap: 0.375rem; align-items: center; flex-wrap: wrap; padding: 0.25rem 0; }
   .item-index { display: inline-flex; align-items: center; justify-content: center; width: 1.25rem; height: 1.25rem; border-radius: 50%; background: var(--color-text-muted); color: #fff; font-size: 0.65rem; font-weight: 700; flex-shrink: 0; }
