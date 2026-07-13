@@ -1,5 +1,6 @@
 <script>
   import { getLogs } from '../api.js';
+  import { formatDateTimePrecise } from '../format-date.js';
 
   let logs = $state([]);
   let loading = $state(true);
@@ -69,17 +70,6 @@
     if (mode === 'mock') return 'badge-mock';
     if (mode === 'proxy') return 'badge-proxy';
     return 'badge-error';
-  }
-
-  function formatDateTime(ts) {
-    return new Date(ts).toLocaleString('fr-FR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
   }
 
   function openDetail(log) { detailLog = log; }
@@ -173,7 +163,7 @@
         <tbody>
           {#each filteredLogs() as log, idx}
             <tr data-testid="request-log-row-{idx}">
-              <td class="col-time">{formatDateTime(log.timestamp)}</td>
+              <td class="col-time">{formatDateTimePrecise(log.timestamp)}</td>
               <td><strong>{log.service_name}</strong></td>
               <td><span class="method-badge" data-method={log.method}>{log.method}</span></td>
               <td class="col-path"><code>{log.path}</code></td>
@@ -202,7 +192,7 @@
       <dl class="detail-list">
         <div class="detail-row">
           <dt>Date/Heure</dt>
-          <dd>{formatDateTime(detailLog.timestamp)}</dd>
+          <dd>{formatDateTimePrecise(detailLog.timestamp)}</dd>
         </div>
         <div class="detail-row">
           <dt>Service</dt>
