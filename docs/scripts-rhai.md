@@ -17,6 +17,8 @@ Ces trois blocs sont **totalement indépendants** : ils voient tous la même req
 
 > **Pré-script et Post-script sont repliés par défaut** derrière une zone "Options avancées" — la plupart des règles n'en ont pas besoin, seul le **Script** principal reste toujours visible. Cliquez sur "Options avancées (pré-script / post-script)" pour les afficher. Si vous modifiez une règle qui utilise déjà l'un des deux, la zone s'ouvre **automatiquement** à l'affichage : vous ne pouvez jamais tomber sur du contenu déjà configuré sans le voir. Replier/déplier n'efface jamais ce que vous avez saisi.
 
+![Options avancées repliées par défaut sur une nouvelle règle : seul le bouton "▶ Options avancées" est visible](screenshots/regle-options-avancees-repliees.png)
+
 *(Capture manquante — aucun scénario E2E existant n'active simultanément les 3 zones de script [pré-script/script/post-script sont des blocs repliés indépendamment, activés un par un dans les tests actuels] ; à réaliser manuellement, cf `frontend/e2e/README.md` section captures.)*
 
 Chaque bloc peut retourner :

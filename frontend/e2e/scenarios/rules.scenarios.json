@@ -143,7 +143,11 @@
         { "action": "click", "target": "serviceCard.configureButton", "params": { "name": "fold-adv-svc" } },
         { "action": "click", "target": "ruleList.addButton" },
         { "action": "assertVisible", "target": "ruleForm.advancedOptionsToggleButton" },
-        { "action": "assertHidden", "target": "ruleForm.advancedOptionsPanel" }
+        { "action": "assertHidden", "target": "ruleForm.advancedOptionsPanel" },
+        { "action": "click", "target": "ruleForm.advancedOptionsToggleButton" },
+        { "action": "click", "target": "ruleForm.advancedOptionsToggleButton" },
+        { "action": "assertHidden", "target": "ruleForm.advancedOptionsPanel" },
+        { "action": "screenshot", "file": "regle-options-avancees-repliees.png" }
       ]
     },
     {
@@ -196,6 +200,7 @@
         { "action": "click", "target": "jsonBuilder.collapseButton", "params": { "path": "0" } },
         { "action": "assertHidden", "target": "jsonBuilder.keyInput", "params": { "path": "0-children-0" } },
         { "action": "assertVisible", "target": "jsonBuilder.collapsedIndicator", "params": { "path": "0" } },
+        { "action": "screenshot", "file": "regle-json-noeud-replie.png" },
         { "action": "click", "target": "jsonBuilder.collapseButton", "params": { "path": "0" } },
         { "action": "assertVisible", "target": "jsonBuilder.keyInput", "params": { "path": "0-children-0" } },
         { "action": "click", "target": "ruleForm.submitButton" },

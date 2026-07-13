@@ -20,6 +20,8 @@ Pour naviguer dans une structure profondément imbriquée sans se perdre, un fil
 
 Chaque champ **objet** ou **tableau** (JSON comme XML) affiche aussi un petit **chevron** (▼/▶) à gauche : cliquez dessus pour **replier** ce champ et masquer temporairement son contenu — pratique une fois qu'une branche est déjà configurée et que vous voulez vous concentrer sur le reste sans la faire défiler à chaque fois. Un texte ("N masqué(s)") rappelle qu'il y a du contenu caché. Replier/déplier n'efface jamais rien : c'est un pur affichage, et tout reste déplié par défaut à l'ouverture du formulaire.
 
+![Champ JSON replié : le chevron pointe à droite et un indicateur signale le contenu masqué](screenshots/regle-json-noeud-replie.png)
+
 *(Capture manquante — aucun scénario E2E existant ne navigue dans le builder JSON guidé avec le fil d'Ariane ; à réaliser manuellement, cf `frontend/e2e/README.md` section captures.)*
 
 ### 2. Le mode "exemple d'abord" (coller un exemple existant)
