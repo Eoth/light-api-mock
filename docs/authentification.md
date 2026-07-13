@@ -41,6 +41,12 @@ présence du bouton "Reset" à côté du badge.)*
 - Nécessite un serveur Keycloak déjà en place et accessible depuis lightMock ; sans cette
   configuration renseignée correctement, lightMock refuse de démarrer si l'authentification est
   activée (pour éviter de tourner accidentellement "à moitié protégé").
+- **lightMock est autonome : aucune passerelle d'authentification externe n'est requise en
+  amont.** L'application sert elle-même son écran de connexion, y compris quand
+  l'authentification est activée — la page d'accueil (HTML, script et style) reste accessible
+  sans token, seuls les appels à l'API de gestion (services, groupes, sauvegardes, etc.)
+  l'exigent. Un déploiement derrière un reverse-proxy/une passerelle reste possible, mais n'est
+  jamais un prérequis pour que l'écran de connexion s'affiche.
 - Un bouton "Reset" (réinitialisation complète, voir [Administration](administration.md)) peut être
   affiché ou masqué indépendamment de l'authentification — mais sa présence à l'écran n'est
   **jamais** la seule protection réelle : l'autorisation est toujours vérifiée côté serveur.
