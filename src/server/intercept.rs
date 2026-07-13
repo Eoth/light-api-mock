@@ -95,6 +95,32 @@ async fn do_proxy(
     req: Request<Body>,
     captured: Option<CapturedRequest>,
 ) -> Response {
+    // Service "purement mocke" (sujet 22, real_target_url vide, cf CLAUDE.md
+    // §3) : ne jamais tenter de proxifier vers une URL vide. `validate_service`
+    // bloque deja cette combinaison a la sauvegarde quand is_mocked=false,
+    // mais une regle action=Proxy peut matcher meme si le service est
+    // is_mocked=true et sans cible (bascule a posteriori non bloquante,
+    // §3 point "bascule a posteriori") : garde defensive ici pour renvoyer
+    // une erreur claire plutot qu'une erreur technique confuse (URL invalide,
+    // echec DNS...).
+    if service.real_target_url.trim().is_empty() {
+        tracing::warn!(
+            service_key = %service.name, method = %method_str, path = %path,
+            context = %context, mode = "proxy-blocked",
+            "proxy attempted on a purely-mocked service (no target configured)"
+        );
+        let message = "Ce service est purement mocke (aucune cible configuree) : impossible de relayer cette requete.";
+        state.request_log.log_proxy(
+            &service.name,
+            method_str,
+            path,
+            "(aucune cible configuree)",
+            StatusCode::BAD_GATEWAY.as_u16(),
+            captured,
+        );
+        return (StatusCode::BAD_GATEWAY, message).into_response();
+    }
+
     let prefix = match group_code {
         Some(code) => format!("/{}/{}", code, service.name),
         None => format!("/{}", service.name),
@@ -217,7 +243,18 @@ async fn handle_service(
         state
             .request_log
             .log_no_rule(&service.name, &method_str, path, captured);
-        return StatusCode::NOT_FOUND.into_response();
+        // Message explicite (sujet 22) : un service "purement mocke" (aucune
+        // cible, cf CLAUDE.md §3) n'a de toute facon jamais tente de proxy de
+        // repli ici (is_mocked=true => uniquement les regles sont evaluees,
+        // voir plus haut) — mais sans message, l'absence de reponse restait
+        // silencieuse. Le message differencie ce cas d'un service avec cible
+        // qui manque juste une regle, pour orienter le diagnostic.
+        let message = if service.real_target_url.trim().is_empty() {
+            "Aucune regle ne correspond a cette requete : ce service est purement mocke (aucune cible configuree)."
+        } else {
+            "Aucune regle ne correspond a cette requete pour ce service."
+        };
+        return (StatusCode::NOT_FOUND, message).into_response();
     };
 
     if rule.action == RuleAction::Proxy {
@@ -999,6 +1036,199 @@ mod tests {
         assert_eq!(captured.path_params.get("id").unwrap(), "42");
         assert_eq!(captured.query_params.get("foo").unwrap(), "bar");
         assert!(!captured.body_truncated);
+
+        std::fs::remove_dir_all(&data_dir).ok();
+    }
+
+    // --- Service "purement mocke" (sujet 22, real_target_url vide) ---
+    // Helper partage par les 3 tests ci-dessous : construit un vrai serveur
+    // Axum (meme routeur qu'en production) pour une config donnee. Factorise
+    // ici (contrairement aux tests precedents, ecrits avant ce sujet) car
+    // les 3 scenarios suivants ne different que par la config initiale.
+    async fn spawn_test_server(config: MockConfig) -> (u16, crate::server::request_log::RequestLog, std::path::PathBuf) {
+        let data_dir = temp_dir_for_intercept_test();
+        let store = MockStore::new(data_dir.join("mock-config.yaml"));
+        store.replace(config).await.unwrap();
+        store.flush().await;
+
+        #[cfg(feature = "messaging-kafka")]
+        let messaging = crate::messaging::MessagingState {
+            message_log: crate::messaging::message_log::MessageLog::new(),
+            reply_topic: None,
+            publisher: crate::messaging::consumer::Publisher::None,
+        };
+        let state = AppState {
+            store,
+            proxy: crate::engine::ProxyClient::new(),
+            seq_counters: std::sync::Arc::new(std::sync::RwLock::new(HashMap::new())),
+            request_log: crate::server::request_log::RequestLog::new(),
+            auth_config: disabled_auth_config(),
+            keycloak: None,
+            script_engine: ScriptEngine::new(),
+            ping_cache: crate::server::ping::PingCache::new(),
+            #[cfg(feature = "messaging-kafka")]
+            messaging,
+        };
+        let request_log_handle = state.request_log.clone();
+        let app = crate::server::build_router(state, &data_dir);
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let server_port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            axum::serve(listener, app).await.unwrap();
+        });
+        (server_port, request_log_handle, data_dir)
+    }
+
+    fn purely_mocked_service(rules: Vec<Rule>) -> Service {
+        Service {
+            name: "nocible".into(),
+            listen_path: "".into(),
+            real_target_url: "".into(),
+            is_mocked: true,
+            rewrite_directory_urls: false,
+            group_name: None,
+            wsdl_mode: WsdlMode::default(),
+            rules,
+        }
+    }
+
+    #[tokio::test]
+    async fn no_rule_match_message_mentions_purely_mocked_when_target_empty() {
+        // Regle qui ne peut jamais matcher un GET (methode POST uniquement),
+        // pour forcer le chemin "aucune regle ne correspond".
+        let rule = Rule {
+            name: "post-only".into(),
+            method: "POST".into(),
+            sub_path: None,
+            action: RuleAction::Mock,
+            pre_script: None,
+            script: None,
+            post_script: None,
+            conditions: ConditionGroup::default(),
+            response: MockResponse { status: 200, headers: vec![], body: vec![], chaos: None },
+        };
+        let (port, request_log_handle, data_dir) = spawn_test_server(MockConfig {
+            services: vec![purely_mocked_service(vec![rule])],
+            groups: vec![],
+        })
+        .await;
+
+        let resp = reqwest::Client::new()
+            .get(format!("http://127.0.0.1:{port}/nocible/anything"))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(resp.status().as_u16(), 404);
+        let body = resp.text().await.unwrap();
+        assert!(
+            body.contains("purement mock"),
+            "le message doit expliciter l'absence de cible, obtenu: {body}"
+        );
+
+        let logged = request_log_handle.recent(1);
+        assert_eq!(logged[0].mode, "no-rule");
+
+        std::fs::remove_dir_all(&data_dir).ok();
+    }
+
+    #[tokio::test]
+    async fn no_rule_match_message_is_generic_when_target_configured() {
+        let rule = Rule {
+            name: "post-only".into(),
+            method: "POST".into(),
+            sub_path: None,
+            action: RuleAction::Mock,
+            pre_script: None,
+            script: None,
+            post_script: None,
+            conditions: ConditionGroup::default(),
+            response: MockResponse { status: 200, headers: vec![], body: vec![], chaos: None },
+        };
+        let mut service = purely_mocked_service(vec![rule]);
+        service.name = "avecible".into();
+        service.real_target_url = "http://unused.invalid".into();
+        let (port, _log, data_dir) = spawn_test_server(MockConfig {
+            services: vec![service],
+            groups: vec![],
+        })
+        .await;
+
+        let resp = reqwest::Client::new()
+            .get(format!("http://127.0.0.1:{port}/avecible/anything"))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(resp.status().as_u16(), 404);
+        let body = resp.text().await.unwrap();
+        assert!(
+            !body.contains("purement mock"),
+            "un service avec cible ne doit pas afficher le message 'purement mocke', obtenu: {body}"
+        );
+
+        std::fs::remove_dir_all(&data_dir).ok();
+    }
+
+    #[tokio::test]
+    async fn service_level_proxy_with_empty_target_returns_clear_error() {
+        // Combinaison normalement bloquee par validate_service a la
+        // sauvegarde (is_mocked=false + cible vide), mais atteignable si la
+        // config a ete modifiee hors de l'API (edition manuelle du YAML) :
+        // le garde-fou runtime de do_proxy doit rester la derniere ligne de
+        // defense, cf CLAUDE.md §3/§5.
+        let mut service = purely_mocked_service(vec![]);
+        service.is_mocked = false;
+        let (port, request_log_handle, data_dir) = spawn_test_server(MockConfig {
+            services: vec![service],
+            groups: vec![],
+        })
+        .await;
+
+        let resp = reqwest::Client::new()
+            .get(format!("http://127.0.0.1:{port}/nocible/anything"))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(resp.status().as_u16(), 502);
+        let body = resp.text().await.unwrap();
+        assert!(body.contains("purement mocke") || body.contains("impossible de relayer"));
+
+        let logged = request_log_handle.recent(1);
+        assert_eq!(logged[0].mode, "proxy");
+        assert_eq!(logged[0].status, 502);
+
+        std::fs::remove_dir_all(&data_dir).ok();
+    }
+
+    #[tokio::test]
+    async fn rule_level_proxy_action_with_empty_target_returns_clear_error() {
+        // Bascule a posteriori (sujet 22, §3) : un service devenu "purement
+        // mocke" peut encore contenir une regle action=Proxy (avertissement
+        // non-bloquant a la sauvegarde) — si cette regle matche malgre tout
+        // en production, la requete ne doit jamais atteindre un vrai appel
+        // proxy vers une URL vide.
+        let rule = Rule {
+            name: "stale-proxy-rule".into(),
+            method: "GET".into(),
+            sub_path: None,
+            action: RuleAction::Proxy,
+            pre_script: None,
+            script: None,
+            post_script: None,
+            conditions: ConditionGroup::default(),
+            response: MockResponse { status: 200, headers: vec![], body: vec![], chaos: None },
+        };
+        let (port, _log, data_dir) = spawn_test_server(MockConfig {
+            services: vec![purely_mocked_service(vec![rule])],
+            groups: vec![],
+        })
+        .await;
+
+        let resp = reqwest::Client::new()
+            .get(format!("http://127.0.0.1:{port}/nocible/anything"))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(resp.status().as_u16(), 502);
 
         std::fs::remove_dir_all(&data_dir).ok();
     }

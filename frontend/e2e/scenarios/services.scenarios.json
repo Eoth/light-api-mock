@@ -77,6 +77,50 @@
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
         { "action": "assertVisible", "target": "serviceCard.card", "params": { "name": "tpl-test" } }
       ]
+    },
+    {
+      "scenario": "Creer un service purement mocke via le formulaire",
+      "steps": [
+        { "action": "goto", "page": "services" },
+        { "action": "click", "target": "app.addServiceButton" },
+        { "action": "fill", "target": "serviceForm.nameInput", "value": "purely-mocked-svc" },
+        { "action": "click", "target": "toggleSwitch.switch", "params": { "label": "Service-purement-mocké" } },
+        { "action": "assertHidden", "target": "serviceForm.targetInput" },
+        { "action": "screenshot", "file": "service-purement-mocke-formulaire.png" },
+        { "action": "click", "target": "serviceForm.submitButton" },
+        { "action": "assertVisible", "target": "serviceDetail.editButton" },
+        { "action": "assertHidden", "target": "urlHealthBadge.status", "params": { "serviceName": "purely-mocked-svc" } }
+      ]
+    },
+    {
+      "scenario": "Decocher purement mocke reaffiche la cible sans perte des regles",
+      "steps": [
+        { "action": "goto", "page": "services" },
+        { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
+        { "action": "click", "target": "serviceCard.configureButton", "params": { "name": "purely-mocked-existing" } },
+        { "action": "click", "target": "serviceDetail.editButton" },
+        { "action": "assertHidden", "target": "serviceForm.targetInput" },
+        { "action": "click", "target": "toggleSwitch.switch", "params": { "label": "Service-purement-mocké" } },
+        { "action": "assertVisible", "target": "serviceForm.targetInput" },
+        { "action": "fill", "target": "serviceForm.targetInput", "value": "http://nouvelle-cible:8080" },
+        { "action": "click", "target": "serviceForm.submitButton" },
+        { "action": "assertVisible", "target": "ruleList.item", "params": { "name": "existing-rule" } }
+      ]
+    },
+    {
+      "scenario": "Bascule a posteriori vers purement mocke avec une regle Proxy existante affiche un avertissement",
+      "steps": [
+        { "action": "goto", "page": "services" },
+        { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
+        { "action": "click", "target": "serviceCard.configureButton", "params": { "name": "svc-with-proxy-rule" } },
+        { "action": "click", "target": "serviceDetail.editButton" },
+        { "action": "click", "target": "toggleSwitch.switch", "params": { "label": "Service-purement-mocké" } },
+        { "action": "click", "target": "serviceForm.submitButton" },
+        { "action": "assertVisible", "target": "serviceForm.purelyMockedWarning" },
+        { "action": "click", "target": "serviceForm.purelyMockedSaveAnywayButton" },
+        { "action": "assertVisible", "target": "serviceDetail.editButton" },
+        { "action": "assertHidden", "target": "urlHealthBadge.status", "params": { "serviceName": "svc-with-proxy-rule" } }
+      ]
     }
   ]
 }

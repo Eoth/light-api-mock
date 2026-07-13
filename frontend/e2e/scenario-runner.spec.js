@@ -320,3 +320,36 @@ test.describe('Runner data-driven (scenarios JSON) - lot 5 (detecteur de conflit
     await runScenario(page, loadScenario('rules.scenarios.json', "Enregistrer quand meme malgre l'avertissement de conflit fonctionne"));
   });
 });
+
+// Lot 6 : couverture E2E neuve (pas une migration) pour le service
+// "purement mocke" (real_target_url vide, sujet 22, cf CLAUDE.md §3).
+test.describe('Runner data-driven (scenarios JSON) - lot 6 (service purement mocke)', () => {
+  test.beforeEach(async ({ request }) => {
+    await request.delete(`${API}/config/reset`);
+  });
+
+  test('creer un service purement mocke (scenario JSON)', async ({ page }) => {
+    await runScenario(page, loadScenario('services.scenarios.json', 'Creer un service purement mocke via le formulaire'));
+  });
+
+  test('decocher purement mocke reaffiche la cible sans perte de regles (scenario JSON)', async ({ page, request }) => {
+    await request.post(`${API}/services`, {
+      data: validService('purely-mocked-existing', { real_target_url: '', rules: [validRule('existing-rule')] }),
+    });
+    await runScenario(page, loadScenario('services.scenarios.json', 'Decocher purement mocke reaffiche la cible sans perte des regles'));
+  });
+
+  test('action Proxy absente pour une regle d un service purement mocke (scenario JSON)', async ({ page, request }) => {
+    await request.post(`${API}/services`, {
+      data: validService('purely-mocked-for-rule', { real_target_url: '' }),
+    });
+    await runScenario(page, loadScenario('rules.scenarios.json', "L'action Proxy est absente pour une regle d'un service purement mocke"));
+  });
+
+  test('bascule a posteriori avec regle Proxy existante avertit sans bloquer (scenario JSON)', async ({ page, request }) => {
+    await request.post(`${API}/services`, {
+      data: validService('svc-with-proxy-rule', { rules: [validRule('legacy-proxy-rule', { action: 'proxy' })] }),
+    });
+    await runScenario(page, loadScenario('services.scenarios.json', 'Bascule a posteriori vers purement mocke avec une regle Proxy existante affiche un avertissement'));
+  });
+});

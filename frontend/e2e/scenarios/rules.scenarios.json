@@ -108,6 +108,18 @@
         { "action": "click", "target": "ruleForm.conflictSaveAnywayButton" },
         { "action": "assertVisible", "target": "ruleList.item", "params": { "name": "conflict-rule-two" } }
       ]
+    },
+    {
+      "scenario": "L'action Proxy est absente pour une regle d'un service purement mocke",
+      "steps": [
+        { "action": "goto", "page": "services" },
+        { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
+        { "action": "click", "target": "serviceCard.configureButton", "params": { "name": "purely-mocked-for-rule" } },
+        { "action": "click", "target": "ruleList.addButton" },
+        { "action": "assertVisible", "target": "ruleForm.actionMockOption" },
+        { "action": "assertHidden", "target": "ruleForm.actionProxyOption" },
+        { "action": "assertVisible", "target": "ruleForm.purelyMockedHint" }
+      ]
     }
   ]
 }

@@ -1,6 +1,7 @@
 <script>
   import { untrack } from 'svelte';
   import FormField from './FormField.svelte';
+  import ToggleSwitch from './ToggleSwitch.svelte';
   import { buildServiceTestUrl } from '../service-url.js';
 
   let {
@@ -14,6 +15,20 @@
   let name = $state(untrack(() => service?.name ?? ''));
   let listenPath = $state(untrack(() => service?.listen_path ?? ''));
   let realTargetUrl = $state(untrack(() => service?.real_target_url ?? 'http://'));
+  // Service "purement mocke" (sujet 22) : deduit de real_target_url plutot
+  // qu'un nouveau champ persiste (voir CLAUDE.md §3) — une cible vide EST la
+  // definition de "purement mocke". `??` ne remplace pas une chaine vide,
+  // donc un service existant avec real_target_url: "" est correctement
+  // detecte comme deja purement mocke a l'ouverture du formulaire.
+  let purelyMocked = $state(untrack(() => service ? !service.real_target_url?.trim() : false));
+  // Regles action=Proxy deja presentes sur ce service (avant edition) :
+  // sert uniquement a l'avertissement de bascule a posteriori (point 7,
+  // meme esprit non-bloquant que le detecteur de conflit de regles, sujet
+  // 14) quand l'utilisateur coche "purement mocke" alors que ces regles
+  // existent deja.
+  const proxyRulesAffected = untrack(() => (service?.rules ?? []).filter((r) => r.action === 'proxy'));
+  let pendingPurelyMockedWarning = $state(false);
+  let pendingPayload = $state(null);
   let serviceType = $state(untrack(() => {
     if (service?.wsdl_mode === 'mock' || service?.wsdl_mode === 'proxy') return 'soap';
     return service?.rewrite_directory_urls ? 'soap' : 'rest';
@@ -51,9 +66,53 @@
     return null;
   }
 
+  // Bascule d'affichage : decocher reaffiche le champ cible sans perdre la
+  // valeur precedemment saisie (realTargetUrl n'est jamais efface quand la
+  // case est cochee, seul son rendu est conditionne — point 2 du sujet 22).
+  // Si le champ n'a jamais eu de valeur exploitable, un point de depart
+  // pratique ('http://') est propose, comme pour un service tout neuf.
+  function handlePurelyMockedChange(val) {
+    purelyMocked = val;
+    if (!val && !realTargetUrl.trim()) {
+      realTargetUrl = 'http://';
+    }
+  }
+
+  function buildPayload() {
+    const isSoap = serviceType === 'soap';
+    // Service purement mocke = is_mocked force a true (une cible vide en
+    // proxy direct n'a aucun sens, cf validate_service cote backend) et
+    // real_target_url toujours envoye vide, quoi que contienne encore le
+    // champ cache (il n'est jamais lu dans ce cas).
+    const payload = {
+      name: name.trim(),
+      listen_path: listenPath.trim(),
+      real_target_url: purelyMocked ? '' : realTargetUrl.trim(),
+      is_mocked: purelyMocked ? true : (service?.is_mocked ?? false),
+      rewrite_directory_urls: isSoap,
+      wsdl_mode: isSoap ? 'auto' : 'auto',
+      rules: service?.rules ?? [],
+    };
+    if (groupName) payload.group_name = groupName;
+    return payload;
+  }
+
+  async function submitPayload(payload) {
+    saving = true;
+    try {
+      await onSave(payload);
+    } catch (e) {
+      error = e.message;
+    } finally {
+      saving = false;
+    }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     error = '';
+    pendingPurelyMockedWarning = false;
+    pendingPayload = null;
 
     const nameErr = validateName(name);
     if (nameErr) { error = nameErr; return; }
@@ -61,27 +120,33 @@
     const pathErr = validatePath(listenPath);
     if (pathErr) { error = pathErr; return; }
 
-    if (!realTargetUrl.trim()) { error = "L'URL cible est requise."; return; }
+    if (!purelyMocked && !realTargetUrl.trim()) { error = "L'URL cible est requise."; return; }
 
-    saving = true;
-    try {
-      const isSoap = serviceType === 'soap';
-      const payload = {
-        name: name.trim(),
-        listen_path: listenPath.trim(),
-        real_target_url: realTargetUrl.trim(),
-        is_mocked: service?.is_mocked ?? false,
-        rewrite_directory_urls: isSoap,
-        wsdl_mode: isSoap ? 'auto' : 'auto',
-        rules: service?.rules ?? [],
-      };
-      if (groupName) payload.group_name = groupName;
-      await onSave(payload);
-    } catch (e) {
-      error = e.message;
-    } finally {
-      saving = false;
+    const payload = buildPayload();
+
+    // Bascule a posteriori (point 7) : avertir plutot que bloquer, meme
+    // esprit non-bloquant que le detecteur de conflit de regles (sujet 14,
+    // RuleForm.svelte) — une regle Proxy existante ne casse rien tant que
+    // l'utilisateur n'a pas explicitement confirme vouloir passer outre.
+    if (purelyMocked && proxyRulesAffected.length > 0) {
+      pendingPurelyMockedWarning = true;
+      pendingPayload = payload;
+      return;
     }
+
+    await submitPayload(payload);
+  }
+
+  function confirmSaveDespitePurelyMockedWarning() {
+    const payload = pendingPayload;
+    pendingPurelyMockedWarning = false;
+    pendingPayload = null;
+    if (payload) submitPayload(payload);
+  }
+
+  function cancelPurelyMockedWarning() {
+    pendingPurelyMockedWarning = false;
+    pendingPayload = null;
   }
 </script>
 
@@ -118,19 +183,43 @@
     {/snippet}
   </FormField>
 
-  <FormField id="svc-target" label="URL cible réelle" hint="Adresse du vrai backend dans le cluster (utilisée en mode proxy)">
-    {#snippet children({ id, describedBy })}
-      <input
-        {id}
-        type="url"
-        bind:value={realTargetUrl}
-        required
-        placeholder="ex: http://service-users.default.svc:8080"
-        aria-describedby={describedBy}
-        data-testid="service-form-target-input"
-      />
-    {/snippet}
-  </FormField>
+  <div class="form-field">
+    <ToggleSwitch
+      label="Service purement mocké"
+      checked={purelyMocked}
+      onchange={handlePurelyMockedChange}
+    />
+    <span class="field-hint">Aucune cible réelle : pas de mode proxy, pas de test de disponibilité. Peut être activé à tout moment sans perdre les règles déjà configurées.</span>
+  </div>
+
+  {#if !purelyMocked}
+    <FormField id="svc-target" label="URL cible réelle" hint="Adresse du vrai backend dans le cluster (utilisée en mode proxy)">
+      {#snippet children({ id, describedBy })}
+        <input
+          {id}
+          type="url"
+          bind:value={realTargetUrl}
+          required
+          placeholder="ex: http://service-users.default.svc:8080"
+          aria-describedby={describedBy}
+          data-testid="service-form-target-input"
+        />
+      {/snippet}
+    </FormField>
+  {/if}
+
+  {#if pendingPurelyMockedWarning}
+    <div class="mode-warning" role="alert" data-testid="service-form-purely-mocked-warning">
+      <p>
+        &#9888; {proxyRulesAffected.length > 1 ? 'Ces règles' : 'Cette règle'} de ce service {proxyRulesAffected.length > 1 ? 'sont' : 'est'} en action "Proxy" et ne {proxyRulesAffected.length > 1 ? 'fonctionneront' : 'fonctionnera'} plus une fois le service marqué purement mocké (elle{proxyRulesAffected.length > 1 ? 's' : ''} renverra une erreur claire au lieu de relayer vers une cible) :
+        {proxyRulesAffected.map(r => r.name).join(', ')}.
+      </p>
+      <div class="mode-warning-actions">
+        <button type="button" class="btn btn-sm btn-primary" onclick={confirmSaveDespitePurelyMockedWarning} data-testid="service-form-purely-mocked-save-anyway-button">Enregistrer quand même</button>
+        <button type="button" class="btn btn-sm btn-secondary" onclick={cancelPurelyMockedWarning} data-testid="service-form-purely-mocked-cancel-button">Revenir en arrière</button>
+      </div>
+    </div>
+  {/if}
 
   <FormField id="svc-type" label="Type de service" hint={serviceType === 'soap' ? 'Les requetes ?wsdl seront automatiquement proxyfiees vers le backend reel.' : 'API REST standard (JSON).'}>
     {#snippet children({ id, describedBy })}
@@ -177,6 +266,14 @@
     border-radius: var(--radius);
     padding: 1.5rem;
   }
+
+  /* Meme pattern d'avertissement non-bloquant que RuleForm.svelte
+     (detecteur de conflit de regles, sujet 14) : classe locale, pas de
+     redefinition d'une classe centralisee d'app.css (voir CLAUDE.md §5). */
+  .mode-warning { background: #fff3cd; border: 1px solid #ffc107; color: #664d03; padding: 0.75rem; border-radius: var(--radius); margin-bottom: 0.75rem; }
+  :global([data-theme="dark"]) .mode-warning { background: #332701; border-color: #e5a50a; color: #ffe082; }
+  .mode-warning p { margin: 0 0 0.5rem; font-size: 0.875rem; }
+  .mode-warning-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 
   .url-preview {
     background: var(--color-bg);
