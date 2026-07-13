@@ -12,6 +12,7 @@
   // is_mocked=false) n'en ont jamais : le chemin de streaming zero-buffering
   // ne bufferise pas le corps, donc rien n'est capturable.
   import { testRule } from '../api.js';
+  import { formatDateTime } from '../format-date.js';
   import FormField from './FormField.svelte';
 
   let { serviceName, groupName = null, logs = [], getDraftRule } = $props();
@@ -47,7 +48,7 @@
   }
 
   function logLabel(log) {
-    const date = new Date(log.timestamp).toLocaleString();
+    const date = formatDateTime(log.timestamp);
     return `${log.method} ${log.path} — ${log.mode} — ${date}`;
   }
 

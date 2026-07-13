@@ -7,6 +7,7 @@
   // ce composant n'est monte par App.svelte que si canShowReset est vrai
   // (meme garde que le bouton Reset).
   import { getBackups, restoreBackup } from '../api.js';
+  import { formatDateTime } from '../format-date.js';
   import ConfirmDialog from './ConfirmDialog.svelte';
 
   let { onNotify = () => {}, onBack = () => {} } = $props();
@@ -43,7 +44,7 @@
   }
 
   function formatDate(ms) {
-    return new Date(ms).toLocaleString('fr-FR');
+    return formatDateTime(ms, undefined, 'fr-FR');
   }
 
   function formatSize(bytes) {

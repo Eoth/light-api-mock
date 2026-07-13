@@ -9,6 +9,7 @@
   // c'est le chemin utilise par les tests E2E dans un environnement sans
   // broker Kafka disponible (voir e2e/messaging.spec.js).
   import { getMessagingLogs, simulateMessage } from '../api.js';
+  import { formatDateTimePrecise } from '../format-date.js';
 
   let { onNotify = () => {}, onBack = () => {} } = $props();
 
@@ -63,13 +64,6 @@
 
   function directionLabel(direction) {
     return direction === 'out' ? 'Sortant (reply)' : 'Entrant';
-  }
-
-  function formatDateTime(ts) {
-    return new Date(ts).toLocaleString('fr-FR', {
-      day: '2-digit', month: '2-digit', year: '2-digit',
-      hour: '2-digit', minute: '2-digit', second: '2-digit',
-    });
   }
 
   function openDetail(log) { detailLog = log; }
@@ -179,7 +173,7 @@
         <tbody>
           {#each filteredLogs() as log, idx}
             <tr data-testid="messaging-log-row-{idx}">
-              <td class="col-time">{formatDateTime(log.timestamp)}</td>
+              <td class="col-time">{formatDateTimePrecise(log.timestamp)}</td>
               <td><span class="badge {directionBadge(log.direction)}">{directionLabel(log.direction)}</span></td>
               <td class="col-path"><code>{log.topic}</code></td>
               <td class="col-detail" title={log.rule_matched ? `${log.service_name} / ${log.rule_matched}` : '-'}>
@@ -214,7 +208,7 @@
       <dl class="detail-list">
         <div class="detail-row">
           <dt>Date/Heure</dt>
-          <dd>{formatDateTime(detailLog.timestamp)}</dd>
+          <dd>{formatDateTimePrecise(detailLog.timestamp)}</dd>
         </div>
         <div class="detail-row">
           <dt>Direction</dt>
