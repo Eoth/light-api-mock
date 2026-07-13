@@ -30,7 +30,14 @@ pub async fn auth_middleware(
     let path = req.uri().path().to_string();
 
     let no_auth_paths = ["/api/health", "/api/auth/status", "/api/auth/login", "/api/auth/validate"];
-    if no_auth_paths.iter().any(|p| path == *p) {
+    // Assets statiques de la SPA (index.html, bundle JS/CSS, favicon) : voir
+    // `is_static_asset_route` (src/server/validation.rs) pour la justification
+    // complete. Sans ce bypass, un navigateur sans token ne peut meme pas
+    // charger le JS qui affiche l'ecran de connexion (LoginForm.svelte) quand
+    // AUTH_ENABLED=true. Volontairement distinct de `no_auth_paths` ci-dessus
+    // (egalite stricte) : ce bypass ne doit JAMAIS etre etendu a un prefixe
+    // "/api" — voir les tests de non-regression dans validation.rs.
+    if no_auth_paths.iter().any(|p| path == *p) || crate::server::validation::is_static_asset_route(&path) {
         req.extensions_mut().insert(AuthUser::anonymous());
         return next.run(req).await;
     }
@@ -354,6 +361,57 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(validate.status().as_u16(), 400, "/api/auth/validate doit etre exempt d'auth (meme raisonnement que /auth/login)");
+    }
+
+    #[tokio::test]
+    async fn static_asset_routes_accessible_without_any_token() {
+        // Branche: la coquille de la SPA (racine, index.html, bundle
+        // assets/, favicon) reste chargeable sans token meme avec l'auth
+        // activee ET Keycloak volontairement absent (None) — sinon un
+        // navigateur ne recevrait jamais le JS qui affiche LoginForm.svelte.
+        // spawn_test_app sert `data_dir` comme static_dir (aucun fichier
+        // reel dedans) : on verifie donc l'ABSENCE du 401 "Token manquant"
+        // (preuve que le bypass a bien agi), pas un contenu de fichier reel
+        // — ServeDir renverra 404 pour un fichier absent, ce qui est attendu
+        // ici et ne remet pas en cause le test.
+        let auth_config = enabled_auth_config("http://127.0.0.1:1".into(), vec![]);
+        let base = spawn_test_app(auth_config, None).await;
+        let root = base.trim_end_matches("/api");
+        let client = reqwest::Client::new();
+
+        for path in ["/", "/index.html", "/assets/main.js", "/favicon.ico"] {
+            let resp = client.get(format!("{root}{path}")).send().await.unwrap();
+            assert_ne!(
+                resp.status().as_u16(),
+                401,
+                "asset statique {path} ne doit jamais exiger de token"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn static_asset_bypass_does_not_widen_api_protection() {
+        // Regression cible : le bypass des assets statiques ne doit jamais
+        // affaiblir la protection d'une route /api/* arbitraire (hors les 4
+        // routes deja exemptees). Prouve au niveau du vrai routeur Axum, pas
+        // seulement au niveau unitaire de is_static_asset_route
+        // (validation.rs), que le comportement bout-en-bout reste correct.
+        let kc_url = spawn_fake_keycloak("good-token", "alice").await;
+        let auth_config = enabled_auth_config(kc_url, vec![]);
+        let keycloak = Some(KeycloakClient::new(auth_config.clone()));
+        let base = spawn_test_app(auth_config, keycloak).await;
+        let client = reqwest::Client::new();
+
+        let resp = client
+            .get(format!("{base}/services"))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(
+            resp.status().as_u16(),
+            401,
+            "/api/services doit rester protege malgre le bypass des assets statiques"
+        );
     }
 
     #[tokio::test]

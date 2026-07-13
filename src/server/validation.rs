@@ -32,6 +32,29 @@ pub fn is_internal_route(path: &str) -> bool {
         .any(|prefix| lower == *prefix || lower.starts_with(prefix))
 }
 
+// Sous-ensemble volontairement RESTREINT de `is_internal_route` : les memes
+// prefixes SAUF "/api"/"/api/". Utilise exclusivement par `auth_middleware`
+// (src/auth/middleware.rs) pour laisser un navigateur SANS token charger la
+// coquille de la SPA (index.html + bundle JS/CSS + favicon) quand
+// AUTH_ENABLED=true — sans quoi le JS qui affiche l'ecran de connexion
+// (LoginForm.svelte) ne peut lui-meme jamais etre telecharge (probleme de
+// poule et l'oeuf). Aucun `/api/*` ne doit JAMAIS apparaitre ici : ce serait
+// exactement l'affaiblissement de la protection API que ce bypass doit
+// eviter. Les 4 routes /api/auth/* deja exemptees dans auth_middleware
+// restent gerees separement, par egalite stricte de chemin (pas par ce
+// prefixe).
+const STATIC_ASSET_PATH_PREFIXES: &[&str] = &["/index.html", "/assets/", "/favicon.ico"];
+
+pub fn is_static_asset_route(path: &str) -> bool {
+    if path == "/" || path.is_empty() {
+        return true;
+    }
+    let lower = path.to_lowercase();
+    STATIC_ASSET_PATH_PREFIXES
+        .iter()
+        .any(|prefix| lower == *prefix || lower.starts_with(prefix))
+}
+
 fn is_dangerous_listen_path(_listen_path: &str) -> bool {
     false
 }
@@ -291,6 +314,34 @@ mod tests {
         assert!(is_internal_route("/assets/main.js"));
         assert!(!is_internal_route("/my-svc/foo"));
         assert!(!is_internal_route("/insee/v4/sirene/123"));
+    }
+
+    #[test]
+    fn is_static_asset_route_covers_spa_shell() {
+        assert!(is_static_asset_route("/"));
+        assert!(is_static_asset_route(""));
+        assert!(is_static_asset_route("/index.html"));
+        assert!(is_static_asset_route("/assets/main.js"));
+        assert!(is_static_asset_route("/assets/index-B2Cp0FJn.css"));
+        assert!(is_static_asset_route("/favicon.ico"));
+    }
+
+    #[test]
+    fn is_static_asset_route_never_matches_api_routes() {
+        // Regression cible : ce bypass ne doit JAMAIS s'etendre a /api/*,
+        // sans quoi auth_middleware laisserait passer des routes protegees.
+        assert!(!is_static_asset_route("/api"));
+        assert!(!is_static_asset_route("/api/services"));
+        assert!(!is_static_asset_route("/api/auth/me"));
+        // Piege de prefixe potentiel : "/api/assets/x" NE commence PAS par
+        // "/assets/", donc aucune collision malgre le nom partage "assets".
+        assert!(!is_static_asset_route("/api/assets/x"));
+    }
+
+    #[test]
+    fn is_static_asset_route_does_not_match_user_service_routes() {
+        assert!(!is_static_asset_route("/my-svc/foo"));
+        assert!(!is_static_asset_route("/insee/v4/sirene/123"));
     }
 
     #[test]
