@@ -291,12 +291,103 @@ describe('RuleForm: action Proxy masquee pour un service purement mocke (sujet 2
       conditions: { all_of: [], any_of: [] },
       response: { status: 200, headers: [], body: [{ type: 'Literal', value: 'ok' }], chaos: null },
     };
-    const { container } = render(RuleForm, {
+    const { container, getByTestId } = render(RuleForm, {
       props: { rule: staleRule, existingRules: [], isPurelyMocked: true, onSave },
     });
 
     await submitForm(container);
+    // Avertissement obligatoire avant sauvegarde reelle (voir describe
+    // dedie ci-dessous) : pas de onSave direct ici.
+    expect(onSave).not.toHaveBeenCalled();
+    await fireEvent.click(getByTestId('rule-form-stale-proxy-save-anyway-button'));
     await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
     expect(onSave.mock.calls[0][0].action).toBe('mock');
+  });
+});
+
+describe('RuleForm: avertissement avant de persister le changement proxy -> mock (complement sujet 22)', () => {
+  function staleProxyRule(overrides = {}) {
+    return {
+      name: 'stale-proxy-rule',
+      action: 'proxy',
+      conditions: { all_of: [], any_of: [] },
+      response: { status: 200, headers: [], body: [{ type: 'Literal', value: 'ok' }], chaos: null },
+      ...overrides,
+    };
+  }
+
+  it('affiche un avertissement explicite et bloque la sauvegarde tant qu\'il n\'est pas confirme', async () => {
+    const onSave = vi.fn();
+    // Le mock `checkRuleConflicts` est partage entre tous les tests de ce
+    // fichier (pas de reset global) : on compare le nombre d'appels avant/
+    // apres plutot que de supposer un compteur a zero.
+    const conflictCallsBefore = checkRuleConflicts.mock.calls.length;
+    const { container, getByTestId } = render(RuleForm, {
+      props: { rule: staleProxyRule(), existingRules: [], isPurelyMocked: true, onSave },
+    });
+
+    await submitForm(container);
+
+    const warning = getByTestId('rule-form-stale-proxy-warning');
+    expect(warning).toHaveTextContent('Proxy');
+    expect(warning).toHaveTextContent('Mock');
+    expect(onSave).not.toHaveBeenCalled();
+    // Le detecteur de conflit (appel reseau) n'est pas interroge tant que
+    // l'avertissement local n'est pas resolu.
+    expect(checkRuleConflicts.mock.calls.length).toBe(conflictCallsBefore);
+  });
+
+  it('"Enregistrer quand meme" persiste effectivement le changement vers mock', async () => {
+    checkRuleConflicts.mockResolvedValue({ conflicts: [] });
+    const onSave = vi.fn();
+    const { container, getByTestId, queryByTestId } = render(RuleForm, {
+      props: { rule: staleProxyRule(), existingRules: [], isPurelyMocked: true, onSave },
+    });
+
+    await submitForm(container);
+    await fireEvent.click(getByTestId('rule-form-stale-proxy-save-anyway-button'));
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    expect(onSave.mock.calls[0][0].action).toBe('mock');
+    expect(queryByTestId('rule-form-stale-proxy-warning')).not.toBeInTheDocument();
+  });
+
+  it('"Modifier la regle" referme l\'avertissement sans rien sauvegarder', async () => {
+    const onSave = vi.fn();
+    const { container, getByTestId, queryByTestId } = render(RuleForm, {
+      props: { rule: staleProxyRule(), existingRules: [], isPurelyMocked: true, onSave },
+    });
+
+    await submitForm(container);
+    await fireEvent.click(getByTestId('rule-form-stale-proxy-cancel-button'));
+
+    expect(onSave).not.toHaveBeenCalled();
+    expect(queryByTestId('rule-form-stale-proxy-warning')).not.toBeInTheDocument();
+  });
+
+  it('n\'apparait jamais pour une regle mock ordinaire sur un service purement mocke', async () => {
+    checkRuleConflicts.mockResolvedValue({ conflicts: [] });
+    const onSave = vi.fn();
+    const ordinaryRule = staleProxyRule({ name: 'ordinary-mock-rule', action: 'mock' });
+    const { container, queryByTestId } = render(RuleForm, {
+      props: { rule: ordinaryRule, existingRules: [], isPurelyMocked: true, onSave },
+    });
+
+    await submitForm(container);
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    expect(queryByTestId('rule-form-stale-proxy-warning')).not.toBeInTheDocument();
+  });
+
+  it('n\'apparait jamais pour une regle proxy sur un service qui a une cible (pas purement mocke)', async () => {
+    checkRuleConflicts.mockResolvedValue({ conflicts: [] });
+    const onSave = vi.fn();
+    const { container, queryByTestId } = render(RuleForm, {
+      props: { rule: staleProxyRule(), existingRules: [], isPurelyMocked: false, onSave },
+    });
+
+    await submitForm(container);
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    expect(onSave.mock.calls[0][0].action).toBe('proxy');
+    expect(queryByTestId('rule-form-stale-proxy-warning')).not.toBeInTheDocument();
   });
 });

@@ -51,6 +51,13 @@
   // Proxy est masquee ci-dessous, donc ce cas ne doit pas rester bloque sur
   // une valeur qu'aucun radio visible ne represente.
   let ruleAction = $state(untrack(() => isPurelyMocked && init?.action === 'proxy' ? 'mock' : (init?.action ?? 'mock')));
+  // Vrai uniquement pour LA regle qui vient d'etre ainsi repassee de proxy a
+  // mock a l'ouverture (valeur stockee "proxy", affichage force "mock") —
+  // stable pour toute la duree de vie du formulaire (ne depend jamais de
+  // `ruleAction`, qui ne peut de toute facon plus reprendre "proxy" tant que
+  // l'option est masquee). Sert uniquement a declencher l'avertissement de
+  // sauvegarde ci-dessous ; ne doit jamais influencer `ruleAction` lui-meme.
+  const isStaleProxyRule = untrack(() => isPurelyMocked && init?.action === 'proxy');
   let scriptEnabled = $state(!!init?.script);
   let scriptCode = $state(init?.script ?? '');
   let scriptValidation = $state({ status: '', message: '' });
@@ -208,6 +215,17 @@
   let pendingRulePayload = $state(null);
   let checkingConflicts = $state(false);
 
+  // Avertissement de changement d'action reelle (complement sujet 22, cf
+  // CLAUDE.md §3) : ne concerne QUE `isStaleProxyRule` (valeur stockee
+  // "proxy", forcee a "mock" a l'ouverture parce que le service est
+  // purement mocke) — jamais affiche pour une regle mock ordinaire ni pour
+  // une regle proxy sur un service qui a une cible. Meme pattern non
+  // bloquant que le detecteur de conflit ci-dessus et que l'avertissement
+  // de bascule de `ServiceForm.svelte` : informer, laisser "Enregistrer
+  // quand meme" proceder, "Modifier la regle" referme sans rien sauvegarder.
+  let pendingStaleProxyWarning = $state(false);
+  let pendingStaleProxyPayload = $state(null);
+
   function buildRulePayload() {
     const finalStatus = responseMode === 'empty' ? 204 : status;
     const finalHeaders = responseMode === 'empty' ? [] : respHeaders.filter(h => h.name.trim());
@@ -241,6 +259,8 @@
     formError = '';
     pendingConflicts = [];
     pendingRulePayload = null;
+    pendingStaleProxyWarning = false;
+    pendingStaleProxyPayload = null;
 
     const trimmedName = name.trim();
     if (!trimmedName) { formError = 'Le nom de la regle est requis.'; return; }
@@ -256,6 +276,20 @@
 
     const builtRule = buildRulePayload();
 
+    // Verification purement locale (pas d'appel reseau) : passe AVANT le
+    // detecteur de conflit, pour ne pas interroger le backend tant que
+    // l'utilisateur n'a pas confirme vouloir persister ce changement
+    // d'action reel (proxy -> mock).
+    if (isStaleProxyRule) {
+      pendingStaleProxyWarning = true;
+      pendingStaleProxyPayload = builtRule;
+      return;
+    }
+
+    await checkConflictsAndSave(builtRule);
+  }
+
+  async function checkConflictsAndSave(builtRule) {
     checkingConflicts = true;
     try {
       const result = await checkRuleConflicts({
@@ -287,6 +321,18 @@
     } finally {
       checkingConflicts = false;
     }
+  }
+
+  function confirmSaveDespiteStaleProxyWarning() {
+    const payload = pendingStaleProxyPayload;
+    pendingStaleProxyWarning = false;
+    pendingStaleProxyPayload = null;
+    if (payload) checkConflictsAndSave(payload);
+  }
+
+  function cancelStaleProxyWarning() {
+    pendingStaleProxyWarning = false;
+    pendingStaleProxyPayload = null;
   }
 
   function confirmSaveDespiteConflicts() {
@@ -897,6 +943,18 @@
       </div>
     {/if}
   </fieldset>
+  {/if}
+
+  {#if pendingStaleProxyWarning}
+    <div class="conflict-warning" role="alert" data-testid="rule-form-stale-proxy-warning">
+      <p class="conflict-warning-title">
+        &#9888; Cette règle était enregistrée en action « Proxy », mais ce service est désormais purement mocké : l'enregistrer maintenant la fera basculer réellement en « Mock » (elle ne relaiera plus jamais vers une cible).
+      </p>
+      <div class="mode-warning-actions">
+        <button type="button" class="btn btn-sm btn-primary" onclick={confirmSaveDespiteStaleProxyWarning} data-testid="rule-form-stale-proxy-save-anyway-button">Enregistrer quand même</button>
+        <button type="button" class="btn btn-sm btn-secondary" onclick={cancelStaleProxyWarning} data-testid="rule-form-stale-proxy-cancel-button">Modifier la règle</button>
+      </div>
+    </div>
   {/if}
 
   {#if pendingConflicts.length > 0}

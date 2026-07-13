@@ -352,4 +352,24 @@ test.describe('Runner data-driven (scenarios JSON) - lot 6 (service purement moc
     });
     await runScenario(page, loadScenario('services.scenarios.json', 'Bascule a posteriori vers purement mocke avec une regle Proxy existante affiche un avertissement'));
   });
+
+  test('modifier une regle proxy heritee avertit avant de persister le changement vers mock (scenario JSON)', async ({ page, request }) => {
+    await request.post(`${API}/services`, {
+      data: validService('purely-mocked-stale-proxy', {
+        real_target_url: '',
+        rules: [validRule('stale-proxy-rule', { action: 'proxy' })],
+      }),
+    });
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Modifier une regle proxy heritee sur un service purement mocke affiche un avertissement avant sauvegarde'));
+
+    // Verification hors runner (pas une interaction UI) : le clic sur
+    // "Enregistrer quand meme" a bien persiste le changement reel
+    // proxy -> mock, pas seulement fait disparaitre l'avertissement a
+    // l'ecran.
+    const resp = await request.get(`${API}/services/purely-mocked-stale-proxy`);
+    const body = await resp.json();
+    const rule = body.rules.find((r) => r.name === 'stale-proxy-rule');
+    expect(rule.action).toBe('mock');
+    expect(rule.sub_path).toBe('/updated');
+  });
 });
