@@ -1,19 +1,10 @@
 # lightMock — Vue d'ensemble des fonctionnalités
 
-lightMock est un outil qui simule ("mock") ou relaie ("proxy") des appels HTTP vers un vrai
-service — utile pour tester une application sans dépendre d'un backend réel, ou pour rejouer des
-scénarios précis (erreurs, lenteurs, données particulières) à la demande. Tout se pilote depuis
-une interface web, sans redémarrage.
+lightMock est un outil qui simule ("mock") ou relaie ("proxy") des appels HTTP vers un vrai service — utile pour tester une application sans dépendre d'un backend réel, ou pour rejouer des scénarios précis (erreurs, lenteurs, données particulières) à la demande. Tout se pilote depuis une interface web, sans redémarrage.
 
-Cette page est une **vue d'ensemble rapide** : une ligne ou deux par fonctionnalité, avec un lien
-vers la page qui explique comment l'utiliser en détail. Si vous découvrez lightMock, parcourez
-cette liste une première fois pour savoir ce qui existe, puis revenez piocher les pages
-détaillées au besoin.
+Cette page est une **vue d'ensemble rapide** : une ligne ou deux par fonctionnalité, avec un lien vers la page qui explique comment l'utiliser en détail. Si vous découvrez lightMock, parcourez cette liste une première fois pour savoir ce qui existe, puis revenez piocher les pages détaillées au besoin.
 
-> Cette documentation est destinée aux utilisateurs et testeurs du produit (métier, QA). Pour les
-> détails techniques d'installation ou d'architecture, voir `README.md` à la racine du dépôt —
-> cette doc-ci ne le duplique pas, elle explique **ce que le produit permet de faire** et
-> **comment s'en servir**.
+> Cette documentation est destinée aux utilisateurs et testeurs du produit (métier, QA). Pour les détails techniques d'installation ou d'architecture, voir `README.md` à la racine du dépôt — cette doc-ci ne le duplique pas, elle explique **ce que le produit permet de faire** et **comment s'en servir**.
 
 ![Écran d'accueil de lightMock avec la liste des services](screenshots/accueil-liste-services.png)
 
@@ -56,6 +47,4 @@ détaillées au besoin.
 
 ---
 
-**Vous ne trouvez pas une fonctionnalité ?** Elle est peut-être décrite dans une des pages
-ci-dessus sous un autre nom — utilisez la recherche de votre wiki. Si elle manque vraiment,
-signalez-le : cette documentation est maintenue en même temps que le produit.
+**Vous ne trouvez pas une fonctionnalité ?** Elle est peut-être décrite dans une des pages ci-dessus sous un autre nom — utilisez la recherche de votre wiki. Si elle manque vraiment, signalez-le : cette documentation est maintenue en même temps que le produit.
