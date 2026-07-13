@@ -8,9 +8,11 @@ Un [service](services.md) en mode simulé peut avoir **plusieurs règles**. Chaq
 - **Méthode HTTP** : `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS` ou `HEAD`. C'est la règle, pas le service, qui porte la méthode — un même service peut donc répondre différemment sur `GET` et sur `POST`.
 - **Sous-chemin** (optionnel) : un complément au chemin d'écoute du service, pour distinguer plusieurs règles sur des URL voisines. Laissé vide, la règle s'applique à tout chemin sous le service.
 - **Conditions** (optionnelles) : des critères supplémentaires pour affiner quand la règle s'applique (voir ci-dessous). Sans condition, la règle matche dès que la méthode et le sous-chemin correspondent.
-- **Action** : `mock` (répondre avec le contenu configuré, voir [Réponses dynamiques et templates](reponses-et-templates.md)) ou `proxy` (relayer cette requête précise vers le vrai backend, pour un mock partiel — voir [Services et routage](services.md)).
+- **Action** : `mock` (répondre avec le contenu configuré, voir [Réponses dynamiques et templates](reponses-et-templates.md)) ou `proxy` (relayer cette requête précise vers le vrai backend, pour un mock partiel — voir [Services et routage](services.md)). Sur un [service purement mocké](services.md#service-purement-mocké-aucune-cible) (aucune cible réelle configurée), l'action `proxy` n'est pas proposée.
 
 ![Formulaire de création d'une règle (méthode, sous-chemin, action)](screenshots/regle-formulaire-creation.png)
+
+**Ouvrir une règle déjà enregistrée en `proxy` sur un service devenu purement mocké** (cas d'une règle créée avant que le service ne soit basculé en "purement mocké") : le formulaire l'affiche automatiquement en `mock`, seule action encore disponible. Ce n'est qu'un affichage tant que vous n'avez rien enregistré — mais si vous sauvegardez cette règle (même pour un tout autre changement, par exemple une condition), lightMock affiche d'abord un avertissement explicite rappelant que cette sauvegarde va réellement faire basculer la règle de `proxy` à `mock`, avant de vous laisser confirmer ("Enregistrer quand même") ou revenir en arrière.
 
 ## Les conditions : cibler une requête précisément
 

@@ -120,6 +120,20 @@
         { "action": "assertHidden", "target": "ruleForm.actionProxyOption" },
         { "action": "assertVisible", "target": "ruleForm.purelyMockedHint" }
       ]
+    },
+    {
+      "scenario": "Modifier une regle proxy heritee sur un service purement mocke affiche un avertissement avant sauvegarde",
+      "steps": [
+        { "action": "goto", "page": "services" },
+        { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
+        { "action": "click", "target": "serviceCard.configureButton", "params": { "name": "purely-mocked-stale-proxy" } },
+        { "action": "click", "target": "ruleList.editButton", "params": { "name": "stale-proxy-rule" } },
+        { "action": "fill", "target": "ruleForm.subpathInput", "value": "/updated" },
+        { "action": "click", "target": "ruleForm.submitButton" },
+        { "action": "assertVisible", "target": "ruleForm.staleProxyWarning" },
+        { "action": "click", "target": "ruleForm.staleProxySaveAnywayButton" },
+        { "action": "assertVisible", "target": "ruleList.item", "params": { "name": "stale-proxy-rule" } }
+      ]
     }
   ]
 }

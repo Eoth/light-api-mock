@@ -122,7 +122,10 @@
     "conflictWarning": "[data-testid=\"rule-form-conflict-warning\"]",
     "conflictWarningItem": "[data-testid=\"rule-form-conflict-warning-item-{name}\"]",
     "conflictSaveAnywayButton": "[data-testid=\"rule-form-conflict-save-anyway-button\"]",
-    "conflictCancelButton": "[data-testid=\"rule-form-conflict-cancel-button\"]"
+    "conflictCancelButton": "[data-testid=\"rule-form-conflict-cancel-button\"]",
+    "staleProxyWarning": "[data-testid=\"rule-form-stale-proxy-warning\"]",
+    "staleProxySaveAnywayButton": "[data-testid=\"rule-form-stale-proxy-save-anyway-button\"]",
+    "staleProxyCancelButton": "[data-testid=\"rule-form-stale-proxy-cancel-button\"]"
   },
 
   "conditionForm": {
