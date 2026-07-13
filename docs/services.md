@@ -9,11 +9,28 @@ Depuis l'écran d'accueil, le bouton **"+ Ajouter un service"** ouvre un formula
 - **Nom** : identifie le service et sert de premier segment de son URL (voir plus bas). Uniquement lettres, chiffres, tirets et underscores (pas d'espace ni de caractères spéciaux).
 - **Chemin d'écoute** (`listen_path`) : la portion d'URL après le nom du service, par exemple `/v1/utilisateurs/{id}`. Elle peut contenir des paramètres entre accolades (`{id}`) qui seront réutilisables dans les réponses. Si elle est laissée vide, le service répond à **n'importe quel chemin** en dessous de son nom.
 - **URL cible réelle** (`real_target_url`) : l'adresse du vrai backend, utilisée quand une requête est relayée en mode proxy (voir ci-dessous) et par le [ping de disponibilité](ping-de-disponibilite.md).
+- **Service purement mocké** (case à cocher) : voir la section dédiée juste après.
 - **Mock actif** : interrupteur qui bascule le service entre mode simulé et mode relais (voir ci-dessous).
 - **Type de service** : REST (par défaut) ou SOAP — voir la section dédiée plus bas.
 - **Groupe** (optionnel) : rattache le service à un [groupe de services](groupes.md).
 
 ![Formulaire de création d'un nouveau service](screenshots/service-formulaire-creation.png)
+
+## Service purement mocké (aucune cible)
+
+Certains services n'ont jamais vocation à relayer une vraie requête : ils ne servent qu'à simuler des réponses. Pour eux, saisir une URL cible est une charge inutile. La case **"Service purement mocké"** retire cette étape :
+
+- Une fois cochée, le champ **URL cible réelle** disparaît complètement du formulaire (pas seulement grisé) — ainsi que le [ping de disponibilité](ping-de-disponibilite.md), qui n'a plus de sens sans cible.
+- Le service est automatiquement gardé en mode simulé (l'interrupteur "Mock actif" ne peut pas être désactivé pour un service sans cible : un mode relais sans cible ne mènerait qu'à une erreur).
+- Décocher la case à tout moment (y compris en modification) réaffiche le champ cible sans perdre quoi que ce soit — règles, groupe, type de service restent intacts.
+
+![Formulaire avec la case "Service purement mocké" cochée : le champ cible a disparu](screenshots/service-purement-mocke-formulaire.png)
+
+**Comportement d'une requête sans règle correspondante** : sur un service purement mocké, si aucune règle ne matche, la réponse est un `404` avec un message explicite ("ce service est purement mocké, aucune cible configurée") plutôt qu'une tentative de relais ratée vers une adresse vide.
+
+**Une règle en action "Proxy" n'a pas de sens sur un service purement mocké** : cette option est donc retirée du formulaire de règle pour ces services-là (seule l'action "Mock" reste proposée).
+
+**Basculer un service existant vers "purement mocké" alors qu'il a déjà des règles en action Proxy** : lightMock avertit plutôt que de bloquer — un message liste les règles concernées (elles cesseront de relayer réellement, remplacées par une erreur claire) et propose "Enregistrer quand même" ou de revenir en arrière pour les corriger d'abord.
 
 ## Comment l'URL est construite
 

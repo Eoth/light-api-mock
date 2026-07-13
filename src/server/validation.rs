@@ -127,6 +127,19 @@ pub fn validate_service(service: &Service) -> Result<(), ValidationError> {
         });
     }
 
+    // Service "purement mocke" (sujet 22) : real_target_url vide est une
+    // valeur volontaire ("aucune cible configuree"), pas une omission a
+    // rejeter — voir CLAUDE.md §3. En revanche is_mocked=false (proxy pur
+    // niveau service) sans cible n'a aucun sens : ce serait forcement un
+    // proxy vers une URL vide a chaque requete. Bloque a la source plutot
+    // que de laisser cette combinaison invalide atteindre le pipeline HTTP.
+    if !service.is_mocked && service.real_target_url.trim().is_empty() {
+        return Err(ValidationError {
+            field: "real_target_url",
+            message: "Un service sans cible ne peut pas etre en proxy direct (is_mocked=false) : activez le mode mock ou renseignez une cible.".into(),
+        });
+    }
+
     let mut seen_rules = std::collections::HashSet::new();
     for rule in &service.rules {
         let rn = rule.name.trim();
@@ -302,6 +315,37 @@ mod tests {
     fn accept_valid_service() {
         assert!(validate_service(&svc("insee", "/v4/sirene/{siret}")).is_ok());
         assert!(validate_service(&svc("users-api", "/v1/users/{id}")).is_ok());
+    }
+
+    #[test]
+    fn accept_empty_target_when_purely_mocked() {
+        // Service "purement mocke" (sujet 22) : real_target_url vide est
+        // accepte tant que is_mocked reste true (les regles sont toujours
+        // evaluees, aucun proxy n'est jamais tente).
+        let mut s = svc("purely-mocked", "/v1/*");
+        s.real_target_url = "".into();
+        s.is_mocked = true;
+        assert!(validate_service(&s).is_ok());
+    }
+
+    #[test]
+    fn reject_empty_target_without_is_mocked() {
+        // is_mocked=false (proxy pur niveau service) sans cible est une
+        // combinaison invalide : ce serait un proxy vers une URL vide a
+        // chaque requete.
+        let mut s = svc("broken", "/v1/*");
+        s.real_target_url = "".into();
+        s.is_mocked = false;
+        let err = validate_service(&s).unwrap_err();
+        assert_eq!(err.field, "real_target_url");
+    }
+
+    #[test]
+    fn reject_whitespace_only_target_without_is_mocked() {
+        let mut s = svc("broken2", "/v1/*");
+        s.real_target_url = "   ".into();
+        s.is_mocked = false;
+        assert!(validate_service(&s).is_err());
     }
 
     #[test]

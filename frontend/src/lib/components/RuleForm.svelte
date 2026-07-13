@@ -27,6 +27,10 @@
     serviceName = null,
     groupName = null,
     listenPath = '',
+    // Service "purement mocke" (sujet 22, cf CLAUDE.md §3) : quand vrai,
+    // l'action "Proxy" n'a plus de sens (aucune cible vers laquelle
+    // relayer) — masquee ci-dessous plutot que simplement desactivee.
+    isPurelyMocked = false,
     onSave = () => {},
     onCancel = () => {},
   } = $props();
@@ -42,7 +46,11 @@
   let name = $state(init?.name ?? '');
   let ruleMethod = $state(init?.method ?? 'GET');
   let subPath = $state(init?.sub_path ?? '');
-  let ruleAction = $state(init?.action ?? 'mock');
+  // Une regle heritee (action=proxy) editee alors que le service est deja
+  // purement mocke n'a plus de choix valide autre que "mock" — l'option
+  // Proxy est masquee ci-dessous, donc ce cas ne doit pas rester bloque sur
+  // une valeur qu'aucun radio visible ne represente.
+  let ruleAction = $state(untrack(() => isPurelyMocked && init?.action === 'proxy' ? 'mock' : (init?.action ?? 'mock')));
   let scriptEnabled = $state(!!init?.script);
   let scriptCode = $state(init?.script ?? '');
   let scriptValidation = $state({ status: '', message: '' });
@@ -565,17 +573,22 @@
   <!-- ACTION -->
   <fieldset class="section action-section">
     <legend>Action quand cette regle matche</legend>
+    {#if isPurelyMocked}
+      <p class="section-help" data-testid="rule-form-purely-mocked-hint">Ce service est purement mocké (aucune cible configurée) : seule l'action Mock est disponible.</p>
+    {/if}
     <div class="action-selector">
-      <label class="action-option" class:selected={ruleAction === 'mock'}>
+      <label class="action-option" class:selected={ruleAction === 'mock'} data-testid="rule-form-action-mock-option">
         <input type="radio" bind:group={ruleAction} value="mock" data-testid="rule-form-action-mock-radio" />
         <span class="action-label">Mock</span>
         <span class="action-desc">Retourner la reponse simulee ci-dessous</span>
       </label>
-      <label class="action-option" class:selected={ruleAction === 'proxy'}>
-        <input type="radio" bind:group={ruleAction} value="proxy" data-testid="rule-form-action-proxy-radio" />
-        <span class="action-label">Proxy</span>
-        <span class="action-desc">Forwarder vers la cible reelle du service</span>
-      </label>
+      {#if !isPurelyMocked}
+        <label class="action-option" class:selected={ruleAction === 'proxy'} data-testid="rule-form-action-proxy-option">
+          <input type="radio" bind:group={ruleAction} value="proxy" data-testid="rule-form-action-proxy-radio" />
+          <span class="action-label">Proxy</span>
+          <span class="action-desc">Forwarder vers la cible reelle du service</span>
+        </label>
+      {/if}
     </div>
   </fieldset>
 

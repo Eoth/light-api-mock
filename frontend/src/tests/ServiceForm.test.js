@@ -2,6 +2,8 @@ import { render, fireEvent } from '@testing-library/svelte';
 import { describe, it, expect, vi } from 'vitest';
 import ServiceForm from '../lib/components/ServiceForm.svelte';
 
+const PURELY_MOCKED_LABEL = 'Service purement mocké';
+
 async function setInput(el, value) {
   el.value = value;
   await fireEvent.input(el);
@@ -196,5 +198,140 @@ describe('ServiceForm validation', () => {
     await setInput(getByLabelText('URL cible réelle'), 'http://backend:8080');
     await submitForm(container);
     expect(onSave).toHaveBeenCalled();
+  });
+});
+
+describe('ServiceForm service purement mocké (sujet 22)', () => {
+  it('cocher la case masque le champ cible et permet la creation sans cible', async () => {
+    const onSave = vi.fn().mockResolvedValue({});
+    const { getByLabelText, getByRole, queryByLabelText, container } = render(ServiceForm, { props: { onSave } });
+
+    // Non coche par defaut : le champ cible est requis comme avant.
+    expect(getByLabelText('URL cible réelle')).toBeInTheDocument();
+
+    await fireEvent.click(getByRole('switch', { name: PURELY_MOCKED_LABEL }));
+    expect(queryByLabelText('URL cible réelle')).not.toBeInTheDocument();
+
+    await setInput(getByLabelText('Nom du service'), 'sans-cible');
+    await submitForm(container);
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+      name: 'sans-cible',
+      real_target_url: '',
+      is_mocked: true,
+    }));
+  });
+
+  it('un service existant sans cible ouvre le formulaire avec la case deja cochee', () => {
+    const existingService = {
+      name: 'deja-purement-mocke',
+      listen_path: '',
+      real_target_url: '',
+      is_mocked: true,
+      rewrite_directory_urls: false,
+      rules: [],
+    };
+    const { getByRole, queryByLabelText } = render(ServiceForm, {
+      props: { service: existingService, isEdit: true },
+    });
+
+    expect(getByRole('switch', { name: PURELY_MOCKED_LABEL })).toHaveAttribute('aria-checked', 'true');
+    expect(queryByLabelText('URL cible réelle')).not.toBeInTheDocument();
+  });
+
+  it('decocher reaffiche le champ cible sans perte des regles existantes', async () => {
+    const onSave = vi.fn().mockResolvedValue({});
+    const existingRules = [{ name: 'r1', action: 'mock' }];
+    const existingService = {
+      name: 'deja-purement-mocke',
+      listen_path: '',
+      real_target_url: '',
+      is_mocked: true,
+      rewrite_directory_urls: false,
+      rules: existingRules,
+    };
+    const { getByLabelText, getByRole, container } = render(ServiceForm, {
+      props: { service: existingService, isEdit: true, onSave },
+    });
+
+    await fireEvent.click(getByRole('switch', { name: PURELY_MOCKED_LABEL }));
+    const targetInput = getByLabelText('URL cible réelle');
+    await setInput(targetInput, 'http://nouvelle-cible:8080');
+    await submitForm(container);
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+      real_target_url: 'http://nouvelle-cible:8080',
+      rules: existingRules,
+    }));
+  });
+
+  it("bascule a posteriori : avertit sans bloquer quand des regles Proxy existent deja, 'Enregistrer quand meme' sauvegarde", async () => {
+    const onSave = vi.fn().mockResolvedValue({});
+    const existingService = {
+      name: 'avec-regles-proxy',
+      listen_path: '',
+      real_target_url: 'http://backend:8080',
+      is_mocked: true,
+      rewrite_directory_urls: false,
+      rules: [{ name: 'proxy-rule', action: 'proxy' }, { name: 'mock-rule', action: 'mock' }],
+    };
+    const { getByRole, container, queryByTestId, getByTestId } = render(ServiceForm, {
+      props: { service: existingService, isEdit: true, onSave },
+    });
+
+    await fireEvent.click(getByRole('switch', { name: PURELY_MOCKED_LABEL }));
+    await submitForm(container);
+
+    expect(onSave).not.toHaveBeenCalled();
+    const warning = getByTestId('service-form-purely-mocked-warning');
+    expect(warning).toHaveTextContent('proxy-rule');
+    expect(warning).not.toHaveTextContent('mock-rule');
+
+    await fireEvent.click(getByTestId('service-form-purely-mocked-save-anyway-button'));
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ real_target_url: '', is_mocked: true }));
+    expect(queryByTestId('service-form-purely-mocked-warning')).not.toBeInTheDocument();
+  });
+
+  it("bascule a posteriori : 'Revenir en arriere' referme l'avertissement sans sauvegarder", async () => {
+    const onSave = vi.fn().mockResolvedValue({});
+    const existingService = {
+      name: 'avec-regle-proxy',
+      listen_path: '',
+      real_target_url: 'http://backend:8080',
+      is_mocked: true,
+      rewrite_directory_urls: false,
+      rules: [{ name: 'proxy-rule', action: 'proxy' }],
+    };
+    const { getByRole, container, getByTestId, queryByTestId } = render(ServiceForm, {
+      props: { service: existingService, isEdit: true, onSave },
+    });
+
+    await fireEvent.click(getByRole('switch', { name: PURELY_MOCKED_LABEL }));
+    await submitForm(container);
+    expect(getByTestId('service-form-purely-mocked-warning')).toBeInTheDocument();
+
+    await fireEvent.click(getByTestId('service-form-purely-mocked-cancel-button'));
+    expect(onSave).not.toHaveBeenCalled();
+    expect(queryByTestId('service-form-purely-mocked-warning')).not.toBeInTheDocument();
+  });
+
+  it('aucun avertissement quand le service purement mocke n\'a aucune regle Proxy', async () => {
+    const onSave = vi.fn().mockResolvedValue({});
+    const existingService = {
+      name: 'sans-regle-proxy',
+      listen_path: '',
+      real_target_url: 'http://backend:8080',
+      is_mocked: true,
+      rewrite_directory_urls: false,
+      rules: [{ name: 'mock-rule', action: 'mock' }],
+    };
+    const { getByRole, container } = render(ServiceForm, {
+      props: { service: existingService, isEdit: true, onSave },
+    });
+
+    await fireEvent.click(getByRole('switch', { name: PURELY_MOCKED_LABEL }));
+    await submitForm(container);
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ real_target_url: '', is_mocked: true }));
   });
 });

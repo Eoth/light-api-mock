@@ -261,3 +261,42 @@ describe('RuleForm: detecteur de conflit a la sauvegarde', () => {
     await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
   });
 });
+
+describe('RuleForm: action Proxy masquee pour un service purement mocke (sujet 22)', () => {
+  it('affiche les deux actions (Mock et Proxy) quand le service a une cible', () => {
+    const { getByTestId, queryByTestId } = render(RuleForm, {
+      props: { isPurelyMocked: false },
+    });
+
+    expect(getByTestId('rule-form-action-mock-radio')).toBeInTheDocument();
+    expect(getByTestId('rule-form-action-proxy-radio')).toBeInTheDocument();
+    expect(queryByTestId('rule-form-purely-mocked-hint')).not.toBeInTheDocument();
+  });
+
+  it('masque l\'action Proxy quand le service est purement mocke', () => {
+    const { getByTestId, queryByTestId } = render(RuleForm, {
+      props: { isPurelyMocked: true },
+    });
+
+    expect(getByTestId('rule-form-action-mock-radio')).toBeInTheDocument();
+    expect(queryByTestId('rule-form-action-proxy-radio')).not.toBeInTheDocument();
+  });
+
+  it('une regle heritee en action=proxy repasse en mock a l\'ouverture si le service est purement mocke', async () => {
+    checkRuleConflicts.mockResolvedValue({ conflicts: [] });
+    const onSave = vi.fn();
+    const staleRule = {
+      name: 'stale-proxy-rule',
+      action: 'proxy',
+      conditions: { all_of: [], any_of: [] },
+      response: { status: 200, headers: [], body: [{ type: 'Literal', value: 'ok' }], chaos: null },
+    };
+    const { container } = render(RuleForm, {
+      props: { rule: staleRule, existingRules: [], isPurelyMocked: true, onSave },
+    });
+
+    await submitForm(container);
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+    expect(onSave.mock.calls[0][0].action).toBe('mock');
+  });
+});

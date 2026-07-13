@@ -130,14 +130,21 @@
           <dt>Chemin d'écoute</dt>
           <dd><code>{service.listen_path}</code></dd>
         </div>
-        <div class="dl-row">
-          <dt>URL cible réelle</dt>
-          <dd><code>{service.real_target_url}</code></dd>
-        </div>
-        <div class="dl-row">
-          <dt>Disponibilité</dt>
-          <dd><UrlHealthBadge serviceName={service.name} groupName={service.group_name} /></dd>
-        </div>
+        {#if service.real_target_url?.trim()}
+          <div class="dl-row">
+            <dt>URL cible réelle</dt>
+            <dd><code>{service.real_target_url}</code></dd>
+          </div>
+          <div class="dl-row">
+            <dt>Disponibilité</dt>
+            <dd><UrlHealthBadge serviceName={service.name} groupName={service.group_name} /></dd>
+          </div>
+        {:else}
+          <div class="dl-row">
+            <dt>URL cible réelle</dt>
+            <dd>Service purement mocké (aucune cible)</dd>
+          </div>
+        {/if}
         <div class="dl-row">
           <dt>Réécriture annuaire</dt>
           <dd>{service.rewrite_directory_urls ? 'Oui' : 'Non'}</dd>
@@ -171,6 +178,7 @@
       serviceName={service.name}
       groupName={service.group_name}
       listenPath={service.listen_path}
+      isPurelyMocked={!service.real_target_url?.trim()}
       onSave={handleSaveRule}
       onCancel={() => editingRuleIdx = null}
     />
@@ -182,6 +190,7 @@
       serviceName={service.name}
       groupName={service.group_name}
       listenPath={service.listen_path}
+      isPurelyMocked={!service.real_target_url?.trim()}
       onSave={handleSaveRule}
       onCancel={() => { addingRule = false; clonedRule = null; }}
     />

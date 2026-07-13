@@ -27,14 +27,21 @@
         <dt>URL test</dt>
         <dd><code>{testUrl}</code></dd>
       </div>
-      <div class="detail-row">
-        <dt>Cible</dt>
-        <dd><code>{service.real_target_url}</code></dd>
-      </div>
-      <div class="detail-row">
-        <dt>Disponibilité</dt>
-        <dd><UrlHealthBadge serviceName={service.name} groupName={service.group_name} /></dd>
-      </div>
+      {#if service.real_target_url?.trim()}
+        <div class="detail-row">
+          <dt>Cible</dt>
+          <dd><code>{service.real_target_url}</code></dd>
+        </div>
+        <div class="detail-row">
+          <dt>Disponibilité</dt>
+          <dd><UrlHealthBadge serviceName={service.name} groupName={service.group_name} /></dd>
+        </div>
+      {:else}
+        <div class="detail-row">
+          <dt>Cible</dt>
+          <dd>Service purement mocké (aucune cible)</dd>
+        </div>
+      {/if}
       <div class="detail-row">
         <dt>Regles</dt>
         <dd>{service.rules?.length ?? 0}</dd>
