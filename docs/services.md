@@ -77,6 +77,11 @@ techniques SOAP (WSDL — le fichier qui décrit une API SOAP) :
   d'API), soit être **prises en charge par vos règles mockées** (`Mock`, si vous voulez simuler
   aussi la description du service).
 
+![Formulaire de service avec le type "SOAP / XML" sélectionné](screenshots/service-formulaire-soap.png)
+
+*(Capture réalisée manuellement. Passer un service en SOAP se fait entièrement depuis ce même
+formulaire de création/modification — aucune configuration supplémentaire n'est nécessaire.)*
+
 ## Suppression, modification, clonage
 
 - **Modifier** un service ouvre le même formulaire pré-rempli.

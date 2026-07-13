@@ -12,9 +12,12 @@ Quand l'authentification est activée, lightMock délègue la vérification de l
 organisation, le cas échéant) : un écran de connexion apparaît, et l'accès est ensuite lié à
 l'utilisateur connecté.
 
-*(Capture manquante — l'environnement de tests automatisés tourne avec `AUTH_ENABLED=false`,
-l'écran de connexion Keycloak n'y apparaît jamais ; nécessite un serveur Keycloak réel pour être
-capturée, à réaliser manuellement.)*
+![Écran de connexion affiché quand l'authentification est activée](screenshots/authentification-ecran-connexion.png)
+
+*(Capture réalisée manuellement contre une instance locale temporaire configurée avec
+`AUTH_ENABLED=true` et un serveur Keycloak de substitution ne servant qu'à illustrer l'écran —
+aucun véritable serveur Keycloak d'organisation n'a été utilisé. Le rendu de l'écran lui-même
+est identique quel que soit le Keycloak réellement connecté.)*
 
 Les droits d'accès dépendent alors :
 
@@ -23,8 +26,11 @@ Les droits d'accès dépendent alors :
 - D'une liste de **super-administrateurs**, qui ont accès à tout, y compris aux actions
   sensibles (réinitialisation complète, restauration de sauvegardes).
 
-*(Capture manquante — même raison que ci-dessus : nécessite une session Keycloak réelle, à
-réaliser manuellement.)*
+![Barre de navigation une fois connecté, avec le badge du nom d'utilisateur](screenshots/authentification-badge-connecte.png)
+
+*(Même capture de substitution que ci-dessus. Une fois connecté, le nom d'utilisateur apparaît en
+badge dans la barre de navigation ; ici l'utilisateur est aussi super-administrateur, d'où la
+présence du bouton "Reset" à côté du badge.)*
 
 ## Prérequis et limites
 

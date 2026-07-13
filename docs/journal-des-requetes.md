@@ -4,9 +4,11 @@ Le bouton **"Logs"** de la barre de navigation ouvre l'historique des dernières
 par lightMock, tous services confondus. Utile pour comprendre ce qui a été réellement envoyé par
 l'application testée, et pour diagnostiquer une règle qui ne se déclenche pas comme prévu.
 
-*(Capture manquante — aucun scénario E2E existant n'ouvre l'écran "Logs" [`RequestLog.svelte`],
-le journal n'est utilisé qu'indirectement via le sélecteur du testeur de règle ; à réaliser
-manuellement, cf `frontend/e2e/README.md` section captures.)*
+![Journal des requêtes listant les derniers appels reçus par un service](screenshots/journal-des-requetes-liste.png)
+
+*(Capture réalisée manuellement — le journal n'est normalement traversé qu'indirectement via le
+sélecteur du testeur de règle, aucun scénario E2E automatisé n'ouvre l'écran "Logs" pour
+lui-même.)*
 
 ## Ce que montre une entrée du journal
 
@@ -18,8 +20,9 @@ manuellement, cf `frontend/e2e/README.md` section captures.)*
 Ce détail est justement ce qu'utilise le [testeur de règle](testeur-de-regle-et-conflits.md) pour
 rejouer une requête précédente contre un brouillon de règle.
 
-*(Capture manquante — même raison que ci-dessus : aucun scénario E2E existant n'ouvre le détail
-d'une entrée du journal ; à réaliser manuellement, cf `frontend/e2e/README.md` section captures.)*
+![Détail d'une entrée du journal : méthode, chemin, mode et règle matchée](screenshots/journal-des-requetes-detail.png)
+
+*(Même remarque que ci-dessus : capture manuelle.)*
 
 ## Prérequis et limites
 

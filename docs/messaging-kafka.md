@@ -13,10 +13,10 @@ n'est simplement pas incluse dans votre installation — ce n'est pas une erreur
 
 ![Bouton "Messages Kafka" visible dans la barre de navigation](screenshots/messaging-bouton-nav.png)
 
-*(Capture générée automatiquement par `npm run docs:screenshots`, mais uniquement contre un
-binaire compilé avec `--features messaging-kafka` — `frontend/e2e/messaging.spec.js` est
-`test.skip` sinon. Le binaire de développement par défaut ne l'a pas : régénérer contre un
-binaire avec la feature activée si cette image manque encore.)*
+*(Capture générée automatiquement par `npm run docs:screenshots`, réalisée contre un binaire
+compilé avec `--features messaging-kafka` — `frontend/e2e/messaging.spec.js` est `test.skip`
+sinon. Le binaire de développement par défaut ne l'a pas : régénérer contre un binaire avec la
+feature activée si cette image redevient manquante après une future mise à jour de l'interface.)*
 
 ## Fonctionnement
 
