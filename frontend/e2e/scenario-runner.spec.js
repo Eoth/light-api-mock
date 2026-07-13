@@ -54,6 +54,14 @@
 // Les tests d'origine sont supprimes du fichier source une fois leur
 // equivalent JSON valide vert (pas de doublon testant deux fois le meme
 // parcours).
+//
+// Lot 5 : couverture E2E neuve (pas une migration) pour le detecteur de
+// conflit de regles (sujet 14).
+// Lot 6 : couverture E2E neuve (pas une migration) pour le service
+// "purement mocke" (sujet 22).
+// Lot 7 : couverture E2E neuve (pas une migration) pour le pliage des
+// arbres JSON/XML et le repli par defaut des Options avancees
+// pre_script/post_script (sujet 25).
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -371,5 +379,58 @@ test.describe('Runner data-driven (scenarios JSON) - lot 6 (service purement moc
     const rule = body.rules.find((r) => r.name === 'stale-proxy-rule');
     expect(rule.action).toBe('mock');
     expect(rule.sub_path).toBe('/updated');
+  });
+});
+
+// Lot 7 : couverture E2E neuve (pas une migration) pour le pliage des
+// arbres JSON/XML et le repli par defaut des Options avancees
+// (pre_script/post_script), sujet 25 -- cf CLAUDE.md, "Chevrons repliables
+// JSON/XML" / "Options avancees pre/post script". Seul le pliage JSON est
+// couvert ici en E2E (le mecanisme XML est strictement identique --
+// meme composant de pliage, meme attribut `hidden` -- deja verifie en
+// profondeur par XmlResponseBuilder.test.js ; dupliquer un parcours UI
+// quasi identique en E2E n'aurait ajoute aucune garantie supplementaire).
+test.describe('Runner data-driven (scenarios JSON) - lot 7 (pliage JSON + options avancees)', () => {
+  test.beforeEach(async ({ request }) => {
+    await request.delete(`${API}/config/reset`);
+    await request.post(`${API}/services`, {
+      data: validService('fold-adv-svc', {
+        rules: [validRule('fold-adv-existing-rule', { post_script: '"deja configure"' })],
+      }),
+    });
+  });
+
+  test('options avancees repliees par defaut pour une nouvelle regle (scenario JSON)', async ({ page }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Options avancees repliees par defaut pour une nouvelle regle'));
+  });
+
+  test('options avancees s ouvre automatiquement si post_script deja rempli (scenario JSON)', async ({ page }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Options avancees s ouvre automatiquement si une regle existante a deja du post_script'));
+  });
+
+  test('saisir du contenu dans le pre-script survit au pliage/depliage des options avancees (scenario JSON)', async ({ page, request }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Saisir du contenu dans le pre-script puis plier/deplier les options avancees ne perd rien'));
+
+    // Verification hors runner : le contenu saisi dans le pre-script avant
+    // le pliage a bien ete persiste (preuve reelle, pas seulement que le
+    // champ redevient visible a l'ecran).
+    const resp = await request.get(`${API}/services/fold-adv-svc`);
+    const body = await resp.json();
+    const rule = body.rules.find((r) => r.name === 'fold-adv-rule');
+    expect(rule.pre_script).toBe('"greeting"');
+  });
+
+  test('replier un noeud JSON imbrique ne perd pas son contenu (scenario JSON)', async ({ page, request }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Replier un noeud JSON imbrique masque ses sous-champs sans perdre leur contenu'));
+
+    // Verification hors runner : le sous-champ saisi pendant que le noeud
+    // parent etait replie (puis redeplie) a bien ete persiste dans le
+    // template genere.
+    const resp = await request.get(`${API}/services/fold-adv-svc`);
+    const body = await resp.json();
+    const rule = body.rules.find((r) => r.name === 'fold-json-rule');
+    expect(rule.response.body[0].template).toContain('"parent"');
+    expect(rule.response.body[0].template).toContain('"child"');
+    expect(rule.response.body[0].template).toContain('hello');
   });
 });

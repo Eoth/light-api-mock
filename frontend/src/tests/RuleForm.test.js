@@ -101,8 +101,16 @@ describe('RuleForm: pre_script / post_script', () => {
     expect(payload.post_script).toBeNull();
   });
 
-  it('affiche les toggles Pré-script et Post-script', () => {
+  it('les toggles Pré-script et Post-script sont replies par defaut derriere "Options avancées"', () => {
+    const { getByRole, queryByRole } = render(RuleForm);
+    expect(getByRole('button', { name: /Options avancées/, expanded: false })).toBeInTheDocument();
+    expect(queryByRole('switch', { name: 'Pré-script (préparation)' })).not.toBeInTheDocument();
+    expect(queryByRole('switch', { name: 'Post-script (finalisation)' })).not.toBeInTheDocument();
+  });
+
+  it('deplier "Options avancées" affiche les toggles Pré-script et Post-script', async () => {
     const { getByRole } = render(RuleForm);
+    await fireEvent.click(getByRole('button', { name: /Options avancées/ }));
     expect(getByRole('switch', { name: 'Pré-script (préparation)' })).toBeInTheDocument();
     expect(getByRole('switch', { name: 'Post-script (finalisation)' })).toBeInTheDocument();
   });
@@ -113,6 +121,7 @@ describe('RuleForm: pre_script / post_script', () => {
     const { getByLabelText, getByRole, container } = render(RuleForm, { props: { onSave } });
 
     await setInput(getByLabelText('Nom de la regle'), 'r2');
+    await fireEvent.click(getByRole('button', { name: /Options avancées/ }));
     await fireEvent.click(getByRole('switch', { name: 'Pré-script (préparation)' }));
     await fireEvent.click(getByRole('switch', { name: 'Post-script (finalisation)' }));
 
@@ -137,12 +146,61 @@ describe('RuleForm: pre_script / post_script', () => {
     const { getByLabelText, getByRole, container } = render(RuleForm, { props: { onSave } });
 
     await setInput(getByLabelText('Nom de la regle'), 'r3');
+    await fireEvent.click(getByRole('button', { name: /Options avancées/ }));
     await fireEvent.click(getByRole('switch', { name: 'Pré-script (préparation)' }));
     await submitForm(container);
 
     await waitFor(() => expect(onSave).toHaveBeenCalled());
     const [payload] = onSave.mock.calls[0];
     expect(payload.pre_script).toBeNull();
+  });
+});
+
+describe('RuleForm: ouverture automatique des "Options avancées"', () => {
+  const baseRule = {
+    name: 'existing',
+    action: 'mock',
+    conditions: { all_of: [], any_of: [] },
+    response: { status: 200, headers: [], body: [{ type: 'Literal', value: 'ok' }], chaos: null },
+  };
+
+  it('reste repliee a l\'ouverture d\'une regle sans pre_script ni post_script', () => {
+    const { getByRole, queryByRole } = render(RuleForm, { props: { rule: baseRule } });
+    expect(getByRole('button', { name: /Options avancées/, expanded: false })).toBeInTheDocument();
+    expect(queryByRole('switch', { name: 'Pré-script (préparation)' })).not.toBeInTheDocument();
+  });
+
+  it('s\'ouvre automatiquement si post_script a deja du contenu', () => {
+    const rule = { ...baseRule, post_script: '"deja configure"' };
+    const { getByRole } = render(RuleForm, { props: { rule } });
+    expect(getByRole('button', { name: /Options avancées/, expanded: true })).toBeInTheDocument();
+    expect(getByRole('switch', { name: 'Post-script (finalisation)' })).toBeInTheDocument();
+  });
+
+  it('s\'ouvre automatiquement si pre_script a deja du contenu', () => {
+    const rule = { ...baseRule, pre_script: '"deja configure"' };
+    const { getByRole } = render(RuleForm, { props: { rule } });
+    expect(getByRole('button', { name: /Options avancées/, expanded: true })).toBeInTheDocument();
+    expect(getByRole('switch', { name: 'Pré-script (préparation)' })).toBeInTheDocument();
+  });
+
+  it('replier/deplier "Options avancées" ne fait perdre aucun contenu deja saisi', async () => {
+    const { getByRole, container } = render(RuleForm);
+
+    await fireEvent.click(getByRole('button', { name: /Options avancées/ }));
+    await fireEvent.click(getByRole('switch', { name: 'Pré-script (préparation)' }));
+    const preTextarea = container.querySelector('#rule-pre-script');
+    await setInput(preTextarea, '"contenu saisi"');
+
+    // Replier la zone : le contenu ne doit pas etre reinitialise (pas de
+    // demontage du composant, juste un attribut `hidden`).
+    await fireEvent.click(getByRole('button', { name: /Options avancées/ }));
+    expect(container.querySelector('#rule-pre-script').value).toBe('"contenu saisi"');
+
+    await fireEvent.click(getByRole('button', { name: /Options avancées/ }));
+    expect(getByRole('switch', { name: 'Pré-script (préparation)' })).toBeInTheDocument();
+    expect(container.querySelector('#rule-pre-script')).toBeVisible();
+    expect(container.querySelector('#rule-pre-script').value).toBe('"contenu saisi"');
   });
 });
 

@@ -125,7 +125,9 @@
     "conflictCancelButton": "[data-testid=\"rule-form-conflict-cancel-button\"]",
     "staleProxyWarning": "[data-testid=\"rule-form-stale-proxy-warning\"]",
     "staleProxySaveAnywayButton": "[data-testid=\"rule-form-stale-proxy-save-anyway-button\"]",
-    "staleProxyCancelButton": "[data-testid=\"rule-form-stale-proxy-cancel-button\"]"
+    "staleProxyCancelButton": "[data-testid=\"rule-form-stale-proxy-cancel-button\"]",
+    "advancedOptionsToggleButton": "[data-testid=\"rule-form-advanced-options-toggle-button\"]",
+    "advancedOptionsPanel": "[data-testid=\"rule-form-advanced-options-panel\"]"
   },
 
   "conditionForm": {
@@ -168,7 +170,9 @@
     "addItemButton": "[data-testid=\"json-builder-add-item-button-{path}\"]",
     "addTemplateFieldButton": "[data-testid=\"json-builder-add-template-field-button-{path}\"]",
     "breadcrumbLink": "[data-testid=\"json-builder-breadcrumb-link-{idx}\"]",
-    "addFieldButton": "[data-testid=\"json-builder-add-field-button\"]"
+    "addFieldButton": "[data-testid=\"json-builder-add-field-button\"]",
+    "collapseButton": "[data-testid=\"json-builder-collapse-button-{path}\"]",
+    "collapsedIndicator": "[data-testid=\"json-builder-collapsed-indicator-{path}\"]"
   },
 
   "xmlBuilder": {
@@ -183,7 +187,9 @@
     "moveDownButton": "[data-testid=\"xml-builder-movedown-button-{path}\"]",
     "deleteButton": "[data-testid=\"xml-builder-delete-button-{path}\"]",
     "addSubnodeButton": "[data-testid=\"xml-builder-add-subnode-button-{path}\"]",
-    "addNodeButton": "[data-testid=\"xml-builder-add-node-button\"]"
+    "addNodeButton": "[data-testid=\"xml-builder-add-node-button\"]",
+    "collapseButton": "[data-testid=\"xml-builder-collapse-button-{path}\"]",
+    "collapsedIndicator": "[data-testid=\"xml-builder-collapsed-indicator-{path}\"]"
   },
 
   "jsonPasteBuilder": {

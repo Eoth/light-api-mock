@@ -134,6 +134,73 @@
         { "action": "click", "target": "ruleForm.staleProxySaveAnywayButton" },
         { "action": "assertVisible", "target": "ruleList.item", "params": { "name": "stale-proxy-rule" } }
       ]
+    },
+    {
+      "scenario": "Options avancees repliees par defaut pour une nouvelle regle",
+      "steps": [
+        { "action": "goto", "page": "services" },
+        { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
+        { "action": "click", "target": "serviceCard.configureButton", "params": { "name": "fold-adv-svc" } },
+        { "action": "click", "target": "ruleList.addButton" },
+        { "action": "assertVisible", "target": "ruleForm.advancedOptionsToggleButton" },
+        { "action": "assertHidden", "target": "ruleForm.advancedOptionsPanel" }
+      ]
+    },
+    {
+      "scenario": "Options avancees s ouvre automatiquement si une regle existante a deja du post_script",
+      "steps": [
+        { "action": "goto", "page": "services" },
+        { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
+        { "action": "click", "target": "serviceCard.configureButton", "params": { "name": "fold-adv-svc" } },
+        { "action": "click", "target": "ruleList.editButton", "params": { "name": "fold-adv-existing-rule" } },
+        { "action": "assertVisible", "target": "ruleForm.advancedOptionsPanel" }
+      ]
+    },
+    {
+      "scenario": "Saisir du contenu dans le pre-script puis plier/deplier les options avancees ne perd rien",
+      "steps": [
+        { "action": "goto", "page": "services" },
+        { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
+        { "action": "click", "target": "serviceCard.configureButton", "params": { "name": "fold-adv-svc" } },
+        { "action": "click", "target": "ruleList.addButton" },
+        { "action": "fill", "target": "ruleForm.nameInput", "value": "fold-adv-rule" },
+        { "action": "selectOption", "target": "ruleForm.methodSelect", "value": "POST" },
+        { "action": "click", "target": "ruleForm.advancedOptionsToggleButton" },
+        { "action": "click", "target": "toggleSwitch.switch", "params": { "label": "Pré-script-(préparation)" } },
+        { "action": "fill", "target": "rhaiScriptEditor.textarea", "params": { "id": "rule-pre-script" }, "value": "\"greeting\"" },
+        { "action": "click", "target": "ruleForm.advancedOptionsToggleButton" },
+        { "action": "assertHidden", "target": "rhaiScriptEditor.textarea", "params": { "id": "rule-pre-script" } },
+        { "action": "click", "target": "ruleForm.advancedOptionsToggleButton" },
+        { "action": "assertVisible", "target": "rhaiScriptEditor.textarea", "params": { "id": "rule-pre-script" } },
+        { "action": "click", "target": "ruleForm.submitButton" },
+        { "action": "assertVisible", "target": "ruleList.item", "params": { "name": "fold-adv-rule" } }
+      ]
+    },
+    {
+      "scenario": "Replier un noeud JSON imbrique masque ses sous-champs sans perdre leur contenu",
+      "steps": [
+        { "action": "goto", "page": "services" },
+        { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
+        { "action": "click", "target": "serviceCard.configureButton", "params": { "name": "fold-adv-svc" } },
+        { "action": "click", "target": "ruleList.addButton" },
+        { "action": "fill", "target": "ruleForm.nameInput", "value": "fold-json-rule" },
+        { "action": "selectOption", "target": "ruleForm.methodSelect", "value": "POST" },
+        { "action": "click", "target": "ruleForm.modeButton", "params": { "mode": "json-guided" } },
+        { "action": "click", "target": "jsonBuilder.addFieldButton" },
+        { "action": "fill", "target": "jsonBuilder.keyInput", "params": { "path": "0" }, "value": "parent" },
+        { "action": "selectOption", "target": "jsonBuilder.typeSelect", "params": { "path": "0" }, "value": "object" },
+        { "action": "click", "target": "jsonBuilder.addSubfieldButton", "params": { "path": "0" } },
+        { "action": "fill", "target": "jsonBuilder.keyInput", "params": { "path": "0-children-0" }, "value": "child" },
+        { "action": "fill", "target": "jsonBuilder.valueInput", "params": { "path": "0-children-0" }, "value": "hello" },
+        { "action": "assertVisible", "target": "jsonBuilder.keyInput", "params": { "path": "0-children-0" } },
+        { "action": "click", "target": "jsonBuilder.collapseButton", "params": { "path": "0" } },
+        { "action": "assertHidden", "target": "jsonBuilder.keyInput", "params": { "path": "0-children-0" } },
+        { "action": "assertVisible", "target": "jsonBuilder.collapsedIndicator", "params": { "path": "0" } },
+        { "action": "click", "target": "jsonBuilder.collapseButton", "params": { "path": "0" } },
+        { "action": "assertVisible", "target": "jsonBuilder.keyInput", "params": { "path": "0-children-0" } },
+        { "action": "click", "target": "ruleForm.submitButton" },
+        { "action": "assertVisible", "target": "ruleList.item", "params": { "name": "fold-json-rule" } }
+      ]
     }
   ]
 }

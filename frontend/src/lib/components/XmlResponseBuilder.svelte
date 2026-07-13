@@ -106,6 +106,20 @@
 
   function needsValueInput(src) { return ['fixed','path','query','header','body'].includes(src); }
 
+  // Pliage/depliage des noeuds parents (memes principes que
+  // JsonResponseBuilder.svelte : Set en memoire, cle par testPath
+  // positionnel, tout deplie par defaut). Voir ce fichier pour le detail
+  // de la decision (CLAUDE.md, "Chevrons repliables JSON/XML").
+  let collapsedPaths = $state(new Set());
+
+  function isCollapsed(testPath) { return collapsedPaths.has(testPath); }
+
+  function toggleCollapse(testPath) {
+    const next = new Set(collapsedPaths);
+    if (next.has(testPath)) next.delete(testPath); else next.add(testPath);
+    collapsedPaths = next;
+  }
+
   export function toTemplate() {
     return xmlFieldsToTemplate(fields, rootTag);
   }
@@ -138,14 +152,30 @@
     {#each nodeList as field, idx}
       {@const nt = field.nodeType || 'value'}
       {@const testPath = [...path, idx].join('-')}
+      {@const collapsed = nt === 'parent' && isCollapsed(testPath)}
       <div class="field-row" style:margin-left="{depth * 1.25}rem">
         <div class="field-main">
+          {#if nt === 'parent'}
+            <button
+              type="button"
+              class="btn-icon collapse-toggle"
+              onclick={() => toggleCollapse(testPath)}
+              aria-expanded={!collapsed}
+              aria-controls="xml-builder-children-{testPath}"
+              aria-label={collapsed ? `Deplier ${field.tag || 'ce noeud'}` : `Replier ${field.tag || 'ce noeud'}`}
+              title={collapsed ? 'Deplier' : 'Replier'}
+              data-testid="xml-builder-collapse-button-{testPath}"
+            >{collapsed ? '▶' : '▼'}</button>
+          {/if}
           <input type="text" class="tag-input" value={field.tag} oninput={(e) => updateProp(path, idx, 'tag', e.target.value)} placeholder="tag" aria-label="Tag XML" data-testid="xml-builder-tag-input-{testPath}" />
           <select class="type-select" value={nt} onchange={(e) => changeNodeType(path, idx, e.target.value)} aria-label="Type de noeud" data-testid="xml-builder-type-select-{testPath}">
             {#each nodeTypes as t}<option value={t.value}>{t.label}</option>{/each}
           </select>
           {#if nt === 'value'}
             {@render renderValueControls(field, path, idx)}
+          {/if}
+          {#if collapsed}
+            <span class="collapsed-indicator" data-testid="xml-builder-collapsed-indicator-{testPath}">({(field.children || []).length} masque{(field.children || []).length > 1 ? 's' : ''})</span>
           {/if}
           <div class="field-actions">
             <button type="button" class="btn-icon" onclick={() => moveAt(path, idx, -1)} disabled={idx === 0} aria-label="Monter" title="Monter" data-testid="xml-builder-moveup-button-{testPath}">&#9650;</button>
@@ -154,7 +184,7 @@
           </div>
         </div>
         {#if nt === 'parent'}
-          <div class="nested-block">
+          <div class="nested-block" id="xml-builder-children-{testPath}" hidden={collapsed}>
             {@render renderNodes(field.children || [], [...path, idx, 'children'], depth + 1)}
             <button type="button" class="btn btn-xs btn-outline" onclick={() => addNodeAt([...path, idx, 'children'])} data-testid="xml-builder-add-subnode-button-{testPath}">+ Sous-noeud</button>
           </div>
@@ -204,6 +234,8 @@
   .btn-icon.btn-delete:hover:not(:disabled) { color: var(--color-danger); border-color: var(--color-danger); }
 
   .nested-block { margin-top: 0.375rem; padding-left: 0.75rem; border-left: 2px solid var(--color-primary); }
+  .collapse-toggle { flex-shrink: 0; }
+  .collapsed-indicator { font-size: 0.75rem; color: var(--color-text-muted); font-style: italic; white-space: nowrap; }
 
   .btn-xs { padding: 0.15rem 0.5rem; font-size: 0.75rem; border-radius: var(--radius); border: 1px solid transparent; font-weight: 600; }
 
