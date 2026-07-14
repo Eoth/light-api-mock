@@ -451,3 +451,42 @@ test.describe('Runner data-driven (scenarios JSON) - lot 8 (doc SOAPAction)', ()
     await runScenario(page, loadScenario('rules.scenarios.json', 'Deux regles sur le meme service routees par le header SOAPAction (illustration doc)'));
   });
 });
+
+// Lot 9 : couverture E2E neuve (pas une migration) illustrant, pour la doc
+// utilisateur (docs/scripts-rhai.md), le pattern "la requete contient une
+// liste d'objets, la reponse doit contenir le meme nombre d'elements
+// construits par position" via parse_json/to_json (script Rhai). Seul
+// l'exemple JSON est illustre en UI (l'exemple XML/SOAP equivalent est deja
+// verifie bout-en-bout par les tests d'integration Rust dans
+// src/server/intercept.rs -- dupliquer un parcours UI quasi identique en
+// E2E n'aurait ajoute aucune garantie supplementaire, cf §3 sobriete des
+// tests du projet).
+test.describe('Runner data-driven (scenarios JSON) - lot 9 (repetition JSON/XML)', () => {
+  test.beforeEach(async ({ request }) => {
+    await request.delete(`${API}/config/reset`);
+    await request.post(`${API}/services`, {
+      data: validService('repeat-pattern-svc', { listen_path: '/calcul', real_target_url: '' }),
+    });
+  });
+
+  test('configurer une regle de repetition JSON via l UI produit bien N elements de reponse (scenario JSON)', async ({ page, request }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Configurer une regle qui repete un element de reponse par element de la requete (illustration doc)'));
+
+    // Verification hors runner (pas une interaction UI) : la regle
+    // configuree via le formulaire produit reellement le comportement
+    // documente -- un vrai appel HTTP avec 2 lignes doit renvoyer 2
+    // elements, chacun construit a partir de la ligne correspondante.
+    const resp = await request.post('http://localhost:7342/repeat-pattern-svc/calcul', {
+      data: { lines: [{ sku: 'REF-001', qty: 3 }, { sku: 'REF-002', qty: 1 }] },
+    });
+    expect(resp.status()).toBe(200);
+    const body = await resp.json();
+    expect(body.count).toBe(2);
+    expect(body.lines).toHaveLength(2);
+    expect(body.lines[0].sku).toBe('REF-001');
+    expect(body.lines[0].qty).toBe(3);
+    expect(body.lines[1].sku).toBe('REF-002');
+    expect(body.lines[1].qty).toBe(1);
+    expect(body.lines[0].lineTotal).toBe(body.lines[0].unitPrice * 3);
+  });
+});

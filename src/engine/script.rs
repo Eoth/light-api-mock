@@ -3,6 +3,12 @@
 // Chaque regle peut avoir un champ `script` optionnel qui est execute
 // avant le rendu du template. Le resultat est accessible via {{script}}
 // (si string) ou {{script.champ}} (si l'objet retourne est un map #{}).
+//
+// parse_json/to_json/parse_xml_items/xml_element (voir plus bas) : ajoutees
+// pour le cas d'usage "la requete contient une liste d'objets, la reponse
+// doit contenir le meme nombre d'elements construits par position" (JSON et
+// XML/SOAP) — ni {{variable}} ni les conditions de regle ne peuvent boucler.
+// Cf docs/scripts-rhai.md pour deux exemples complets verifies bout-en-bout.
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -109,6 +115,39 @@ impl ScriptEngine {
             },
         );
 
+        // parse_json/to_json : pont JSON <-> structure Rhai navigable (Array/Map),
+        // pour le pattern "boucler sur une liste d'objets de la requete et
+        // construire N elements de reponse" (aucun {{variable}}/condition de
+        // regle ne peut boucler). `parse_json(request.body)` retourne un Array/Map
+        // Rhai ; `to_json(valeur)` serialise en texte JSON, a inserer tel quel
+        // dans un champ du map retourne par le script (ex. `#{ items: to_json(out) }`
+        // puis `{{script.items}}` dans le template de reponse — simple substitution
+        // texte, deja geree par le moteur de template existant).
+        engine.register_fn("parse_json", |text: &str| -> rhai::Dynamic {
+            serde_json::from_str::<serde_json::Value>(text)
+                .map(|v| json_value_to_dynamic(&v))
+                .unwrap_or(rhai::Dynamic::UNIT)
+        });
+        engine.register_fn("to_json", |value: rhai::Dynamic| -> String {
+            serde_json::to_string(&dynamic_to_json_value(&value)).unwrap_or_default()
+        });
+
+        // parse_xml_items/xml_element : equivalent XML/SOAP de parse_json/to_json
+        // pour le meme cas d'usage. Pas d'analogue generique "XML <-> Dynamic"
+        // (l'XML n'a pas de mapping 1:1 evident objet/tableau, contrairement au
+        // JSON) : parse_xml_items() extrait directement les elements REPETES a un
+        // chemin donne (le besoin reel : une liste d'objets) en Array de Map (un
+        // niveau de champs enfants, cf limitation documentee sur la fonction),
+        // xml_element() construit un element (et ses enfants, recursivement) a
+        // partir d'une valeur Rhai. `path` reutilise la meme syntaxe segment/segment
+        // (prefixe de namespace ignore) que ConditionSource::XPath (§ matcher.rs).
+        engine.register_fn("parse_xml_items", |text: &str, path: &str| -> rhai::Array {
+            parse_xml_items_impl(text, path)
+        });
+        engine.register_fn("xml_element", |tag: &str, value: rhai::Dynamic| -> String {
+            xml_element_impl(tag, &value)
+        });
+
         Self {
             engine: Arc::new(engine),
         }
@@ -207,6 +246,202 @@ fn seeded_pick_impl(seed: &str, list: &rhai::Array) -> rhai::Dynamic {
     let hash = crate::server::codegen::fnv1a_hash(seed);
     let idx = (hash % list.len() as u64) as usize;
     list[idx].clone()
+}
+
+// --- JSON <-> Dynamic (parse_json / to_json) ---
+
+fn json_value_to_dynamic(value: &serde_json::Value) -> rhai::Dynamic {
+    match value {
+        serde_json::Value::Null => rhai::Dynamic::UNIT,
+        serde_json::Value::Bool(b) => rhai::Dynamic::from(*b),
+        serde_json::Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                rhai::Dynamic::from(i)
+            } else {
+                rhai::Dynamic::from(n.as_f64().unwrap_or_default())
+            }
+        }
+        serde_json::Value::String(s) => rhai::Dynamic::from(s.clone()),
+        serde_json::Value::Array(arr) => {
+            let items: rhai::Array = arr.iter().map(json_value_to_dynamic).collect();
+            rhai::Dynamic::from_array(items)
+        }
+        serde_json::Value::Object(obj) => {
+            let map: rhai::Map = obj
+                .iter()
+                .map(|(k, v)| (k.as_str().into(), json_value_to_dynamic(v)))
+                .collect();
+            rhai::Dynamic::from_map(map)
+        }
+    }
+}
+
+fn dynamic_to_json_value(value: &rhai::Dynamic) -> serde_json::Value {
+    if value.is_unit() {
+        serde_json::Value::Null
+    } else if value.is_bool() {
+        serde_json::Value::Bool(value.as_bool().unwrap_or_default())
+    } else if value.is_int() {
+        serde_json::Value::from(value.as_int().unwrap_or_default())
+    } else if value.is_float() {
+        serde_json::Number::from_f64(value.as_float().unwrap_or_default())
+            .map(serde_json::Value::Number)
+            .unwrap_or(serde_json::Value::Null)
+    } else if value.is_array() {
+        let arr = value.clone().into_array().unwrap_or_default();
+        serde_json::Value::Array(arr.iter().map(dynamic_to_json_value).collect())
+    } else if value.is_map() {
+        let map = value.clone().cast::<rhai::Map>();
+        let obj: serde_json::Map<String, serde_json::Value> = map
+            .iter()
+            .map(|(k, v)| (k.to_string(), dynamic_to_json_value(v)))
+            .collect();
+        serde_json::Value::Object(obj)
+    } else {
+        // string (et tout type sans equivalent JSON direct) : fallback texte,
+        // coherent avec le reste du moteur (ScriptResult.fields fait deja
+        // system­atiquement `.to_string()` sur les valeurs de map, cf execute()).
+        serde_json::Value::String(value.to_string())
+    }
+}
+
+// --- XML : extraction d'elements repetes + construction (parse_xml_items / xml_element) ---
+
+// Extrait TOUS les elements repetes au chemin `path` (segments separes par
+// "/", dernier segment = tag de l'element repete ; prefixes de namespace
+// ignores via MatchEngine::local_name, meme convention que ConditionSource::
+// XPath) en Array de Map Rhai (un champ Map par element, cle = tag de
+// l'enfant, valeur = son texte). Limitation assumee (cas d'usage cible :
+// items plats type SOAP `<product><sku>A</sku><qty>2</qty></product>`) :
+// seul le PREMIER niveau d'enfants de chaque item est capture ; une
+// structure imbriquee plus profonde a l'interieur d'un item n'est pas
+// supportee (ignoree silencieusement) — un vrai parseur XML->arbre generique
+// serait disproportionne pour ce besoin (cf CLAUDE.md, sobriete des API).
+fn parse_xml_items_impl(xml: &str, path: &str) -> rhai::Array {
+    use quick_xml::events::Event;
+    use quick_xml::reader::Reader;
+
+    let segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
+    let Some((item_tag, parent_segments)) = segments.split_last() else {
+        return rhai::Array::new();
+    };
+
+    let mut reader = Reader::from_str(xml);
+    let mut parent_depth = 0usize;
+    let mut in_parent = parent_segments.is_empty();
+    let mut items = rhai::Array::new();
+
+    // item_depth : 0 = hors item, 1 = a l'interieur de l'element item lui-meme,
+    // 2 = a l'interieur d'un champ enfant de l'item (feuille capturee).
+    let mut item_depth: u32 = 0;
+    let mut current_item = rhai::Map::new();
+    let mut current_field = String::new();
+    let mut current_text = String::new();
+
+    loop {
+        match reader.read_event() {
+            Ok(Event::Start(e)) => {
+                let local = crate::engine::matcher::MatchEngine::local_name(&e);
+                if item_depth == 0 {
+                    if in_parent {
+                        if local == *item_tag {
+                            item_depth = 1;
+                            current_item = rhai::Map::new();
+                        }
+                    } else if parent_depth < parent_segments.len()
+                        && local == parent_segments[parent_depth]
+                    {
+                        parent_depth += 1;
+                        if parent_depth == parent_segments.len() {
+                            in_parent = true;
+                        }
+                    }
+                } else if item_depth == 1 {
+                    current_field = local;
+                    current_text.clear();
+                    item_depth = 2;
+                } else {
+                    item_depth += 1;
+                }
+            }
+            Ok(Event::Text(e)) => {
+                if item_depth == 2 {
+                    if let Ok(t) = e.unescape() {
+                        current_text.push_str(&t);
+                    }
+                }
+            }
+            Ok(Event::End(_)) => {
+                if item_depth == 2 {
+                    current_item.insert(
+                        std::mem::take(&mut current_field).into(),
+                        rhai::Dynamic::from(current_text.trim().to_string()),
+                    );
+                    current_text.clear();
+                    item_depth = 1;
+                } else if item_depth == 1 {
+                    items.push(rhai::Dynamic::from_map(std::mem::take(&mut current_item)));
+                    item_depth = 0;
+                } else if item_depth > 2 {
+                    item_depth -= 1;
+                } else if in_parent {
+                    parent_depth = parent_depth.saturating_sub(1);
+                    if parent_depth < parent_segments.len() {
+                        in_parent = false;
+                    }
+                }
+            }
+            Ok(Event::Eof) => break,
+            Err(_) => break,
+            _ => {}
+        }
+    }
+    items
+}
+
+// Construit un element XML `<tag>...</tag>` a partir d'une valeur Rhai :
+// - Map -> un element enfant par cle (recursif) ; une valeur Array sous une
+//   cle REPETE le tag de cette cle (une occurrence par element) plutot que de
+//   produire un tableau litteral (l'XML n'a pas de syntaxe de tableau) ;
+// - Array (au niveau racine de l'appel) -> le tag lui-meme repete une fois
+//   par element (usage : concatener `xml_element("item", it)` dans une
+//   boucle Rhai, ou passer directement le tableau si tous les items partagent
+//   un seul tag) ;
+// - scalaire (string/int/float/bool) -> texte echappe ;
+// - unit (absent/null) -> element auto-ferme `<tag/>`.
+fn xml_element_impl(tag: &str, value: &rhai::Dynamic) -> String {
+    if value.is_map() {
+        let map = value.clone().cast::<rhai::Map>();
+        let mut inner = String::new();
+        for (k, v) in map.iter() {
+            if v.is_array() {
+                let arr = v.clone().into_array().unwrap_or_default();
+                for item in &arr {
+                    inner.push_str(&xml_element_impl(&k.to_string(), item));
+                }
+            } else {
+                inner.push_str(&xml_element_impl(&k.to_string(), v));
+            }
+        }
+        format!("<{tag}>{inner}</{tag}>")
+    } else if value.is_array() {
+        let arr = value.clone().into_array().unwrap_or_default();
+        arr.iter()
+            .map(|item| xml_element_impl(tag, item))
+            .collect()
+    } else if value.is_unit() {
+        format!("<{tag}/>")
+    } else {
+        format!("<{tag}>{}</{tag}>", xml_escape_text(&value.to_string()))
+    }
+}
+
+fn xml_escape_text(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&apos;")
 }
 
 #[cfg(test)]
@@ -566,5 +801,215 @@ mod tests {
         let result = engine.execute(r#"`${year()}-05-10`"#, &empty_ctx()).unwrap();
         assert!(result.value.ends_with("-05-10"));
         assert_eq!(result.value.len(), 10);
+    }
+
+    // --- parse_json / to_json ---
+
+    #[test]
+    fn parse_json_array_len_and_index_access() {
+        let engine = ScriptEngine::new();
+        let ctx = ScriptContext {
+            body: r#"[{"id":"1"},{"id":"2"},{"id":"3"}]"#.into(),
+            ..empty_ctx()
+        };
+        let result = engine
+            .execute("parse_json(request.body).len()", &ctx)
+            .unwrap();
+        assert_eq!(result.value, "3");
+        let result = engine
+            .execute("parse_json(request.body)[1].id", &ctx)
+            .unwrap();
+        assert_eq!(result.value, "2");
+    }
+
+    #[test]
+    fn parse_json_object_field_access() {
+        let engine = ScriptEngine::new();
+        let ctx = ScriptContext {
+            body: r#"{"name":"Alice","age":30}"#.into(),
+            ..empty_ctx()
+        };
+        let result = engine.execute("parse_json(request.body).name", &ctx).unwrap();
+        assert_eq!(result.value, "Alice");
+        let result = engine.execute("parse_json(request.body).age", &ctx).unwrap();
+        assert_eq!(result.value, "30");
+    }
+
+    #[test]
+    fn parse_json_invalid_returns_unit_not_error() {
+        let engine = ScriptEngine::new();
+        let ctx = ScriptContext {
+            body: "not valid json".into(),
+            ..empty_ctx()
+        };
+        let result = engine
+            .execute("type_of(parse_json(request.body))", &ctx)
+            .unwrap();
+        assert_eq!(result.value, "()");
+    }
+
+    #[test]
+    fn to_json_scalar_and_map() {
+        let engine = ScriptEngine::new();
+        let result = engine.execute(r#"to_json("hello")"#, &empty_ctx()).unwrap();
+        assert_eq!(result.value, "\"hello\"");
+        let result = engine
+            .execute(r#"to_json(#{ id: 1, name: "Alice" })"#, &empty_ctx())
+            .unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&result.value).unwrap();
+        assert_eq!(parsed["id"], 1);
+        assert_eq!(parsed["name"], "Alice");
+    }
+
+    #[test]
+    fn parse_json_then_to_json_roundtrip_array_of_objects() {
+        let engine = ScriptEngine::new();
+        let ctx = ScriptContext {
+            body: r#"[{"sku":"A1","qty":2},{"sku":"B2","qty":5}]"#.into(),
+            ..empty_ctx()
+        };
+        let script = r#"
+            let items = parse_json(request.body);
+            let out = [];
+            for it in items {
+                out.push(#{ sku: it.sku, doubled: it.qty * 2 });
+            }
+            to_json(out)
+        "#;
+        let result = engine.execute(script, &ctx).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&result.value).unwrap();
+        assert_eq!(parsed.as_array().unwrap().len(), 2);
+        assert_eq!(parsed[0]["sku"], "A1");
+        assert_eq!(parsed[0]["doubled"], 4);
+        assert_eq!(parsed[1]["sku"], "B2");
+        assert_eq!(parsed[1]["doubled"], 10);
+    }
+
+    #[test]
+    fn parse_json_then_to_json_empty_array_stays_empty() {
+        let engine = ScriptEngine::new();
+        let ctx = ScriptContext {
+            body: "[]".into(),
+            ..empty_ctx()
+        };
+        let script = r#"
+            let items = parse_json(request.body);
+            let out = [];
+            for it in items { out.push(it); }
+            to_json(out)
+        "#;
+        let result = engine.execute(script, &ctx).unwrap();
+        assert_eq!(result.value, "[]");
+    }
+
+    // --- parse_xml_items / xml_element ---
+
+    #[test]
+    fn parse_xml_items_extracts_repeated_flat_elements() {
+        let engine = ScriptEngine::new();
+        let ctx = ScriptContext {
+            body: "<products><product><sku>A1</sku><qty>2</qty></product><product><sku>B2</sku><qty>5</qty></product></products>".into(),
+            ..empty_ctx()
+        };
+        let result = engine
+            .execute(
+                r#"parse_xml_items(request.body, "products/product").len()"#,
+                &ctx,
+            )
+            .unwrap();
+        assert_eq!(result.value, "2");
+        let result = engine
+            .execute(
+                r#"parse_xml_items(request.body, "products/product")[0].sku"#,
+                &ctx,
+            )
+            .unwrap();
+        assert_eq!(result.value, "A1");
+        let result = engine
+            .execute(
+                r#"parse_xml_items(request.body, "products/product")[1].qty"#,
+                &ctx,
+            )
+            .unwrap();
+        assert_eq!(result.value, "5");
+    }
+
+    #[test]
+    fn parse_xml_items_ignores_namespace_prefixes() {
+        let engine = ScriptEngine::new();
+        let ctx = ScriptContext {
+            body: r#"<soap:Envelope><soap:Body><products><product><sku>A1</sku></product></products></soap:Body></soap:Envelope>"#.into(),
+            ..empty_ctx()
+        };
+        let result = engine
+            .execute(
+                r#"parse_xml_items(request.body, "Envelope/Body/products/product").len()"#,
+                &ctx,
+            )
+            .unwrap();
+        assert_eq!(result.value, "1");
+    }
+
+    #[test]
+    fn parse_xml_items_no_match_returns_empty_array() {
+        let engine = ScriptEngine::new();
+        let ctx = ScriptContext {
+            body: "<products></products>".into(),
+            ..empty_ctx()
+        };
+        let result = engine
+            .execute(
+                r#"parse_xml_items(request.body, "products/product").len()"#,
+                &ctx,
+            )
+            .unwrap();
+        assert_eq!(result.value, "0");
+    }
+
+    #[test]
+    fn xml_element_scalar_escapes_special_chars() {
+        let engine = ScriptEngine::new();
+        let result = engine
+            .execute(r#"xml_element("name", "A & <B>")"#, &empty_ctx())
+            .unwrap();
+        assert_eq!(result.value, "<name>A &amp; &lt;B&gt;</name>");
+    }
+
+    #[test]
+    fn xml_element_map_builds_nested_children() {
+        let engine = ScriptEngine::new();
+        let result = engine
+            .execute(
+                r#"xml_element("product", #{ sku: "A1", qty: 2 })"#,
+                &empty_ctx(),
+            )
+            .unwrap();
+        assert!(result.value.starts_with("<product>"));
+        assert!(result.value.ends_with("</product>"));
+        assert!(result.value.contains("<sku>A1</sku>"));
+        assert!(result.value.contains("<qty>2</qty>"));
+    }
+
+    #[test]
+    fn parse_xml_items_then_xml_element_roundtrip_builds_same_count() {
+        let engine = ScriptEngine::new();
+        let ctx = ScriptContext {
+            body: "<products><product><sku>A1</sku><qty>2</qty></product><product><sku>B2</sku><qty>5</qty></product><product><sku>C3</sku><qty>9</qty></product></products>".into(),
+            ..empty_ctx()
+        };
+        let script = r#"
+            let items = parse_xml_items(request.body, "products/product");
+            let out = "";
+            for it in items {
+                out += xml_element("item", #{ sku: it.sku, doubledQty: parse_int(it.qty) * 2 });
+            }
+            out
+        "#;
+        let result = engine.execute(script, &ctx).unwrap();
+        assert_eq!(result.value.matches("<item>").count(), 3);
+        assert!(result.value.contains("<sku>A1</sku>"));
+        assert!(result.value.contains("<doubledQty>4</doubledQty>"));
+        assert!(result.value.contains("<sku>C3</sku>"));
+        assert!(result.value.contains("<doubledQty>18</doubledQty>"));
     }
 }

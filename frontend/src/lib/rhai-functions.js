@@ -71,6 +71,30 @@ export const RHAI_FUNCTIONS = [
     description: 'Choisit un element de la liste de facon deterministe pour un meme seed.',
     insertText: 'seeded_pick(seed, ["a", "b"])',
   },
+  {
+    name: 'parse_json',
+    signature: 'parse_json(texte)',
+    description: 'Parse un texte JSON (ex. request.body) en liste/objet Rhai navigable.',
+    insertText: 'parse_json(request.body)',
+  },
+  {
+    name: 'to_json',
+    signature: 'to_json(valeur)',
+    description: 'Serialise une liste/objet Rhai en texte JSON, a inserer via {{script.champ}}.',
+    insertText: 'to_json(valeur)',
+  },
+  {
+    name: 'parse_xml_items',
+    signature: 'parse_xml_items(texte, "chemin/vers/item")',
+    description: 'Extrait tous les elements XML repetes a un chemin en liste d\'objets Rhai (un niveau de champs enfants).',
+    insertText: 'parse_xml_items(request.body, "chemin/vers/item")',
+  },
+  {
+    name: 'xml_element',
+    signature: 'xml_element(tag, valeur)',
+    description: 'Construit un element XML <tag>...</tag> a partir d\'une liste/objet Rhai (recursif).',
+    insertText: 'xml_element("tag", valeur)',
+  },
 ];
 
 // Fonctions dont le nom commence par `query` (insensible a la casse).
