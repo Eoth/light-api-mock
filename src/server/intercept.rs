@@ -407,7 +407,7 @@ fn extract_headers(headers: &axum::http::HeaderMap) -> HashMap<String, String> {
 mod tests {
     use super::*;
     use crate::engine::matcher::match_path;
-    use crate::models::{BodyFragment, ConditionGroup, MockConfig, MockResponse, Rule};
+    use crate::models::{BodyFragment, ConditionGroup, HeaderEntry, MockConfig, MockResponse, Rule};
     use crate::store::MockStore;
 
     #[test]
@@ -1229,6 +1229,237 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(resp.status().as_u16(), 502);
+
+        std::fs::remove_dir_all(&data_dir).ok();
+    }
+
+    // --- Pattern "repetition JSON/XML" (parse_json/to_json/parse_xml_items/
+    // xml_element, cf CLAUDE.md §3) : la requete contient une liste d'objets,
+    // la reponse doit contenir le meme nombre d'elements construits par
+    // position. Verifie bout-en-bout (vrai serveur Axum + vraie requete HTTP)
+    // pour N=2, N=1 et N=0, en JSON (REST) et en XML (SOAP) — memes scripts
+    // que ceux documentes dans docs/scripts-rhai.md, pour garantir qu'un
+    // utilisateur qui copie-colle l'exemple obtient bien ce comportement.
+    fn json_repetition_rule() -> Rule {
+        Rule {
+            name: "calcul-devis".into(),
+            method: "POST".into(),
+            sub_path: None,
+            action: RuleAction::Mock,
+            pre_script: None,
+            script: Some(
+                r#"
+                    let req = parse_json(request.body);
+                    let lines = req.lines;
+                    let out = [];
+                    for line in lines {
+                        let unit_price = seeded_int(line.sku, 10, 500);
+                        out.push(#{
+                            sku: line.sku,
+                            qty: line.qty,
+                            unitPrice: unit_price,
+                            lineTotal: unit_price * line.qty
+                        });
+                    }
+                    #{
+                        count: out.len(),
+                        lines_json: to_json(out)
+                    }
+                "#
+                .into(),
+            ),
+            post_script: None,
+            conditions: ConditionGroup::default(),
+            response: MockResponse {
+                status: 200,
+                headers: vec![HeaderEntry { name: "Content-Type".into(), value: "application/json".into() }],
+                body: vec![BodyFragment::Template {
+                    template: r#"{"count":{{script.count}},"lines":{{script.lines_json}}}"#.into(),
+                }],
+                chaos: None,
+            },
+        }
+    }
+
+    #[tokio::test]
+    async fn json_repetition_pattern_builds_one_response_item_per_request_item() {
+        let mut service = purely_mocked_service(vec![json_repetition_rule()]);
+        service.name = "devis".into();
+        let (port, _log, data_dir) = spawn_test_server(MockConfig {
+            services: vec![service],
+            groups: vec![],
+        })
+        .await;
+        let client = reqwest::Client::new();
+        let url = format!("http://127.0.0.1:{port}/devis/calcul");
+
+        // N=2 : deux lignes distinctes, valeurs piochees par position.
+        let resp = client
+            .post(&url)
+            .json(&serde_json::json!({"lines": [
+                {"sku": "REF-001", "qty": 3},
+                {"sku": "REF-002", "qty": 1},
+            ]}))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(resp.status().as_u16(), 200);
+        let body: serde_json::Value = resp.json().await.unwrap();
+        assert_eq!(body["count"], 2);
+        let lines = body["lines"].as_array().unwrap();
+        assert_eq!(lines.len(), 2);
+        assert_eq!(lines[0]["sku"], "REF-001");
+        assert_eq!(lines[0]["qty"], 3);
+        assert_eq!(lines[1]["sku"], "REF-002");
+        assert_eq!(lines[1]["qty"], 1);
+        // Determinisme : le meme SKU produit toujours le meme unitPrice
+        // (seeded_int), verifie plus bas sur l'appel N=1 avec le meme REF-001.
+        let ref001_price = lines[0]["unitPrice"].as_i64().unwrap();
+        assert_eq!(lines[0]["lineTotal"], ref001_price * 3);
+
+        // N=1 : une seule ligne, meme SKU que ci-dessus -> meme unitPrice.
+        let resp = client
+            .post(&url)
+            .json(&serde_json::json!({"lines": [{"sku": "REF-001", "qty": 9}]}))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(resp.status().as_u16(), 200);
+        let body: serde_json::Value = resp.json().await.unwrap();
+        assert_eq!(body["count"], 1);
+        let lines = body["lines"].as_array().unwrap();
+        assert_eq!(lines.len(), 1);
+        assert_eq!(lines[0]["unitPrice"].as_i64().unwrap(), ref001_price);
+        assert_eq!(lines[0]["lineTotal"], ref001_price * 9);
+
+        // N=0 : liste vide -> reponse avec un tableau vide, pas d'erreur.
+        let resp = client
+            .post(&url)
+            .json(&serde_json::json!({"lines": []}))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(resp.status().as_u16(), 200);
+        let body: serde_json::Value = resp.json().await.unwrap();
+        assert_eq!(body["count"], 0);
+        assert!(body["lines"].as_array().unwrap().is_empty());
+
+        std::fs::remove_dir_all(&data_dir).ok();
+    }
+
+    fn xml_repetition_rule() -> Rule {
+        Rule {
+            name: "calcul-totaux".into(),
+            method: "POST".into(),
+            sub_path: None,
+            action: RuleAction::Mock,
+            pre_script: None,
+            script: Some(
+                r#"
+                    let articles = parse_xml_items(request.body, "Envelope/Body/GetOrderTotalsRequest/articles/article");
+                    let out = "";
+                    for a in articles {
+                        let unit_price = seeded_int(a.sku, 10, 500);
+                        let qty = parse_int(a.qty);
+                        out += xml_element("article", #{
+                            sku: a.sku,
+                            qty: a.qty,
+                            unitPrice: unit_price,
+                            lineTotal: unit_price * qty
+                        });
+                    }
+                    #{
+                        count: articles.len(),
+                        articles_xml: out
+                    }
+                "#
+                .into(),
+            ),
+            post_script: None,
+            conditions: ConditionGroup::default(),
+            response: MockResponse {
+                status: 200,
+                headers: vec![HeaderEntry { name: "Content-Type".into(), value: "text/xml".into() }],
+                body: vec![BodyFragment::Template {
+                    template: r#"<?xml version="1.0"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><GetOrderTotalsResponse><count>{{script.count}}</count><articles>{{script.articles_xml}}</articles></GetOrderTotalsResponse></soap:Body></soap:Envelope>"#.into(),
+                }],
+                chaos: None,
+            },
+        }
+    }
+
+    fn soap_request(articles_xml: &str) -> String {
+        format!(
+            r#"<?xml version="1.0"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><GetOrderTotalsRequest><articles>{articles_xml}</articles></GetOrderTotalsRequest></soap:Body></soap:Envelope>"#
+        )
+    }
+
+    #[tokio::test]
+    async fn xml_repetition_pattern_builds_one_response_item_per_request_item() {
+        let mut service = purely_mocked_service(vec![xml_repetition_rule()]);
+        service.name = "commande-soap".into();
+        let (port, _log, data_dir) = spawn_test_server(MockConfig {
+            services: vec![service],
+            groups: vec![],
+        })
+        .await;
+        let client = reqwest::Client::new();
+        let url = format!("http://127.0.0.1:{port}/commande-soap/totaux");
+
+        // N=2
+        let body_xml = soap_request(
+            "<article><sku>REF-001</sku><qty>3</qty></article><article><sku>REF-002</sku><qty>1</qty></article>",
+        );
+        let resp = client
+            .post(&url)
+            .header("Content-Type", "text/xml")
+            .body(body_xml)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(resp.status().as_u16(), 200);
+        let text = resp.text().await.unwrap();
+        assert_eq!(text.matches("<article>").count(), 2);
+        assert!(text.contains("<count>2</count>"));
+        assert!(text.contains("<sku>REF-001</sku>"));
+        assert!(text.contains("<sku>REF-002</sku>"));
+        // lineTotal = unitPrice * qty ; REF-001 qty=3 -> extraire unitPrice pour verifier.
+        let unit_price_pos = text.find("<sku>REF-001</sku>").unwrap();
+        let after = &text[unit_price_pos..];
+        let up_start = after.find("<unitPrice>").unwrap() + "<unitPrice>".len();
+        let up_end = after.find("</unitPrice>").unwrap();
+        let ref001_price: i64 = after[up_start..up_end].parse().unwrap();
+        assert!(text.contains(&format!("<lineTotal>{}</lineTotal>", ref001_price * 3)));
+
+        // N=1 : meme SKU REF-001 -> meme unitPrice (determinisme seeded_int).
+        let body_xml = soap_request("<article><sku>REF-001</sku><qty>9</qty></article>");
+        let resp = client
+            .post(&url)
+            .header("Content-Type", "text/xml")
+            .body(body_xml)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(resp.status().as_u16(), 200);
+        let text = resp.text().await.unwrap();
+        assert_eq!(text.matches("<article>").count(), 1);
+        assert!(text.contains("<count>1</count>"));
+        assert!(text.contains(&format!("<unitPrice>{ref001_price}</unitPrice>")));
+        assert!(text.contains(&format!("<lineTotal>{}</lineTotal>", ref001_price * 9)));
+
+        // N=0 : aucun article -> reponse avec <articles></articles> vide, pas d'erreur.
+        let body_xml = soap_request("");
+        let resp = client
+            .post(&url)
+            .header("Content-Type", "text/xml")
+            .body(body_xml)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(resp.status().as_u16(), 200);
+        let text = resp.text().await.unwrap();
+        assert!(text.contains("<count>0</count>"));
+        assert!(text.contains("<articles></articles>"));
 
         std::fs::remove_dir_all(&data_dir).ok();
     }

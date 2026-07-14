@@ -465,7 +465,10 @@ impl MatchEngine {
         None
     }
 
-    fn local_name(e: &quick_xml::events::BytesStart<'_>) -> String {
+    // pub(crate) : reutilise tel quel par engine::script::parse_xml_items_impl
+    // (fonction native Rhai `parse_xml_items`, sujet "repetition JSON/XML") pour
+    // ne pas dupliquer le decapage de prefixe de namespace XML (`soap:Body` -> `Body`).
+    pub(crate) fn local_name(e: &quick_xml::events::BytesStart<'_>) -> String {
         let full = String::from_utf8_lossy(e.name().as_ref()).to_string();
         full.split(':').last().unwrap_or(&full).to_string()
     }
