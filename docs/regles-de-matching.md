@@ -46,6 +46,29 @@ Plusieurs conditions peuvent être combinées :
 
 Pour un paramètre de chemin, l'interface propose une liste fermée des noms de paramètres réellement présents dans l'URL du service (pas de faute de frappe possible). Pour un paramètre de requête, une liste de suggestions apparaît à partir des paramètres vus dans le [journal des requêtes](journal-des-requetes.md) récentes — mais vous restez libre de saisir une valeur qui n'y figure pas encore.
 
+## Cas d'usage : une même URL qui répond différemment selon l'opération SOAP
+
+Question fréquente pour les services SOAP/XML : peut-on faire répondre **la même URL** différemment selon l'en-tête `SOAPAction`, ou selon le contenu de l'enveloppe envoyée ? **Oui, sans aucun développement** — il suffit de créer plusieurs règles sur le même service, chacune avec sa propre condition. Comme les règles sont évaluées dans l'ordre et que la première qui correspond gagne (voir plus bas), chaque opération SOAP obtient sa propre réponse simulée.
+
+### Router sur l'en-tête `SOAPAction`
+
+Créez une règle par opération, chacune avec une condition **En-tête HTTP** sur la clé `SOAPAction` :
+
+| Règle `get-client` | Règle `get-order` |
+|---|---|
+| ![Condition de la règle get-client : en-tête SOAPAction égal à GetClient](screenshots/regle-condition-soapaction-get-client.png) | ![Condition de la règle get-order : en-tête SOAPAction égal à GetOrder](screenshots/regle-condition-soapaction-get-order.png) |
+
+Concrètement, une requête `POST` sur ce service avec l'en-tête `SOAPAction: GetClient` déclenche la règle `get-client` (et sa réponse dédiée), tandis qu'une requête avec `SOAPAction: GetOrder` déclenche `get-order` — sur la **même URL**, sans condition sur le chemin. Une requête avec une troisième valeur de `SOAPAction` (ou sans cet en-tête) ne matche aucune des deux règles et reçoit la réponse "aucune règle ne correspond" (voir [Services et routage](services.md)).
+
+### Variante : router sur le contenu du corps plutôt que sur un en-tête
+
+Certains clients SOAP n'envoient pas d'en-tête `SOAPAction` exploitable, ou vous préférez distinguer les opérations par le nom de l'élément XML envoyé dans l'enveloppe. Utilisez alors une condition **XPath (XML/SOAP)** sur le corps plutôt qu'un en-tête — même principe, une règle par opération :
+
+- Règle `get-client` : source `XPath (XML/SOAP)`, clé `Envelope/Body/GetClientRequest`, opérateur `Existe` — matche tout corps dont l'enveloppe contient un élément `GetClientRequest` dans `Body` (le chemin ne tient pas compte des préfixes d'espace de noms, ex. `soap:Envelope`).
+- Règle `get-order` : mêmes réglages avec `Envelope/Body/GetOrderRequest`.
+
+Le même principe s'applique à un corps JSON avec une condition **Chemin JSON dans le corps** (JSON Pointer) — par exemple `/type` égal à `"client"` pour distinguer le type d'objet envoyé, plutôt qu'un élément XML.
+
 ## Quelle règle s'applique si plusieurs correspondent ?
 
 Les règles d'un service sont évaluées **dans l'ordre où elles sont listées**, et **la première qui correspond gagne** — les suivantes ne sont même pas regardées. L'ordre des règles est donc important : une règle très générale placée avant une règle plus spécifique "masquera" toujours cette dernière.
