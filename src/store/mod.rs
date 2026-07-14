@@ -472,6 +472,23 @@ impl MockStore {
     /// PROTECTED_BACKUP_MAX_AGE_MS. Opportuniste : declenche par l'ecriture
     /// en cours, pas de timer. Age lu depuis le timestamp encode dans le nom
     /// de fichier (`pre-reset-{ts}.yaml`), pas depuis les metadonnees disque.
+    ///
+    /// Appelee sous le verrou d'ecriture, sur CHAQUE mutation (§3/§5 point 22,
+    /// "opportuniste a chaque ecriture normale") : `backups/protected/` n'est
+    /// borne QUE par cette purge (pas de rotation par quantite comme
+    /// `backups/`), donc en usage reel (E2E ou dev quotidien qui reset
+    /// souvent, jamais 30 jours sans mutation) ce dossier peut compter des
+    /// centaines/milliers de fichiers avant sa premiere expiration. `entry
+    /// .file_type()` (plutot que `entry.path().is_file()`, qui refait un
+    /// `stat()` par fichier) reutilise le type deja renvoye par l'enumeration
+    /// du repertoire (gratuit sur Windows via WIN32_FIND_DATAW, pas d'appel
+    /// systeme supplementaire) : evite N stats couteux inutiles a CHAQUE
+    /// mutation de l'appli des que ce dossier grossit. Diagnostique via un
+    /// dossier `backups/protected/` de dev local a >1300 entrees (accumule
+    /// par des mois de sessions E2E, chaque `beforeEach` faisant un
+    /// `DELETE /api/config/reset`) : cf le commentaire du test
+    /// `purge_expired_protected_backups_correct_with_many_entries` plus bas
+    /// pour la mesure avant/apres.
     fn purge_expired_protected_backups(parent: &Path) -> Result<(), StoreError> {
         let protected_dir = parent.join("backups").join("protected");
         if !protected_dir.exists() {
@@ -481,10 +498,11 @@ impl MockStore {
         let now = Self::now_ms();
         for entry in std::fs::read_dir(&protected_dir).map_err(|e| StoreError::Io(e.to_string()))? {
             let Ok(entry) = entry else { continue };
-            let path = entry.path();
-            if !path.is_file() {
+            let is_file = entry.file_type().map(|t| t.is_file()).unwrap_or(false);
+            if !is_file {
                 continue;
             }
+            let path = entry.path();
             if let Some(ts) = Self::extract_protected_timestamp(&path) {
                 if now.saturating_sub(ts) >= PROTECTED_BACKUP_MAX_AGE_MS {
                     std::fs::remove_file(&path).map_err(|e| StoreError::Io(e.to_string()))?;
@@ -855,6 +873,67 @@ mod tests {
 
         let count = std::fs::read_dir(&protected_dir).unwrap().count();
         assert_eq!(count, 1, "pre-reset backup under 30 days old must be kept");
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// Regression pour la cause racine du flaky E2E write-behind (sujets
+    /// 24/27, cf CLAUDE.md §7) : `backups/protected/` n'a AUCUNE rotation par
+    /// quantite (contrairement a `backups/`, cape a BACKUP_MAX_COUNT) — seule
+    /// `purge_expired_protected_backups` (appelee sous verrou, sur CHAQUE
+    /// mutation) le borne, par age. En dev local/E2E ou `DELETE
+    /// /api/config/reset` est appele avant quasi chaque test (donc chaque run
+    /// de la suite ajoute des dizaines de backups proteges, jamais vieux de
+    /// 30 jours entre deux sessions), ce dossier avait grossi a >1300
+    /// entrees sur cette machine — reproduit ici avec 1500 entrees fraiches +
+    /// 1 expiree. Avant le passage de `path.is_file()` (un `stat()` par
+    /// fichier) a `entry.file_type()` (deja connu de l'enumeration du
+    /// repertoire, gratuit sur Windows), cette fonction faisait ~1500 appels
+    /// systeme synchrones SOUS LE VERROU D'ECRITURE a CHAQUE mutation de
+    /// l'appli (pas seulement les resets) — mesure directement responsable
+    /// (avec la latence intrinseque d'un dossier synchronise OneDrive) de
+    /// ralentissements suffisants pour occasionnellement depasser la fenetre
+    /// de polling (5s) des tests E2E write-behind. Ce test ne mesure pas le
+    /// temps (fragile en CI) mais verifie la CORRECTION a l'echelle : seule
+    /// l'entree expiree est purgee parmi 1501, aucune des fraiches n'est
+    /// touchee.
+    #[tokio::test]
+    async fn purge_expired_protected_backups_correct_with_many_entries() {
+        let dir = temp_dir();
+        let store = MockStore::load_or_init(&dir).await.unwrap();
+        store.replace(sample_config()).await.unwrap();
+
+        let protected_dir = dir.join("backups").join("protected");
+        std::fs::create_dir_all(&protected_dir).unwrap();
+
+        // now_ms() lue UNE SEULE FOIS avant la boucle : appelee a chaque
+        // iteration, l'horloge reelle peut avancer pendant les 1500 ecritures
+        // et faire coincider deux (i, now_ms()) differents sur le meme
+        // fresh_ts (collision de nom de fichier -> moins de 1500 fichiers
+        // reellement crees). Purement arithmetique ici, aucune ambiguite.
+        let base_now = MockStore::now_ms();
+        for i in 0..1500 {
+            let fresh_ts = base_now - 1_000 - i;
+            std::fs::write(
+                protected_dir.join(format!("pre-reset-{fresh_ts}.yaml")),
+                b"services: []\ngroups: []\n",
+            )
+            .unwrap();
+        }
+        let old_ts = MockStore::now_ms() - PROTECTED_BACKUP_MAX_AGE_MS - 1_000;
+        std::fs::write(
+            protected_dir.join(format!("pre-reset-{old_ts}.yaml")),
+            b"services: []\ngroups: []\n",
+        )
+        .unwrap();
+
+        store.replace(MockConfig::empty()).await.unwrap();
+
+        let remaining = std::fs::read_dir(&protected_dir).unwrap().count();
+        assert_eq!(remaining, 1500, "only the single expired entry should be purged out of 1501");
+        assert!(
+            !protected_dir.join(format!("pre-reset-{old_ts}.yaml")).exists(),
+            "the expired entry itself must be gone"
+        );
         std::fs::remove_dir_all(&dir).ok();
     }
 
