@@ -528,3 +528,31 @@ test.describe('Runner data-driven (scenarios JSON) - lot 10 (XML par exemple)', 
     expect(xml).not.toContain('00000000000000');
   });
 });
+
+// Lot 11 : couverture E2E neuve (pas une migration), comble un trou constate
+// a l'audit documentaire du sujet "illustrer la doc" -- le mode "exemple
+// d'abord" JSON (JsonPasteBuilder.svelte) preexistait au sujet 13a mais
+// n'avait jamais ete illustre par une capture, contrairement a sa variante
+// XML (lot 10) qui l'a ete des le sujet 27. Colle un exemple JSON plat, verifie
+// la detection des champs, puis reassigne un champ en parametre de chemin et
+// verifie hors runner qu'une vraie requete HTTP produit bien la valeur
+// substituee -- pas seulement que le formulaire se soumet sans erreur.
+test.describe('Runner data-driven (scenarios JSON) - lot 11 (JSON par exemple)', () => {
+  test.beforeEach(async ({ request }) => {
+    await request.delete(`${API}/config/reset`);
+    await request.post(`${API}/services`, {
+      data: validService('json-paste-demo', { listen_path: '/entreprise/{siret}' }),
+    });
+  });
+
+  test('configurer une regle via le mode JSON par exemple produit le JSON attendu (scenario JSON)', async ({ page, request }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Configurer une regle via le mode JSON par exemple (coller un exemple)'));
+
+    const resp = await request.get('http://localhost:7342/json-paste-demo/entreprise/44306184100047');
+    expect(resp.status()).toBe(200);
+    const body = await resp.json();
+    expect(body.siret).toBe('44306184100047');
+    expect(body.nom).toBe('ACME Corp');
+    expect(body.actif).toBe(true);
+  });
+});

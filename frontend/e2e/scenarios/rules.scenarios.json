@@ -276,6 +276,25 @@
         { "action": "click", "target": "ruleForm.submitButton" },
         { "action": "assertVisible", "target": "ruleList.item", "params": { "name": "xml-paste-rule" } }
       ]
+    },
+    {
+      "scenario": "Configurer une regle via le mode JSON par exemple (coller un exemple)",
+      "steps": [
+        { "action": "goto", "page": "services" },
+        { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
+        { "action": "click", "target": "serviceCard.configureButton", "params": { "name": "json-paste-demo" } },
+        { "action": "click", "target": "ruleList.addButton" },
+        { "action": "fill", "target": "ruleForm.nameInput", "value": "json-paste-rule" },
+        { "action": "click", "target": "ruleForm.modeButton", "params": { "mode": "json-paste" } },
+        { "action": "fill", "target": "jsonPasteBuilder.textarea", "value": "{\"siret\":\"00000000000000\",\"nom\":\"ACME Corp\",\"actif\":true}" },
+        { "action": "click", "target": "jsonPasteBuilder.analyzeButton" },
+        { "action": "assertVisible", "target": "jsonPasteBuilder.sourceSelect", "params": { "path": "0" } },
+        { "action": "screenshot", "file": "reponse-json-exemple-detection.png" },
+        { "action": "selectOption", "target": "jsonPasteBuilder.sourceSelect", "params": { "path": "0" }, "value": "path" },
+        { "action": "fill", "target": "jsonPasteBuilder.valueInput", "params": { "path": "0" }, "value": "siret" },
+        { "action": "click", "target": "ruleForm.submitButton" },
+        { "action": "assertVisible", "target": "ruleList.item", "params": { "name": "json-paste-rule" } }
+      ]
     }
   ]
 }

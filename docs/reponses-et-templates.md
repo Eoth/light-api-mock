@@ -28,7 +28,9 @@ Chaque champ **objet** ou **tableau** (JSON comme XML) affiche aussi un petit **
 
 Pour les corps déjà complexes, il est souvent plus rapide de **coller un exemple réel** de réponse (par exemple, une réponse déjà obtenue du vrai backend) : lightMock détecte automatiquement tous les champs et vous permet ensuite de remplacer certaines valeurs par des variables ou des données factices, champ par champ. Ce mode existe pour le **JSON** (bouton "JSON par exemple") et pour le **XML** (bouton "XML par exemple", y compris pour une enveloppe SOAP).
 
-*(Capture manquante — aucun scénario E2E existant n'utilise le mode "exemple d'abord" JSON (`JsonPasteBuilder`) ; à réaliser manuellement, cf `frontend/e2e/README.md` section captures.)*
+![Mode JSON par exemple : les champs détectés après collage, chacun avec sa source (« Garder la valeur » par défaut)](screenshots/reponse-json-exemple-detection.png)
+
+Côté JSON, tous les champs détectés s'affichent **à plat** (avec une simple indentation pour les niveaux imbriqués) — suffisant pour un JSON REST, généralement peu profond.
 
 #### Le mode "exemple d'abord" côté XML
 
