@@ -62,6 +62,8 @@
 // Lot 7 : couverture E2E neuve (pas une migration) pour le pliage des
 // arbres JSON/XML et le repli par defaut des Options avancees
 // pre_script/post_script (sujet 25).
+// Lot 10 : couverture E2E neuve (pas une migration) pour le portage du mode
+// "coller un exemple" au XML (XmlPasteBuilder.svelte).
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -488,5 +490,41 @@ test.describe('Runner data-driven (scenarios JSON) - lot 9 (repetition JSON/XML)
     expect(body.lines[1].sku).toBe('REF-002');
     expect(body.lines[1].qty).toBe(1);
     expect(body.lines[0].lineTotal).toBe(body.lines[0].unitPrice * 3);
+  });
+});
+
+// Lot 10 : couverture E2E neuve (pas une migration) pour le portage du mode
+// "coller un exemple" au XML (XmlPasteBuilder.svelte, miroir de
+// JsonPasteBuilder.svelte avec breadcrumb/pliage/attributs XML en plus, cf
+// CLAUDE.md "Mode 'coller un exemple' XML"). Colle un exemple XML imbrique
+// (enveloppe avec un attribut de namespace), navigue dans le noeud enfant
+// via le fil d'Ariane, transforme une valeur en variable de path param, puis
+// verifie hors runner qu'une vraie requete HTTP produit bien le XML attendu
+// (valeur substituee + attribut/contenu fixe preserves) -- pas seulement que
+// le formulaire se soumet sans erreur.
+test.describe('Runner data-driven (scenarios JSON) - lot 10 (XML par exemple)', () => {
+  test.beforeEach(async ({ request }) => {
+    await request.delete(`${API}/config/reset`);
+    await request.post(`${API}/services`, {
+      data: validService('xml-paste-demo', { listen_path: '/quote/{siret}' }),
+    });
+  });
+
+  test('configurer une regle via le mode XML par exemple produit le XML attendu (scenario JSON)', async ({ page, request }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Configurer une regle via le mode XML par exemple (coller un exemple SOAP)'));
+
+    // Verification hors runner : la regle configuree visuellement (paste +
+    // navigation breadcrumb + assignation source=path sur un champ imbrique)
+    // produit reellement, a l'execution, un XML ou le siret colle a
+    // l'origine (fixe) a bien ete remplace par le path param de la vraie
+    // requete, tandis que le nom (jamais reassigne) et l'attribut de
+    // namespace de la racine (jamais touche) restent preserves tels quels.
+    const resp = await request.get('http://localhost:7342/xml-paste-demo/quote/12345678901234');
+    expect(resp.status()).toBe(200);
+    const xml = await resp.text();
+    expect(xml).toContain('<devisResponse xmlns:x="urn:test">');
+    expect(xml).toContain('<nom>ACME Corp</nom>');
+    expect(xml).toContain('<siret>12345678901234</siret>');
+    expect(xml).not.toContain('00000000000000');
   });
 });
