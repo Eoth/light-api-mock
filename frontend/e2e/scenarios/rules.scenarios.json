@@ -256,6 +256,26 @@
         { "action": "click", "target": "ruleForm.submitButton" },
         { "action": "assertVisible", "target": "ruleList.item", "params": { "name": "calcul-devis" } }
       ]
+    },
+    {
+      "scenario": "Configurer une regle via le mode XML par exemple (coller un exemple SOAP)",
+      "steps": [
+        { "action": "goto", "page": "services" },
+        { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
+        { "action": "click", "target": "serviceCard.configureButton", "params": { "name": "xml-paste-demo" } },
+        { "action": "click", "target": "ruleList.addButton" },
+        { "action": "fill", "target": "ruleForm.nameInput", "value": "xml-paste-rule" },
+        { "action": "click", "target": "ruleForm.modeButton", "params": { "mode": "xml-paste" } },
+        { "action": "fill", "target": "xmlPasteBuilder.textarea", "value": "<devisResponse xmlns:x=\"urn:test\"><client><nom>ACME Corp</nom><siret>00000000000000</siret></client></devisResponse>" },
+        { "action": "click", "target": "xmlPasteBuilder.analyzeButton" },
+        { "action": "assertVisible", "target": "xmlPasteBuilder.navigateButton", "params": { "path": "0" } },
+        { "action": "click", "target": "xmlPasteBuilder.navigateButton", "params": { "path": "0" } },
+        { "action": "screenshot", "file": "reponse-xml-exemple-navigation.png" },
+        { "action": "selectOption", "target": "xmlPasteBuilder.sourceSelect", "params": { "path": "0-children-1" }, "value": "path" },
+        { "action": "fill", "target": "xmlPasteBuilder.valueInput", "params": { "path": "0-children-1" }, "value": "siret" },
+        { "action": "click", "target": "ruleForm.submitButton" },
+        { "action": "assertVisible", "target": "ruleList.item", "params": { "name": "xml-paste-rule" } }
+      ]
     }
   ]
 }

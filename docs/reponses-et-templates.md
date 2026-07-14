@@ -26,11 +26,23 @@ Chaque champ **objet** ou **tableau** (JSON comme XML) affiche aussi un petit **
 
 ### 2. Le mode "exemple d'abord" (coller un exemple existant)
 
-Pour les corps JSON déjà complexes, il est souvent plus rapide de **coller un exemple réel** de réponse (par exemple, une réponse déjà obtenue du vrai backend) : lightMock détecte automatiquement tous les champs et vous permet ensuite de remplacer certaines valeurs par des variables ou des données factices, champ par champ.
+Pour les corps déjà complexes, il est souvent plus rapide de **coller un exemple réel** de réponse (par exemple, une réponse déjà obtenue du vrai backend) : lightMock détecte automatiquement tous les champs et vous permet ensuite de remplacer certaines valeurs par des variables ou des données factices, champ par champ. Ce mode existe pour le **JSON** (bouton "JSON par exemple") et pour le **XML** (bouton "XML par exemple", y compris pour une enveloppe SOAP).
 
-*(Capture manquante — aucun scénario E2E existant n'utilise le mode "exemple d'abord" (`JsonPasteBuilder`) ; à réaliser manuellement, cf `frontend/e2e/README.md` section captures.)*
+*(Capture manquante — aucun scénario E2E existant n'utilise le mode "exemple d'abord" JSON (`JsonPasteBuilder`) ; à réaliser manuellement, cf `frontend/e2e/README.md` section captures.)*
 
-> Ce mode "coller un exemple" n'est disponible que pour le JSON pour le moment ; le XML se construit uniquement via le builder guidé.
+#### Le mode "exemple d'abord" côté XML
+
+Contrairement au mode JSON (qui affiche tous les champs détectés à plat, sans navigation), le mode XML propose en plus, pour un XML souvent plus profondément imbriqué (une enveloppe SOAP, par exemple) :
+
+- le même **fil d'Ariane** que le builder guidé JSON (bouton "→" pour "entrer" dans un nœud, chemin cliquable pour en ressortir),
+- les mêmes **chevrons de pliage** (▼/▶) que partout ailleurs dans l'éditeur,
+- l'édition des **attributs XML** de chaque élément (y compris la racine) : un attribut détecté (ex. une déclaration d'espace de noms `xmlns:soap="..."`) peut, comme un contenu texte, être remplacé par une variable ou laissé tel quel.
+
+![Mode XML par exemple : fil d'Ariane après navigation dans un nœud, attributs affichés au-dessus](screenshots/reponse-xml-exemple-navigation.png)
+
+Les préfixes d'espace de noms (`soap:Envelope`) et les déclarations `xmlns`/`xmlns:*` sont conservés tels quels (comme du texte) ; lightMock ne résout pas leur signification — coller un XML avec espaces de noms fonctionne sans erreur, mais aucune validation sémantique n'est faite dessus.
+
+> Comme pour le mode guidé, le mode "exemple d'abord" ne permet pas de renommer, ajouter ou supprimer un champ/nœud détecté — pour ces retouches, repassez par le mode guidé habituel (JSON ou XML).
 
 ## La syntaxe des templates : `{{ }}`
 
@@ -87,4 +99,5 @@ Pour tester la robustesse d'une application face à un backend capricieux, chaqu
 - Aucun prérequis particulier : disponible dès l'installation de base.
 - Le mode "coller un exemple" (paste) n'est pas encore éditable en profondeur après détection
   (renommage/ajout/suppression de champs) — pour ces retouches fines, repassez par le builder guidé habituel.
-- Le mode "coller un exemple" existe seulement pour JSON, pas pour XML.
+- Côté XML, un espace de noms (`xmlns:...`) est conservé tel quel dans le tag/l'attribut, sans résolution — voir "Le mode 'exemple d'abord' côté XML" plus haut.
+- Côté XML toujours, un nœud qui mélange du texte direct et des sous-éléments (contenu dit "mixte") n'est pas représenté fidèlement : les sous-éléments sont conservés, le texte direct est ignoré.

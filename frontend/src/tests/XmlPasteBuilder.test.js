@@ -1,0 +1,151 @@
+import { render, fireEvent, waitFor } from '@testing-library/svelte';
+import { describe, it, expect, vi } from 'vitest';
+import XmlPasteBuilder from '../lib/components/XmlPasteBuilder.svelte';
+
+async function pasteAndParse(getByLabelText, getByText, xml) {
+  const textarea = getByLabelText(/Collez un exemple/);
+  await fireEvent.input(textarea, { target: { value: xml } });
+  await fireEvent.click(getByText('Analyser et variabiliser'));
+}
+
+describe('XmlPasteBuilder (exampleXmlToFields via tpl-utils.js)', () => {
+  it('detecte les noeuds d\'un XML colle et les affiche', async () => {
+    const onUpdate = vi.fn();
+    const { getByLabelText, getByText } = render(XmlPasteBuilder, { props: { onUpdate } });
+
+    await pasteAndParse(getByLabelText, getByText, '<response><siret>44306184100047</siret><nom>ACME</nom></response>');
+
+    await waitFor(() => expect(getByText('siret')).toBeInTheDocument());
+    expect(getByText('nom')).toBeInTheDocument();
+    expect(onUpdate).toHaveBeenCalled();
+  });
+
+  it('affiche le tag racine detecte', async () => {
+    const { getByLabelText, getByText } = render(XmlPasteBuilder);
+    await pasteAndParse(getByLabelText, getByText, '<devis><id>1</id></devis>');
+    await waitFor(() => expect(getByText('devis', { exact: false })).toBeInTheDocument());
+  });
+
+  it('affiche une erreur sur un XML invalide', async () => {
+    const { getByLabelText, getByText } = render(XmlPasteBuilder);
+    await pasteAndParse(getByLabelText, getByText, '<a><b></a>');
+    await waitFor(() => expect(getByText(/XML invalide/)).toBeInTheDocument());
+  });
+
+  it('rejette une racine sans element imbrique avec un message explicite', async () => {
+    const { getByLabelText, getByText } = render(XmlPasteBuilder);
+    await pasteAndParse(getByLabelText, getByText, '<response>juste du texte</response>');
+    await waitFor(() => expect(getByText(/aucun element imbrique/)).toBeInTheDocument());
+  });
+
+  it('le bouton "Recoller un XML" revient a la zone de collage', async () => {
+    const { getByLabelText, getByText } = render(XmlPasteBuilder);
+    await pasteAndParse(getByLabelText, getByText, '<r><a>1</a></r>');
+    await waitFor(() => expect(getByText('a')).toBeInTheDocument());
+
+    await fireEvent.click(getByText('Recoller un XML'));
+    expect(getByLabelText(/Collez un exemple/)).toBeInTheDocument();
+  });
+
+  it('assigner une source transforme la previsualisation en variable', async () => {
+    const onUpdate = vi.fn();
+    const { getByLabelText, getByText } = render(XmlPasteBuilder, { props: { onUpdate } });
+    await pasteAndParse(getByLabelText, getByText, '<r><siret>123</siret></r>');
+    await waitFor(() => expect(getByText('siret')).toBeInTheDocument());
+
+    const select = getByLabelText('Source pour siret');
+    await fireEvent.change(select, { target: { value: 'path' } });
+
+    const [fields] = onUpdate.mock.calls.at(-1);
+    expect(fields[0].source).toBe('path');
+  });
+});
+
+describe('XmlPasteBuilder — navigation par fil d\'Ariane et pliage (divergence assumee vs JsonPasteBuilder)', () => {
+  const nestedXml = '<r><unite_legale><nom>ACME</nom><adresse><ville>Paris</ville></adresse></unite_legale></r>';
+
+  it('n\'affiche pas de breadcrumb tant qu\'on est a la racine', async () => {
+    const { getByLabelText, getByText, queryByLabelText } = render(XmlPasteBuilder);
+    await pasteAndParse(getByLabelText, getByText, nestedXml);
+    await waitFor(() => expect(getByText('unite_legale')).toBeInTheDocument());
+    expect(queryByLabelText('Chemin des donnees')).not.toBeInTheDocument();
+  });
+
+  it('navigue dans un noeud parent via le bouton "Naviguer"', async () => {
+    const { getByLabelText, getByText, getByRole } = render(XmlPasteBuilder);
+    await pasteAndParse(getByLabelText, getByText, nestedXml);
+    await waitFor(() => expect(getByLabelText('Naviguer dans unite_legale')).toBeInTheDocument());
+
+    await fireEvent.click(getByLabelText('Naviguer dans unite_legale'));
+
+    const breadcrumb = getByRole('navigation', { name: 'Chemin des donnees' });
+    expect(breadcrumb).toHaveTextContent('racine');
+    expect(breadcrumb).toHaveTextContent('unite_legale');
+    expect(getByText('nom')).toBeInTheDocument();
+  });
+
+  it('permet de remonter en cliquant sur "racine" dans le breadcrumb', async () => {
+    const { getByLabelText, getByText } = render(XmlPasteBuilder);
+    await pasteAndParse(getByLabelText, getByText, nestedXml);
+    await waitFor(() => expect(getByLabelText('Naviguer dans unite_legale')).toBeInTheDocument());
+
+    await fireEvent.click(getByLabelText('Naviguer dans unite_legale'));
+    expect(getByText('nom')).toBeInTheDocument();
+
+    await fireEvent.click(getByText('racine'));
+    expect(getByText('unite_legale')).toBeInTheDocument();
+  });
+
+  it('replier un noeud masque ses enfants et affiche un indicateur, sans muter les donnees', async () => {
+    const onUpdate = vi.fn();
+    const { getByLabelText, getByText, queryByText } = render(XmlPasteBuilder, { props: { onUpdate } });
+    await pasteAndParse(getByLabelText, getByText, nestedXml);
+    await waitFor(() => expect(getByLabelText('Replier unite_legale')).toBeInTheDocument());
+    onUpdate.mockClear();
+
+    await fireEvent.click(getByLabelText('Replier unite_legale'));
+
+    expect(getByLabelText('Deplier unite_legale')).toHaveAttribute('aria-expanded', 'false');
+    expect(queryByText('nom')).not.toBeVisible();
+    expect(onUpdate).not.toHaveBeenCalled();
+  });
+
+  it('un noeud "value" (sans enfants) n\'a pas de chevron de pliage', async () => {
+    const { getByLabelText, getByText, queryByLabelText } = render(XmlPasteBuilder);
+    await pasteAndParse(getByLabelText, getByText, nestedXml);
+    await waitFor(() => expect(getByLabelText('Naviguer dans unite_legale')).toBeInTheDocument());
+    await fireEvent.click(getByLabelText('Naviguer dans unite_legale'));
+    expect(queryByLabelText('Replier nom')).not.toBeInTheDocument();
+  });
+});
+
+describe('XmlPasteBuilder — attributs XML (specificite absente du modele JSON)', () => {
+  it('detecte et affiche les attributs de la racine et d\'un noeud enfant', async () => {
+    const { getByLabelText, getByText } = render(XmlPasteBuilder);
+    await pasteAndParse(getByLabelText, getByText, '<response xmlns:soap="http://x"><id type="uuid">42</id></response>');
+
+    await waitFor(() => expect(getByText('@xmlns:soap')).toBeInTheDocument());
+    expect(getByText('@type')).toBeInTheDocument();
+  });
+
+  it('assigner une source a un attribut le transforme en variable, sans toucher au contenu du noeud', async () => {
+    const onUpdate = vi.fn();
+    const { getByLabelText, getByText } = render(XmlPasteBuilder, { props: { onUpdate } });
+    await pasteAndParse(getByLabelText, getByText, '<r><id type="fixe">42</id></r>');
+    await waitFor(() => expect(getByText('@type')).toBeInTheDocument());
+
+    const attrSelect = getByLabelText("Source pour l'attribut type (0)");
+    await fireEvent.change(attrSelect, { target: { value: 'header' } });
+
+    const [fields] = onUpdate.mock.calls.at(-1);
+    expect(fields[0].attributes[0].source).toBe('header');
+    expect(fields[0].value).toBe('42');
+  });
+
+  it('ne plante pas sur un XML sans attributs (liste vide, pas de section Attributs affichee)', async () => {
+    const { getByLabelText, getByText, queryByText } = render(XmlPasteBuilder);
+    await pasteAndParse(getByLabelText, getByText, '<r><a>1</a></r>');
+    await waitFor(() => expect(getByText('a')).toBeInTheDocument());
+    expect(queryByText('Attributs :')).not.toBeInTheDocument();
+  });
+});

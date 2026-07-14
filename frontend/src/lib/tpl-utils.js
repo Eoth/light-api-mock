@@ -399,18 +399,104 @@ function splitTplArray(inner) {
 }
 
 // ── XML: Fields → Template string ────────────────────────────────────
+//
+// `attributes` (optionnel, nouveau) : liste de {name, source, value, pipe}
+// portee par un noeud (racine incluse via `rootAttributes`) ou par un
+// champ value/parent. Retro-compatible : un champ/racine sans `attributes`
+// (tout le XML construit avant ce sujet) produit exactement le meme texte
+// qu'avant, `xmlAttrsToTpl` renvoyant '' pour une liste vide/absente.
+// Aucun echappement des valeurs d'attribut (guillemets compris) : coherent
+// avec le choix deliberement fait pour le contenu texte des elements
+// (CLAUDE.md, "resolve_variable... jamais re-echappee") -- le template
+// reste du texte brut de bout en bout.
 
-export function xmlFieldsToTemplate(fields, rootTag = 'response') {
+export function xmlFieldsToTemplate(fields, rootTag = 'response', rootAttributes = []) {
+  const attrs = xmlAttrsToTpl(rootAttributes);
   const inner = fields.filter(f => f.tag?.trim()).map(f => xmlNodeToTpl(f)).join('');
-  return `<${rootTag}>${inner}</${rootTag}>`;
+  return `<${rootTag}${attrs}>${inner}</${rootTag}>`;
+}
+
+function xmlAttrsToTpl(attributes) {
+  return (attributes || [])
+    .filter(a => a.name?.trim())
+    .map(a => ` ${a.name.trim()}="${buildExpr(a)}"`)
+    .join('');
 }
 
 function xmlNodeToTpl(field) {
   const t = field.tag?.trim();
   if (!t) return '';
+  const attrs = xmlAttrsToTpl(field.attributes);
   if ((field.nodeType || 'value') === 'parent') {
     const inner = (field.children || []).filter(c => c.tag?.trim()).map(c => xmlNodeToTpl(c)).join('');
-    return `<${t}>${inner}</${t}>`;
+    return `<${t}${attrs}>${inner}</${t}>`;
   }
-  return `<${t}>${buildExpr(field)}</${t}>`;
+  return `<${t}${attrs}>${buildExpr(field)}</${t}>`;
+}
+
+// ── Example XML: raw text → Fields (mode "coller un exemple", XML) ────
+// Miroir de exampleJsonToFields (voir plus haut) pour le XML : part d'un
+// exemple XML brut (litteral, sans {{}}) tel que colle par l'utilisateur
+// (typiquement une reponse SOAP reelle), et retourne { rootTag,
+// rootAttributes, fields } ou `fields` est la liste des ELEMENTS ENFANTS
+// DIRECTS de la racine, au meme format que celui consomme par
+// XmlResponseBuilder.svelte (tag/nodeType/source/value/children), etendu
+// avec `attributes` (nouveau, cf CLAUDE.md "Mode 'coller un exemple' XML").
+//
+// Limites assumees et documentees (pas des bugs a corriger silencieusement,
+// meme esprit que la limite deja assumee pour parse_xml_items cote Rhai,
+// CLAUDE.md point 66) :
+//  - Prefixes de namespace ("soap:Envelope") et declarations xmlns/xmlns:*
+//    sont preserves TELS QUELS comme du texte litteral dans le nom de
+//    tag/attribut (DOMParser les restitue deja ainsi via .tagName/.name) --
+//    aucune resolution semantique (pas de mapping prefixe -> URI). Suffisant
+//    pour reconstruire un template fidele au XML colle sans jamais planter
+//    dessus ; une validation stricte des namespaces est hors scope.
+//  - Contenu mixte (texte + elements enfants sur le meme noeud) : les
+//    elements enfants gagnent (noeud traite comme 'parent'), le texte
+//    direct du noeud est ignore -- cas rare pour des reponses API/SOAP
+//    typiques (texte pur en feuille XOR structure imbriquee).
+//  - Une racine sans aucun element enfant (uniquement du texte) est
+//    rejetee avec un message explicite, comme un tableau JSON vide cote
+//    exampleJsonToFields.
+
+export function exampleXmlToFields(xmlString) {
+  const text = xmlString.trim();
+  if (!text) {
+    throw new TypeError('Collez un XML valide.');
+  }
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(text, 'application/xml');
+  if (doc.querySelector('parsererror')) {
+    throw new TypeError('XML invalide : verifiez les tags (noms vides, imbrication incorrecte).');
+  }
+  const root = doc.documentElement;
+  if (!root) {
+    throw new TypeError('XML invalide : aucun element racine trouve.');
+  }
+  const childElements = Array.from(root.children || []);
+  if (childElements.length === 0) {
+    throw new TypeError('La racine XML ne contient aucun element imbrique. Collez un XML avec au moins un sous-element.');
+  }
+  return {
+    rootTag: root.tagName,
+    rootAttributes: xmlAttributesToFields(root),
+    fields: childElements.map(xmlElementToField),
+  };
+}
+
+function xmlAttributesToFields(el) {
+  return Array.from(el.attributes || []).map(attr => ({
+    name: attr.name, source: 'fixed', value: attr.value, pipe: '',
+  }));
+}
+
+function xmlElementToField(el) {
+  const tag = el.tagName;
+  const attributes = xmlAttributesToFields(el);
+  const childElements = Array.from(el.children || []);
+  if (childElements.length > 0) {
+    return { tag, nodeType: 'parent', attributes, children: childElements.map(xmlElementToField) };
+  }
+  return { tag, nodeType: 'value', source: 'fixed', value: el.textContent ?? '', pipe: '', attributes };
 }

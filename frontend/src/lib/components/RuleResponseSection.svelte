@@ -30,6 +30,7 @@
   import JsonResponseBuilder from './JsonResponseBuilder.svelte';
   import JsonPasteBuilder from './JsonPasteBuilder.svelte';
   import XmlResponseBuilder from './XmlResponseBuilder.svelte';
+  import XmlPasteBuilder from './XmlPasteBuilder.svelte';
   import RuleScriptSlot from './RuleScriptSlot.svelte';
   import ToggleSwitch from './ToggleSwitch.svelte';
   import { templateToFields, validateTemplateAsJson, validateTemplateAsXml } from '../tpl-utils.js';
@@ -77,6 +78,8 @@
   let jsonPasteRef = $state(null);
   let xmlFields = $state([]);
   let xmlBuilderRef = $state(null);
+  let xmlPasteFields = $state([]);
+  let xmlPasteRef = $state(null);
   let textContent = $state('');
 
   // pre_script/script/post_script : blocs additionnels independants (meme
@@ -134,6 +137,9 @@
     }
     if (responseMode === 'xml-guided' && xmlBuilderRef) {
       return [{ type: 'Template', template: xmlBuilderRef.toTemplate() }];
+    }
+    if (responseMode === 'xml-paste' && xmlPasteRef) {
+      return [{ type: 'Template', template: xmlPasteRef.toTemplate() }];
     }
     if (responseMode === 'text') {
       return [{ type: 'Literal', value: textContent }];
@@ -220,6 +226,7 @@
     if (responseMode === 'json-paste') return jsonPasteFields.length > 0;
     if (responseMode === 'json-guided') return jsonFields.length > 0;
     if (responseMode === 'xml-guided') return xmlFields.length > 0;
+    if (responseMode === 'xml-paste') return xmlPasteFields.length > 0;
     if (responseMode === 'text') return textContent.trim().length > 0;
     if (responseMode === 'advanced') return fragments.some(f => {
       if (f.type === 'Template') return f.template?.trim();
@@ -379,6 +386,10 @@
       const err = validateTemplateAsXml(xmlBuilderRef.toTemplate());
       if (err) return err;
     }
+    if (responseMode === 'xml-paste' && xmlPasteRef) {
+      const err = validateTemplateAsXml(xmlPasteRef.toTemplate());
+      if (err) return err;
+    }
     if (responseMode === 'advanced') {
       const tpl = getAdvancedTemplate();
       const ct = respHeaders.find(h => h.name?.toLowerCase() === 'content-type')?.value?.toLowerCase() || '';
@@ -400,7 +411,7 @@
     if ((responseMode === 'json-guided' || responseMode === 'json-paste') && !finalHeaders.some(h => h.name.toLowerCase() === 'content-type')) {
       finalHeaders.push({ name: 'Content-Type', value: 'application/json' });
     }
-    if (responseMode === 'xml-guided' && !finalHeaders.some(h => h.name.toLowerCase() === 'content-type')) {
+    if ((responseMode === 'xml-guided' || responseMode === 'xml-paste') && !finalHeaders.some(h => h.name.toLowerCase() === 'content-type')) {
       finalHeaders.push({ name: 'Content-Type', value: 'application/xml' });
     }
     const finalBody = buildFragmentsFromMode();
@@ -460,7 +471,7 @@
   {#if responseOpen}
     {#key modeKey}
     <div class="mode-selector" role="radiogroup" aria-label="Mode de reponse">
-      {#each [['json-paste','JSON par exemple'],['json-guided','JSON guide'],['xml-guided','XML guide'],['text','Texte'],['advanced','Template avance'],['empty','Vide (204)']] as [val, label]}
+      {#each [['json-paste','JSON par exemple'],['json-guided','JSON guide'],['xml-paste','XML par exemple'],['xml-guided','XML guide'],['text','Texte'],['advanced','Template avance'],['empty','Vide (204)']] as [val, label]}
         <button type="button" class="mode-btn" class:mode-active={responseMode === val} onclick={() => requestModeSwitch(val)} role="radio" aria-checked={responseMode === val} data-testid="rule-form-mode-button-{val}">{label}</button>
       {/each}
     </div>
@@ -514,6 +525,11 @@
     {:else if responseMode === 'json-guided'}
       <div class="sub-section">
         <JsonResponseBuilder bind:this={jsonBuilderRef} fields={jsonFields} onUpdate={(f) => jsonFields = f} />
+      </div>
+
+    {:else if responseMode === 'xml-paste'}
+      <div class="sub-section">
+        <XmlPasteBuilder bind:this={xmlPasteRef} fields={xmlPasteFields} onUpdate={(f) => xmlPasteFields = f} />
       </div>
 
     {:else if responseMode === 'xml-guided'}

@@ -202,6 +202,23 @@
     "valueInput": "[data-testid=\"json-paste-builder-value-input-{path}\"]"
   },
 
+  "xmlPasteBuilder": {
+    "textarea": "[data-testid=\"xml-paste-builder-textarea\"]",
+    "error": "[data-testid=\"xml-paste-builder-error\"]",
+    "analyzeButton": "[data-testid=\"xml-paste-builder-analyze-button\"]",
+    "resetButton": "[data-testid=\"xml-paste-builder-reset-button\"]",
+    "sourceSelect": "[data-testid=\"xml-paste-builder-source-select-{path}\"]",
+    "fakeSelect": "[data-testid=\"xml-paste-builder-fake-select-{path}\"]",
+    "valueInput": "[data-testid=\"xml-paste-builder-value-input-{path}\"]",
+    "collapseButton": "[data-testid=\"xml-paste-builder-collapse-button-{path}\"]",
+    "collapsedIndicator": "[data-testid=\"xml-paste-builder-collapsed-indicator-{path}\"]",
+    "navigateButton": "[data-testid=\"xml-paste-builder-navigate-button-{path}\"]",
+    "breadcrumbLink": "[data-testid=\"xml-paste-builder-breadcrumb-link-{idx}\"]",
+    "attrSourceSelect": "[data-testid=\"xml-paste-builder-attr-source-select-{path}-{attrIdx}\"]",
+    "attrFakeSelect": "[data-testid=\"xml-paste-builder-attr-fake-select-{path}-{attrIdx}\"]",
+    "attrValueInput": "[data-testid=\"xml-paste-builder-attr-value-input-{path}-{attrIdx}\"]"
+  },
+
   "responseEditor": {
     "statusInput": "[data-testid=\"response-editor-status-input\"]",
     "removeHeaderButton": "[data-testid=\"response-editor-remove-header-button-{idx}\"]",
