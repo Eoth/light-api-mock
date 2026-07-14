@@ -206,6 +206,36 @@
         { "action": "click", "target": "ruleForm.submitButton" },
         { "action": "assertVisible", "target": "ruleList.item", "params": { "name": "fold-json-rule" } }
       ]
+    },
+    {
+      "scenario": "Deux regles sur le meme service routees par le header SOAPAction (illustration doc)",
+      "steps": [
+        { "action": "goto", "page": "services" },
+        { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
+        { "action": "click", "target": "serviceCard.configureButton", "params": { "name": "soap-routing-demo" } },
+        { "action": "click", "target": "ruleList.addButton" },
+        { "action": "fill", "target": "ruleForm.nameInput", "value": "get-client" },
+        { "action": "selectOption", "target": "ruleForm.methodSelect", "value": "POST" },
+        { "action": "click", "target": "ruleForm.addConditionAllOfButton" },
+        { "action": "selectOption", "target": "conditionForm.sourceSelect", "value": "Header" },
+        { "action": "fill", "target": "conditionForm.keyInput", "value": "SOAPAction" },
+        { "action": "fill", "target": "conditionForm.valueInput", "value": "GetClient" },
+        { "action": "screenshot", "file": "regle-condition-soapaction-get-client.png" },
+        { "action": "click", "target": "conditionForm.submitButton" },
+        { "action": "click", "target": "ruleForm.submitButton" },
+        { "action": "assertVisible", "target": "ruleList.item", "params": { "name": "get-client" } },
+        { "action": "click", "target": "ruleList.addButton" },
+        { "action": "fill", "target": "ruleForm.nameInput", "value": "get-order" },
+        { "action": "selectOption", "target": "ruleForm.methodSelect", "value": "POST" },
+        { "action": "click", "target": "ruleForm.addConditionAllOfButton" },
+        { "action": "selectOption", "target": "conditionForm.sourceSelect", "value": "Header" },
+        { "action": "fill", "target": "conditionForm.keyInput", "value": "SOAPAction" },
+        { "action": "fill", "target": "conditionForm.valueInput", "value": "GetOrder" },
+        { "action": "screenshot", "file": "regle-condition-soapaction-get-order.png" },
+        { "action": "click", "target": "conditionForm.submitButton" },
+        { "action": "click", "target": "ruleForm.submitButton" },
+        { "action": "assertVisible", "target": "ruleList.item", "params": { "name": "get-order" } }
+      ]
     }
   ]
 }

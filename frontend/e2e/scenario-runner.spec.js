@@ -434,3 +434,20 @@ test.describe('Runner data-driven (scenarios JSON) - lot 7 (pliage JSON + option
     expect(rule.response.body[0].template).toContain('hello');
   });
 });
+
+// Lot 8 : couverture E2E neuve (pas une migration) illustrant, pour la doc
+// utilisateur (docs/regles-de-matching.md), qu'un meme service peut deja
+// repondre differemment selon le header SOAPAction via deux regles
+// independantes (chacune avec sa propre condition Header/SOAPAction) --
+// aucune fonctionnalite nouvelle, juste la capture des deux ecrans de
+// configuration de condition.
+test.describe('Runner data-driven (scenarios JSON) - lot 8 (doc SOAPAction)', () => {
+  test.beforeEach(async ({ request }) => {
+    await request.delete(`${API}/config/reset`);
+    await request.post(`${API}/services`, { data: validService('soap-routing-demo') });
+  });
+
+  test('deux regles routees par SOAPAction sur le meme service (scenario JSON)', async ({ page }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Deux regles sur le meme service routees par le header SOAPAction (illustration doc)'));
+  });
+});
