@@ -29,6 +29,19 @@ describe('RHAI_FUNCTIONS (source unique)', () => {
     expect(names).toContain('date_past');
     expect(names).toContain('date_future');
   });
+
+  it('inclut les 4 accesseurs de contexte de requete (path/query/headers/body)', () => {
+    const names = RHAI_FUNCTIONS.map((f) => f.name);
+    expect(names).toContain('request.path');
+    expect(names).toContain('request.query');
+    expect(names).toContain('request.headers');
+    expect(names).toContain('request.body');
+  });
+
+  it('documente que les noms d\'en-tete sont normalises en minuscules', () => {
+    const headers = RHAI_FUNCTIONS.find((f) => f.name === 'request.headers');
+    expect(headers.description.toLowerCase()).toContain('minuscule');
+  });
 });
 
 describe('filterRhaiFunctions', () => {
@@ -50,6 +63,13 @@ describe('filterRhaiFunctions', () => {
     // "now" est prefixe de now_ms/now_iso mais pas de year() ni uuid()
     const matches = filterRhaiFunctions('now');
     expect(matches.map((f) => f.name).sort()).toEqual(['now_iso', 'now_ms']);
+  });
+
+  it('taper "request" propose les 4 accesseurs de contexte (path/query/headers/body)', () => {
+    const matches = filterRhaiFunctions('request');
+    expect(matches.map((f) => f.name).sort()).toEqual([
+      'request.body', 'request.headers', 'request.path', 'request.query',
+    ]);
   });
 });
 
@@ -81,5 +101,10 @@ describe('computeInsertSelection', () => {
   it('place le curseur en fin de texte pour un appel sans parametre', () => {
     const sel = computeInsertSelection('now_ms()');
     expect(sel).toEqual({ start: 8, end: 8 });
+  });
+
+  it('place le curseur en fin de texte pour un accesseur de contexte (sans parentheses)', () => {
+    const sel = computeInsertSelection('request.path');
+    expect(sel).toEqual({ start: 'request.path'.length, end: 'request.path'.length });
   });
 });

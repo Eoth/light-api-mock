@@ -446,7 +446,7 @@
       <p><strong>Variables :</strong> <code>let x = 42;</code> <code>let s = "hello";</code></p>
       <p><strong>Conditions :</strong> <code>if x &gt; 10 {"{"} "grand" {"}"} else {"{"} "petit" {"}"}</code></p>
       <p><strong>Strings :</strong> <code>s.to_upper()</code> <code>s.len()</code> <code>s.contains("el")</code> <code>s.replace("a", "b")</code></p>
-      <p><strong>Fonctions lightMock disponibles</strong> (autocompletion dans l'editeur : tapez le debut d'un nom, ou <kbd>Ctrl</kbd>+<kbd>Espace</kbd>) :</p>
+      <p><strong>Fonctions et donnees de contexte disponibles</strong> (autocompletion dans l'editeur : tapez le debut d'un nom, ou <kbd>Ctrl</kbd>+<kbd>Espace</kbd>) :</p>
       <ul class="script-fn-list">
         {#each RHAI_FUNCTIONS as fn}
           <li><code>{fn.signature}</code> — {fn.description}</li>

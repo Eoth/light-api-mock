@@ -1012,4 +1012,162 @@ mod tests {
         assert!(result.value.contains("<sku>C3</sku>"));
         assert!(result.value.contains("<doubledQty>18</doubledQty>"));
     }
+
+    // --- Scripts "complexes" representatifs (cf CLAUDE.md, "Visibilite des
+    // erreurs de script" + docs/scripts-rhai.md) : map/lookup, boucle avec
+    // condition, acces combine a plusieurs sources de contexte. Objectif :
+    // securiser ces usages a l'avenir (pas seulement le cas precis
+    // remonte), en couvrant la VRAIE syntaxe correcte (verifiee au moment du
+    // diagnostic : indexation de map `#{}` par cle, `.contains()`, `in`,
+    // `.get()`, `switch` fonctionnent tous sans erreur, y compris sur une
+    // cle absente qui renvoie simplement une valeur vide plutot que de
+    // lever une exception).
+
+    #[test]
+    fn map_lookup_returns_mapped_value_for_known_key() {
+        let engine = ScriptEngine::new();
+        let script = r#"
+            let mapping = #{ "svc-a": "id-1", "svc-b": "id-2" };
+            let key = request.path.name;
+            if mapping.contains(key) { mapping[key] } else { "unknown" }
+        "#;
+        let mut path = HashMap::new();
+        path.insert("name".into(), "svc-b".into());
+        let ctx = ScriptContext { path_params: path, ..empty_ctx() };
+        let result = engine.execute(script, &ctx).unwrap();
+        assert_eq!(result.value, "id-2");
+    }
+
+    #[test]
+    fn map_lookup_falls_back_for_unknown_key() {
+        let engine = ScriptEngine::new();
+        let script = r#"
+            let mapping = #{ "svc-a": "id-1", "svc-b": "id-2" };
+            let key = request.path.name;
+            if mapping.contains(key) { mapping[key] } else { "unknown" }
+        "#;
+        let mut path = HashMap::new();
+        path.insert("name".into(), "svc-zzz".into());
+        let ctx = ScriptContext { path_params: path, ..empty_ctx() };
+        let result = engine.execute(script, &ctx).unwrap();
+        assert_eq!(result.value, "unknown");
+    }
+
+    #[test]
+    fn map_lookup_via_switch_expression() {
+        // Variante avec `switch`, alternative valide au if/mapping.contains
+        // ci-dessus — les deux syntaxes sont documentees dans
+        // docs/scripts-rhai.md.
+        let engine = ScriptEngine::new();
+        let script = r#"
+            let key = request.path.name;
+            switch key {
+                "svc-a" => "id-1",
+                "svc-b" => "id-2",
+                _ => "unknown"
+            }
+        "#;
+        let mut path = HashMap::new();
+        path.insert("name".into(), "svc-a".into());
+        let ctx = ScriptContext { path_params: path, ..empty_ctx() };
+        let result = engine.execute(script, &ctx).unwrap();
+        assert_eq!(result.value, "id-1");
+    }
+
+    #[test]
+    fn loop_with_condition_counts_matching_items() {
+        // Boucle avec condition : compte les lignes d'une liste JSON dont la
+        // quantite depasse un seuil, construit un resume dans un map.
+        let engine = ScriptEngine::new();
+        let ctx = ScriptContext {
+            body: r#"[{"sku":"A","qty":1},{"sku":"B","qty":5},{"sku":"C","qty":12}]"#.into(),
+            ..empty_ctx()
+        };
+        let script = r#"
+            let items = parse_json(request.body);
+            let big_count = 0;
+            let skus = [];
+            for it in items {
+                if it.qty > 3 {
+                    big_count += 1;
+                    skus.push(it.sku);
+                }
+            }
+            #{ big_count: big_count, big_skus: to_json(skus) }
+        "#;
+        let result = engine.execute(script, &ctx).unwrap();
+        assert_eq!(result.fields.get("big_count").unwrap(), "2");
+        let skus: serde_json::Value = serde_json::from_str(result.fields.get("big_skus").unwrap()).unwrap();
+        assert_eq!(skus, serde_json::json!(["B", "C"]));
+    }
+
+    #[test]
+    fn combines_path_query_headers_and_body_in_one_script() {
+        // Acces combine a toutes les sources de contexte disponibles dans un
+        // seul script (path/query/headers/body), avec un fallback via
+        // if/else sur une en-tete absente. Rhai n'a PAS d'operateur
+        // ternaire `?:` (verifie : "Unknown operator: '?'") — if/else est la
+        // seule forme valide ici.
+        let engine = ScriptEngine::new();
+        let mut path = HashMap::new();
+        path.insert("id".into(), "42".into());
+        let mut query = HashMap::new();
+        query.insert("verbose".into(), "true".into());
+        let mut headers = HashMap::new();
+        headers.insert("x-request-id".into(), "req-abc".into());
+        let ctx = ScriptContext {
+            body: r#"{"note":"hello"}"#.into(),
+            headers,
+            query_params: query,
+            path_params: path,
+        };
+        let script = r#"
+            let id = request.path.id;
+            let verbose = request.query.verbose;
+            let req_id = if request.headers.contains("x-request-id") { request.headers["x-request-id"] } else { "none" };
+            let missing = if request.headers.contains("x-absent") { request.headers["x-absent"] } else { "none" };
+            let note = parse_json(request.body).note;
+            #{ id: id, verbose: verbose, req_id: req_id, missing: missing, note: note }
+        "#;
+        let result = engine.execute(script, &ctx).unwrap();
+        assert_eq!(result.fields.get("id").unwrap(), "42");
+        assert_eq!(result.fields.get("verbose").unwrap(), "true");
+        assert_eq!(result.fields.get("req_id").unwrap(), "req-abc");
+        assert_eq!(result.fields.get("missing").unwrap(), "none");
+        assert_eq!(result.fields.get("note").unwrap(), "hello");
+    }
+
+    // --- Visibilite des erreurs d'execution (cause racine du sujet
+    // "Visibilite des erreurs de script") : appeler une fonction Rhai
+    // inexistante EST une vraie erreur d'execution (contrairement a un
+    // acces a une cle de map absente, qui renvoie silencieusement une
+    // valeur vide sans jamais lever d'erreur, cf tests ci-dessus). C'est
+    // cette classe d'erreur que engine.execute() remonte via Err(...), et
+    // que run_rule_script (intercept.rs) avale en soft-fail, et que
+    // /api/rule-test (server/api.rs) rend desormais visible au testeur de
+    // regle. Ne pas supprimer ce test : c'est la preuve que le mecanisme de
+    // detection a une vraie erreur a se mettre sous la dent.
+
+    #[test]
+    fn calling_undefined_function_is_a_real_execution_error() {
+        let engine = ScriptEngine::new();
+        let result = engine.execute("totally_undefined_fn(1, 2)", &empty_ctx());
+        let err = result.expect_err("un appel de fonction inexistante doit etre une erreur d'execution");
+        assert!(err.contains("totally_undefined_fn"));
+    }
+
+    #[test]
+    fn missing_map_key_access_is_not_an_error_unlike_undefined_function() {
+        // Documente la difference exacte diagnostiquee : contrairement a une
+        // fonction inexistante (test ci-dessus), une cle de map absente
+        // n'est PAS une erreur — c'est la raison pour laquelle une
+        // validation "a vide" (dry-run avec un contexte synthetique) ne
+        // suffirait pas a detecter un mauvais nom de cle, et pourquoi le
+        // testeur de regle (contre une VRAIE requete capturee) reste le bon
+        // outil pour ce cas — cf commentaire sur /api/rule-test.
+        let engine = ScriptEngine::new();
+        let result = engine.execute("request.path.this_key_does_not_exist", &empty_ctx());
+        assert!(result.is_ok(), "une cle absente ne doit jamais lever d'erreur");
+        assert_eq!(result.unwrap().value, "");
+    }
 }

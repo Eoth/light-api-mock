@@ -218,3 +218,84 @@ test.describe('Testeur de regle : condition mal choisie contre une vraie requete
     await expect(page.getByText(/corps de cette requête a été tronqué/)).not.toBeVisible();
   });
 });
+
+// Visibilite des erreurs d'execution de script (cf CLAUDE.md, "Visibilite
+// des erreurs de script") : avant cette extension, /api/rule-test ne
+// rejouait que le matching, jamais les scripts — un script casse (fonction
+// Rhai inexistante) restait invisible du testeur, exactement comme en
+// production (soft-fail + log serveur uniquement). Ces 2 tests couvrent le
+// cas d'erreur ET le cas nominal (map/lookup correct) demandes en E2E.
+test.describe('Testeur de regle : execution des scripts', () => {
+  test.beforeEach(async ({ request }) => {
+    await request.delete(`${API}/config/reset`);
+  });
+
+  test('un script en erreur a l\'execution affiche un message clair, pas un echec silencieux', async ({ page, request }) => {
+    await request.post(`${API}/services`, {
+      data: validService('script-error-svc', { listen_path: '/*' }),
+    });
+    await request.get(`${BASE}/script-error-svc/anything`);
+
+    await openAddRuleForm(page, 'script-error-svc');
+    await page.locator('input#rule-name').fill('script-casse');
+
+    // Active le bloc "Script personnalisé" et y saisit un appel de fonction
+    // Rhai INEXISTANTE — la classe d'erreur diagnostiquee comme cause
+    // racine (validate() ne la detecte pas, seule une vraie execution le
+    // peut).
+    await page.getByRole('switch', { name: /Script personnalis/ }).click();
+    await page.locator('#rule-script').fill('totally_undefined_fn(1, 2)');
+
+    const logSelect = page.locator('#rule-tester-log');
+    await expect(logSelect).toBeVisible();
+    const matchingOption = logSelect.locator('option', { hasText: 'script-error-svc/anything' }).first();
+    await expect(matchingOption).toBeAttached();
+    await logSelect.selectOption(await matchingOption.getAttribute('value'));
+
+    await page.getByRole('button', { name: /Tester contre cette requête/ }).click();
+
+    await expect(page.getByText(/matcherait cette requête/)).toBeVisible();
+    const errorBanner = page.getByTestId('rule-tester-script-errors');
+    await expect(errorBanner).toBeVisible();
+    await expect(errorBanner).toContainText('totally_undefined_fn');
+    await expect(page.getByTestId('rule-tester-script-error-script')).toBeVisible();
+    await docsScreenshot(page, 'testeur-regle-erreur-script.png');
+  });
+
+  test('un script de correspondance (map/lookup) correct ne produit aucune erreur', async ({ page, request }) => {
+    // listen_path avec {name} : le path param est deja extrait au niveau
+    // SERVICE (cf CLAUDE.md, capture du detail de requete), donc disponible
+    // via request.path.name des la capture, sans meme avoir besoin d'un
+    // sous-chemin de regle.
+    await request.post(`${API}/services`, {
+      data: validService('lookup-e2e-svc', { listen_path: '/lookup/{name}' }),
+    });
+    const captured = await request.get(`${BASE}/lookup-e2e-svc/lookup/billing`);
+    expect(captured.status()).toBe(404); // pas encore de regle -> no-rule, mais capture quand meme
+
+    await openAddRuleForm(page, 'lookup-e2e-svc');
+    await page.locator('input#rule-name').fill('lookup-service');
+
+    // Meme script, meme syntaxe verifiee, que le test d'integration backend
+    // (map_lookup_by_path_param_returns_correct_target_and_falls_back_for_unknown_key,
+    // src/server/intercept.rs) et que l'exemple documente dans
+    // docs/scripts-rhai.md.
+    await page.getByRole('switch', { name: /Script personnalis/ }).click();
+    await page.locator('#rule-script').fill(
+      'let mapping = #{ "billing": "svc-billing-042", "orders": "svc-orders-017" };\n' +
+      'let name = request.path.name;\n' +
+      'if mapping.contains(name) { #{ id: mapping[name], found: "true" } } else { #{ id: "unknown", found: "false" } }'
+    );
+
+    const logSelect = page.locator('#rule-tester-log');
+    await expect(logSelect).toBeVisible();
+    const matchingOption = logSelect.locator('option', { hasText: 'lookup-e2e-svc/lookup/billing' }).first();
+    await expect(matchingOption).toBeAttached();
+    await logSelect.selectOption(await matchingOption.getAttribute('value'));
+
+    await page.getByRole('button', { name: /Tester contre cette requête/ }).click();
+
+    await expect(page.getByText(/matcherait cette requête/)).toBeVisible();
+    await expect(page.getByTestId('rule-tester-script-errors')).not.toBeVisible();
+  });
+});
