@@ -4,7 +4,21 @@
   // service. Aucune mutation, aucun appel proxy — un simple POST vers
   // /api/rule-test (stateless, cf src/server/api.rs) qui recalcule
   // method/sub_path/conditions et renvoie le detail condition par condition
-  // (MatchEngine::evaluate_rule_test, src/engine/matcher.rs).
+  // (MatchEngine::evaluate_rule_test, src/engine/matcher.rs) ET, si la regle
+  // matche, execute reellement les 3 blocs de script (pre_script/script/
+  // post_script) contre la VRAIE requete capturee choisie.
+  //
+  // Pourquoi l'execution de script est ici et pas ailleurs (cf CLAUDE.md,
+  // "Visibilite des erreurs de script") : en production, une erreur
+  // d'execution de script (fonction Rhai inexistante, erreur de type...)
+  // est deliberement avalee en soft-fail (intercept.rs::run_rule_script) —
+  // la requete n'est jamais bloquee par un script casse, seul un
+  // tracing::warn! cote serveur en garde trace. Ce testeur est le SEUL
+  // endroit ou cette meme erreur redevient visible pour l'utilisateur,
+  // AVANT sauvegarde, contre une requete reelle (jamais un contexte
+  // synthetique/vide qui produirait de faux positifs sur des scripts qui
+  // dependent legitimement du corps/des params de la requete, ex. le
+  // pattern parse_json(request.body) documente dans scripts-rhai.md).
   //
   // `logs` est deja filtre par le parent (RuleForm) aux entrees du service
   // courant — on ne fait ici que filtrer celles qui ont un detail capture
@@ -64,6 +78,10 @@
         method: draft.method,
         sub_path: draft.subPath || null,
         conditions: { all_of: draft.allOf, any_of: draft.anyOf },
+        action: draft.action ?? 'mock',
+        pre_script: draft.preScript ?? null,
+        script: draft.script ?? null,
+        post_script: draft.postScript ?? null,
         request: {
           method: log.method,
           remaining_path: log.captured.remaining_path,
@@ -90,6 +108,16 @@
     !!result?.body_truncated &&
     [...(result.all_of ?? []), ...(result.any_of ?? [])].some((e) => bodyBasedSource(e.condition.source.type))
   );
+
+  const SLOT_LABELS = {
+    pre_script: 'Pré-script (préparation)',
+    script: 'Script personnalisé',
+    post_script: 'Post-script (finalisation)',
+  };
+
+  function slotLabel(slot) {
+    return SLOT_LABELS[slot] ?? slot;
+  }
 </script>
 
 <section class="rule-tester" aria-label="Testeur de règle contre une requête réelle">
@@ -136,6 +164,23 @@
           <li>{result.method_matches ? '✓' : '✗'} Méthode HTTP {result.method_matches ? 'correspond' : 'ne correspond pas'}</li>
           <li>{result.sub_path_matches ? '✓' : '✗'} Sous-chemin {result.sub_path_matches ? 'correspond' : 'ne correspond pas'}</li>
         </ul>
+
+        {#if result.script_errors?.length > 0}
+          <div class="script-error-banner" role="alert" data-testid="rule-tester-script-errors">
+            <p class="script-error-title">
+              ⚠ {result.script_errors.length === 1 ? 'Un script a échoué à l\'exécution' : 'Des scripts ont échoué à l\'exécution'}
+              — la réponse serait rendue avec un résultat vide pour {result.script_errors.length === 1 ? 'ce script' : 'ces scripts'}
+              (aucune erreur n'est renvoyée au client, cf comportement de production).
+            </p>
+            <ul class="script-error-list">
+              {#each result.script_errors as err}
+                <li data-testid="rule-tester-script-error-{err.slot}">
+                  <strong>{slotLabel(err.slot)}</strong> : <code>{err.message}</code>
+                </li>
+              {/each}
+            </ul>
+          </div>
+        {/if}
 
         {#if showBodyTruncationWarning}
           <p class="body-truncation-warning">
@@ -222,6 +267,32 @@
     background: var(--color-warning-bg, #fcf8e3);
     padding: 0.5rem 0.75rem;
     border-radius: var(--radius);
+  }
+
+  .script-error-banner {
+    margin: 0.5rem 0;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius);
+    background: var(--color-error-bg, #fdecea);
+    border: 1px solid var(--color-error-text, #c0392b);
+  }
+
+  .script-error-title {
+    margin: 0 0 0.375rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-error-text, #c0392b);
+  }
+
+  .script-error-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.8125rem;
+    word-break: break-word;
   }
 
   .condition-group-result h4 {

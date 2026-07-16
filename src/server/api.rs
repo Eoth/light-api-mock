@@ -4,7 +4,8 @@ use crate::engine::matcher::{
     ConditionEvaluation, ConflictWinner, MatchEngine, OtherRuleConflictInput, RequestData,
     RuleConflictDraft, RuleTestInput,
 };
-use crate::models::{ConditionGroup, Group, MockConfig, Service};
+use crate::engine::script::ScriptContext;
+use crate::models::{ConditionGroup, Group, MockConfig, RuleAction, Service};
 use crate::server::AppState;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -1084,7 +1085,7 @@ async fn validate_script(
 // aucun service n'est charge depuis le store, donc pas d'identite de service
 // a desambiguiser (cf service_matches).
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, Default)]
 struct RuleTestCapturedRequest {
     method: String,
     remaining_path: String,
@@ -1102,12 +1103,46 @@ struct RuleTestCapturedRequest {
     content_type: Option<String>,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, Default)]
 struct RuleTestRequest {
     method: String,
     sub_path: Option<String>,
     conditions: ConditionGroup,
+    // Les 4 champs ci-dessous sont optionnels (absents des payloads envoyes
+    // avant cette extension) : #[serde(default)] preserve la compatibilite
+    // avec un frontend qui n'enverrait pas encore ces champs. `action` par
+    // defaut Mock (RuleAction::default()), coherent avec le modele Rule.
+    //
+    // Pourquoi ces champs existent (cf CLAUDE.md, "Visibilite des erreurs de
+    // script") : avant cette extension, /api/rule-test ne rejouait QUE le
+    // matching (method/sub_path/conditions) — jamais les scripts. Un script
+    // qui echoue a l'execution (fonction inexistante, erreur de type...)
+    // etait donc invisible du testeur de regle, alors meme que c'est
+    // EXACTEMENT ce que ce testeur doit permettre de detecter avant
+    // sauvegarde. `pre_script`/`script`/`post_script` sont desormais
+    // executes (si la regle matche et n'est pas en action=Proxy, memes
+    // conditions que la production, cf run_rule_script dans intercept.rs)
+    // contre la VRAIE requete capturee choisie par l'utilisateur — jamais
+    // contre un contexte synthetique/vide, ce qui evite tout faux positif
+    // (contrairement a une validation "a vide" qui ferait planter a tort un
+    // script comme `parse_json(request.body).len()` des que le corps de
+    // test est absent/invalide, cf le pattern de repetition JSON/XML deja
+    // documente).
+    #[serde(default)]
+    action: RuleAction,
+    #[serde(default)]
+    pre_script: Option<String>,
+    #[serde(default)]
+    script: Option<String>,
+    #[serde(default)]
+    post_script: Option<String>,
     request: RuleTestCapturedRequest,
+}
+
+#[derive(serde::Serialize)]
+struct ScriptExecutionError {
+    slot: &'static str,
+    message: String,
 }
 
 #[derive(serde::Serialize)]
@@ -1119,9 +1154,23 @@ struct RuleTestResponse {
     body_truncated: bool,
     all_of: Vec<ConditionEvaluation>,
     any_of: Vec<ConditionEvaluation>,
+    // Erreurs d'execution des blocs de script (pre_script/script/post_script),
+    // rejouees contre la VRAIE requete capturee (jamais un contexte
+    // synthetique). Vide si la regle ne matche pas (les scripts ne
+    // s'executent jamais dans ce cas, memes conditions que la production) ou
+    // si aucun script n'est configure. C'est le SEUL endroit ou une erreur
+    // d'execution de script redevient visible pour l'utilisateur : en
+    // production (intercept.rs::run_rule_script), la meme erreur est
+    // deliberement avalee en soft-fail (repli sur un ScriptResult vide, la
+    // requete n'est jamais bloquee par un script casse) et seulement
+    // journalisee cote serveur (tracing::warn!) — invisible sans acces aux
+    // logs K8s. Ne JAMAIS faire disparaitre ce champ ou le rendre silencieux
+    // : c'est le correctif du sujet "script errors" (cf CLAUDE.md).
+    script_errors: Vec<ScriptExecutionError>,
 }
 
 async fn test_rule(
+    State(state): State<AppState>,
     Extension(_user): Extension<AuthUser>,
     Json(payload): Json<RuleTestRequest>,
 ) -> Json<RuleTestResponse> {
@@ -1145,6 +1194,30 @@ async fn test_rule(
         &req,
     );
 
+    // Memes conditions qu'en production (intercept.rs) pour executer les
+    // scripts : la regle doit matcher ET ne pas etre en action=Proxy (un
+    // proxy ne rend jamais de template, donc n'execute jamais de script).
+    let mut script_errors = Vec::new();
+    if outcome.overall_matched && payload.action != RuleAction::Proxy {
+        let script_ctx = ScriptContext {
+            body: String::from_utf8_lossy(&req.body).into_owned(),
+            headers: req.headers.clone(),
+            query_params: req.query_params.clone(),
+            path_params: outcome.path_params.clone(),
+        };
+        for (slot, script) in [
+            ("pre_script", &payload.pre_script),
+            ("script", &payload.script),
+            ("post_script", &payload.post_script),
+        ] {
+            if let Some(code) = script {
+                if let Err(message) = state.script_engine.execute(code, &script_ctx) {
+                    script_errors.push(ScriptExecutionError { slot, message });
+                }
+            }
+        }
+    }
+
     Json(RuleTestResponse {
         method_matches: outcome.method_matches,
         sub_path_matches: outcome.sub_path_matches,
@@ -1153,6 +1226,7 @@ async fn test_rule(
         body_truncated,
         all_of: outcome.group.all_of,
         any_of: outcome.group.any_of,
+        script_errors,
     })
 }
 
@@ -1514,6 +1588,46 @@ mod tests {
         AuthUser::anonymous()
     }
 
+    // AppState minimal pour appeler test_rule() directement (sans passer par
+    // un vrai serveur HTTP, cf spawn_test_app plus haut pour le pattern
+    // complet) : seul script_engine est reellement exerce par ces tests,
+    // le reste est un etat vide/desactive standard.
+    async fn test_state() -> AppState {
+        let data_dir = std::env::temp_dir().join(format!(
+            "lightmock-scripttest-{}",
+            fastrand::u64(..)
+        ));
+        std::fs::create_dir_all(&data_dir).unwrap();
+        let store = crate::store::MockStore::new(data_dir.join("mock-config.yaml"));
+        store.replace(MockConfig { services: vec![], groups: vec![] }).await.unwrap();
+
+        #[cfg(feature = "messaging-kafka")]
+        let messaging = crate::messaging::MessagingState {
+            message_log: crate::messaging::message_log::MessageLog::new(),
+            reply_topic: None,
+            publisher: crate::messaging::consumer::Publisher::None,
+        };
+        AppState {
+            store,
+            proxy: crate::engine::ProxyClient::new(),
+            seq_counters: Arc::new(std::sync::RwLock::new(std::collections::HashMap::new())),
+            request_log: crate::server::request_log::RequestLog::new(),
+            auth_config: crate::auth::AuthConfig {
+                enabled: false,
+                keycloak_url: String::new(),
+                realm: String::new(),
+                client_id: String::new(),
+                super_admins: vec![],
+                show_reset_button: false,
+            },
+            keycloak: None,
+            script_engine: crate::engine::script::ScriptEngine::new(),
+            ping_cache: crate::server::ping::PingCache::new(),
+            #[cfg(feature = "messaging-kafka")]
+            messaging,
+        }
+    }
+
     fn empty_captured(method: &str, remaining_path: &str) -> RuleTestCapturedRequest {
         RuleTestCapturedRequest {
             method: method.into(),
@@ -1542,13 +1656,15 @@ mod tests {
                 any_of: vec![],
             },
             request: captured,
+            ..Default::default()
         };
-        let Json(result) = test_rule(Extension(anon_user()), Json(payload)).await;
+        let Json(result) = test_rule(State(test_state().await), Extension(anon_user()), Json(payload)).await;
         assert!(result.method_matches);
         assert!(result.sub_path_matches);
         assert!(result.overall_matched);
         assert_eq!(result.path_params.get("id").unwrap(), "42");
         assert!(result.all_of[0].matched);
+        assert!(result.script_errors.is_empty());
     }
 
     #[tokio::test]
@@ -1566,8 +1682,9 @@ mod tests {
                 any_of: vec![],
             },
             request: captured,
+            ..Default::default()
         };
-        let Json(result) = test_rule(Extension(anon_user()), Json(payload)).await;
+        let Json(result) = test_rule(State(test_state().await), Extension(anon_user()), Json(payload)).await;
         assert!(!result.overall_matched);
         assert!(!result.all_of[0].matched);
         let hint = result.all_of[0].hint.as_deref().unwrap();
@@ -1581,8 +1698,9 @@ mod tests {
             sub_path: None,
             conditions: ConditionGroup::default(),
             request: empty_captured("POST", "/anything"),
+            ..Default::default()
         };
-        let Json(result) = test_rule(Extension(anon_user()), Json(payload)).await;
+        let Json(result) = test_rule(State(test_state().await), Extension(anon_user()), Json(payload)).await;
         assert!(!result.method_matches);
         assert!(!result.overall_matched);
     }
@@ -1596,9 +1714,108 @@ mod tests {
             sub_path: None,
             conditions: ConditionGroup::default(),
             request: captured,
+            ..Default::default()
         };
-        let Json(result) = test_rule(Extension(anon_user()), Json(payload)).await;
+        let Json(result) = test_rule(State(test_state().await), Extension(anon_user()), Json(payload)).await;
         assert!(result.body_truncated);
+    }
+
+    // --- test_rule() : execution des scripts (visibilite des erreurs) ---
+    //
+    // Avant cette extension, /api/rule-test ne rejouait QUE le matching —
+    // un script casse (fonction Rhai inexistante, erreur de type...) restait
+    // invisible du testeur de regle, exactement comme en production
+    // (run_rule_script soft-fail + log serveur uniquement, cf CLAUDE.md).
+    // Ces tests couvrent le nouveau champ `script_errors`.
+
+    #[tokio::test]
+    async fn test_rule_reports_script_execution_error_when_rule_matches() {
+        let payload = RuleTestRequest {
+            method: "GET".into(),
+            sub_path: None,
+            conditions: ConditionGroup::default(),
+            // Fonction inexistante : compile() (utilise par /api/script/validate)
+            // ne la detecterait pas, seule une vraie execution le peut — c'est
+            // exactement la classe d'erreur diagnostiquee comme cause racine.
+            script: Some("totally_undefined_fn(1, 2)".into()),
+            request: empty_captured("GET", "/x"),
+            ..Default::default()
+        };
+        let Json(result) = test_rule(State(test_state().await), Extension(anon_user()), Json(payload)).await;
+        assert!(result.overall_matched);
+        assert_eq!(result.script_errors.len(), 1);
+        assert_eq!(result.script_errors[0].slot, "script");
+        assert!(result.script_errors[0].message.contains("totally_undefined_fn"));
+    }
+
+    #[tokio::test]
+    async fn test_rule_reports_errors_for_all_three_script_slots_independently() {
+        let payload = RuleTestRequest {
+            method: "GET".into(),
+            sub_path: None,
+            conditions: ConditionGroup::default(),
+            pre_script: Some("broken_pre()".into()),
+            script: Some("\"ok\"".into()),
+            post_script: Some("broken_post()".into()),
+            request: empty_captured("GET", "/x"),
+            ..Default::default()
+        };
+        let Json(result) = test_rule(State(test_state().await), Extension(anon_user()), Json(payload)).await;
+        assert!(result.overall_matched);
+        let slots: Vec<&str> = result.script_errors.iter().map(|e| e.slot).collect();
+        assert_eq!(slots, vec!["pre_script", "post_script"]);
+    }
+
+    #[tokio::test]
+    async fn test_rule_no_script_execution_attempted_when_rule_does_not_match() {
+        let payload = RuleTestRequest {
+            method: "POST".into(),
+            sub_path: None,
+            conditions: ConditionGroup::default(),
+            script: Some("totally_undefined_fn(1, 2)".into()),
+            request: empty_captured("GET", "/x"),
+            ..Default::default()
+        };
+        let Json(result) = test_rule(State(test_state().await), Extension(anon_user()), Json(payload)).await;
+        assert!(!result.overall_matched, "GET != POST : la regle ne doit pas matcher");
+        assert!(
+            result.script_errors.is_empty(),
+            "un script n'est jamais execute pour une regle qui ne matche pas, meme conditions qu'en production"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_rule_no_script_execution_attempted_for_proxy_action() {
+        let payload = RuleTestRequest {
+            method: "GET".into(),
+            sub_path: None,
+            conditions: ConditionGroup::default(),
+            action: crate::models::RuleAction::Proxy,
+            script: Some("totally_undefined_fn(1, 2)".into()),
+            request: empty_captured("GET", "/x"),
+            ..Default::default()
+        };
+        let Json(result) = test_rule(State(test_state().await), Extension(anon_user()), Json(payload)).await;
+        assert!(result.overall_matched);
+        assert!(
+            result.script_errors.is_empty(),
+            "un proxy ne rend jamais de template donc n'execute jamais de script, meme en production"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_rule_valid_scripts_report_no_error() {
+        let payload = RuleTestRequest {
+            method: "GET".into(),
+            sub_path: None,
+            conditions: ConditionGroup::default(),
+            script: Some(r#"#{ greeting: "hi" }"#.into()),
+            request: empty_captured("GET", "/x"),
+            ..Default::default()
+        };
+        let Json(result) = test_rule(State(test_state().await), Extension(anon_user()), Json(payload)).await;
+        assert!(result.overall_matched);
+        assert!(result.script_errors.is_empty());
     }
 
     // --- check_rule_conflicts (POST /api/rule-conflicts) tests ---

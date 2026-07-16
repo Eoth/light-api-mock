@@ -274,7 +274,26 @@
       {serviceName}
       {groupName}
       logs={serviceLogs}
-      getDraftRule={() => ({ method: ruleMethod, subPath, allOf, anyOf })}
+      getDraftRule={() => {
+        // Inclut les 3 blocs de script (pre_script/script/post_script) et
+        // l'action en plus de method/subPath/conditions : le testeur de
+        // regle doit pouvoir rejouer les scripts contre la vraie requete
+        // capturee choisie, pas seulement le matching (cf CLAUDE.md,
+        // "Visibilite des erreurs de script"). responseSectionRef peut etre
+        // null avant le premier rendu complet (bind:this) — improbable au
+        // moment ou l'utilisateur clique "Tester", mais garde defensive.
+        const payload = responseSectionRef?.getPayload() ?? {};
+        return {
+          method: ruleMethod,
+          subPath,
+          allOf,
+          anyOf,
+          action: ruleAction,
+          preScript: payload.pre_script ?? null,
+          script: payload.script ?? null,
+          postScript: payload.post_script ?? null,
+        };
+      }}
     />
   {/if}
 

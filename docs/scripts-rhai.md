@@ -25,6 +25,21 @@ Chaque bloc peut retourner :
 - une **valeur simple** (texte, nombre) → utilisable comme `{{script}}` / `{{pre_script}}` / `{{post_script}}`,
 - ou une **structure avec plusieurs champs** (`#{ nom: "...", age: 30 }`) → chaque champ devient utilisable individuellement, ex. `{{script.nom}}`, `{{script.age}}`.
 
+## Accéder aux données de la requête
+
+Chaque script voit la requête entrante à travers une variable `request`, qui a 4 champs :
+
+| Accès | Contenu |
+|---|---|
+| `request.path.nom_du_parametre` | Un paramètre de chemin (ex. `{id}` dans `/orders/{id}` → `request.path.id`) |
+| `request.query.nom_du_parametre` | Un paramètre de requête (ex. `?page=2` → `request.query.page`) |
+| `request.headers.nom_entete` | Un en-tête HTTP. **Important : les noms d'en-tête sont toujours en minuscules** côté serveur (ex. l'en-tête `SOAPAction` devient `request.headers.soapaction`) — utilisez toujours un nom en minuscules, sinon la clé sera introuvable. |
+| `request.body` | Le corps brut de la requête, en texte. À combiner avec `parse_json()`/`parse_xml_items()` (voir plus bas) si le corps est structuré. |
+
+> **Piège à connaître : accéder à une clé absente ne provoque JAMAIS d'erreur.** Que ce soit `request.path.id` (via un point) ou `request.headers["x-absent"]` (entre crochets), une clé qui n'existe pas renvoie simplement une valeur vide — le script continue de s'exécuter normalement. C'est très différent d'appeler une fonction qui n'existe pas (voir la section suivante, "Quand un script échoue") : ça, c'est une vraie erreur. Concrètement, une règle qui ne fonctionne jamais comme prévu à cause d'un nom de paramètre mal orthographié (`request.path.id` alors que le paramètre s'appelle en réalité `orderId`) échouera **silencieusement**, sans aucun message d'erreur nulle part — utilisez le [testeur de règle](testeur-de-regle-et-conflits.md) contre une vraie requête capturée pour vérifier qu'une clé est bien trouvée avant de vous fier au script.
+
+Comme pour les fonctions ci-dessous, ces 4 accès apparaissent dans l'autocomplétion de l'éditeur de script (tapez `request` pour les voir).
+
 ## Fonctions disponibles
 
 | Fonction | Ce qu'elle fait |
@@ -48,6 +63,56 @@ Chaque bloc peut retourner :
 L'éditeur affiche ces fonctions dans une liste déroulante dès que vous commencez à taper leur nom (ou en appuyant sur `Ctrl+Espace` pour voir la liste complète), avec leur signature et leur description — pas besoin de mémoriser ce tableau.
 
 ![Autocomplétion des fonctions Rhai pendant la frappe dans l'éditeur](screenshots/rhai-autocompletion.png)
+
+## Quand un script échoue
+
+Un script peut échouer à l'exécution — par exemple si vous appelez une fonction qui n'existe pas (faute de frappe sur un nom de fonction, fonction inventée en s'inspirant du tableau ci-dessus mais mal orthographiée...). Il est important de comprendre ce qui se passe dans ce cas, car **ce n'est PAS la même chose qu'une clé absente** (cf encadré ci-dessus) :
+
+- **Une clé absente** (`request.path.nom_qui_n_existe_pas`) ne lève jamais d'erreur — le script continue, la valeur est simplement vide.
+- **Un appel de fonction inexistante** (`ma_fonction_inventee(1, 2)`) **est une vraie erreur d'exécution**. Le script s'arrête immédiatement à cet endroit — aucune des instructions suivantes ne s'exécute (y compris une éventuelle branche `else` d'un `if`, si l'erreur survient dans la branche `if`).
+
+**En production**, une erreur d'exécution de script n'empêche jamais la requête d'être servie : le mécanisme est volontairement tolérant ("soft-fail") — la règle continue de s'appliquer, mais `{{script}}`/`{{script.champ}}` (ou `{{pre_script...}}`/`{{post_script...}}` selon le bloc en erreur) se rendent comme du texte **vide**. Rien n'indique visuellement au client HTTP qu'une erreur s'est produite — c'est un choix assumé pour ne jamais transformer un script cassé en panne totale du mock. Une trace de l'erreur reste néanmoins écrite dans les journaux serveur (invisible sans y avoir accès).
+
+**Avant de sauvegarder une règle**, deux niveaux de vérification existent :
+1. Le bouton **"Valider le script"** sous chaque zone de script vérifie la **syntaxe** (le script est-il un programme Rhai valide ?) — mais ne détecte PAS un appel à une fonction inexistante, ni une erreur qui ne se produit qu'à l'exécution réelle.
+2. Le **[testeur de règle](testeur-de-regle-et-conflits.md)** ("Tester contre une requête réelle", visible pendant l'édition d'une règle) exécute réellement vos scripts contre une vraie requête déjà capturée, et affiche un message d'erreur explicite si l'un d'eux échoue — c'est la façon fiable de détecter ce type de problème avant de sauvegarder, puisque la syntaxe seule ne suffit pas.
+
+![Testeur de règle affichant un message d'erreur clair suite à l'appel d'une fonction Rhai inexistante](screenshots/testeur-regle-erreur-script.png)
+
+## Cas d'usage : table de correspondance (map) avec repli
+
+Besoin fréquent : faire correspondre une valeur reçue (un nom, un code...) à une autre valeur (un identifiant, une URL...) à l'aide d'une petite table fixe, avec une valeur de repli si la clé recherchée n'y figure pas. C'est un simple objet Rhai (`#{ ... }`) indexé par clé — plusieurs syntaxes équivalentes fonctionnent :
+
+```rhai
+let mapping = #{
+    "billing": "svc-billing-042",
+    "orders": "svc-orders-017"
+};
+let name = request.path.name;
+
+// Variante 1 : verifier la presence avant d'indexer.
+if mapping.contains(name) {
+    #{ id: mapping[name], found: "true" }
+} else {
+    #{ id: "unknown", found: "false" }
+}
+
+// Variante 2, equivalente : `switch` (plus lisible avec beaucoup de cas).
+// switch name {
+//     "billing" => "svc-billing-042",
+//     "orders" => "svc-orders-017",
+//     _ => "unknown"
+// }
+```
+
+**Exemple complet** — service `annuaire`, chemin `/lookup/{name}`, règle `GET` (script ci-dessus), corps de réponse (mode "Template avancé") :
+```xml
+<?xml version="1.0"?><serviceLookup><name>{{path.name}}</name><id>{{script.id}}</id><found>{{script.found}}</found></serviceLookup>
+```
+
+Vérifié par de vraies requêtes HTTP : `GET /annuaire/lookup/billing` renvoie `<id>svc-billing-042</id><found>true</found>` ; `GET /annuaire/lookup/nonexistent` (clé absente de la table) renvoie bien la branche de repli, `<id>unknown</id><found>false</found>`, sans aucune erreur.
+
+> **Piège à éviter** : Rhai n'a **pas** d'opérateur ternaire `cond ? a : b` (contrairement à JavaScript) — utilisez `if { ... } else { ... }` comme dans l'exemple ci-dessus. Une tentative d'utiliser `?:` provoque une erreur de syntaxe ("Unknown operator"), détectée par le bouton "Valider le script".
 
 ## Cas d'usage : réponse toujours identique pour une même clé
 
@@ -190,6 +255,6 @@ Notez que `unitPrice` vaut `445` pour `REF-001` dans les deux exemples (JSON et 
 - Aucun prérequis particulier : disponible dès l'installation de base, aucune configuration à activer.
 - `seeded_int`/`seeded_pick` garantissent la **stabilité** du résultat pour une même clé, mais pas l'absence totale de collision entre deux clés différentes (deux SIRET distincts pourraient, très rarement, tomber sur le même résultat) — c'est un compromis acceptable pour du mock, pas approprié pour un usage nécessitant une unicité garantie.
 - Les scripts ne sont **pas** exécutés pour les messages [Kafka](messaging-kafka.md) simulés — ils restent réservés au trafic HTTP.
-- La syntaxe est validée avant sauvegarde (le formulaire signale une erreur si le script ne peut pas s'exécuter), mais uniquement au niveau syntaxique — une erreur de logique métier (mauvaise valeur calculée) ne sera pas détectée automatiquement.
+- La syntaxe est validée avant sauvegarde ("Valider le script"), mais uniquement au niveau syntaxique — une erreur qui ne se manifeste qu'à l'exécution (fonction inexistante, division par zéro...) ou une erreur de logique métier (mauvaise valeur calculée) ne sera pas détectée par ce bouton. Utilisez le [testeur de règle](testeur-de-regle-et-conflits.md) contre une vraie requête capturée pour détecter les erreurs d'exécution avant de sauvegarder (cf "Quand un script échoue" ci-dessus).
 - `parse_json(texte)` renvoie une valeur "vide" (ni liste, ni objet) si le texte n'est pas du JSON valide, plutôt que de faire échouer le script — pensez à vérifier le format de la requête si `parse_json(request.body)` ne se comporte pas comme attendu.
 - `parse_xml_items` ne capture qu'un seul niveau de champs enfants par élément répété (cf exemple SOAP ci-dessus) — pas de structure imbriquée à l'intérieur d'un article/ligne.

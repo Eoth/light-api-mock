@@ -1463,4 +1463,87 @@ mod tests {
 
         std::fs::remove_dir_all(&data_dir).ok();
     }
+
+    // --- Cas d'usage "map de correspondance + lookup par path param, reponse
+    // XML" (cf CLAUDE.md, "Visibilite des erreurs de script") : verifie
+    // bout-en-bout que la VRAIE syntaxe Rhai correcte pour ce pattern (map
+    // literale #{...}, `.contains(cle)` + indexation `mapping[cle]`,
+    // fallback via if/else) fonctionne, y compris la branche de repli quand
+    // la cle est absente — meme script que celui documente dans
+    // docs/scripts-rhai.md, pour garantir qu'un copier-coller fonctionne.
+    fn service_lookup_rule() -> Rule {
+        Rule {
+            name: "lookup-service".into(),
+            method: "GET".into(),
+            sub_path: Some("/lookup/{name}".into()),
+            action: RuleAction::Mock,
+            pre_script: None,
+            script: Some(
+                r#"
+                    let mapping = #{
+                        "billing": "svc-billing-042",
+                        "orders": "svc-orders-017"
+                    };
+                    let name = request.path.name;
+                    if mapping.contains(name) {
+                        #{ id: mapping[name], found: "true" }
+                    } else {
+                        #{ id: "unknown", found: "false" }
+                    }
+                "#
+                .into(),
+            ),
+            post_script: None,
+            conditions: ConditionGroup::default(),
+            response: MockResponse {
+                status: 200,
+                headers: vec![HeaderEntry { name: "Content-Type".into(), value: "text/xml".into() }],
+                body: vec![BodyFragment::Template {
+                    template: r#"<?xml version="1.0"?><serviceLookup><name>{{path.name}}</name><id>{{script.id}}</id><found>{{script.found}}</found></serviceLookup>"#.into(),
+                }],
+                chaos: None,
+            },
+        }
+    }
+
+    #[tokio::test]
+    async fn map_lookup_by_path_param_returns_correct_target_and_falls_back_for_unknown_key() {
+        let mut service = purely_mocked_service(vec![service_lookup_rule()]);
+        service.name = "annuaire".into();
+        let (port, _log, data_dir) = spawn_test_server(MockConfig {
+            services: vec![service],
+            groups: vec![],
+        })
+        .await;
+        let client = reqwest::Client::new();
+
+        // Cle presente dans la map : lookup reussi.
+        let resp = client
+            .get(format!("http://127.0.0.1:{port}/annuaire/lookup/billing"))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(resp.status().as_u16(), 200);
+        let text = resp.text().await.unwrap();
+        assert!(text.contains("<name>billing</name>"));
+        assert!(text.contains("<id>svc-billing-042</id>"));
+        assert!(text.contains("<found>true</found>"));
+
+        // Cle absente de la map : la branche de repli (else) s'execute
+        // correctement — c'est exactement ce que le script silencieusement
+        // en echec (fonction inexistante) du bug d'origine ne parvenait
+        // jamais a atteindre.
+        let resp = client
+            .get(format!("http://127.0.0.1:{port}/annuaire/lookup/nonexistent"))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(resp.status().as_u16(), 200);
+        let text = resp.text().await.unwrap();
+        assert!(text.contains("<name>nonexistent</name>"));
+        assert!(text.contains("<id>unknown</id>"));
+        assert!(text.contains("<found>false</found>"));
+
+        std::fs::remove_dir_all(&data_dir).ok();
+    }
 }

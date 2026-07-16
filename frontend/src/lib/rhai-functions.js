@@ -5,6 +5,44 @@
 // tpl-utils.js pour le format template : une seule liste a mettre a jour
 // quand une fonction native est ajoutee/modifiee cote moteur.
 export const RHAI_FUNCTIONS = [
+  // --- Acces au contexte de la requete (variable `request`, pas des
+  // fonctions a proprement parler, mais listees ici pour beneficier de la
+  // meme autocompletion/doc que le reste — meme principe de source unique).
+  // Miroir de ScriptEngine::execute() (src/engine/script.rs), qui pousse un
+  // seul objet `request` dans le scope Rhai avec 4 champs : body/headers/
+  // query/path. IMPORTANT : acceder a une cle absente ne leve JAMAIS
+  // d'erreur en Rhai (ni via `.cle`, ni via `["cle"]`) — ca renvoie
+  // simplement une valeur vide/absente. Une regle qui ne matche jamais a
+  // cause d'un nom de cle errone (ex. `request.path.id` alors que le path
+  // param s'appelle `orderId`) echoue donc SILENCIEUSEMENT (aucune erreur a
+  // l'execution), contrairement a l'appel d'une fonction native inexistante
+  // (voir plus bas) qui, lui, produit une vraie erreur. Utiliser le testeur
+  // de regle (section "Tester contre une requete reelle" ci-dessus) pour
+  // verifier qu'une cle est bien trouvee avant de se fier au script.
+  {
+    name: 'request.path',
+    signature: 'request.path.nom_du_parametre',
+    description: 'Parametres de chemin extraits de l\'URL (ex. {id} dans /orders/{id} -> request.path.id). Cle absente = valeur vide, jamais d\'erreur.',
+    insertText: 'request.path',
+  },
+  {
+    name: 'request.query',
+    signature: 'request.query.nom_du_parametre',
+    description: 'Parametres de la query string (ex. ?page=2 -> request.query.page). Cle absente = valeur vide, jamais d\'erreur.',
+    insertText: 'request.query',
+  },
+  {
+    name: 'request.headers',
+    signature: 'request.headers.nom_entete',
+    description: 'En-tetes HTTP de la requete. ATTENTION : les noms sont toujours normalises en minuscules cote serveur (ex. "SOAPAction" devient request.headers.soapaction) — utiliser un nom en minuscules, sinon la cle est silencieusement introuvable.',
+    insertText: 'request.headers',
+  },
+  {
+    name: 'request.body',
+    signature: 'request.body',
+    description: 'Corps brut de la requete, en texte. A parser avec parse_json()/parse_xml_items() si le corps est structure.',
+    insertText: 'request.body',
+  },
   {
     name: 'random_int',
     signature: 'random_int(min, max)',
