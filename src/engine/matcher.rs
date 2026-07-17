@@ -422,25 +422,43 @@ impl MatchEngine {
         Self::walk_xml(text, &segments)
     }
 
+    // Correctif (sujet "SOAPAction recherche/Siret") : suit la VRAIE pile d'ancetres XML
+    // (`stack`, local names dans l'ordre d'imbrication reelle) plutot qu'un compteur plat.
+    // L'ancienne version decrementait `depth_match` sur N'IMPORTE QUEL evenement End des
+    // qu'un match partiel etait en cours, meme si l'element ferme n'avait rien a voir avec
+    // le chemin recherche (ex. un <Header></Header> non-autoferme, sibling de <Body>) — un
+    // tel sibling cassait silencieusement le matching de tout chemin XPath dont un ancetre
+    // avait deja matche. La comparaison se fait desormais sur la pile REELLE complete
+    // (stack == segments), donc un sibling non-matchant n'affecte jamais un ancetre deja
+    // matche : seul son propre passage pile/depile est concerne.
     fn walk_xml(xml: &str, segments: &[&str]) -> Option<String> {
         use quick_xml::events::Event;
         use quick_xml::reader::Reader;
 
         let mut reader = Reader::from_str(xml);
-        let mut depth_match = 0usize;
+        let mut stack: Vec<String> = Vec::new();
         let mut capture = false;
         let mut result = String::new();
+
+        let path_matches = |stack: &[String]| {
+            stack.len() == segments.len() && stack.iter().map(String::as_str).eq(segments.iter().copied())
+        };
 
         loop {
             match reader.read_event() {
                 Ok(Event::Start(e)) => {
-                    let local = Self::local_name(&e);
-                    if depth_match < segments.len() && local == segments[depth_match] {
-                        depth_match += 1;
-                        if depth_match == segments.len() {
-                            capture = true;
-                        }
+                    stack.push(Self::local_name(&e));
+                    if !capture && path_matches(&stack) {
+                        capture = true;
                     }
+                }
+                Ok(Event::Empty(e)) => {
+                    // Element auto-ferme (`<tag/>`) : pas de Text/End separes a suivre.
+                    stack.push(Self::local_name(&e));
+                    if path_matches(&stack) {
+                        return Some(result);
+                    }
+                    stack.pop();
                 }
                 Ok(Event::Text(e)) => {
                     if capture {
@@ -453,9 +471,7 @@ impl MatchEngine {
                     if capture {
                         return Some(result);
                     }
-                    if depth_match > 0 {
-                        depth_match -= 1;
-                    }
+                    stack.pop();
                 }
                 Ok(Event::Eof) => break,
                 Err(_) => break,
@@ -766,6 +782,68 @@ mod tests {
         )];
         let req = make_req(&[], &[], body, Some("text/xml"));
         assert!(MatchEngine::first_match(&rules, &req).is_some());
+    }
+
+    #[test]
+    fn xpath_soap_with_header_sibling_before_body() {
+        // Regression pour le bug corrige (sujet "SOAPAction recherche/Siret") : un
+        // <Header></Header> non-autoferme, sibling de <Body> sous <Envelope>, ne doit
+        // plus casser le matching d'un ancetre deja matche (Envelope).
+        let body = br#"<SOAP:Envelope><SOAP-ENV:Header></SOAP-ENV:Header><SOAP-ENV:Body><ns3:recherche><ns3:Siret>12345678901234</ns3:Siret></ns3:recherche></SOAP-ENV:Body></SOAP:Envelope>"#;
+        let rules = vec![simple_rule(
+            "soap-header-sibling",
+            ConditionGroup {
+                all_of: vec![Condition {
+                    source: ConditionSource::XPath("Envelope/Body/recherche".into()),
+                    operator: Operator::Exists,
+                }],
+                any_of: vec![],
+            },
+        )];
+        let req = make_req(&[], &[], body, Some("text/xml"));
+        assert!(MatchEngine::first_match(&rules, &req).is_some());
+    }
+
+    #[test]
+    fn xpath_soap_distinguishes_sibling_operations() {
+        // Deux operations possibles sur le meme service (recherche vs mode), meme
+        // structure d'enveloppe avec Header sibling : seule la regle dont la condition
+        // XPath correspond a l'operation reellement presente doit matcher.
+        let body_recherche = br#"<SOAP:Envelope><SOAP-ENV:Header></SOAP-ENV:Header><SOAP-ENV:Body><ns3:recherche><ns3:Siret>12345678901234</ns3:Siret></ns3:recherche></SOAP-ENV:Body></SOAP:Envelope>"#;
+        let rules = vec![
+            simple_rule(
+                "op-mode",
+                ConditionGroup {
+                    all_of: vec![Condition {
+                        source: ConditionSource::XPath("Envelope/Body/mode".into()),
+                        operator: Operator::Exists,
+                    }],
+                    any_of: vec![],
+                },
+            ),
+            simple_rule(
+                "op-recherche",
+                ConditionGroup {
+                    all_of: vec![Condition {
+                        source: ConditionSource::XPath("Envelope/Body/recherche".into()),
+                        operator: Operator::Exists,
+                    }],
+                    any_of: vec![],
+                },
+            ),
+        ];
+        let req = make_req(&[], &[], body_recherche, Some("text/xml"));
+        let (matched, _) = MatchEngine::first_match(&rules, &req).unwrap();
+        assert_eq!(matched.name, "op-recherche");
+    }
+
+    #[test]
+    fn xpath_matches_self_closing_target_element() {
+        // Event::Empty (<tag/>) : necessaire si l'operation ciblee n'a pas de contenu
+        // (ex. <ns3:mode/> sans enfant), cas non couvert avant ce correctif.
+        let body = br#"<SOAP:Envelope><SOAP-ENV:Header/><SOAP-ENV:Body><ns3:mode/></SOAP-ENV:Body></SOAP:Envelope>"#;
+        let result = MatchEngine::extract_xpath(body, "Envelope/Body/mode");
+        assert_eq!(result, Some(String::new()));
     }
 
     #[test]

@@ -407,7 +407,10 @@ fn extract_headers(headers: &axum::http::HeaderMap) -> HashMap<String, String> {
 mod tests {
     use super::*;
     use crate::engine::matcher::match_path;
-    use crate::models::{BodyFragment, ConditionGroup, HeaderEntry, MockConfig, MockResponse, Rule};
+    use crate::models::{
+        BodyFragment, Condition, ConditionGroup, ConditionSource, HeaderEntry, MockConfig,
+        MockResponse, Operator, Rule,
+    };
     use crate::store::MockStore;
 
     #[test]
@@ -1543,6 +1546,123 @@ mod tests {
         assert!(text.contains("<name>nonexistent</name>"));
         assert!(text.contains("<id>unknown</id>"));
         assert!(text.contains("<found>false</found>"));
+
+        std::fs::remove_dir_all(&data_dir).ok();
+    }
+
+    // --- Condition XPath sur XML SOAP namespace + extraction requete->reponse
+    // (sujet "SOAPAction recherche/Siret") : verifie bout-en-bout que la
+    // condition XPath "Envelope/Body/recherche" (sans prefixe de namespace, cf
+    // MatchEngine::local_name) route correctement selon l'operation SOAP
+    // presente dans le corps, meme avec un <Header></Header> non-autoferme
+    // sibling de <Body> (structure SOAP realiste qui declenchait le bug
+    // corrige de walk_xml — cf commentaire sur MatchEngine::walk_xml). Verifie
+    // aussi que le script d'extraction (parse_xml_items) recupere une valeur
+    // du corps de requete (Siret) et la reinjecte dans la reponse.
+    fn soap_condition_rules() -> Vec<Rule> {
+        vec![
+            Rule {
+                name: "operation-recherche".into(),
+                method: "POST".into(),
+                sub_path: None,
+                action: RuleAction::Mock,
+                pre_script: None,
+                script: Some(
+                    r#"
+                        let items = parse_xml_items(request.body, "Envelope/Body/recherche");
+                        let siret = if items.len() > 0 { items[0].Siret } else { "" };
+                        #{ siret: siret }
+                    "#
+                    .into(),
+                ),
+                post_script: None,
+                conditions: ConditionGroup {
+                    all_of: vec![Condition {
+                        source: ConditionSource::XPath("Envelope/Body/recherche".into()),
+                        operator: Operator::Exists,
+                    }],
+                    any_of: vec![],
+                },
+                response: MockResponse {
+                    status: 200,
+                    headers: vec![HeaderEntry { name: "Content-Type".into(), value: "text/xml".into() }],
+                    body: vec![BodyFragment::Template {
+                        template: r#"<?xml version="1.0"?><rechercheResponse><siret>{{script.siret}}</siret></rechercheResponse>"#.into(),
+                    }],
+                    chaos: None,
+                },
+            },
+            Rule {
+                name: "operation-mode".into(),
+                method: "POST".into(),
+                sub_path: None,
+                action: RuleAction::Mock,
+                pre_script: None,
+                script: None,
+                post_script: None,
+                conditions: ConditionGroup {
+                    all_of: vec![Condition {
+                        source: ConditionSource::XPath("Envelope/Body/mode".into()),
+                        operator: Operator::Exists,
+                    }],
+                    any_of: vec![],
+                },
+                response: MockResponse {
+                    status: 200,
+                    headers: vec![HeaderEntry { name: "Content-Type".into(), value: "text/xml".into() }],
+                    body: vec![BodyFragment::Template {
+                        template: r#"<?xml version="1.0"?><modeResponse><ok>true</ok></modeResponse>"#.into(),
+                    }],
+                    chaos: None,
+                },
+            },
+        ]
+    }
+
+    #[tokio::test]
+    async fn soap_xpath_condition_routes_by_operation_and_extracts_value_into_response() {
+        let mut service = purely_mocked_service(soap_condition_rules());
+        service.name = "annuaire-soap".into();
+        let (port, _log, data_dir) = spawn_test_server(MockConfig {
+            services: vec![service],
+            groups: vec![],
+        })
+        .await;
+        let client = reqwest::Client::new();
+        let url = format!("http://127.0.0.1:{port}/annuaire-soap/service");
+
+        // Requete "recherche" avec un Header non-autoferme sibling de Body (structure
+        // SOAP realiste) : la condition XPath doit matcher malgre le Header, et le
+        // Siret de la requete doit se retrouver tel quel dans la reponse.
+        let body_recherche = r#"<SOAP:Envelope><SOAP-ENV:Header></SOAP-ENV:Header><SOAP-ENV:Body><ns3:recherche><ns3:Nom>Test</ns3:Nom><ns3:Siret>12345678901234</ns3:Siret></ns3:recherche></SOAP-ENV:Body></SOAP:Envelope>"#;
+        let resp = client
+            .post(&url)
+            .header("Content-Type", "text/xml")
+            .body(body_recherche)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(resp.status().as_u16(), 200);
+        let text = resp.text().await.unwrap();
+        assert!(
+            text.contains("<siret>12345678901234</siret>"),
+            "le Siret de la requete doit etre reinjecte dans la reponse, obtenu: {text}"
+        );
+
+        // Requete "mode" (autre operation, meme structure d'enveloppe avec Header) :
+        // la regle "recherche" ne doit PAS matcher, "mode" doit repondre a la place.
+        let body_mode = r#"<SOAP:Envelope><SOAP-ENV:Header></SOAP-ENV:Header><SOAP-ENV:Body><ns3:mode><ns3:Valeur>test</ns3:Valeur></ns3:mode></SOAP-ENV:Body></SOAP:Envelope>"#;
+        let resp = client
+            .post(&url)
+            .header("Content-Type", "text/xml")
+            .body(body_mode)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(resp.status().as_u16(), 200);
+        let text = resp.text().await.unwrap();
+        assert!(text.contains("<modeResponse>"));
+        assert!(!text.contains("<siret>"));
 
         std::fs::remove_dir_all(&data_dir).ok();
     }

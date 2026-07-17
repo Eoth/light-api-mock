@@ -69,6 +69,37 @@ Certains clients SOAP n'envoient pas d'en-tête `SOAPAction` exploitable, ou vou
 
 Le même principe s'applique à un corps JSON avec une condition **Chemin JSON dans le corps** (JSON Pointer) — par exemple `/type` égal à `"client"` pour distinguer le type d'objet envoyé, plutôt qu'un élément XML.
 
+#### Exemple vérifié — distinguer deux opérations SOAP par le nom de l'élément dans `Body`
+
+Service `annuaire-soap`, chemin `/service`, deux règles `POST` :
+
+| Règle | Condition |
+|---|---|
+| `operation-recherche` | `XPath (XML/SOAP)`, clé `Envelope/Body/recherche`, opérateur `Existe` |
+| `operation-mode` | `XPath (XML/SOAP)`, clé `Envelope/Body/mode`, opérateur `Existe` |
+
+![Condition XPath sur le corps SOAP (Envelope/Body/recherche, opérateur Existe)](screenshots/regle-condition-xpath-soap-namespace.png)
+
+Une requête `POST` avec ce corps (notez le `<Header></Header>` vide, non auto-fermé, avant `<Body>` — une structure d'enveloppe SOAP tout à fait courante) :
+
+```xml
+<SOAP:Envelope>
+  <SOAP-ENV:Header></SOAP-ENV:Header>
+  <SOAP-ENV:Body>
+    <ns3:recherche>
+      <ns3:Nom>Test</ns3:Nom>
+      <ns3:Siret>98765432109876</ns3:Siret>
+    </ns3:recherche>
+  </SOAP-ENV:Body>
+</SOAP:Envelope>
+```
+
+déclenche la règle `operation-recherche` (et **pas** `operation-mode`) — vérifié par un vrai appel HTTP. Une requête avec `<ns3:mode>...</ns3:mode>` à la place de `<ns3:recherche>` déclenche `operation-mode` à la place. Notez que le chemin `Envelope/Body/recherche` ne contient **aucun préfixe d'espace de noms** (ni `SOAP:`, ni `SOAP-ENV:`, ni `ns3:`) — c'est la syntaxe correcte : ces préfixes sont toujours ignorés dans le chemin (voir "Prérequis et limites" ci-dessous), les inclure dans le chemin (ex. `SOAP-ENV:Body/ns3:recherche`) ne matcherait jamais rien.
+
+> **Ce cas précis (Header non auto-fermé avant Body) a été un vrai bug, corrigé.** Avant ce correctif, une condition XPath comme `Envelope/Body/recherche` ne matchait jamais dès qu'un élément frère de `Body` — tel qu'un `<Header></Header>` vide écrit avec une balise ouvrante et une balise fermante séparées, plutôt qu'auto-fermée (`<Header/>`) — précédait `Body` dans l'enveloppe. Ce n'était **pas** une erreur de syntaxe de votre part : le chemin sans préfixe (`Envelope/Body/recherche`) est et a toujours été la bonne syntaxe ; c'était bien un défaut du moteur de correspondance XPath (`walk_xml`), qui perdait la trace d'un ancêtre déjà reconnu (`Envelope`) dès qu'un élément non lié à ce chemin se refermait. Si votre lightMock est à jour, ce cas fonctionne comme documenté ci-dessus.
+
+Pour récupérer une valeur de ce corps SOAP (par exemple le `Siret`) et la réinjecter dans la réponse, voir [le cas d'usage dédié dans Scripts Rhai](scripts-rhai.md#cas-dusage--extraire-une-valeur-de-la-requête-soap-vers-la-réponse).
+
 ## Quelle règle s'applique si plusieurs correspondent ?
 
 Les règles d'un service sont évaluées **dans l'ordre où elles sont listées**, et **la première qui correspond gagne** — les suivantes ne sont même pas regardées. L'ordre des règles est donc important : une règle très générale placée avant une règle plus spécifique "masquera" toujours cette dernière.
