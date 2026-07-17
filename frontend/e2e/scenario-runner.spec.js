@@ -556,3 +556,37 @@ test.describe('Runner data-driven (scenarios JSON) - lot 11 (JSON par exemple)',
     expect(body.actif).toBe(true);
   });
 });
+
+// Lot 12 : couverture E2E neuve (pas une migration), pour le sujet "SOAPAction
+// recherche/Siret" -- configure via l'UI une condition XPath sur un XML SOAP
+// namespace (Envelope/Body/recherche) et un script d'extraction
+// (parse_xml_items) qui reinjecte le Siret de la requete dans la reponse.
+// Verifie hors runner (vraie requete HTTP avec un corps SOAP realiste,
+// Header non-autoferme sibling de Body) que la condition matche bien et que
+// le Siret extrait se retrouve dans la reponse -- pas seulement que le
+// formulaire se soumet sans erreur.
+test.describe('Runner data-driven (scenarios JSON) - lot 12 (XPath SOAP + extraction)', () => {
+  test.beforeEach(async ({ request }) => {
+    await request.delete(`${API}/config/reset`);
+    await request.post(`${API}/services`, {
+      data: validService('soap-extraction-demo', { listen_path: '/service', real_target_url: '' }),
+    });
+  });
+
+  test('configurer une condition XPath SOAP + extraction via l UI produit bien le Siret dans la reponse (scenario JSON)', async ({ page, request }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Condition XPath sur un XML SOAP namespace + extraction d une valeur vers la reponse (illustration doc)'));
+
+    // Verification hors runner : requete SOAP realiste, avec un
+    // <Header></Header> non-autoferme sibling de <Body> (structure qui
+    // declenchait le bug corrige de walk_xml) -- la condition XPath doit
+    // matcher malgre le Header, et le Siret de la requete doit se retrouver
+    // tel quel dans la reponse.
+    const resp = await request.post('http://localhost:7342/soap-extraction-demo/service', {
+      headers: { 'Content-Type': 'text/xml' },
+      data: '<SOAP:Envelope><SOAP-ENV:Header></SOAP-ENV:Header><SOAP-ENV:Body><ns3:recherche><ns3:Nom>Test</ns3:Nom><ns3:Siret>98765432109876</ns3:Siret></ns3:recherche></SOAP-ENV:Body></SOAP:Envelope>',
+    });
+    expect(resp.status()).toBe(200);
+    const xml = await resp.text();
+    expect(xml).toContain('<siret>98765432109876</siret>');
+  });
+});

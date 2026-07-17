@@ -951,6 +951,44 @@ mod tests {
     }
 
     #[test]
+    fn parse_xml_items_extracts_single_soap_operation_value_with_header_sibling() {
+        // Cas d'usage verifie (sujet "SOAPAction recherche/Siret") : extraire UNE
+        // valeur (pas une liste) du corps d'une requete SOAP realiste, avec un
+        // <Header></Header> non-autoferme sibling de <Body> (structure SOAP typique)
+        // et plusieurs champs enfants (Nom + Siret) dans l'element d'operation.
+        // Pattern retenu : parse_xml_items() sur le chemin qui mene a l'element
+        // d'operation lui-meme (pas jusqu'a la feuille), puis `[0].Champ` — l'element
+        // d'operation n'a qu'UNE occurrence sous Body, donc l'array a toujours une
+        // longueur de 1 dans ce cas d'usage.
+        let engine = ScriptEngine::new();
+        let ctx = ScriptContext {
+            body: r#"<SOAP:Envelope><SOAP-ENV:Header></SOAP-ENV:Header><SOAP-ENV:Body><ns3:recherche><ns3:Nom>Test</ns3:Nom><ns3:Siret>12345678901234</ns3:Siret></ns3:recherche></SOAP-ENV:Body></SOAP:Envelope>"#.into(),
+            ..empty_ctx()
+        };
+        let len = engine
+            .execute(
+                r#"parse_xml_items(request.body, "Envelope/Body/recherche").len()"#,
+                &ctx,
+            )
+            .unwrap();
+        assert_eq!(len.value, "1");
+        let siret = engine
+            .execute(
+                r#"parse_xml_items(request.body, "Envelope/Body/recherche")[0].Siret"#,
+                &ctx,
+            )
+            .unwrap();
+        assert_eq!(siret.value, "12345678901234");
+        let nom = engine
+            .execute(
+                r#"parse_xml_items(request.body, "Envelope/Body/recherche")[0].Nom"#,
+                &ctx,
+            )
+            .unwrap();
+        assert_eq!(nom.value, "Test");
+    }
+
+    #[test]
     fn parse_xml_items_no_match_returns_empty_array() {
         let engine = ScriptEngine::new();
         let ctx = ScriptContext {

@@ -250,6 +250,54 @@ Notez que `unitPrice` vaut `445` pour `REF-001` dans les deux exemples (JSON et 
 
 > **Limite de `parse_xml_items`** : seul le premier niveau d'enfants de chaque élément répété est capturé (des champs "à plat", comme `<sku>`/`<qty>` ci-dessus). Une structure imbriquée plus profonde à l'intérieur d'un article ne sera pas extraite — pensez à garder les éléments répétés simples, ou à ajouter plusieurs appels `parse_xml_items` avec des chemins différents si nécessaire.
 
+## Cas d'usage : extraire une valeur de la requête SOAP vers la réponse
+
+Besoin fréquent avec un client SOAP : récupérer **une seule valeur** envoyée dans l'enveloppe (par exemple un numéro SIRET dans `<ns3:Siret>`) et la renvoyer telle quelle dans la réponse simulée, sans forcément passer par une [condition XPath](regles-de-matching.md#cas-dusage--une-même-url-qui-répond-différemment-selon-lopération-soap) — c'est une extraction, pas une comparaison.
+
+Utilisez `parse_xml_items(texte, "chemin/vers/element")` **jusqu'à l'élément qui contient la valeur recherchée** (pas jusqu'à la valeur elle-même) — comme cet élément n'apparaît normalement qu'une seule fois dans une requête SOAP, la liste renvoyée n'a qu'un élément, dont vous lisez le champ voulu à l'index `0` :
+
+```rhai
+// L'element "recherche" (l'operation SOAP) n'apparait qu'UNE fois dans le
+// corps -> parse_xml_items() renvoie une liste a UN element ; [0] recupere
+// cet element, dont chaque enfant direct (Nom, Siret...) est un champ.
+let items = parse_xml_items(request.body, "Envelope/Body/recherche");
+let siret = if items.len() > 0 { items[0].Siret } else { "" };
+#{ siret: siret }
+```
+
+**Exemple complet** — service `annuaire-soap`, chemin `/service`, règle `POST` avec une condition **XPath (XML/SOAP)** `Envelope/Body/recherche` = `Existe` (pour ne matcher que l'opération "recherche", voir [Règles de correspondance](regles-de-matching.md#cas-dusage--une-même-url-qui-répond-différemment-selon-lopération-soap)) et le script ci-dessus :
+
+![Condition XPath sur le corps SOAP (Envelope/Body/recherche, opérateur Existe)](screenshots/regle-condition-xpath-soap-namespace.png)
+
+![Script d'extraction (parse_xml_items) et template de réponse réinjectant le Siret](screenshots/regle-script-extraction-xpath-soap.png)
+
+**Corps de la réponse** (mode "Template avancé") :
+```xml
+<?xml version="1.0"?><rechercheResponse><siret>{{script.siret}}</siret></rechercheResponse>
+```
+
+**Requête envoyée** (enveloppe SOAP réaliste, avec un `<Header>` vide **non auto-fermé**, sibling de `<Body>`) :
+```xml
+<SOAP:Envelope>
+  <SOAP-ENV:Header></SOAP-ENV:Header>
+  <SOAP-ENV:Body>
+    <ns3:recherche>
+      <ns3:Nom>Test</ns3:Nom>
+      <ns3:Siret>98765432109876</ns3:Siret>
+    </ns3:recherche>
+  </SOAP-ENV:Body>
+</SOAP:Envelope>
+```
+
+**Réponse obtenue** (vérifiée par un vrai appel HTTP) :
+```xml
+<?xml version="1.0"?><rechercheResponse><siret>98765432109876</siret></rechercheResponse>
+```
+
+> **Ce cas précis (Header non auto-fermé avant Body) a été un vrai bug, corrigé** : avant ce correctif, la condition XPath `Envelope/Body/recherche` ne matchait **jamais** dès qu'un élément frère de `<Body>` (comme un `<Header></Header>` vide écrit avec balise ouvrante/fermante plutôt qu'auto-fermée `<Header/>`) précédait `<Body>` dans l'enveloppe — un cas SOAP pourtant très courant. Ce n'était pas une erreur de syntaxe côté utilisateur : `Envelope/Body/recherche` (sans préfixe d'espace de noms, cf [Règles de correspondance](regles-de-matching.md)) est bien la bonne syntaxe. Si votre lightMock est à jour, ce cas fonctionne comme documenté ci-dessus ; s'il persiste, vérifiez que le `<Header>` en question n'est pas auto-fermé différemment de l'exemple, ou testez votre condition avec le [testeur de règle](testeur-de-regle-et-conflits.md) contre la requête réellement capturée.
+
+Le même principe (`[0].NomDuChamp`) fonctionne pour un corps **JSON** avec `parse_json(request.body).nomDuChamp` — inutile de passer par `parse_xml_items` en dehors du XML/SOAP.
+
 ## Prérequis et limites
 
 - Aucun prérequis particulier : disponible dès l'installation de base, aucune configuration à activer.

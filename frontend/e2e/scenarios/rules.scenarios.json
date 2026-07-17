@@ -295,6 +295,32 @@
         { "action": "click", "target": "ruleForm.submitButton" },
         { "action": "assertVisible", "target": "ruleList.item", "params": { "name": "json-paste-rule" } }
       ]
+    },
+    {
+      "scenario": "Condition XPath sur un XML SOAP namespace + extraction d une valeur vers la reponse (illustration doc)",
+      "steps": [
+        { "action": "goto", "page": "services" },
+        { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
+        { "action": "click", "target": "serviceCard.configureButton", "params": { "name": "soap-extraction-demo" } },
+        { "action": "click", "target": "ruleList.addButton" },
+        { "action": "fill", "target": "ruleForm.nameInput", "value": "operation-recherche" },
+        { "action": "selectOption", "target": "ruleForm.methodSelect", "value": "POST" },
+        { "action": "click", "target": "ruleForm.addConditionAllOfButton" },
+        { "action": "selectOption", "target": "conditionForm.sourceSelect", "value": "XPath" },
+        { "action": "fill", "target": "conditionForm.keyInput", "value": "Envelope/Body/recherche" },
+        { "action": "selectOption", "target": "conditionForm.operatorSelect", "value": "Exists" },
+        { "action": "screenshot", "file": "regle-condition-xpath-soap-namespace.png" },
+        { "action": "click", "target": "conditionForm.submitButton" },
+        { "action": "click", "target": "toggleSwitch.switch", "params": { "label": "Script-personnalise" } },
+        { "action": "fill", "target": "rhaiScriptEditor.textarea", "params": { "id": "rule-script" }, "value": "let items = parse_xml_items(request.body, \"Envelope/Body/recherche\");\nlet siret = if items.len() > 0 { items[0].Siret } else { \"\" };\n#{ siret: siret }" },
+        { "action": "click", "target": "ruleForm.modeButton", "params": { "mode": "advanced" } },
+        { "action": "click", "target": "ruleForm.fragmentAddButton" },
+        { "action": "selectOption", "target": "ruleForm.fragmentTypeSelect", "params": { "idx": "0" }, "value": "Template" },
+        { "action": "fill", "target": "ruleForm.fragmentTemplateTextarea", "params": { "idx": "0" }, "value": "<?xml version=\"1.0\"?><rechercheResponse><siret>{{script.siret}}</siret></rechercheResponse>" },
+        { "action": "screenshot", "file": "regle-script-extraction-xpath-soap.png" },
+        { "action": "click", "target": "ruleForm.submitButton" },
+        { "action": "assertVisible", "target": "ruleList.item", "params": { "name": "operation-recherche" } }
+      ]
     }
   ]
 }
