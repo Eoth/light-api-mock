@@ -298,4 +298,63 @@ test.describe('Testeur de regle : execution des scripts', () => {
     await expect(page.getByText(/matcherait cette requête/)).toBeVisible();
     await expect(page.getByTestId('rule-tester-script-errors')).not.toBeVisible();
   });
+
+  // Visibilite d'un resultat REUSSI mais errone (cf CLAUDE.md, "seeded_pick
+  // sur une liste d'objets : valeurs absentes/incorrectes sans erreur") :
+  // un script sans la moindre erreur d'execution peut quand meme produire
+  // un resultat que l'auteur de la regle n'attendait pas. Ce test reproduit
+  // exactement le signalement (liste de villes + seeded_pick, objet pioche
+  // imbrique sous une cle) et verifie que le testeur montre desormais le
+  // contenu REEL produit, y compris le champ imbrique serialise en JSON
+  // valide (correctif de dynamic_field_to_string, src/engine/script.rs).
+  test('affiche le resultat reel d\'un script reussi (seeded_pick sur une liste d\'objets)', async ({ page, request }) => {
+    await request.post(`${API}/services`, {
+      data: validService('seeded-pick-object-svc', { listen_path: '/quote/{siret}' }),
+    });
+    const captured = await request.get(`${BASE}/seeded-pick-object-svc/quote/44306184100047`);
+    expect(captured.status()).toBe(404); // pas encore de regle -> no-rule, mais capture quand meme
+
+    await openAddRuleForm(page, 'seeded-pick-object-svc');
+    await page.locator('input#rule-name').fill('quote-rule');
+
+    await page.getByRole('switch', { name: /Script personnalis/ }).click();
+    await page.locator('#rule-script').fill(
+      'let villes = [\n' +
+      '  #{ name: "Paris", cp: "75000", insee: "75056" },\n' +
+      '  #{ name: "Lyon", cp: "69000", insee: "69123" }\n' +
+      '];\n' +
+      'let ville = seeded_pick(request.path.siret, villes);\n' +
+      '#{ ville: ville, quoteId: "fixed-id" }'
+    );
+
+    const logSelect = page.locator('#rule-tester-log');
+    await expect(logSelect).toBeVisible();
+    const matchingOption = logSelect.locator('option', { hasText: 'seeded-pick-object-svc/quote/44306184100047' }).first();
+    await expect(matchingOption).toBeAttached();
+    await logSelect.selectOption(await matchingOption.getAttribute('value'));
+
+    await page.getByRole('button', { name: /Tester contre cette requête/ }).click();
+
+    await expect(page.getByText(/matcherait cette requête/)).toBeVisible();
+    // Aucune erreur d'execution (c'est le point du diagnostic : le script
+    // ne plante jamais dans ce scenario).
+    await expect(page.getByTestId('rule-tester-script-errors')).not.toBeVisible();
+
+    const resultPanel = page.getByTestId('rule-tester-script-results');
+    await expect(resultPanel).toBeVisible();
+    const slotPanel = page.getByTestId('rule-tester-script-result-script');
+    await expect(slotPanel).toBeVisible();
+    // "quoteId" : champ scalaire, valeur exacte visible.
+    await expect(slotPanel).toContainText('{{script.quoteId}}');
+    await expect(slotPanel).toContainText('fixed-id');
+    // "ville" : champ imbrique -- doit apparaitre comme du JSON valide
+    // (name/cp/insee), jamais la syntaxe Rhai #{...} d'avant le correctif.
+    await expect(slotPanel).toContainText('{{script.ville}}');
+    await expect(slotPanel).not.toContainText('#{');
+    const villeFieldText = await slotPanel.textContent();
+    const jsonStart = villeFieldText.indexOf('{"');
+    expect(jsonStart).toBeGreaterThan(-1);
+    const villeJson = JSON.parse(villeFieldText.slice(jsonStart, villeFieldText.indexOf('}', jsonStart) + 1));
+    expect(['Paris', 'Lyon']).toContain(villeJson.name);
+  });
 });

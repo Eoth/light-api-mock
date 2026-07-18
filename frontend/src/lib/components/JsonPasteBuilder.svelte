@@ -134,6 +134,15 @@
     return ['fixed', 'path', 'query', 'header', 'body', 'script'].includes(src);
   }
 
+  // Meme clarification que JsonResponseBuilder.svelte/XmlResponseBuilder.svelte
+  // (cf CLAUDE.md, "seeded_pick sur une liste d'objets") : un seul niveau de
+  // cle plate est navigable ({{script.champ}}), jamais un chemin imbrique.
+  function valuePlaceholder(src) {
+    if (src === 'fixed') return 'valeur fixe';
+    if (src === 'script') return 'ex: nom (vide = {{script}} entier ; 1 seul niveau — testez la regle pour voir les cles)';
+    return 'nom du parametre';
+  }
+
   export function toTemplate() {
     const obj = fieldsToTemplate(fields);
     return isArrayRoot ? `[${obj}]` : obj;
@@ -223,7 +232,7 @@
                   class="paste-value"
                   value={field.value}
                   oninput={(e) => updateField(currentPath, 'value', e.target.value)}
-                  placeholder={field.source === 'fixed' ? 'valeur fixe' : 'nom du parametre'}
+                  placeholder={valuePlaceholder(field.source)}
                   aria-label="Valeur pour {field.key}"
                   data-testid="json-paste-builder-value-input-{currentPath.join('-')}"
                 />

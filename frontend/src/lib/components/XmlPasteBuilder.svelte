@@ -220,6 +220,10 @@
   function valuePlaceholder(src) {
     if (src === 'fixed') return 'valeur fixe';
     if (src === 'xpath') return 'ex: Envelope/Body/recherche/Siret';
+    // Meme clarification que XmlResponseBuilder.svelte (cf CLAUDE.md,
+    // "seeded_pick sur une liste d'objets") : un seul niveau de cle plate
+    // est navigable ({{script.champ}}), jamais un chemin imbrique.
+    if (src === 'script') return 'ex: nom (vide = {{script}} entier ; 1 seul niveau — testez la regle pour voir les cles)';
     return 'nom du parametre';
   }
 

@@ -264,4 +264,134 @@ describe('RuleTester: appel API et affichage du resultat', () => {
     await waitFor(() => expect(queryByTestId('rule-tester-result')).toBeInTheDocument());
     expect(queryByTestId('rule-tester-script-errors')).not.toBeInTheDocument();
   });
+
+  // --- script_results : visibilite d'un resultat REUSSI mais errone (cf
+  // CLAUDE.md "seeded_pick sur une liste d'objets : valeurs
+  // absentes/incorrectes sans erreur"). Un script sans erreur d'execution
+  // peut quand meme produire un resultat inattendu (typo de cle, objet
+  // imbrique non navigable) — ces tests verifient que le testeur montre
+  // desormais CE QUE le script a reellement produit, pas seulement l'absence
+  // d'erreur.
+
+  it('affiche les champs produits par un script reussi (ex: objet pioche via seeded_pick)', async () => {
+    testRule.mockResolvedValue({
+      method_matches: true,
+      sub_path_matches: true,
+      path_params: {},
+      overall_matched: true,
+      body_truncated: false,
+      all_of: [],
+      any_of: [],
+      script_errors: [],
+      script_results: [
+        { slot: 'script', value: '', fields: { name: 'Lyon', cp: '69000', insee: '69123' } },
+      ],
+    });
+
+    const { getByLabelText, getByRole, getByTestId, getByText } = render(RuleTester, {
+      props: {
+        serviceName: 'svc-a',
+        logs: [logWithDetail],
+        getDraftRule: draft({ script: 'seeded_pick(request.path.siret, villes)' }),
+      },
+    });
+
+    await fireEvent.change(getByLabelText('Requête capturée'), { target: { value: '0' } });
+    await fireEvent.click(getByRole('button', { name: /Tester contre cette requête/ }));
+
+    await waitFor(() => expect(getByTestId('rule-tester-script-results')).toBeInTheDocument());
+    expect(getByTestId('rule-tester-script-result-script')).toBeInTheDocument();
+    expect(getByText('{{script.name}}')).toBeInTheDocument();
+    expect(getByText('Lyon')).toBeInTheDocument();
+    expect(getByText('{{script.cp}}')).toBeInTheDocument();
+    expect(getByText('69000')).toBeInTheDocument();
+  });
+
+  it('affiche la valeur JSON reelle d\'un champ imbrique (pas la syntaxe Rhai #{...})', async () => {
+    // Cas precis diagnostique : un objet pioche imbrique sous une cle
+    // ("ville") reste une seule cle plate cote {{script.champ}} — le
+    // testeur doit exposer ca clairement, ce qui permet a l'utilisateur de
+    // constater qu'un chemin imbrique {{script.ville.name}} n'existe pas.
+    testRule.mockResolvedValue({
+      method_matches: true,
+      sub_path_matches: true,
+      path_params: {},
+      overall_matched: true,
+      body_truncated: false,
+      all_of: [],
+      any_of: [],
+      script_errors: [],
+      script_results: [
+        { slot: 'script', value: '', fields: { ville: '{"cp":"69000","insee":"69123","name":"Lyon"}', id: 'fixed-id' } },
+      ],
+    });
+
+    const { getByLabelText, getByRole, getByTestId, getByText } = render(RuleTester, {
+      props: {
+        serviceName: 'svc-a',
+        logs: [logWithDetail],
+        getDraftRule: draft({ script: 'let ville = seeded_pick(...); #{ ville: ville, id: "fixed-id" }' }),
+      },
+    });
+
+    await fireEvent.change(getByLabelText('Requête capturée'), { target: { value: '0' } });
+    await fireEvent.click(getByRole('button', { name: /Tester contre cette requête/ }));
+
+    await waitFor(() => expect(getByTestId('rule-tester-script-results')).toBeInTheDocument());
+    expect(getByText('{{script.ville}}')).toBeInTheDocument();
+    expect(getByText('{"cp":"69000","insee":"69123","name":"Lyon"}')).toBeInTheDocument();
+  });
+
+  it('affiche la valeur simple ({{slot}}) quand le script retourne un scalaire (pas un map)', async () => {
+    testRule.mockResolvedValue({
+      method_matches: true,
+      sub_path_matches: true,
+      path_params: {},
+      overall_matched: true,
+      body_truncated: false,
+      all_of: [],
+      any_of: [],
+      script_errors: [],
+      script_results: [{ slot: 'script', value: 'hello', fields: {} }],
+    });
+
+    const { getByLabelText, getByRole, getByTestId, getByText } = render(RuleTester, {
+      props: {
+        serviceName: 'svc-a',
+        logs: [logWithDetail],
+        getDraftRule: draft({ script: '"hello"' }),
+      },
+    });
+
+    await fireEvent.change(getByLabelText('Requête capturée'), { target: { value: '0' } });
+    await fireEvent.click(getByRole('button', { name: /Tester contre cette requête/ }));
+
+    await waitFor(() => expect(getByTestId('rule-tester-script-results')).toBeInTheDocument());
+    expect(getByText('{{script}}')).toBeInTheDocument();
+    expect(getByText('hello')).toBeInTheDocument();
+  });
+
+  it('n\'affiche aucun panneau de resultat de script quand aucun script n\'est configure', async () => {
+    testRule.mockResolvedValue({
+      method_matches: true,
+      sub_path_matches: true,
+      path_params: {},
+      overall_matched: true,
+      body_truncated: false,
+      all_of: [],
+      any_of: [],
+      script_errors: [],
+      script_results: [],
+    });
+
+    const { getByLabelText, getByRole, queryByTestId } = render(RuleTester, {
+      props: { serviceName: 'svc-a', logs: [logWithDetail], getDraftRule: draft() },
+    });
+
+    await fireEvent.change(getByLabelText('Requête capturée'), { target: { value: '0' } });
+    await fireEvent.click(getByRole('button', { name: /Tester contre cette requête/ }));
+
+    await waitFor(() => expect(queryByTestId('rule-tester-result')).toBeInTheDocument());
+    expect(queryByTestId('rule-tester-script-results')).not.toBeInTheDocument();
+  });
 });

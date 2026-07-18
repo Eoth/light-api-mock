@@ -134,6 +134,50 @@ Résultat : `GET /seeded-test/entreprise/44306184100047` renverra systématiquem
 
 *(Capture manquante — les tests E2E existants pour `seeded_pick`/`seeded_int` [`frontend/e2e/insee.spec.mjs`] vérifient le résultat via de vraies requêtes HTTP, pas via une capture d'écran de l'éditeur de script combiné au testeur de règle ; à réaliser manuellement, cf `frontend/e2e/README.md` section captures.)*
 
+## Cas d'usage : piocher un objet complet (pas juste une valeur) dans une liste
+
+Variante fréquente du cas précédent : au lieu de piocher une simple valeur texte, vous voulez piocher **un objet complet avec plusieurs champs** (par exemple une ville avec son nom, son code postal et son code INSEE) et réutiliser plusieurs de ces champs dans la réponse. `seeded_pick` fonctionne exactement pareil sur une liste d'objets (`#{ ... }`) que sur une liste de textes — le point important est **comment vous utilisez le résultat ensuite**.
+
+**La façon la plus simple : faites de l'objet pioché la valeur de retour du script, directement.** Chacun de ses champs devient alors utilisable individuellement via `{{script.nom_du_champ}}`, exactement comme dans les exemples précédents :
+
+**Exemple** — service `villes-demo`, chemin `/quote/{siret}`, règle `GET` :
+
+```rhai
+let villes = [
+    #{ name: "Paris", cp: "75000", insee: "75056" },
+    #{ name: "Lyon", cp: "69000", insee: "69123" },
+    #{ name: "Marseille", cp: "13000", insee: "13055" }
+];
+seeded_pick(request.path.siret, villes)
+```
+
+Corps de la réponse :
+```json
+{"siret":"{{path.siret}}","name":"{{script.name}}","cp":"{{script.cp}}","insee":"{{script.insee}}"}
+```
+
+Vérifié par de vraies requêtes HTTP : `GET /villes-demo/quote/44306184100047` renvoie systématiquement `{"siret":"44306184100047","name":"Marseille","cp":"13000","insee":"13055"}` (les 3 champs de la ville pigée sont bien tous accessibles), toujours la même ville pour ce SIRET.
+
+> **Piège fréquent : combiner l'objet pioché avec autre chose dans le même script casse la référence en pointillé.** Si vous avez besoin d'ajouter une autre information calculée à côté de l'objet pioché (par exemple un identifiant de devis), il est tentant d'écrire :
+> ```rhai
+> let ville = seeded_pick(request.path.siret, villes);
+> #{ ville: ville, quoteId: seeded_int(request.path.siret, 1000, 9999).to_string() }
+> ```
+> **`{{script.ville.name}}` ne fonctionnera PAS** — `{{script.champ}}` ne navigue **qu'un seul niveau** : il n'existe qu'une seule clé "ville" (pas "ville.name"). Le champ `ville` est bien exposé, mais comme du **JSON déjà sérialisé** (utilisable directement dans un fragment "Template avancé", par exemple `"ville":{{script.ville}}` sans guillemets autour de la variable) :
+> ```json
+> {"siret":"{{path.siret}}","ville":{{script.ville}},"quoteId":"{{script.quoteId}}"}
+> ```
+> Vérifié par une vraie requête HTTP : `GET /villes-demo/quote/44306184100047` renvoie `{"siret":"44306184100047","ville":{"cp":"13000","insee":"13055","name":"Marseille"},"quoteId":"6051"}` — un JSON valide et bien imbriqué.
+>
+> Si vous avez besoin des champs de la ville **individuellement adressables** (pas comme un bloc JSON entier), sortez-les vous-même à plat plutôt que de les laisser imbriqués :
+> ```rhai
+> let ville = seeded_pick(request.path.siret, villes);
+> #{ ville_name: ville.name, ville_cp: ville.cp, quoteId: seeded_int(request.path.siret, 1000, 9999).to_string() }
+> ```
+> puis `{{script.ville_name}}`/`{{script.ville_cp}}` séparément.
+>
+> **Aucune erreur n'apparaît jamais dans les deux cas ratés ci-dessus** (`{{script.ville.name}}` se rend simplement vide) — c'est le même comportement documenté plus haut ("Quand un script échoue") : une clé absente n'est jamais une erreur d'exécution. Le [testeur de règle](testeur-de-regle-et-conflits.md) est le seul endroit qui montre **le contenu réel** produit par votre script (chaque clé et sa valeur) avant sauvegarde — utilisez-le systématiquement dès que le résultat "ne semble pas correct" alors qu'aucune erreur n'est signalée.
+
 ## Cas d'usage : répéter un élément de réponse par élément de la requête
 
 Besoin fréquent : la requête envoyée contient une **liste d'objets** (des lignes de commande, des articles...) et la réponse doit contenir **le même nombre d'éléments**, chacun construit en piochant des informations dans l'élément correspondant de la requête (même position). Ni une variable `{{...}}` simple ni les conditions d'une règle ne peuvent faire ça — il n'y a pas de boucle possible en dehors d'un script. C'est le rôle de `parse_json`/`to_json` (pour du JSON/REST) et `parse_xml_items`/`xml_element` (pour du XML/SOAP) : parser la liste reçue, boucler dessus dans le script, puis reconstruire un texte JSON ou XML directement injectable dans le corps de la réponse.
