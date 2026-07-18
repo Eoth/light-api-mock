@@ -90,6 +90,7 @@
     "addConditionAnyOfButton": "[data-testid=\"rule-form-add-condition-anyof-button\"]",
     "responseToggleButton": "[data-testid=\"rule-form-response-toggle-button\"]",
     "modeButton": "[data-testid=\"rule-form-mode-button-{mode}\"]",
+    "openDetailButton": "[data-testid=\"rule-form-open-detail-button\"]",
     "modeSwitchConfirmButton": "[data-testid=\"rule-form-mode-switch-confirm-button\"]",
     "modeSwitchCancelButton": "[data-testid=\"rule-form-mode-switch-cancel-button\"]",
     "statusInput": "[data-testid=\"rule-form-status-input\"]",
@@ -201,7 +202,8 @@
     "resetButton": "[data-testid=\"json-paste-builder-reset-button\"]",
     "sourceSelect": "[data-testid=\"json-paste-builder-source-select-{path}\"]",
     "fakeSelect": "[data-testid=\"json-paste-builder-fake-select-{path}\"]",
-    "valueInput": "[data-testid=\"json-paste-builder-value-input-{path}\"]"
+    "valueInput": "[data-testid=\"json-paste-builder-value-input-{path}\"]",
+    "pipeInput": "[data-testid=\"json-paste-builder-pipe-input-{path}\"]"
   },
 
   "xmlPasteBuilder": {
@@ -218,7 +220,8 @@
     "breadcrumbLink": "[data-testid=\"xml-paste-builder-breadcrumb-link-{idx}\"]",
     "attrSourceSelect": "[data-testid=\"xml-paste-builder-attr-source-select-{path}-{attrIdx}\"]",
     "attrFakeSelect": "[data-testid=\"xml-paste-builder-attr-fake-select-{path}-{attrIdx}\"]",
-    "attrValueInput": "[data-testid=\"xml-paste-builder-attr-value-input-{path}-{attrIdx}\"]"
+    "attrValueInput": "[data-testid=\"xml-paste-builder-attr-value-input-{path}-{attrIdx}\"]",
+    "pipeInput": "[data-testid=\"xml-paste-builder-pipe-input-{path}\"]"
   },
 
   "responseEditor": {

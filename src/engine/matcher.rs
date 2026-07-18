@@ -630,6 +630,7 @@ mod tests {
             pre_script: None,
             script: None,
             post_script: None,
+            response_mode: None,
             conditions,
             response: MockResponse {
                 status: 200,

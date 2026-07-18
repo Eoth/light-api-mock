@@ -874,6 +874,7 @@ mod tests {
                         pre_script: None,
                         script: None,
                         post_script: None,
+                        response_mode: None,
                         conditions: ConditionGroup::default(),
                         response: MockResponse {
                             status: 200,
@@ -983,6 +984,7 @@ mod tests {
                         pre_script: None,
                         script: None,
                         post_script: None,
+                        response_mode: None,
                         conditions: ConditionGroup::default(),
                         response: MockResponse {
                             status: 200,
@@ -1107,6 +1109,7 @@ mod tests {
             pre_script: None,
             script: None,
             post_script: None,
+            response_mode: None,
             conditions: ConditionGroup::default(),
             response: MockResponse { status: 200, headers: vec![], body: vec![], chaos: None },
         };
@@ -1144,6 +1147,7 @@ mod tests {
             pre_script: None,
             script: None,
             post_script: None,
+            response_mode: None,
             conditions: ConditionGroup::default(),
             response: MockResponse { status: 200, headers: vec![], body: vec![], chaos: None },
         };
@@ -1217,6 +1221,7 @@ mod tests {
             pre_script: None,
             script: None,
             post_script: None,
+            response_mode: None,
             conditions: ConditionGroup::default(),
             response: MockResponse { status: 200, headers: vec![], body: vec![], chaos: None },
         };
@@ -1272,6 +1277,7 @@ mod tests {
                 .into(),
             ),
             post_script: None,
+            response_mode: None,
             conditions: ConditionGroup::default(),
             response: MockResponse {
                 status: 200,
@@ -1379,6 +1385,7 @@ mod tests {
                 .into(),
             ),
             post_script: None,
+            response_mode: None,
             conditions: ConditionGroup::default(),
             response: MockResponse {
                 status: 200,
@@ -1497,6 +1504,7 @@ mod tests {
                 .into(),
             ),
             post_script: None,
+            response_mode: None,
             conditions: ConditionGroup::default(),
             response: MockResponse {
                 status: 200,
@@ -1576,6 +1584,7 @@ mod tests {
                     .into(),
                 ),
                 post_script: None,
+                response_mode: None,
                 conditions: ConditionGroup {
                     all_of: vec![Condition {
                         source: ConditionSource::XPath("Envelope/Body/recherche".into()),
@@ -1600,6 +1609,7 @@ mod tests {
                 pre_script: None,
                 script: None,
                 post_script: None,
+                response_mode: None,
                 conditions: ConditionGroup {
                     all_of: vec![Condition {
                         source: ConditionSource::XPath("Envelope/Body/mode".into()),

@@ -215,7 +215,7 @@ function parseTplValue(key, raw) {
   return { key, fieldType: 'value', source: 'fixed', value: inner, pipe: '', asNumber: !isQuoted };
 }
 
-function findPipeSeparator(expr) {
+export function findPipeSeparator(expr) {
   let depth = 0;
   for (let i = 0; i < expr.length; i++) {
     if (expr[i] === '(') depth++;
@@ -483,6 +483,82 @@ export function exampleXmlToFields(xmlString) {
     rootAttributes: xmlAttributesToFields(root),
     fields: childElements.map(xmlElementToField),
   };
+}
+
+// ── XML template string → Fields (restauration de la vue d'origine) ──
+// Miroir XML de templateToFields() (JSON) : contrairement a
+// exampleXmlToFields (qui part d'un exemple XML LITTERAL, sans {{}}, colle
+// par l'utilisateur), cette fonction part d'un TEMPLATE deja rendu par
+// xmlFieldsToTemplate() (avec {{expr | pipe}} deja en place) et reconstruit
+// la structure Fields (tag/nodeType/source/value/pipe/children/attributes)
+// consommee aussi bien par XmlResponseBuilder.svelte (guide) que
+// XmlPasteBuilder.svelte (par exemple) — ces deux modes partagent la meme
+// forme de Fields, cf CLAUDE.md "Restauration de la vue d'origine a
+// l'edition d'une reponse". Utilise DOMParser comme exampleXmlToFields (les
+// caracteres {, }, |, ( ) sont du texte XML litteral valide, aucun echappement
+// necessaire) ; seule la lecture de la feuille differe : on y detecte un
+// eventuel {{expr | pipe}} au lieu de toujours traiter comme une valeur fixe.
+export function templateToXmlFields(tpl) {
+  const text = tpl.trim();
+  if (!text) {
+    throw new TypeError('Template XML vide.');
+  }
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(text, 'application/xml');
+  if (doc.querySelector('parsererror')) {
+    throw new TypeError('Template XML invalide : impossible de le reanalyser en vue structuree.');
+  }
+  const root = doc.documentElement;
+  if (!root) {
+    throw new TypeError('Template XML invalide : aucun element racine trouve.');
+  }
+  return {
+    rootTag: root.tagName,
+    rootAttributes: xmlAttributesToTplFields(root),
+    fields: Array.from(root.children || []).map(xmlElementToTplField),
+  };
+}
+
+function xmlAttributesToTplFields(el) {
+  return Array.from(el.attributes || []).map(attr => ({
+    name: attr.name, ...parseXmlLeafExpr(attr.value),
+  }));
+}
+
+function xmlElementToTplField(el) {
+  const tag = el.tagName;
+  const attributes = xmlAttributesToTplFields(el);
+  const childElements = Array.from(el.children || []);
+  if (childElements.length > 0) {
+    return { tag, nodeType: 'parent', attributes, children: childElements.map(xmlElementToTplField) };
+  }
+  return { tag, nodeType: 'value', attributes, ...parseXmlLeafExpr(el.textContent ?? '') };
+}
+
+// Lit le contenu d'une feuille XML (texte d'element ou valeur d'attribut) :
+// si c'est EXACTEMENT une expression {{expr | pipe}}, la decompose comme
+// parseTplValue() le fait pour JSON (reutilise varNameToSource +
+// findPipeSeparator) ; sinon, valeur fixe litterale. Pas de notion
+// d'asNumber/guillemets ici (contrairement a JSON) : le texte XML n'a pas
+// cette distinction.
+function parseXmlLeafExpr(raw) {
+  const trimmed = (raw ?? '').trim();
+  const varMatch = trimmed.match(/^\{\{([^}].*?)\}\}$/);
+  if (varMatch) {
+    const expr = varMatch[1];
+    const pipeIdx = findPipeSeparator(expr);
+    let varName, pipe;
+    if (pipeIdx >= 0) {
+      varName = expr.slice(0, pipeIdx).trim();
+      pipe = expr.slice(pipeIdx + 1).trim();
+    } else {
+      varName = expr.trim();
+      pipe = '';
+    }
+    const { source, value } = varNameToSource(varName);
+    return { source, value, pipe };
+  }
+  return { source: 'fixed', value: trimmed, pipe: '' };
 }
 
 function xmlAttributesToFields(el) {

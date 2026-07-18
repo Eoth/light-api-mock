@@ -33,7 +33,7 @@
   import XmlPasteBuilder from './XmlPasteBuilder.svelte';
   import RuleScriptSlot from './RuleScriptSlot.svelte';
   import ToggleSwitch from './ToggleSwitch.svelte';
-  import { templateToFields, validateTemplateAsJson, validateTemplateAsXml } from '../tpl-utils.js';
+  import { templateToFields, templateToXmlFields, validateTemplateAsJson, validateTemplateAsXml } from '../tpl-utils.js';
   import { validateScript as apiValidateScript } from '../api.js';
   import { RHAI_FUNCTIONS } from '../rhai-functions.js';
 
@@ -64,23 +64,100 @@
   // RuleScriptSlot) et ne perd donc jamais de donnees deja saisies.
   let advancedOpen = $state(!!init?.pre_script?.trim() || !!init?.post_script?.trim());
 
-  function detectMode() {
-    if (!init?.response?.body?.length) return 'json-paste';
-    if (init.response.body.length === 1 && init.response.body[0].type === 'Template') return 'advanced';
-    if (init.response.status === 204) return 'empty';
-    return 'advanced';
-  }
-  let responseMode = $state(detectMode());
+  // Restauration de la vue d'origine a l'edition (retour 1, cf CLAUDE.md
+  // "Restauration de la vue d'origine..."). Avant cette passe, une regle
+  // deja construite via n'importe lequel des 4 modes structures (json-paste/
+  // json-guided/xml-paste/xml-guided) retombait TOUJOURS sur 'advanced' des
+  // que response.body etait un unique fragment Template — exactement la
+  // forme que ces 4 modes produisent tous, indiscernables entre eux ET du
+  // "vrai" mode avance a la seule lecture du corps. `Rule.response_mode`
+  // (backend, src/models/mod.rs, EXCEPTION documentee au point 16 -- champ
+  // purement UI) leve cette ambiguite en memorisant explicitement quelle vue
+  // a produit ce template. `computeInitialEditorState()` degrade
+  // gracieusement vers l'ancienne heuristique par forme si `response_mode`
+  // est absent (regle sauvegardee avant cette passe) et retombe sur
+  // 'advanced' des qu'une restauration echoue (JSON invalide, XML invalide,
+  // ou racine tableau JSON -- limite assumee, cf tpl-utils.js::
+  // templateToFields, seul le mode "par exemple" JSON peut produire cette
+  // forme) plutot que de planter l'ouverture du formulaire.
+  function computeInitialEditorState() {
+    const body = init?.response?.body ?? [];
+    const singleTemplate = body.length === 1 && body[0].type === 'Template' ? body[0].template : null;
+    const singleLiteral = body.length === 1 && body[0].type === 'Literal' ? body[0].value : null;
 
-  let jsonFields = $state([]);
+    function fallbackMode() {
+      if (!body.length) return 'json-paste';
+      if (singleTemplate !== null) return 'advanced';
+      if (singleLiteral !== null) return 'text';
+      if (init?.response?.status === 204) return 'empty';
+      return 'advanced';
+    }
+
+    let mode = init?.response_mode ?? fallbackMode();
+
+    const structuredModes = ['json-paste', 'json-guided', 'xml-paste', 'xml-guided'];
+    const structured = {};
+
+    if (structuredModes.includes(mode)) {
+      if (body.length === 0) {
+        // Corps vide (regle neuve, ou regle existante sans reponse encore
+        // configuree) : rien a restaurer, la vue demarre a vide (paste zone
+        // ou detail vide selon le mode) -- ce n'est PAS une incoherence a
+        // degrader, sans quoi TOUTE regle neuve retomberait a tort sur
+        // 'advanced' (bug rencontre et corrige pendant ce sujet : une regle
+        // neuve doit demarrer sur le format JSON assiste par defaut, comme
+        // avant cette passe).
+      } else if (singleTemplate === null) {
+        // Un corps existe mais ne correspond pas a la forme structuree
+        // attendue (config editee hors UI) -- degrade plutot que de planter.
+        mode = 'advanced';
+      } else if (mode === 'json-paste' || mode === 'json-guided') {
+        if (singleTemplate.trim().startsWith('[')) {
+          mode = 'advanced';
+        } else {
+          try { structured.fields = templateToFields(singleTemplate); }
+          catch { mode = 'advanced'; }
+        }
+      } else if (mode === 'xml-paste' || mode === 'xml-guided') {
+        try {
+          const r = templateToXmlFields(singleTemplate);
+          structured.fields = r.fields;
+          structured.rootTag = r.rootTag;
+          structured.rootAttributes = r.rootAttributes;
+        } catch { mode = 'advanced'; }
+      }
+    } else if (mode === 'text') {
+      structured.textContent = singleLiteral ?? '';
+    }
+
+    return { mode, structured };
+  }
+
+  const { mode: initialMode, structured: initialStructured } = computeInitialEditorState();
+
+  // Distinct de `initialMode === 'json-paste'/'xml-paste'` : une regle NEUVE
+  // demarre aussi en mode 'json-paste' (comportement par defaut inchange,
+  // cf fallbackMode ci-dessus) mais n'a RIEN a restaurer -- la zone de
+  // collage doit s'afficher, pas une liste de champs vide. `startParsed` ne
+  // doit etre vrai que si une restauration a reellement produit des champs
+  // (initialStructured.fields non vide), jamais juste parce que le mode
+  // initial correspond.
+  const initialJsonPasteParsed = initialMode === 'json-paste' && (initialStructured.fields?.length ?? 0) > 0;
+  const initialXmlPasteParsed = initialMode === 'xml-paste' && (initialStructured.fields?.length ?? 0) > 0;
+
+  let responseMode = $state(initialMode);
+
+  let jsonFields = $state(initialMode === 'json-guided' ? (initialStructured.fields ?? []) : []);
   let jsonBuilderRef = $state(null);
-  let jsonPasteFields = $state([]);
+  let jsonPasteFields = $state(initialMode === 'json-paste' ? (initialStructured.fields ?? []) : []);
   let jsonPasteRef = $state(null);
-  let xmlFields = $state([]);
+  let xmlFields = $state(initialMode === 'xml-guided' ? (initialStructured.fields ?? []) : []);
   let xmlBuilderRef = $state(null);
-  let xmlPasteFields = $state([]);
+  let xmlPasteFields = $state(initialMode === 'xml-paste' ? (initialStructured.fields ?? []) : []);
   let xmlPasteRef = $state(null);
-  let textContent = $state('');
+  let xmlRootTag = $state(initialStructured.rootTag ?? 'response');
+  let xmlRootAttributes = $state(initialStructured.rootAttributes ?? []);
+  let textContent = $state(initialStructured.textContent ?? '');
 
   // pre_script/script/post_script : blocs additionnels independants (meme
   // ScriptContext, pas de chainage entre eux — voir Rule dans
@@ -215,11 +292,52 @@
 
   function applyModeSwitch(newMode, convResult) {
     if (convResult?.jsonFields) jsonFields = convResult.jsonFields;
+    if (convResult?.jsonPasteFields) jsonPasteFields = convResult.jsonPasteFields;
     if (convResult?.xmlFields) xmlFields = convResult.xmlFields;
+    if (convResult?.xmlPasteFields) xmlPasteFields = convResult.xmlPasteFields;
     if (convResult?.textContent !== undefined) textContent = convResult.textContent;
     if (convResult?.fragments) fragments = convResult.fragments;
     responseMode = newMode;
     modeKey++;
+  }
+
+  // "Modifier en detail" (retour 3, fusion Format x Assiste/Detail, cf
+  // CLAUDE.md) : bascule depuis le sous-mode assiste (json-paste/xml-paste)
+  // vers le sous-mode detail (json-guided/xml-guided) EN CONSERVANT le meme
+  // tableau `fields` (structure identique entre les deux, verifie en etape 0
+  // de ce sujet) -- DELIBEREMENT hors du systeme d'avertissement de
+  // requestModeSwitch/tryConvert : c'est une REVELATION de capacites
+  // supplementaires sur les MEMES donnees, jamais une conversion avec risque
+  // de perte, donc zero avertissement. Aucun chemin retour (detail ->
+  // assiste) n'est propose : une fois revele, le mode detail reste actif
+  // pour le reste de l'edition (choix produit assume, correspond au
+  // libelle "reveler" plutot que "basculer").
+  function revealDetailMode() {
+    if (responseMode === 'json-paste') {
+      jsonFields = jsonPasteFields;
+      responseMode = 'json-guided';
+    } else if (responseMode === 'xml-paste') {
+      xmlFields = xmlPasteFields;
+      responseMode = 'xml-guided';
+    }
+  }
+
+  // Regroupement des 4 modes structures en 2 "Format" (JSON/XML), cf CLAUDE.md
+  // "Fusion Format x Assiste/Detail" -- Texte/Avance/Vide restent 1 bouton
+  // = 1 mode (pas de distinction assiste/detail pour eux, rien a fusionner).
+  function formatOfMode(mode) {
+    if (mode === 'json-paste' || mode === 'json-guided') return 'json';
+    if (mode === 'xml-paste' || mode === 'xml-guided') return 'xml';
+    return mode;
+  }
+
+  function selectFormat(fmt) {
+    // Deja ce format (assiste OU detail) : pas de reinitialisation, evite de
+    // faire perdre une structure detail deja construite par un simple
+    // re-clic accidentel sur le meme bouton de format.
+    if (formatOfMode(responseMode) === fmt) return;
+    const target = fmt === 'json' ? 'json-paste' : fmt === 'xml' ? 'xml-paste' : fmt;
+    requestModeSwitch(target);
   }
 
   function currentModeHasContent() {
@@ -254,8 +372,21 @@
     if (from === 'advanced' && to === 'json-guided') {
       return tryAdvancedToJsonGuided();
     }
+    if (from === 'advanced' && to === 'json-paste') {
+      // Format=JSON cible desormais 'json-paste' en entree par defaut (cf
+      // selectFormat) -- reutilise la MEME conversion sans perte que vers
+      // 'json-guided' pour ne pas regresser ce cas deja fluide avant la
+      // fusion (retour 3), juste range dans jsonPasteFields au lieu de
+      // jsonFields.
+      const r = tryAdvancedToJsonGuided();
+      return r.ok ? { ok: true, jsonPasteFields: r.jsonFields ?? [] } : r;
+    }
     if (from === 'advanced' && to === 'xml-guided') {
       return tryAdvancedToXmlGuided();
+    }
+    if (from === 'advanced' && to === 'xml-paste') {
+      const r = tryAdvancedToXmlGuided();
+      return r.ok ? { ok: true, xmlPasteFields: r.xmlFields ?? [] } : r;
     }
     if (from === 'json-guided' && to === 'advanced') {
       if (jsonBuilderRef) {
@@ -270,10 +401,25 @@
       return { ok: true };
     }
     if (from === 'json-guided' && to === 'xml-guided') {
-      return tryJsonGuidedToXmlGuided();
+      return tryJsonFieldsToXmlFields(jsonFields);
+    }
+    if (from === 'json-guided' && to === 'xml-paste') {
+      const r = tryJsonFieldsToXmlFields(jsonFields);
+      return r.ok ? { ok: true, xmlPasteFields: r.xmlFields ?? [] } : r;
+    }
+    if (from === 'json-paste' && to === 'xml-paste') {
+      // Meme conversion, sourcee sur jsonPasteFields (structure identique a
+      // jsonFields, cf etape 0 de ce sujet) -- capacite nouvelle, aucune
+      // regression a preserver ici (json-paste n'existait pas comme cible/
+      // source de conversion avant cette passe).
+      const r = tryJsonFieldsToXmlFields(jsonPasteFields);
+      return r.ok ? { ok: true, xmlPasteFields: r.xmlFields ?? [] } : r;
     }
     if (from === 'xml-guided' && to === 'json-guided') {
       return { ok: false, reason: 'La conversion XML vers JSON guide n\'est pas supportee. Passez par le mode template avance comme intermediaire.' };
+    }
+    if ((from === 'xml-guided' || from === 'xml-paste') && to === 'json-paste') {
+      return { ok: false, reason: 'La conversion XML vers JSON n\'est pas supportee. Passez par le mode template avance comme intermediaire.' };
     }
     return { ok: false };
   }
@@ -303,10 +449,14 @@
     return { ok: false, reason: 'La conversion automatique XML template vers XML guide n\'est pas encore supportee. Utilisez la vue guidee pour reconstruire la structure.' };
   }
 
-  function tryJsonGuidedToXmlGuided() {
-    if (!jsonFields.length) return { ok: true, xmlFields: [] };
+  // Generalisee (retour 3) pour accepter n'importe quel tableau de Fields
+  // JSON en source -- jsonFields (mode detail) OU jsonPasteFields (mode
+  // assiste), structurellement identiques (cf etape 0 de ce sujet) -- au
+  // lieu de ne lire que jsonFields comme avant cette passe.
+  function tryJsonFieldsToXmlFields(sourceFields) {
+    if (!sourceFields.length) return { ok: true, xmlFields: [] };
     try {
-      const xmlF = jsonFields.filter(f => f.key?.trim()).map(f => jsonFieldToXmlNode(f));
+      const xmlF = sourceFields.filter(f => f.key?.trim()).map(f => jsonFieldToXmlNode(f));
       return { ok: true, xmlFields: xmlF };
     } catch {
       return { ok: false, reason: 'La structure JSON contient des elements incompatibles avec XML (tableaux de valeurs scalaires).' };
@@ -425,6 +575,12 @@
       pre_script: preScriptEnabled && preScriptCode.trim() ? preScriptCode.trim() : null,
       script: scriptEnabled && scriptCode.trim() ? scriptCode.trim() : null,
       post_script: postScriptEnabled && postScriptCode.trim() ? postScriptCode.trim() : null,
+      // Memorise la vue d'origine pour la restaurer a la prochaine edition
+      // (retour 1, cf CLAUDE.md) -- meme valeur que le discriminant interne
+      // `responseMode` (les 7 chaines correspondent deja aux variants
+      // kebab-case de ResponseEditorMode cote backend, cf src/models/mod.rs,
+      // aucune table de correspondance necessaire).
+      response_mode: responseMode,
     };
   }
 </script>
@@ -470,9 +626,19 @@
 
   {#if responseOpen}
     {#key modeKey}
-    <div class="mode-selector" role="radiogroup" aria-label="Mode de reponse">
-      {#each [['json-paste','JSON par exemple'],['json-guided','JSON guide'],['xml-paste','XML par exemple'],['xml-guided','XML guide'],['text','Texte'],['advanced','Template avance'],['empty','Vide (204)']] as [val, label]}
-        <button type="button" class="mode-btn" class:mode-active={responseMode === val} onclick={() => requestModeSwitch(val)} role="radio" aria-checked={responseMode === val} data-testid="rule-form-mode-button-{val}">{label}</button>
+    <!--
+      Fusion Format x Assiste/Detail (retour 3, cf CLAUDE.md) : remplace les
+      7 boutons de mode a plat par 5 boutons de FORMAT (JSON/XML se
+      declinent chacun en 2 sous-modes -- assiste "par exemple"/detail
+      "guide" -- geres via le bouton "Modifier en detail" plus bas, jamais
+      un second niveau de bouton visible d'emblee, cf revealDetailMode()).
+      `data-testid` inchange (`rule-form-mode-button-{val}`, cf selectors.json)
+      -- seules les VALEURS acceptees changent (json/xml/text/advanced/empty
+      au lieu des 7 anciennes).
+    -->
+    <div class="mode-selector" role="radiogroup" aria-label="Format de la reponse">
+      {#each [['json','JSON'],['xml','XML'],['text','Texte'],['advanced','Template avance'],['empty','Vide (204)']] as [val, label]}
+        <button type="button" class="mode-btn" class:mode-active={formatOfMode(responseMode) === val} onclick={() => selectFormat(val)} role="radio" aria-checked={formatOfMode(responseMode) === val} data-testid="rule-form-mode-button-{val}">{label}</button>
       {/each}
     </div>
     {/key}
@@ -519,7 +685,10 @@
 
     {#if responseMode === 'json-paste'}
       <div class="sub-section">
-        <JsonPasteBuilder bind:this={jsonPasteRef} fields={jsonPasteFields} onUpdate={(f) => jsonPasteFields = f} />
+        <JsonPasteBuilder bind:this={jsonPasteRef} fields={jsonPasteFields} startParsed={initialJsonPasteParsed} onUpdate={(f) => jsonPasteFields = f} />
+        <button type="button" class="btn btn-sm btn-outline open-detail-button" onclick={revealDetailMode} data-testid="rule-form-open-detail-button">
+          Modifier en détail (structure complète) →
+        </button>
       </div>
 
     {:else if responseMode === 'json-guided'}
@@ -529,12 +698,15 @@
 
     {:else if responseMode === 'xml-paste'}
       <div class="sub-section">
-        <XmlPasteBuilder bind:this={xmlPasteRef} fields={xmlPasteFields} onUpdate={(f) => xmlPasteFields = f} />
+        <XmlPasteBuilder bind:this={xmlPasteRef} fields={xmlPasteFields} rootTag={xmlRootTag} rootAttributes={xmlRootAttributes} startParsed={initialXmlPasteParsed} onUpdate={(f) => xmlPasteFields = f} />
+        <button type="button" class="btn btn-sm btn-outline open-detail-button" onclick={revealDetailMode} data-testid="rule-form-open-detail-button">
+          Modifier en détail (structure complète) →
+        </button>
       </div>
 
     {:else if responseMode === 'xml-guided'}
       <div class="sub-section">
-        <XmlResponseBuilder bind:this={xmlBuilderRef} fields={xmlFields} onUpdate={(f) => xmlFields = f} />
+        <XmlResponseBuilder bind:this={xmlBuilderRef} fields={xmlFields} rootTag={xmlRootTag} onUpdate={(f) => xmlFields = f} />
       </div>
 
     {:else if responseMode === 'text'}
@@ -673,6 +845,8 @@
   .mode-btn { font-size: 0.875rem; font-weight: 500; cursor: pointer; padding: 0.375rem 0.75rem; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-bg); color: var(--color-text); font-family: inherit; }
   .mode-btn:hover { border-color: var(--color-primary); }
   .mode-btn.mode-active { border-color: var(--color-primary); background: var(--color-focus); font-weight: 600; }
+
+  .open-detail-button { margin-top: 0.5rem; }
 
   .mode-warning { background: #fff3cd; border: 1px solid #ffc107; color: #664d03; padding: 0.75rem; border-radius: var(--radius); margin-bottom: 0.75rem; }
   :global([data-theme="dark"]) .mode-warning { background: #332701; border-color: #e5a50a; color: #ffe082; }

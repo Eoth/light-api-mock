@@ -3,48 +3,77 @@
 Une fois qu'une [règle](regles-de-matching.md) a matché, lightMock doit produire une réponse :
 un code de statut HTTP, des en-têtes, et un corps (JSON ou XML) qui peut être **statique** ou **dynamique** (contenir des valeurs calculées à chaque requête).
 
-## Construire le corps de la réponse
+## Choisir un format, puis un niveau de détail
 
-Deux façons de construire le corps, au choix :
+Le corps de la réponse se construit en deux temps : d'abord un **Format** (JSON, XML, Texte,
+Template avancé, ou Vide), puis — pour JSON et XML uniquement — un **niveau d'édition** (assisté
+ou détaillé). Ces deux niveaux ne sont **pas deux modes séparés à choisir dès le départ** : vous
+démarrez toujours par le niveau assisté (coller un exemple), et un bouton **"Modifier en détail"**
+révèle, sur les *mêmes* données, toutes les capacités du niveau détaillé — sans jamais rien perdre
+de ce qui a déjà été saisi.
 
-### 1. Le builder guidé (recommandé pour débuter)
+![Sélecteur de format (JSON/XML/Texte/Template avancé/Vide) avec la vue assistée JSON affichée en dessous](screenshots/reponse-json-exemple-detection.png)
 
-Un éditeur visuel où vous ajoutez des champs un par un (nom, type, valeur), sans écrire de JSON/XML à la main. Chaque champ peut être :
+### 1. Niveau assisté : coller un exemple existant
 
-- une **valeur fixe** (texte, nombre, booléen tel quel),
-- une **variable** qui sera remplacée à chaque requête (voir "Variables disponibles" plus bas),
-- une **donnée factice** générée automatiquement (voir "Données factices" plus bas),
-- un **objet** ou un **tableau d'objets**, pour construire une structure imbriquée.
+Pour les corps déjà complexes, il est souvent plus rapide de **coller un exemple réel** de réponse
+(par exemple, une réponse déjà obtenue du vrai backend) : lightMock détecte automatiquement tous
+les champs et vous permet ensuite de remplacer certaines valeurs par des variables ou des données
+factices, champ par champ — chaque valeur variable peut aussi recevoir une **transformation**
+(voir "Transformations" plus bas), exactement comme au niveau détaillé.
 
-Pour naviguer dans une structure profondément imbriquée sans se perdre, un fil d'Ariane (chemin cliquable, ex. `racine > adresse > ville`) au-dessus de l'éditeur permet de "rentrer" dans un sous-niveau et d'en ressortir en un clic.
+Côté JSON, tous les champs détectés s'affichent **à plat** (avec une simple indentation pour les niveaux imbriqués) — suffisant pour un JSON REST, généralement peu profond.
+
+Côté XML (souvent plus profondément imbriqué, une enveloppe SOAP par exemple), ce niveau assisté propose en plus :
+
+- un **fil d'Ariane** (bouton "→" pour "entrer" dans un nœud, chemin cliquable pour en ressortir),
+- des **chevrons de pliage** (▼/▶),
+- l'édition des **attributs XML** de chaque élément (y compris la racine) : un attribut détecté (ex. une déclaration d'espace de noms `xmlns:soap="..."`) peut, comme un contenu texte, être remplacé par une variable ou laissé tel quel.
+
+![Mode XML assisté : fil d'Ariane après navigation dans un nœud, attributs affichés au-dessus](screenshots/reponse-xml-exemple-navigation.png)
+
+Les préfixes d'espace de noms (`soap:Envelope`) et les déclarations `xmlns`/`xmlns:*` sont conservés tels quels (comme du texte) ; lightMock ne résout pas leur signification — coller un XML avec espaces de noms fonctionne sans erreur, mais aucune validation sémantique n'est faite dessus.
+
+> Le niveau assisté ne permet pas de renommer, ajouter ou supprimer un champ/nœud détecté — pour
+> ces retouches, cliquez sur **"Modifier en détail →"** (voir ci-dessous).
+
+### 2. Niveau détaillé : structure complète
+
+Un clic sur **"Modifier en détail"** (visible sous la liste de champs du niveau assisté) fait
+apparaître, sur les *mêmes* champs déjà détectés, l'éditeur complet : renommage de clé, ajout/
+suppression/réordonnancement de champ, changement de type (valeur/objet/tableau), et création
+d'une structure **entièrement nouvelle** si vous n'êtes parti d'aucun exemple (le bouton reste
+disponible même sans avoir collé quoi que ce soit — cliquez dessus directement pour démarrer à
+vide). Ce passage est **sans perte** : c'est une révélation de capacités supplémentaires sur les
+données déjà là, jamais une conversion qui recommencerait de zéro. Il n'y a en revanche pas de
+retour possible vers le niveau assisté une fois le détail ouvert — un aller simple, assumé comme
+tel.
 
 Chaque champ **objet** ou **tableau** (JSON comme XML) affiche aussi un petit **chevron** (▼/▶) à gauche : cliquez dessus pour **replier** ce champ et masquer temporairement son contenu — pratique une fois qu'une branche est déjà configurée et que vous voulez vous concentrer sur le reste sans la faire défiler à chaque fois. Un texte ("N masqué(s)") rappelle qu'il y a du contenu caché. Replier/déplier n'efface jamais rien : c'est un pur affichage, et tout reste déplié par défaut à l'ouverture du formulaire.
 
 ![Champ JSON replié : le chevron pointe à droite et un indicateur signale le contenu masqué](screenshots/regle-json-noeud-replie.png)
 
-*(Capture manquante — aucun scénario E2E existant ne navigue dans le builder JSON guidé avec le fil d'Ariane ; à réaliser manuellement, cf `frontend/e2e/README.md` section captures.)*
+Pour naviguer dans une structure profondément imbriquée sans se perdre, un fil d'Ariane (chemin cliquable, ex. `racine > adresse > ville`) au-dessus de l'éditeur permet de "rentrer" dans un sous-niveau et d'en ressortir en un clic.
 
-### 2. Le mode "exemple d'abord" (coller un exemple existant)
+*(Capture manquante — aucun scénario E2E existant ne navigue dans le builder JSON détaillé avec le fil d'Ariane ; à réaliser manuellement, cf `frontend/e2e/README.md` section captures.)*
 
-Pour les corps déjà complexes, il est souvent plus rapide de **coller un exemple réel** de réponse (par exemple, une réponse déjà obtenue du vrai backend) : lightMock détecte automatiquement tous les champs et vous permet ensuite de remplacer certaines valeurs par des variables ou des données factices, champ par champ. Ce mode existe pour le **JSON** (bouton "JSON par exemple") et pour le **XML** (bouton "XML par exemple", y compris pour une enveloppe SOAP).
+### Réouvrir une règle déjà configurée : la vue d'origine est restaurée
 
-![Mode JSON par exemple : les champs détectés après collage, chacun avec sa source (« Garder la valeur » par défaut)](screenshots/reponse-json-exemple-detection.png)
+En rouvrant une règle déjà sauvegardée, lightMock se souvient de **quelle vue** vous avez utilisée
+pour la construire (assistée ou détaillée, JSON ou XML) et rouvre directement celle-ci — vous ne
+retombez plus systématiquement sur le "Template avancé" (texte brut) comme c'était le cas
+auparavant. Une règle construite au niveau assisté rouvre le niveau assisté (avec le bouton
+"Modifier en détail" toujours disponible si besoin), une règle construite au niveau détaillé
+rouvre directement ce niveau. Le mode "Texte" et le mode "Template avancé" sont eux aussi
+restaurés correctement.
 
-Côté JSON, tous les champs détectés s'affichent **à plat** (avec une simple indentation pour les niveaux imbriqués) — suffisant pour un JSON REST, généralement peu profond.
-
-#### Le mode "exemple d'abord" côté XML
-
-Contrairement au mode JSON (qui affiche tous les champs détectés à plat, sans navigation), le mode XML propose en plus, pour un XML souvent plus profondément imbriqué (une enveloppe SOAP, par exemple) :
-
-- le même **fil d'Ariane** que le builder guidé JSON (bouton "→" pour "entrer" dans un nœud, chemin cliquable pour en ressortir),
-- les mêmes **chevrons de pliage** (▼/▶) que partout ailleurs dans l'éditeur,
-- l'édition des **attributs XML** de chaque élément (y compris la racine) : un attribut détecté (ex. une déclaration d'espace de noms `xmlns:soap="..."`) peut, comme un contenu texte, être remplacé par une variable ou laissé tel quel.
-
-![Mode XML par exemple : fil d'Ariane après navigation dans un nœud, attributs affichés au-dessus](screenshots/reponse-xml-exemple-navigation.png)
-
-Les préfixes d'espace de noms (`soap:Envelope`) et les déclarations `xmlns`/`xmlns:*` sont conservés tels quels (comme du texte) ; lightMock ne résout pas leur signification — coller un XML avec espaces de noms fonctionne sans erreur, mais aucune validation sémantique n'est faite dessus.
-
-> Comme pour le mode guidé, le mode "exemple d'abord" ne permet pas de renommer, ajouter ou supprimer un champ/nœud détecté — pour ces retouches, repassez par le mode guidé habituel (JSON ou XML).
+**Limite assumée** : si la réponse a été modifiée hors de l'interface (édition manuelle du fichier
+de configuration, restauration d'une ancienne sauvegarde) et que son contenu ne correspond plus à
+la forme attendue par la vue mémorisée, lightMock retombe sur le "Template avancé" plutôt que
+d'afficher une erreur — votre contenu reste toujours visible et modifiable, seule la vue structurée
+n'est pas restaurée dans ce cas précis. De même, un corps JSON dont la racine est un **tableau**
+(uniquement possible via le niveau assisté JSON) n'est pas restaurable dans une vue structurée à
+la réouverture — limite technique assumée, le "Template avancé" prend le relais.
 
 ## La syntaxe des templates : `{{ }}`
 
@@ -99,7 +128,10 @@ Pour tester la robustesse d'une application face à un backend capricieux, chaqu
 ## Prérequis et limites
 
 - Aucun prérequis particulier : disponible dès l'installation de base.
-- Le mode "coller un exemple" (paste) n'est pas encore éditable en profondeur après détection
-  (renommage/ajout/suppression de champs) — pour ces retouches fines, repassez par le builder guidé habituel.
-- Côté XML, un espace de noms (`xmlns:...`) est conservé tel quel dans le tag/l'attribut, sans résolution — voir "Le mode 'exemple d'abord' côté XML" plus haut.
+- Le niveau assisté (coller un exemple) ne permet pas de renommer, ajouter ou supprimer un champ
+  directement — cliquez sur "Modifier en détail" pour ces retouches, sans perte du contenu déjà saisi.
+- Côté XML, un espace de noms (`xmlns:...`) est conservé tel quel dans le tag/l'attribut, sans résolution — voir "Niveau assisté" plus haut.
 - Côté XML toujours, un nœud qui mélange du texte direct et des sous-éléments (contenu dit "mixte") n'est pas représenté fidèlement : les sous-éléments sont conservés, le texte direct est ignoré.
+- Un corps JSON dont la racine est un tableau (uniquement possible via le niveau assisté) ne peut
+  pas être restauré dans une vue structurée à la réouverture de la règle — voir "Réouvrir une règle
+  déjà configurée" plus haut.

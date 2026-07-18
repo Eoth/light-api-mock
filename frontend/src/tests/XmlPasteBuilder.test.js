@@ -149,3 +149,51 @@ describe('XmlPasteBuilder — attributs XML (specificite absente du modele JSON)
     expect(queryByText('Attributs :')).not.toBeInTheDocument();
   });
 });
+
+// startParsed/rootTag/rootAttributes : seedent l'etat initial pour la
+// restauration d'une regle existante (cf CLAUDE.md, "Restauration de la vue
+// d'origine..."), miroir de JsonPasteBuilder.test.js.
+describe('XmlPasteBuilder — startParsed/rootTag (restauration a l\'edition, retour 1)', () => {
+  it('affiche directement la liste de noeuds quand startParsed=true, sans repasser par la zone de collage', () => {
+    const fields = [{ tag: 'siret', nodeType: 'value', source: 'path', value: 'siret', pipe: '', attributes: [] }];
+    const { getByText, queryByLabelText } = render(XmlPasteBuilder, {
+      props: { fields, startParsed: true, rootTag: 'devisResponse', rootAttributes: [] },
+    });
+
+    expect(getByText('siret')).toBeInTheDocument();
+    expect(queryByLabelText(/Collez un exemple/)).not.toBeInTheDocument();
+  });
+
+  it('affiche la zone de collage quand startParsed=false (defaut), meme avec des fields fournis', () => {
+    const fields = [{ tag: 'siret', nodeType: 'value', source: 'fixed', value: '123', pipe: '', attributes: [] }];
+    const { getByLabelText, queryByText } = render(XmlPasteBuilder, { props: { fields } });
+
+    expect(getByLabelText(/Collez un exemple/)).toBeInTheDocument();
+    expect(queryByText('siret')).not.toBeInTheDocument();
+  });
+});
+
+// Pipes (retour 2, cf CLAUDE.md) : sur le contenu d'un noeud valeur
+// uniquement (pas les attributs, cf commentaire du composant).
+describe('XmlPasteBuilder — pipes (retour 2)', () => {
+  it('n\'affiche pas de champ pipe pour une source "fixed"', async () => {
+    const { getByLabelText, getByText, queryByLabelText } = render(XmlPasteBuilder);
+    await pasteAndParse(getByLabelText, getByText, '<r><nom>ACME</nom></r>');
+    await waitFor(() => expect(getByText('nom')).toBeInTheDocument());
+    expect(queryByLabelText('Pipe de transformation pour nom')).not.toBeInTheDocument();
+  });
+
+  it('affiche un champ pipe des qu\'une source non-fixe est choisie, et le transmet via onUpdate', async () => {
+    const onUpdate = vi.fn();
+    const { getByLabelText, getByText } = render(XmlPasteBuilder, { props: { onUpdate } });
+    await pasteAndParse(getByLabelText, getByText, '<r><siret>123</siret></r>');
+    await waitFor(() => expect(getByText('siret')).toBeInTheDocument());
+
+    await fireEvent.change(getByLabelText('Source pour siret'), { target: { value: 'path' } });
+    const pipeInput = getByLabelText('Pipe de transformation pour siret');
+    await fireEvent.input(pipeInput, { target: { value: 'upper' } });
+
+    const [fields] = onUpdate.mock.calls.at(-1);
+    expect(fields[0].pipe).toBe('upper');
+  });
+});

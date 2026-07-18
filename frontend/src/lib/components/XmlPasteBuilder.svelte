@@ -23,15 +23,27 @@
   // xmlns:* sont preserves tels quels comme texte litteral (aucune
   // resolution semantique) -- cf tpl-utils.js::exampleXmlToFields pour le
   // detail de cette limite assumee.
+  import { untrack } from 'svelte';
   import { buildExpr as sharedBuildExpr, xmlFieldsToTemplate, exampleXmlToFields } from '../tpl-utils.js';
 
-  let { fields = [], onUpdate = () => {} } = $props();
+  // startParsed/initialRootTag/initialRootAttributes : seedent l'etat a la
+  // restauration d'une regle existante (fields/rootTag/rootAttributes deja
+  // reconstruits par le parent depuis le template persiste via
+  // templateToXmlFields, cf RuleResponseSection.svelte). Lus UNE SEULE FOIS
+  // a la creation (untrack), memes principes que JsonPasteBuilder.svelte.
+  let {
+    fields = [],
+    startParsed = false,
+    rootTag: initialRootTag = 'response',
+    rootAttributes: initialRootAttributes = [],
+    onUpdate = () => {},
+  } = $props();
 
   let pasteInput = $state('');
   let parseError = $state('');
-  let parsed = $state(false);
-  let rootTag = $state('response');
-  let rootAttributes = $state([]);
+  let parsed = $state(untrack(() => startParsed));
+  let rootTag = $state(untrack(() => initialRootTag));
+  let rootAttributes = $state(untrack(() => initialRootAttributes));
 
   const valueSources = [
     { value: 'fixed', label: 'Garder la valeur' },
@@ -52,6 +64,26 @@
     'StreetName', 'CityFR', 'PostcodeFR', 'Siren', 'Siret',
     'FullAddressFR', 'DatePast', 'DateFuture', 'TimestampMs',
     'BoolRandom', 'LoremSentence', 'CountryFR', 'IbanFR',
+  ];
+
+  // Pipes (retour beta-testeur, cf JsonPasteBuilder.svelte) : uniquement sur
+  // le CONTENU d'un noeud valeur (memes options que XmlResponseBuilder.svelte
+  // guide) -- pas sur les attributs, qui n'ont deja aucun equivalent dans le
+  // mode guide (l'edition d'attributs est une capacite propre au mode
+  // "par exemple", cf CLAUDE.md).
+  const pipeOptions = [
+    { value: 'lower', label: 'lower' },
+    { value: 'upper', label: 'upper' },
+    { value: 'capitalize', label: 'capitalize' },
+    { value: 'first(N)', label: 'first(N)' },
+    { value: 'last(N)', label: 'last(N)' },
+    { value: 'substr(start,len)', label: 'substr(start,len)' },
+    { value: 'default("val")', label: 'default("val")' },
+    { value: 'replace("a","b")', label: 'replace("a","b")' },
+    { value: 'prepend("prefix")', label: 'prepend("prefix")' },
+    { value: 'append("suffix")', label: 'append("suffix")' },
+    { value: 'length', label: 'length' },
+    { value: 'trim', label: 'trim' },
   ];
 
   function deepClone(obj) { return JSON.parse(JSON.stringify(obj)); }
@@ -336,6 +368,19 @@
                     data-testid="xml-paste-builder-value-input-{testPath}"
                   />
                 {/if}
+                {#if field.source !== 'fixed'}
+                  <input
+                    type="text"
+                    class="pipe-input"
+                    value={field.pipe || ''}
+                    oninput={(e) => updateNodeProp(path, idx, 'pipe', e.target.value)}
+                    placeholder="ex: lower | first(5)"
+                    aria-label="Pipe de transformation pour {field.tag}"
+                    list="dl-xml-paste-pipes"
+                    autocomplete="off"
+                    data-testid="xml-paste-builder-pipe-input-{testPath}"
+                  />
+                {/if}
                 {#if field.source === 'fixed'}
                   <span class="paste-preview-fixed">{field.value}</span>
                 {:else}
@@ -357,6 +402,10 @@
     {/snippet}
 
     {@render renderNodes(focusedFields, focusPath, 0)}
+
+    <datalist id="dl-xml-paste-pipes">
+      {#each pipeOptions as p}<option value={p.value}>{p.label}</option>{/each}
+    </datalist>
   {/if}
 </div>
 
@@ -407,6 +456,13 @@
     border-radius: var(--radius); font-size: 0.8125rem;
     background: var(--color-surface); color: var(--color-text);
     min-width: 8rem; flex: 1;
+  }
+
+  .pipe-input {
+    min-width: 8rem; max-width: 14rem; padding: 0.25rem 0.5rem;
+    border: 1px solid var(--color-border); border-radius: var(--radius);
+    font-size: 0.75rem; font-family: 'Cascadia Code', 'Fira Code', monospace;
+    color: var(--color-primary);
   }
 
   .paste-preview-fixed {
