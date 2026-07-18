@@ -590,3 +590,43 @@ test.describe('Runner data-driven (scenarios JSON) - lot 12 (XPath SOAP + extrac
     expect(xml).toContain('<siret>98765432109876</siret>');
   });
 });
+
+// Lot 13 : couverture E2E neuve (pas une migration), pour l'edition en place
+// d'une condition de regle (jusqu'ici il fallait supprimer puis recreer).
+// Cree une regle avec une condition QueryParam, l'edite en cliquant dessus
+// (bascule vers Header, nouvelle cle, nouvelle valeur), sauvegarde, puis
+// verifie hors runner via de vraies requetes HTTP que le MATCHING refletebien
+// la nouvelle condition (et plus l'ancienne) -- pas seulement que le
+// formulaire affiche le nouveau libelle.
+test.describe('Runner data-driven (scenarios JSON) - lot 13 (edition en place d une condition)', () => {
+  test.beforeEach(async ({ request }) => {
+    await request.delete(`${API}/config/reset`);
+    await request.post(`${API}/services`, {
+      data: validService('edit-condition-svc', { listen_path: '/service', real_target_url: '' }),
+    });
+  });
+
+  test('editer une condition existante en place change reellement le comportement de matching (scenario JSON)', async ({ page, request }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', "Modifier une condition existante d'une regle (edition en place)"));
+
+    // Verification hors runner : la nouvelle condition (Header X-Mode=new-value)
+    // doit matcher...
+    const withNewHeader = await request.post('http://localhost:7342/edit-condition-svc/service', {
+      headers: { 'X-Mode': 'new-value' },
+    });
+    expect(withNewHeader.status()).toBe(200);
+
+    // ... alors que l'ANCIENNE condition (query param mode=legacy), qui a ete
+    // remplacee et non simplement complementee, ne doit plus matcher du tout
+    // (service purement mocke : aucune regle ne correspond -> 404).
+    const withOldQueryParam = await request.post('http://localhost:7342/edit-condition-svc/service?mode=legacy');
+    expect(withOldQueryParam.status()).toBe(404);
+
+    // ... et l'ancienne VALEUR sur la nouvelle cle ne doit pas non plus
+    // matcher, pour ecarter un faux positif ou seule la cle aurait change.
+    const withWrongValue = await request.post('http://localhost:7342/edit-condition-svc/service', {
+      headers: { 'X-Mode': 'legacy' },
+    });
+    expect(withWrongValue.status()).toBe(404);
+  });
+});

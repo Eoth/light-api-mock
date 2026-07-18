@@ -26,6 +26,12 @@
     { value: 'Exists', label: 'Existe (peu importe la valeur)' },
   ];
 
+  // `condition` non-null = edition en place d'une condition existante
+  // (RuleConditionsEditor.svelte), non-fourni/null = ajout d'une nouvelle
+  // condition — seule difference d'usage entre les deux appelants de ce
+  // composant, jamais un mode distinct a gerer explicitement ailleurs.
+  const isEditing = untrack(() => condition != null);
+
   let sourceType = $state(untrack(() => condition?.source?.type ?? 'QueryParam'));
   let sourceKey = $state(untrack(() => condition?.source?.key ?? ''));
   let operatorType = $state(untrack(() => condition?.operator?.type ?? 'Eq'));
@@ -64,7 +70,7 @@
   }
 </script>
 
-<form class="condition-form" onsubmit={handleSubmit} aria-label="Condition de matching">
+<form class="condition-form" onsubmit={handleSubmit} aria-label={isEditing ? 'Modifier la condition' : 'Ajouter une condition'}>
   <div class="form-row">
     <div class="form-field">
       <label for="cond-source">Source</label>
@@ -159,7 +165,7 @@
   </div>
 
   <div class="form-actions">
-    <button type="submit" class="btn btn-sm btn-primary" data-testid="condition-form-submit-button">Valider</button>
+    <button type="submit" class="btn btn-sm btn-primary" data-testid="condition-form-submit-button">{isEditing ? 'Enregistrer' : 'Valider'}</button>
     <button type="button" class="btn btn-sm btn-secondary" onclick={onCancel} data-testid="condition-form-cancel-button">Annuler</button>
   </div>
 </form>
