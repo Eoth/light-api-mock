@@ -53,6 +53,7 @@ Comme pour les fonctions ci-dessous, ces 4 accès apparaissent dans l'autocompl�
 | `date_now(format?)` | La date du jour, avec un format optionnel : `"iso"` (défaut, `AAAA-MM-JJ`), `"fr"` (`JJ/MM/AAAA`), `"en"` (`MM/JJ/AAAA`) |
 | `date_past(jours, format?)` | Une date dans le passé, `jours` jours avant aujourd'hui |
 | `date_future(jours, format?)` | Une date dans le futur, `jours` jours après aujourd'hui |
+| `parse_date(texte, "pattern")` | Sens **inverse** de `date_now`/`date_past`/`date_future` : parse une date **saisie** selon un pattern explicite et retourne le nombre de millisecondes depuis epoch (voir cas d'usage dédié ci-dessous) |
 | `seeded_int(seed, min, max)` | Un entier **toujours identique pour la même `seed`**, entre `min` et `max` |
 | `seeded_pick(seed, [liste])` | Un élément de `liste`, **toujours le même pour la même `seed`** |
 | `parse_json(texte)` | Transforme un texte JSON (ex. `request.body`) en une structure Rhai navigable (liste/objet) |
@@ -78,6 +79,51 @@ Un script peut échouer à l'exécution — par exemple si vous appelez une fonc
 2. Le **[testeur de règle](testeur-de-regle-et-conflits.md)** ("Tester contre une requête réelle", visible pendant l'édition d'une règle) exécute réellement vos scripts contre une vraie requête déjà capturée, et affiche un message d'erreur explicite si l'un d'eux échoue — c'est la façon fiable de détecter ce type de problème avant de sauvegarder, puisque la syntaxe seule ne suffit pas.
 
 ![Testeur de règle affichant un message d'erreur clair suite à l'appel d'une fonction Rhai inexistante](screenshots/testeur-regle-erreur-script.png)
+
+## Cas d'usage : convertir une date saisie dans un format personnalisé en millisecondes
+
+Besoin inverse de `date_now`/`date_past`/`date_future` (qui **génèrent** une date) : votre mock reçoit une date **saisie** par l'appelant dans un format qui n'est pas forcément ISO (ex. `15/03/2026`, avec ou sans heure), et la réponse doit contenir cette date convertie en millisecondes depuis epoch (le format que la plupart des API JSON utilisent en interne). C'est le rôle de `parse_date(texte, "pattern")`.
+
+Le **pattern est toujours explicite** — jamais de détection automatique du format. C'est un choix assumé : deviner automatiquement si `03/04/2026` signifie le 3 avril ou le 4 mars serait ambigu et imprévisible ; en précisant `"dd/MM/yyyy"` ou `"MM/dd/yyyy"`, il n'y a plus aucune ambiguïté.
+
+**Jetons reconnus dans le pattern** (chaque lettre répétée fixe le nombre de chiffres attendus à cet endroit ; tout autre caractère — `/`, `-`, `:`, espace... — doit apparaître tel quel dans le texte) :
+
+| Jeton | Signifie | Largeur |
+|---|---|---|
+| `yyyy` | Année | 4 chiffres |
+| `MM` | Mois (01-12) | 2 chiffres |
+| `dd` | Jour (01-31) | 2 chiffres |
+| `HH` | Heure (00-23) | 2 chiffres, optionnel |
+| `mm` | Minute (00-59) | 2 chiffres, optionnel |
+| `ss` | Seconde (00-59) | 2 chiffres, optionnel |
+
+`yyyy`/`MM`/`dd` sont obligatoires ; `HH`/`mm`/`ss` sont optionnels — un pattern sans heure (ex. `"dd/MM/yyyy"`) suppose minuit (00:00:00).
+
+**Exemple verifié** (script + template complets, testés contre une vraie requête HTTP) :
+
+```rhai
+parse_date(request.query.date, "dd/MM/yyyy")
+```
+
+avec le corps de réponse (mode "Template avancé") :
+
+```json
+{"ms":{{script}}}
+```
+
+Une requête `GET /mon-service/convert?date=15/03/2026` renvoie `{"ms":1773532800000}` — `1773532800000` est bien le nombre de millisecondes depuis epoch pour le 15 mars 2026 à minuit UTC.
+
+![Formulaire de règle configurant un script parse_date, avant sauvegarde](screenshots/regle-script-parse-date.png)
+
+**Avec heure** :
+
+```rhai
+parse_date(request.query.horodatage, "dd/MM/yyyy HH:mm:ss")
+```
+
+`parse_date("15/03/2026 08:30:45", "dd/MM/yyyy HH:mm:ss")` renvoie `1773563445000` (le même 15 mars 2026, mais à 08:30:45 UTC au lieu de minuit).
+
+**Date invalide pour le pattern donné → vraie erreur d'exécution** (même discipline de visibilité que le reste des scripts, cf "Quand un script échoue" ci-dessus — jamais un échec silencieux) : `parse_date("31/02/2026", "dd/MM/yyyy")` échoue avec un message explicite ("n'est pas une date valide"), de même qu'un texte qui ne correspond pas au pattern (mauvais séparateur, champ non numérique, texte trop court/trop long) ou un mois/heure/minute/seconde hors bornes. Une année bissextile est correctement reconnue : `parse_date("29/02/2028", "dd/MM/yyyy")` fonctionne (2028 est bissextile), mais `parse_date("29/02/2026", "dd/MM/yyyy")` échoue (2026 ne l'est pas). Utilisez le [testeur de règle](testeur-de-regle-et-conflits.md) pour vérifier qu'une date saisie type se parse bien avant de sauvegarder.
 
 ## Cas d'usage : table de correspondance (map) avec repli
 
@@ -357,3 +403,4 @@ Le même principe (`[0].NomDuChamp`) fonctionne pour un corps **JSON** avec `par
 - La syntaxe est validée avant sauvegarde ("Valider le script"), mais uniquement au niveau syntaxique — une erreur qui ne se manifeste qu'à l'exécution (fonction inexistante, division par zéro...) ou une erreur de logique métier (mauvaise valeur calculée) ne sera pas détectée par ce bouton. Utilisez le [testeur de règle](testeur-de-regle-et-conflits.md) contre une vraie requête capturée pour détecter les erreurs d'exécution avant de sauvegarder (cf "Quand un script échoue" ci-dessus).
 - `parse_json(texte)` renvoie une valeur "vide" (ni liste, ni objet) si le texte n'est pas du JSON valide, plutôt que de faire échouer le script — pensez à vérifier le format de la requête si `parse_json(request.body)` ne se comporte pas comme attendu.
 - `parse_xml_items` ne capture qu'un seul niveau de champs enfants par élément répété (cf exemple SOAP ci-dessus) — pas de structure imbriquée à l'intérieur d'un article/ligne.
+- `parse_date` attend une **largeur fixe** de chiffres pour chaque jeton du pattern (`dd`/`MM` = toujours 2 chiffres, `yyyy` = toujours 4) — un jour/mois sur un seul chiffre sans zéro de tête (ex. `"5/3/2026"` avec le pattern `"dd/MM/yyyy"`) est rejeté comme une erreur d'exécution, pas interprété avec une largeur variable.

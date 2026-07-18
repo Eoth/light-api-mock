@@ -533,6 +533,26 @@
         { "action": "click", "target": "ruleForm.submitButton" },
         { "action": "assertVisible", "target": "ruleList.item", "params": { "name": "script-detail-rule" } }
       ]
+    },
+    {
+      "scenario": "Convertir une date saisie dans un format personnalise en millisecondes via parse_date (illustration doc)",
+      "steps": [
+        { "action": "goto", "page": "services" },
+        { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
+        { "action": "click", "target": "serviceCard.configureButton", "params": { "name": "parse-date-demo" } },
+        { "action": "click", "target": "ruleList.addButton" },
+        { "action": "fill", "target": "ruleForm.nameInput", "value": "convertir-date" },
+        { "action": "selectOption", "target": "ruleForm.methodSelect", "value": "GET" },
+        { "action": "click", "target": "toggleSwitch.switch", "params": { "label": "Script-personnalise" } },
+        { "action": "fill", "target": "rhaiScriptEditor.textarea", "params": { "id": "rule-script" }, "value": "parse_date(request.query.date, \"dd/MM/yyyy\")" },
+        { "action": "click", "target": "ruleForm.modeButton", "params": { "mode": "advanced" } },
+        { "action": "click", "target": "ruleForm.fragmentAddButton" },
+        { "action": "selectOption", "target": "ruleForm.fragmentTypeSelect", "params": { "idx": "0" }, "value": "Template" },
+        { "action": "fill", "target": "ruleForm.fragmentTemplateTextarea", "params": { "idx": "0" }, "value": "{\"ms\":{{script}}}" },
+        { "action": "screenshot", "file": "regle-script-parse-date.png" },
+        { "action": "click", "target": "ruleForm.submitButton" },
+        { "action": "assertVisible", "target": "ruleList.item", "params": { "name": "convertir-date" } }
+      ]
     }
   ]
 }

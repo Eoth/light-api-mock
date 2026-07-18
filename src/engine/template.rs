@@ -356,6 +356,28 @@ pub(crate) fn civil_from_days(days: i64) -> (i64, u32, u32) {
     (y, mo, d)
 }
 
+// Inverse exacte de civil_from_days (meme algorithme, Howard Hinnant :
+// http://howardhinnant.github.io/date_algorithms.html#days_from_civil).
+// pub(crate) : reutilisee telle quelle par engine::script::parse_date_impl
+// (sujet "parse_date", conversion inverse de date_now/date_past/date_future)
+// pour ne jamais dupliquer le calcul calendaire — meme discipline que
+// civil_from_days ci-dessus. `m` doit etre dans [1,12] et `d` dans [1,31] :
+// l'appelant valide ces bornes avant d'appeler cette fonction ; un `d`
+// hors des jours reels du mois (ex. 31 fevrier) ne panique pas mais produit
+// un decompte de jours qui NE RE-CONVERTIT PAS vers (y,m,d) via
+// civil_from_days — c'est le mecanisme de validation utilise par
+// parse_date_impl (round-trip) plutot que de dupliquer les regles de
+// jours-par-mois/annees bissextiles.
+pub(crate) fn days_from_civil(y: i64, m: u32, d: u32) -> i64 {
+    let y = if m <= 2 { y - 1 } else { y };
+    let era = if y >= 0 { y } else { y - 399 } / 400;
+    let yoe = y - era * 400; // [0, 399]
+    let mp = if m > 2 { m as i64 - 3 } else { m as i64 + 9 }; // [0, 11]
+    let doy = (153 * mp + 2) / 5 + d as i64 - 1; // [0, 365]
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy; // [0, 146096]
+    era * 146097 + doe - 719468
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -709,6 +731,30 @@ mod tests {
     #[test]
     fn epoch_to_iso_known_date() {
         assert_eq!(epoch_to_iso(0), "1970-01-01T00:00:00Z");
+    }
+
+    #[test]
+    fn days_from_civil_is_inverse_of_civil_from_days_epoch() {
+        assert_eq!(days_from_civil(1970, 1, 1), 0);
+        assert_eq!(civil_from_days(0), (1970, 1, 1));
+    }
+
+    #[test]
+    fn days_from_civil_round_trips_for_a_normal_date() {
+        let days = days_from_civil(2026, 3, 15);
+        assert_eq!(civil_from_days(days), (2026, 3, 15));
+    }
+
+    #[test]
+    fn days_from_civil_round_trips_for_leap_day() {
+        let days = days_from_civil(2028, 2, 29);
+        assert_eq!(civil_from_days(days), (2028, 2, 29));
+    }
+
+    #[test]
+    fn days_from_civil_does_not_round_trip_for_invalid_february_31() {
+        let days = days_from_civil(2026, 2, 31);
+        assert_ne!(civil_from_days(days), (2026, 2, 31));
     }
 
     #[test]
