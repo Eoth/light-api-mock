@@ -630,3 +630,55 @@ test.describe('Runner data-driven (scenarios JSON) - lot 13 (edition en place d 
     expect(withWrongValue.status()).toBe(404);
   });
 });
+
+// Lot 14 : couverture E2E neuve (pas une migration), pour le sujet "restauration
+// de la vue d'origine a l'edition d'une reponse" (cf CLAUDE.md). Avant cette
+// passe, editer une regle construite via n'importe quel mode structure
+// (JSON/XML, par exemple/guide) atterrissait TOUJOURS en "Template avance",
+// meme heuristique retour 1 corrigee par Rule.response_mode (backend) +
+// RuleResponseSection.svelte::computeInitialEditorState(). Verifie aussi le
+// retour 2 (pipes desormais disponibles en mode "par exemple") et, de facto,
+// le retour 3 (les boutons de Format fusionnes JSON/XML + reveal "Modifier en
+// detail" sont le seul chemin desormais disponible pour atteindre ces vues).
+test.describe('Runner data-driven (scenarios JSON) - lot 14 (restauration de la vue d origine + pipes en mode par exemple)', () => {
+  test.beforeEach(async ({ request }) => {
+    await request.delete(`${API}/config/reset`);
+    await request.post(`${API}/services`, {
+      data: validService('view-restore-json', { listen_path: '/echo/{siret}' }),
+    });
+    await request.post(`${API}/services`, {
+      data: validService('view-restore-json-detail'),
+    });
+    await request.post(`${API}/services`, {
+      data: validService('view-restore-xml', { listen_path: '/echo/{siret}' }),
+    });
+  });
+
+  test('editer une regle JSON par exemple restaure la vue assistee, pipe applique (scenario JSON)', async ({ page, request }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Editer une regle JSON par exemple restaure la vue assistee avec le pipe applique'));
+
+    // Le scenario reouvre la regle et change le pipe upper -> lower AVANT de
+    // resauvegarder : verifie hors runner que ce changement, fait depuis la
+    // vue restauree (pas depuis un "template avance" reconstruit a vide),
+    // est reellement celui qui a ete persiste.
+    const resp = await request.get('http://localhost:7342/view-restore-json/echo/abc123');
+    expect(resp.status()).toBe(200);
+    const body = await resp.json();
+    expect(body.siret).toBe('abc123');
+    expect(body.note).toBe('bonjour');
+  });
+
+  test('editer une regle JSON en detail restaure la vue detaillee, pas le template avance (scenario JSON)', async ({ page, request }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Editer une regle JSON en detail restaure la vue detaillee, pas le template avance'));
+  });
+
+  test('editer une regle XML par exemple restaure la vue assistee, pipe applique (scenario JSON)', async ({ page, request }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Editer une regle XML par exemple restaure la vue assistee avec le pipe applique'));
+
+    const resp = await request.get('http://localhost:7342/view-restore-xml/echo/abc123');
+    expect(resp.status()).toBe(200);
+    const xml = await resp.text();
+    expect(xml).toContain('<siret>ABC123</siret>');
+    expect(xml).toContain('<note>bonjour</note>');
+  });
+});

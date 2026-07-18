@@ -1,11 +1,29 @@
 <script>
+  // Mode "coller un exemple" JSON : edite uniquement les VALEURS (source/
+  // pipe) des champs deja detectes par l'analyse de l'exemple colle -- ni
+  // renommage de cle, ni ajout/suppression/reordonnancement, ni changement
+  // de type (contrairement au mode guide, JsonResponseBuilder.svelte, qui
+  // partage la MEME forme de Fields mais permet l'edition complete). Voir
+  // CLAUDE.md, "Fusion Format x Assiste/Detail" pour la relation entre les
+  // deux : RuleResponseSection.svelte affiche un bouton "Modifier en detail"
+  // qui reutilise TEL QUEL le tableau `fields` de ce composant pour ouvrir
+  // JsonResponseBuilder, transition sans perte puisque la structure de
+  // donnees est identique (verifie en etape 0 de ce sujet).
+  import { untrack } from 'svelte';
   import { buildExpr as sharedBuildExpr, fieldsToTemplate, exampleJsonToFields } from '../tpl-utils.js';
 
-  let { fields = [], onUpdate = () => {} } = $props();
+  // startParsed : seede l'etat initial `parsed` a la restauration d'une
+  // regle existante (fields deja peuple par le parent depuis le template
+  // persiste, cf RuleResponseSection.svelte::computeInitialEditorState) --
+  // saute la zone de collage et affiche directement la liste de champs. Lu
+  // UNE SEULE FOIS a la creation du composant (untrack, meme idiome que
+  // RuleForm.svelte::init) : les changements ulterieurs de cette prop ne
+  // doivent pas rouvrir/refermer la zone de collage a l'insu de l'utilisateur.
+  let { fields = [], startParsed = false, onUpdate = () => {} } = $props();
 
   let pasteInput = $state('');
   let parseError = $state('');
-  let parsed = $state(false);
+  let parsed = $state(untrack(() => startParsed));
   let isArrayRoot = $state(false);
 
   const valueSources = [
@@ -27,6 +45,26 @@
     'StreetName', 'CityFR', 'PostcodeFR', 'Siren', 'Siret',
     'FullAddressFR', 'DatePast', 'DateFuture', 'TimestampMs',
     'BoolRandom', 'LoremSentence', 'CountryFR', 'IbanFR',
+  ];
+
+  // Pipes (retour beta-testeur : presents en mode guide, absents ici alors
+  // que ce mode est juge excellent par ailleurs) -- memes options que
+  // JsonResponseBuilder.svelte, dans la limite du raisonnable : uniquement
+  // la liste deja existante, aucune nouvelle transformation inventee pour ce
+  // sujet.
+  const pipeOptions = [
+    { value: 'lower', label: 'lower — minuscules' },
+    { value: 'upper', label: 'upper — majuscules' },
+    { value: 'trim', label: 'trim — suppr. espaces' },
+    { value: 'capitalize', label: 'capitalize — 1ere maj.' },
+    { value: 'first(N)', label: 'first(N) — N premiers car.' },
+    { value: 'last(N)', label: 'last(N) — N derniers car.' },
+    { value: 'substr(start,len)', label: 'substr(start,len)' },
+    { value: 'default("val")', label: 'default("val") — si vide' },
+    { value: 'replace("a","b")', label: 'replace("a","b")' },
+    { value: 'prepend("prefix")', label: 'prepend("prefix")' },
+    { value: 'append("suffix")', label: 'append("suffix")' },
+    { value: 'length', label: 'length — nb car.' },
   ];
 
   function handleParse() {
@@ -146,6 +184,20 @@
                 />
               {/if}
 
+              {#if field.source !== 'fixed'}
+                <input
+                  type="text"
+                  class="pipe-input"
+                  value={field.pipe || ''}
+                  oninput={(e) => updateField(currentPath, 'pipe', e.target.value)}
+                  placeholder="ex: first(9) | upper"
+                  aria-label="Pipe de transformation pour {field.key}"
+                  list="dl-paste-pipes"
+                  autocomplete="off"
+                  data-testid="json-paste-builder-pipe-input-{currentPath.join('-')}"
+                />
+              {/if}
+
               {#if field.source === 'fixed'}
                 <span class="paste-preview-fixed">{field.value}</span>
               {:else}
@@ -158,6 +210,10 @@
     {/snippet}
 
     {@render renderFields(fields, [], 0)}
+
+    <datalist id="dl-paste-pipes">
+      {#each pipeOptions as p}<option value={p.value}>{p.label}</option>{/each}
+    </datalist>
   {/if}
 </div>
 
@@ -207,6 +263,12 @@
     border-radius: var(--radius); font-size: 0.8125rem;
     background: var(--color-surface); color: var(--color-text);
     min-width: 8rem; flex: 1;
+  }
+  .pipe-input {
+    min-width: 8rem; max-width: 14rem; padding: 0.25rem 0.5rem;
+    border: 1px solid var(--color-border); border-radius: var(--radius);
+    font-size: 0.75rem; font-family: 'Cascadia Code', 'Fira Code', monospace;
+    color: var(--color-primary);
   }
 
   .paste-preview-fixed {

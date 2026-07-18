@@ -449,3 +449,194 @@ describe('RuleForm: avertissement avant de persister le changement proxy -> mock
     expect(queryByTestId('rule-form-stale-proxy-warning')).not.toBeInTheDocument();
   });
 });
+
+// Restauration de la vue d'origine a l'edition (retour 1, cf CLAUDE.md
+// "Restauration de la vue d'origine a l'edition d'une reponse"). Avant cette
+// passe, TOUTE regle deja construite via un mode structure atterrissait en
+// "Template avance" a la reouverture -- Rule.response_mode (backend) leve
+// l'ambiguite.
+describe('RuleForm: restauration de la vue d\'origine a l\'edition (retour 1)', () => {
+  it('une regle sauvegardee en JSON "par exemple" reouvre directement la vue assistee (pas le template avance)', () => {
+    const rule = {
+      name: 'existing',
+      action: 'mock',
+      response_mode: 'json-paste',
+      conditions: { all_of: [], any_of: [] },
+      response: {
+        status: 200,
+        headers: [{ name: 'Content-Type', value: 'application/json' }],
+        body: [{ type: 'Template', template: '{"siret":"{{path.siret}}"}' }],
+        chaos: null,
+      },
+    };
+    const { container, queryByTestId } = render(RuleForm, { props: { rule } });
+
+    // La vue assistee (paste) est affichee directement, avec le champ deja
+    // reconstruit -- pas la zone de collage (parsed=true des le depart), et
+    // pas le controle "cle" du mode detail (json-guided).
+    const sourceSelect = container.querySelector('[data-testid="json-paste-builder-source-select-0"]');
+    expect(sourceSelect).toBeInTheDocument();
+    expect(sourceSelect.value).toBe('path');
+    expect(queryByTestId('json-paste-builder-textarea')).not.toBeInTheDocument();
+    expect(queryByTestId('json-builder-key-input-0')).not.toBeInTheDocument();
+  });
+
+  it('une regle sauvegardee en JSON "en detail" reouvre directement la vue detaillee (pas le template avance)', () => {
+    const rule = {
+      name: 'existing',
+      action: 'mock',
+      response_mode: 'json-guided',
+      conditions: { all_of: [], any_of: [] },
+      response: {
+        status: 200,
+        headers: [{ name: 'Content-Type', value: 'application/json' }],
+        body: [{ type: 'Template', template: '{"siret":"{{path.siret}}"}' }],
+        chaos: null,
+      },
+    };
+    const { queryByTestId } = render(RuleForm, { props: { rule } });
+
+    const keyInput = queryByTestId('json-builder-key-input-0');
+    expect(keyInput).toBeInTheDocument();
+    expect(keyInput.value).toBe('siret');
+    // Le bouton "Modifier en detail" n'apparait que dans la vue assistee :
+    // deja en detail, il n'a pas lieu d'etre.
+    expect(queryByTestId('rule-form-open-detail-button')).not.toBeInTheDocument();
+  });
+
+  it('une regle sauvegardee en XML "par exemple" reouvre directement la vue assistee, avec le pipe restaure', () => {
+    const rule = {
+      name: 'existing',
+      action: 'mock',
+      response_mode: 'xml-paste',
+      conditions: { all_of: [], any_of: [] },
+      response: {
+        status: 200,
+        headers: [{ name: 'Content-Type', value: 'application/xml' }],
+        body: [{ type: 'Template', template: '<response><siret>{{path.siret | upper}}</siret></response>' }],
+        chaos: null,
+      },
+    };
+    const { container, queryByTestId } = render(RuleForm, { props: { rule } });
+
+    const sourceSelect = container.querySelector('[data-testid="xml-paste-builder-source-select-0"]');
+    expect(sourceSelect).toBeInTheDocument();
+    expect(sourceSelect.value).toBe('path');
+    const pipeInput = container.querySelector('[data-testid="xml-paste-builder-pipe-input-0"]');
+    expect(pipeInput.value).toBe('upper');
+    expect(queryByTestId('xml-paste-builder-textarea')).not.toBeInTheDocument();
+  });
+
+  it('une regle sans response_mode (sauvegardee avant ce sujet) degrade gracieusement vers l\'ancienne heuristique (Template avance)', () => {
+    const rule = {
+      name: 'existing',
+      action: 'mock',
+      conditions: { all_of: [], any_of: [] },
+      response: {
+        status: 200,
+        headers: [{ name: 'Content-Type', value: 'application/json' }],
+        body: [{ type: 'Template', template: '{"siret":"{{path.siret}}"}' }],
+        chaos: null,
+      },
+    };
+    const { queryByTestId } = render(RuleForm, { props: { rule } });
+
+    expect(queryByTestId('rule-form-fragment-template-textarea-0')).toBeInTheDocument();
+    expect(queryByTestId('json-paste-builder-source-select-0')).not.toBeInTheDocument();
+  });
+
+  it('une regle avec response_mode structure mais un corps qui ne correspond plus a cette forme degrade vers Template avance plutot que de planter', () => {
+    const rule = {
+      name: 'existing',
+      action: 'mock',
+      response_mode: 'json-paste',
+      conditions: { all_of: [], any_of: [] },
+      response: {
+        status: 200,
+        headers: [],
+        body: [{ type: 'Literal', value: 'texte brut' }],
+        chaos: null,
+      },
+    };
+    const { queryByTestId } = render(RuleForm, { props: { rule } });
+    expect(queryByTestId('rule-form-fragment-literal-textarea-0')).toBeInTheDocument();
+  });
+});
+
+// Fusion Format x Assiste/Detail (retour 3, cf CLAUDE.md). 5 boutons de
+// Format au lieu de 7 boutons de mode a plat ; JSON/XML se declinent en 2
+// sous-modes via un bouton "Modifier en detail" plutot qu'un second niveau
+// de bouton visible d'emblee.
+describe('RuleForm: fusion Format x Assiste/Detail (retour 3)', () => {
+  it('affiche 5 boutons de format (JSON/XML/Texte/Template avance/Vide), pas 7', () => {
+    const { container } = render(RuleForm);
+    const buttons = container.querySelectorAll('[data-testid^="rule-form-mode-button-"]');
+    expect(buttons).toHaveLength(5);
+    const testids = [...buttons].map((b) => b.dataset.testid);
+    expect(testids).toEqual([
+      'rule-form-mode-button-json',
+      'rule-form-mode-button-xml',
+      'rule-form-mode-button-text',
+      'rule-form-mode-button-advanced',
+      'rule-form-mode-button-empty',
+    ]);
+  });
+
+  it('une regle neuve en JSON affiche d\'abord la vue assistee (paste), avec le bouton "Modifier en detail"', async () => {
+    const { container, queryByTestId } = render(RuleForm);
+    await fireEvent.click(container.querySelector('[data-testid="rule-form-mode-button-json"]'));
+
+    expect(queryByTestId('json-paste-builder-textarea')).toBeInTheDocument();
+    expect(queryByTestId('rule-form-open-detail-button')).toBeInTheDocument();
+  });
+
+  it('"Modifier en detail" revele le mode guide SANS avertissement de perte de donnees (transition sans risque)', async () => {
+    const { container, queryByTestId, queryByRole } = render(RuleForm);
+    await fireEvent.click(container.querySelector('[data-testid="rule-form-mode-button-json"]'));
+    await fireEvent.click(container.querySelector('[data-testid="rule-form-open-detail-button"]'));
+
+    expect(queryByTestId('json-builder-add-field-button')).toBeInTheDocument();
+    expect(queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('re-cliquer sur le meme bouton de format (deja actif) ne reinitialise pas la structure en cours', async () => {
+    const { container } = render(RuleForm);
+    await fireEvent.click(container.querySelector('[data-testid="rule-form-mode-button-json"]'));
+    await fireEvent.click(container.querySelector('[data-testid="rule-form-open-detail-button"]'));
+    await fireEvent.click(container.querySelector('[data-testid="json-builder-add-field-button"]'));
+    const keyInput = container.querySelector('[data-testid="json-builder-key-input-0"]');
+    await setInput(keyInput, 'total');
+
+    await fireEvent.click(container.querySelector('[data-testid="rule-form-mode-button-json"]'));
+
+    expect(container.querySelector('[data-testid="json-builder-key-input-0"]').value).toBe('total');
+  });
+});
+
+// Pipes en mode "par exemple" (retour 2, cf CLAUDE.md). Round-trip complet :
+// coller un exemple, assigner une source + un pipe, verifier que le payload
+// final envoye au backend contient bien `{{expr | pipe}}`.
+describe('RuleForm: pipes en mode "par exemple" (retour 2)', () => {
+  it('un pipe applique en mode JSON par exemple se retrouve dans le template du payload', async () => {
+    checkRuleConflicts.mockResolvedValue({ conflicts: [] });
+    const onSave = vi.fn();
+    const { getByLabelText, container } = render(RuleForm, { props: { onSave } });
+
+    await setInput(getByLabelText('Nom de la regle'), 'pipe-rule');
+    await fireEvent.click(container.querySelector('[data-testid="rule-form-mode-button-json"]'));
+    const textarea = container.querySelector('[data-testid="json-paste-builder-textarea"]');
+    await setInput(textarea, '{"siret":"00000000000000"}');
+    await fireEvent.click(container.querySelector('[data-testid="json-paste-builder-analyze-button"]'));
+
+    const sourceSelect = container.querySelector('[data-testid="json-paste-builder-source-select-0"]');
+    await fireEvent.change(sourceSelect, { target: { value: 'path' } });
+    await setInput(container.querySelector('[data-testid="json-paste-builder-value-input-0"]'), 'siret');
+    await setInput(container.querySelector('[data-testid="json-paste-builder-pipe-input-0"]'), 'upper');
+
+    await submitForm(container);
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    const [payload] = onSave.mock.calls[0];
+    expect(payload.response.body[0].template).toContain('{{path.siret | upper}}');
+    expect(payload.response_mode).toBe('json-paste');
+  });
+});

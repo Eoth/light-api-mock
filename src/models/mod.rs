@@ -65,8 +65,36 @@ pub struct Rule {
     pub pre_script: Option<String>,
     pub script: Option<String>,
     pub post_script: Option<String>,
+    // Discriminant purement UI/editeur (jamais lu par le moteur de matching
+    // ou de rendu) : memorise QUELLE vue du formulaire de regle a produit
+    // `response.body` (json-paste/json-guided/xml-paste/xml-guided/text/
+    // advanced/empty), pour que RuleResponseSection.svelte puisse restaurer
+    // la vue d'origine a l'edition plutot que de systematiquement retomber
+    // sur "Template avance" (cf CLAUDE.md, "Restauration de la vue d'origine
+    // a l'edition d'une reponse"). EXCEPTION DELIBEREE au point 16 (pas de
+    // #[serde(default)] sur les champs obligatoires de Rule) : contrairement
+    // a pre_script/script/post_script (comportement fonctionnel reel),
+    // response_mode ne pilote QUE l'affichage du formulaire d'edition —
+    // l'absence de la cle (YAML/JSON pre-existant a cette passe) degrade
+    // gracieusement vers l'ancienne heuristique de detection par forme du
+    // corps, jamais une erreur de chargement. Memes precedent deja en place
+    // pour group_name/wsdl_mode (point 10).
+    #[serde(default)]
+    pub response_mode: Option<ResponseEditorMode>,
     pub conditions: ConditionGroup,
     pub response: MockResponse,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "kebab-case")]
+pub enum ResponseEditorMode {
+    JsonPaste,
+    JsonGuided,
+    XmlPaste,
+    XmlGuided,
+    Text,
+    Advanced,
+    Empty,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
@@ -218,6 +246,7 @@ mod tests {
                     pre_script: None,
                     script: None,
                     post_script: None,
+                    response_mode: None,
                     conditions: ConditionGroup {
                         all_of: vec![
                             Condition {
@@ -301,6 +330,56 @@ groups: []
         assert_eq!(config.services.len(), 1);
         assert!(config.services[0].rules.is_empty());
         assert!(!config.services[0].is_mocked);
+    }
+
+    #[test]
+    fn deserialize_rule_without_response_mode_defaults_to_none() {
+        // response_mode est un champ purement UI (jamais lu par le moteur de
+        // matching/rendu) -- EXCEPTION deliberee au point 16 (pas de
+        // #[serde(default)] sur les champs obligatoires de Rule) : son
+        // absence dans une config pre-existante ne doit jamais faire echouer
+        // le chargement au demarrage, contrairement a pre_script/script/
+        // post_script (obligatoires, sans default). Cette YAML omet
+        // volontairement la cle `response_mode`.
+        let yaml = r#"
+services:
+  - name: svc
+    listen_path: /svc/*
+    real_target_url: http://svc:80
+    is_mocked: true
+    rewrite_directory_urls: false
+    group_name: ~
+    wsdl_mode: auto
+    rules:
+      - name: legacy-rule
+        method: GET
+        sub_path: ~
+        action: mock
+        pre_script: ~
+        script: ~
+        post_script: ~
+        conditions:
+          all_of: []
+          any_of: []
+        response:
+          status: 200
+          body:
+            - type: Literal
+              value: ok
+groups: []
+"#;
+        let config: MockConfig = serde_yaml::from_str(yaml).expect("deserialize");
+        assert_eq!(config.services[0].rules[0].response_mode, None);
+    }
+
+    #[test]
+    fn response_mode_roundtrip_through_yaml() {
+        let mut config = sample_config();
+        config.services[0].rules[0].response_mode = Some(ResponseEditorMode::JsonPaste);
+        let yaml = serde_yaml::to_string(&config).expect("serialize");
+        assert!(yaml.contains("response_mode: json-paste"));
+        let parsed: MockConfig = serde_yaml::from_str(&yaml).expect("deserialize");
+        assert_eq!(parsed.services[0].rules[0].response_mode, Some(ResponseEditorMode::JsonPaste));
     }
 
     #[test]

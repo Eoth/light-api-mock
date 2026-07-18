@@ -130,7 +130,7 @@
     // Toujours calcule, quel que soit `ruleAction` (meme comportement que
     // l'origine, ou response/scripts vivaient dans un scope jamais demonte
     // — cf RuleResponseSection.svelte).
-    const { response, pre_script, script, post_script } = responseSectionRef.getPayload();
+    const { response, pre_script, script, post_script, response_mode } = responseSectionRef.getPayload();
     return {
       name: name.trim(),
       method: ruleMethod,
@@ -139,6 +139,7 @@
       pre_script,
       script,
       post_script,
+      response_mode,
       conditions: { all_of: allOf, any_of: anyOf },
       response,
     };

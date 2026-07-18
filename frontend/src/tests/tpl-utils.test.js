@@ -11,6 +11,7 @@ import {
   xmlFieldsToTemplate,
   exampleJsonToFields,
   exampleXmlToFields,
+  templateToXmlFields,
 } from '../lib/tpl-utils.js';
 
 // ── fieldsToTemplate ─────────────────────────────────────────────────
@@ -542,5 +543,70 @@ describe('exampleXmlToFields', () => {
     const tpl = xmlFieldsToTemplate(fields, rootTag, rootAttributes);
     expect(validateTemplateAsXml(tpl)).toBeNull();
     expect(tpl).toBe('<resp ver="1"><client id="7"><nom>ACME</nom></client></resp>');
+  });
+});
+
+// ── templateToXmlFields (restauration de la vue d'origine, retour 1) ──
+// Contrairement a exampleXmlToFields (XML LITTERAL sans {{}}, mode "coller
+// un exemple"), cette fonction part d'un TEMPLATE deja rendu par
+// xmlFieldsToTemplate (avec {{expr | pipe}} deja en place) et reconstruit
+// les Fields -- utilisee par RuleResponseSection.svelte pour restaurer la
+// vue xml-paste/xml-guided a l'edition d'une regle existante.
+
+describe('templateToXmlFields', () => {
+  it('reconstruit une valeur fixe (litterale) en source "fixed"', () => {
+    const { rootTag, fields } = templateToXmlFields('<response><nom>ACME</nom></response>');
+    expect(rootTag).toBe('response');
+    expect(fields).toEqual([{ tag: 'nom', nodeType: 'value', attributes: [], source: 'fixed', value: 'ACME', pipe: '' }]);
+  });
+
+  it('reconstruit une expression {{expr}} sans pipe', () => {
+    const { fields } = templateToXmlFields('<response><siret>{{path.siret}}</siret></response>');
+    expect(fields[0].source).toBe('path');
+    expect(fields[0].value).toBe('siret');
+    expect(fields[0].pipe).toBe('');
+  });
+
+  it('reconstruit une expression {{expr | pipe}} avec le pipe', () => {
+    const { fields } = templateToXmlFields('<response><siret>{{path.siret | upper}}</siret></response>');
+    expect(fields[0].source).toBe('path');
+    expect(fields[0].value).toBe('siret');
+    expect(fields[0].pipe).toBe('upper');
+  });
+
+  it('reconstruit un pipe avec parametres (parenthese contenant un |) sans le couper au mauvais endroit', () => {
+    const { fields } = templateToXmlFields('<response><n>{{query.n | default("x|y")}}</n></response>');
+    expect(fields[0].pipe).toBe('default("x|y")');
+  });
+
+  it('reconstruit un noeud imbrique (nodeType parent) recursivement', () => {
+    const { fields } = templateToXmlFields('<response><client><nom>ACME</nom><siret>{{path.siret}}</siret></client></response>');
+    expect(fields[0].nodeType).toBe('parent');
+    expect(fields[0].children).toHaveLength(2);
+    expect(fields[0].children[1].source).toBe('path');
+  });
+
+  it('reconstruit les attributs (racine et noeud) avec leur propre source/pipe', () => {
+    const { rootAttributes, fields } = templateToXmlFields('<response ver="1"><id type="{{path.kind | upper}}">42</id></response>');
+    expect(rootAttributes).toEqual([{ name: 'ver', source: 'fixed', value: '1', pipe: '' }]);
+    expect(fields[0].attributes[0]).toEqual({ name: 'type', source: 'path', value: 'kind', pipe: 'upper' });
+  });
+
+  it('round-trip xmlFieldsToTemplate -> templateToXmlFields -> xmlFieldsToTemplate produit le meme template', () => {
+    const original = '<devisResponse ver="2"><client><nom>ACME</nom><siret>{{path.siret | upper}}</siret></client></devisResponse>';
+    const { rootTag, rootAttributes, fields } = templateToXmlFields(original);
+    expect(xmlFieldsToTemplate(fields, rootTag, rootAttributes)).toBe(original);
+  });
+
+  it('rejette un template vide', () => {
+    expect(() => templateToXmlFields('   ')).toThrow(TypeError);
+  });
+
+  it('rejette un template XML invalide', () => {
+    expect(() => templateToXmlFields('<a><b></a>')).toThrow(TypeError);
+  });
+
+  it('rejette un template sans element racine', () => {
+    expect(() => templateToXmlFields('juste du texte')).toThrow(TypeError);
   });
 });

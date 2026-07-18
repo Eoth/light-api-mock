@@ -50,26 +50,39 @@ Source unique de verite pour le format template lightMock. Centralise :
 | `validateTemplateAsXml(tpl)` | Validation structurelle XML |
 | `templateToPreview(tpl)` | Rendu lisible avec «variables» |
 | `buildExpr(field)` | Construction d'expression variable + pipe |
+| `templateToXmlFields(tpl)` | Template string → Fields JS (deserialisation XML, restauration a l'edition) |
 
-## Modes de reponse (RuleForm)
+## Modes de reponse (RuleForm / RuleResponseSection)
 
-| Mode | Description |
+Le selecteur expose 5 boutons de **Format** (JSON, XML, Texte, Template avance, Vide) ; JSON et
+XML se declinent chacun en 2 sous-modes internes (`responseMode`), jamais visibles comme 2 boutons
+distincts : le format demarre toujours en `*-paste` (assiste), et un bouton "Modifier en detail"
+revele `*-guided` (detail) SANS conversion (memes Fields, juste plus de capacites d'edition -- cf
+CLAUDE.md "Fusion Format x Assiste/Detail").
+
+| responseMode (interne) | Description |
 |---|---|
-| JSON guide | Editeur cle/valeur avec sources dynamiques et pipes, genere un Template |
-| XML guide | Editeur tag/valeur avec sources dynamiques et pipes, genere un Template |
+| json-paste | Coller un exemple JSON, editer uniquement source/pipe par champ deja detecte |
+| json-guided | Editeur cle/valeur complet (renommage/ajout/suppression), sources dynamiques et pipes, genere un Template |
+| xml-paste | Coller un exemple XML, editer source/pipe/attributs par noeud deja detecte |
+| xml-guided | Editeur tag/valeur complet, sources dynamiques et pipes, genere un Template |
 | Texte | Textarea libre, genere un Literal |
 | Template avance | Syntaxe `{path.siret \| first(9)}` brute |
 | Vide (204) | Pas de body |
+
+`Rule.response_mode` (backend, `#[serde(default)]`) persiste cette valeur pour restaurer la bonne
+vue a la reouverture d'une regle (cf `RuleResponseSection.svelte::computeInitialEditorState()`).
 
 ### Conversions entre modes
 
 | De → Vers | Supporte | Notes |
 |---|---|---|
-| JSON guide → Avance | Oui, sans perte | Via `fieldsToTemplate()` |
-| Avance → JSON guide | Oui, si JSON objet | Via `templateToFields()` |
-| JSON guide → XML guide | Partiel | Pas de tableaux scalaires |
+| json-paste ↔ json-guided | Oui, sans perte, hors systeme d'avertissement | `revealDetailMode()`, memes Fields |
+| json-guided → Avance | Oui, sans perte | Via `fieldsToTemplate()` |
+| Avance → json-paste / json-guided | Oui, si JSON objet racine | Via `templateToFields()` |
+| json-guided/json-paste → xml-paste/xml-guided | Partiel | Pas de tableaux scalaires |
 | Avance ↔ Texte | Oui | Concatenation / fragment Literal |
-| XML guide → JSON guide | Non | Structures incompatibles |
+| xml-guided/xml-paste → json-guided/json-paste | Non | Structures incompatibles |
 
 ## Securite frontend
 
