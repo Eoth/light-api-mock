@@ -105,11 +105,16 @@
 
   function emit() { onUpdate(fields); }
 
-  function needsValueInput(src) { return ['fixed','path','query','header','body','xpath'].includes(src); }
+  // 'script' doit rester dans cette liste : c'est le champ qui permet de
+  // preciser QUELLE cle du resultat de script utiliser. Absent par erreur
+  // avant ce correctif alors que la vue "par exemple" (XmlPasteBuilder.svelte)
+  // l'a toujours eu -- cf CLAUDE.md, "diagnostic reponse JSON/XML".
+  function needsValueInput(src) { return ['fixed','path','query','header','body','xpath','script'].includes(src); }
 
   function valuePlaceholder(src) {
     if (src === 'body') return 'ex: /user/name';
     if (src === 'xpath') return 'ex: Envelope/Body/recherche/Siret';
+    if (src === 'script') return 'ex: nom (laisser vide pour {{script}} entier)';
     return 'valeur';
   }
 

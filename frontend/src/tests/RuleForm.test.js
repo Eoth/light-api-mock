@@ -613,6 +613,122 @@ describe('RuleForm: fusion Format x Assiste/Detail (retour 3)', () => {
   });
 });
 
+// Correctif "diagnostic reponse JSON/XML", symptome 2 : convertir un
+// template "Template avance" XML valide vers le format XML echouait
+// TOUJOURS (tryAdvancedToXmlGuided etait un stub qui ne faisait jamais
+// aboutir la conversion, meme pour du XML syntaxiquement correct) alors que
+// coller le meme contenu directement dans la vue "par exemple" fonctionnait
+// sans probleme (elle ne passe jamais par cette fonction). Desormais alignee
+// sur l'equivalent JSON (tryAdvancedToJsonGuided), qui reussissait deja.
+describe('RuleForm: conversion Template avance -> XML (correctif symptome 2)', () => {
+  async function buildAdvancedXmlTemplate(container, getByLabelText, tpl) {
+    await setInput(getByLabelText('Nom de la regle'), 'test-rule');
+    await fireEvent.click(container.querySelector('[data-testid="rule-form-mode-button-advanced"]'));
+    const typeSelect = container.querySelector('[data-testid="rule-form-fragment-type-select-0"]');
+    await fireEvent.change(typeSelect, { target: { value: 'Template' } });
+    const tplTextarea = container.querySelector('[data-testid="rule-form-fragment-template-textarea-0"]');
+    await setInput(tplTextarea, tpl);
+  }
+
+  it('un template XML valide en mode avance se convertit vers XML par exemple sans avertissement', async () => {
+    const { container, getByLabelText, queryByRole } = render(RuleForm);
+    await buildAdvancedXmlTemplate(container, getByLabelText, '<response><nom>ACME</nom></response>');
+
+    await fireEvent.click(container.querySelector('[data-testid="rule-form-mode-button-xml"]'));
+
+    expect(queryByRole('alert')).not.toBeInTheDocument();
+    const sourceSelect = container.querySelector('[data-testid="xml-paste-builder-source-select-0"]');
+    expect(sourceSelect).toBeInTheDocument();
+    expect(container.querySelector('[data-testid="xml-paste-builder-value-input-0"]').value).toBe('ACME');
+  });
+
+  it('les attributs de la racine du template avance sont preserves lors de la conversion', async () => {
+    const { container, getByLabelText } = render(RuleForm);
+    await buildAdvancedXmlTemplate(container, getByLabelText, '<devisResponse ver="1"><nom>ACME</nom></devisResponse>');
+
+    await fireEvent.click(container.querySelector('[data-testid="rule-form-mode-button-xml"]'));
+
+    expect(container.querySelector('[data-testid^="xml-paste-builder-attr-source-select-root"]')).toBeInTheDocument();
+  });
+
+  it('un template XML invalide en mode avance affiche toujours un avertissement de conversion', async () => {
+    const { container, getByLabelText, queryByRole } = render(RuleForm);
+    await buildAdvancedXmlTemplate(container, getByLabelText, '<response><nom>ACME</response>');
+
+    await fireEvent.click(container.querySelector('[data-testid="rule-form-mode-button-xml"]'));
+
+    expect(queryByRole('alert')).toHaveTextContent('Conversion impossible');
+  });
+});
+
+// Correctif "diagnostic reponse JSON/XML", symptome 3 : la fusion Format x
+// Assiste/Detail (retour 3) n'offrait qu'un aller simple ("Modifier en
+// detail") vers la vue detail, sans aucun moyen de revenir a la vue "par
+// exemple" sans perdre le travail en cours. `backToPasteMode()` est le
+// symetrique de `revealDetailMode()` : meme structure de Fields entre les
+// deux sous-modes, donc copie directe sans avertissement de perte.
+describe('RuleForm: retour vers la vue "par exemple" depuis le detail (correctif symptome 3)', () => {
+  it('le bouton retour est absent en vue par exemple et apparait en vue detail', async () => {
+    const { container, queryByTestId } = render(RuleForm);
+    await fireEvent.click(container.querySelector('[data-testid="rule-form-mode-button-json"]'));
+    expect(queryByTestId('rule-form-back-to-paste-button')).not.toBeInTheDocument();
+
+    await fireEvent.click(container.querySelector('[data-testid="rule-form-open-detail-button"]'));
+    expect(queryByTestId('rule-form-back-to-paste-button')).toBeInTheDocument();
+  });
+
+  it('JSON : revenir a la vue par exemple depuis le detail preserve le contenu, sans avertissement', async () => {
+    const { container, queryByRole } = render(RuleForm);
+    await fireEvent.click(container.querySelector('[data-testid="rule-form-mode-button-json"]'));
+    const textarea = container.querySelector('[data-testid="json-paste-builder-textarea"]');
+    await setInput(textarea, '{"nom":"ACME"}');
+    await fireEvent.click(container.querySelector('[data-testid="json-paste-builder-analyze-button"]'));
+    await fireEvent.click(container.querySelector('[data-testid="rule-form-open-detail-button"]'));
+
+    await fireEvent.click(container.querySelector('[data-testid="rule-form-back-to-paste-button"]'));
+
+    expect(queryByRole('alert')).not.toBeInTheDocument();
+    // La liste de champs deja peuplee s'affiche directement (pas la zone de
+    // collage vide) : `startParsed` doit refleter le contenu REEL au moment
+    // du remontage du composant, pas un etat fige a l'ouverture du formulaire.
+    expect(container.querySelector('[data-testid="json-paste-builder-textarea"]')).not.toBeInTheDocument();
+    const sourceSelect = container.querySelector('[data-testid="json-paste-builder-source-select-0"]');
+    expect(sourceSelect).toBeInTheDocument();
+  });
+
+  it('XML : revenir a la vue par exemple depuis le detail preserve le contenu, sans avertissement', async () => {
+    const { container, queryByRole } = render(RuleForm);
+    await fireEvent.click(container.querySelector('[data-testid="rule-form-mode-button-xml"]'));
+    const textarea = container.querySelector('[data-testid="xml-paste-builder-textarea"]');
+    await setInput(textarea, '<response><nom>ACME</nom></response>');
+    await fireEvent.click(container.querySelector('[data-testid="xml-paste-builder-analyze-button"]'));
+    await fireEvent.click(container.querySelector('[data-testid="rule-form-open-detail-button"]'));
+
+    await fireEvent.click(container.querySelector('[data-testid="rule-form-back-to-paste-button"]'));
+
+    expect(queryByRole('alert')).not.toBeInTheDocument();
+    expect(container.querySelector('[data-testid="xml-paste-builder-textarea"]')).not.toBeInTheDocument();
+    expect(container.querySelector('[data-testid="xml-paste-builder-source-select-0"]')).toBeInTheDocument();
+  });
+
+  it('un aller-retour detail -> par exemple -> detail conserve les modifications faites en detail', async () => {
+    const { container } = render(RuleForm);
+    await fireEvent.click(container.querySelector('[data-testid="rule-form-mode-button-json"]'));
+    const textarea = container.querySelector('[data-testid="json-paste-builder-textarea"]');
+    await setInput(textarea, '{"nom":"ACME"}');
+    await fireEvent.click(container.querySelector('[data-testid="json-paste-builder-analyze-button"]'));
+    await fireEvent.click(container.querySelector('[data-testid="rule-form-open-detail-button"]'));
+    await fireEvent.click(container.querySelector('[data-testid="json-builder-add-field-button"]'));
+    await setInput(container.querySelector('[data-testid="json-builder-key-input-1"]'), 'siret');
+
+    await fireEvent.click(container.querySelector('[data-testid="rule-form-back-to-paste-button"]'));
+    await fireEvent.click(container.querySelector('[data-testid="rule-form-open-detail-button"]'));
+
+    expect(container.querySelector('[data-testid="json-builder-key-input-0"]').value).toBe('nom');
+    expect(container.querySelector('[data-testid="json-builder-key-input-1"]').value).toBe('siret');
+  });
+});
+
 // Pipes en mode "par exemple" (retour 2, cf CLAUDE.md). Round-trip complet :
 // coller un exemple, assigner une source + un pipe, verifier que le payload
 // final envoye au backend contient bien `{{expr | pipe}}`.

@@ -64,6 +64,13 @@
 // pre_script/post_script (sujet 25).
 // Lot 10 : couverture E2E neuve (pas une migration) pour le portage du mode
 // "coller un exemple" au XML (XmlPasteBuilder.svelte).
+// Lot 16 : couverture E2E neuve (pas une migration) pour les 4 correctifs du
+// sujet "diagnostic reponse JSON/XML" -- cf CLAUDE.md pour le detail de
+// chaque cause : (1) chevrons de pliage absents en vue JSON "par exemple",
+// (2) conversion "Template avance" -> XML permanentement cassee (stub qui
+// echouait toujours), (3) aucun bouton retour de la vue detail vers la vue
+// "par exemple", (4) source "Resultat du script" masquait son champ de
+// valeur dans les vues detail JSON/XML.
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -712,5 +719,81 @@ test.describe('Runner data-driven (scenarios JSON) - lot 15 (source XPath dans l
     expect(resp.status()).toBe(200);
     const xml = await resp.text();
     expect(xml).toContain('<siret>987654321</siret>');
+  });
+});
+
+// Lot 16 (4 tests, couverture neuve) : un scenario par symptome corrige du
+// sujet "diagnostic reponse JSON/XML" (cf CLAUDE.md pour le diagnostic
+// complet). Chacun verifie explicitement le cas qui echouait avant le
+// correctif, pas seulement que le formulaire se soumet sans erreur.
+test.describe('Runner data-driven (scenarios JSON) - lot 16 (diagnostic reponse JSON/XML)', () => {
+  test.beforeEach(async ({ request }) => {
+    await request.delete(`${API}/config/reset`);
+    await request.post(`${API}/services`, {
+      data: validService('json-fold-demo', { listen_path: '/service', real_target_url: '' }),
+    });
+    await request.post(`${API}/services`, {
+      data: validService('advanced-to-xml-demo', { listen_path: '/service', real_target_url: '' }),
+    });
+    await request.post(`${API}/services`, {
+      data: validService('back-to-paste-demo', { listen_path: '/service', real_target_url: '' }),
+    });
+    await request.post(`${API}/services`, {
+      data: validService('script-value-detail-demo', { listen_path: '/service', real_target_url: '' }),
+    });
+  });
+
+  test('symptome 1 : replier un champ objet en vue JSON par exemple ne perd aucune donnee (scenario JSON)', async ({ page, request }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Replier un champ objet en vue JSON par exemple ne perd aucune donnee'));
+
+    // Avant le correctif, ce chevron de pliage n'existait pas du tout dans
+    // cette vue (JsonPasteBuilder.svelte) -- le scenario ci-dessus l'exerce
+    // deja explicitement (repli/depli en cours de route) ; on verifie ici
+    // que ni le champ non touche (nom) ni le champ modifie APRES un cycle
+    // repli/depli (siret) n'ont ete perdus ou corrompus par le pliage.
+    const resp = await request.post('http://localhost:7342/json-fold-demo/service');
+    expect(resp.status()).toBe(200);
+    const body = await resp.json();
+    expect(body).toEqual({ client: { nom: 'ACME', siret: '12345678901234' } });
+  });
+
+  test('symptome 2 : un template XML valide en mode avance se convertit vers XML sans echouer (scenario JSON)', async ({ page, request }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Convertir un template avance XML valide vers le format XML sans avertissement'));
+
+    // Avant le correctif, cette conversion echouait TOUJOURS (meme pour un
+    // XML valide) -- le scenario n'aurait jamais pu depasser les deux
+    // assertVisible sur la vue "par exemple" XML (elles auraient trouve la
+    // banniere d'avertissement a la place). Verifie ici que le contenu
+    // ET l'attribut de racine ont ete correctement repris jusqu'a la
+    // sauvegarde (pas seulement que le formulaire s'est soumis).
+    const resp = await request.post('http://localhost:7342/advanced-to-xml-demo/service');
+    expect(resp.status()).toBe(200);
+    const xml = await resp.text();
+    expect(xml).toBe('<devisResponse ver="1"><nom>ACME</nom></devisResponse>');
+  });
+
+  test('symptome 3 : revenir a la vue par exemple depuis le detail JSON preserve le contenu (scenario JSON)', async ({ page, request }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Revenir a la vue par exemple depuis le detail JSON preserve le contenu'));
+
+    // Avant le correctif, aucun bouton retour n'existait -- le scenario
+    // n'aurait jamais pu cliquer dessus. Verifie ici que le champ ajoute EN
+    // DETAIL (siret) ET le champ d'origine collé (nom) sont bien tous deux
+    // persistes apres l'aller-retour detail -> par exemple -> sauvegarde.
+    const resp = await request.post('http://localhost:7342/back-to-paste-demo/service');
+    expect(resp.status()).toBe(200);
+    const body = await resp.json();
+    expect(body).toEqual({ nom: 'ACME', siret: '12345678901234' });
+  });
+
+  test('symptome 4 : la source Resultat du script reste utilisable en vue JSON detail (scenario JSON)', async ({ page, request }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'La source Resultat du script reste utilisable en vue JSON detail'));
+
+    // Avant le correctif, le champ de saisie de la cle du script etait
+    // masque : impossible de preciser QUELLE cle du resultat de script
+    // utiliser, la regle n'aurait donc jamais pu produire {{script.nom}}.
+    const resp = await request.post('http://localhost:7342/script-value-detail-demo/service');
+    expect(resp.status()).toBe(200);
+    const body = await resp.json();
+    expect(body).toEqual({ nom: 'ACME Corp' });
   });
 });
