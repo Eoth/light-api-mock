@@ -299,6 +299,14 @@ describe('buildExpr', () => {
   it('script with field', () => {
     expect(buildExpr({ source: 'script', value: 'result', pipe: '' })).toBe('{{script.result}}');
   });
+
+  it('xpath without pipe', () => {
+    expect(buildExpr({ source: 'xpath', value: 'Envelope/Body/recherche/Siret', pipe: '' })).toBe('{{xpath.Envelope/Body/recherche/Siret}}');
+  });
+
+  it('xpath with pipe', () => {
+    expect(buildExpr({ source: 'xpath', value: 'Envelope/Body/recherche/Siret', pipe: 'substr(0,9)' })).toBe('{{xpath.Envelope/Body/recherche/Siret | substr(0,9)}}');
+  });
 });
 
 // ── varNameToSource ──────────────────────────────────────────────────
@@ -321,6 +329,9 @@ describe('varNameToSource', () => {
   });
   it('unknown falls back to fixed', () => {
     expect(varNameToSource('unknown')).toEqual({ source: 'fixed', value: 'unknown' });
+  });
+  it('parses xpath (round-trip with a slash-containing path)', () => {
+    expect(varNameToSource('xpath.Envelope/Body/recherche/Siret')).toEqual({ source: 'xpath', value: 'Envelope/Body/recherche/Siret' });
   });
 });
 

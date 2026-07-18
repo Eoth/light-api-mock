@@ -50,7 +50,8 @@
     { value: 'path', label: 'Parametre URL' },
     { value: 'query', label: 'Query param' },
     { value: 'header', label: 'Header HTTP' },
-    { value: 'body', label: 'Echo body' },
+    { value: 'body', label: 'Echo body (JSON pointer)' },
+    { value: 'xpath', label: 'XPath (XML/SOAP)' },
     { value: 'fake', label: 'Donnee fictive' },
     { value: 'uuid', label: 'UUID' },
     { value: 'now_ms', label: 'Timestamp (ms)' },
@@ -213,7 +214,13 @@
   function emit() { onUpdate(fields); }
 
   function needsValueInput(src) {
-    return ['fixed', 'path', 'query', 'header', 'body', 'script'].includes(src);
+    return ['fixed', 'path', 'query', 'header', 'body', 'xpath', 'script'].includes(src);
+  }
+
+  function valuePlaceholder(src) {
+    if (src === 'fixed') return 'valeur fixe';
+    if (src === 'xpath') return 'ex: Envelope/Body/recherche/Siret';
+    return 'nom du parametre';
   }
 
   function buildExpr(f) { return sharedBuildExpr(f); }
@@ -280,7 +287,7 @@
                   class="paste-value"
                   value={attr.value}
                   oninput={(e) => onAttrUpdate(aidx, 'value', e.target.value)}
-                  placeholder={attr.source === 'fixed' ? 'valeur fixe' : 'nom du parametre'}
+                  placeholder={valuePlaceholder(attr.source)}
                   aria-label="Valeur pour l'attribut {attr.name} ({testPathPrefix})"
                   data-testid="xml-paste-builder-attr-value-input-{testPathPrefix}-{aidx}"
                 />
@@ -363,7 +370,7 @@
                     class="paste-value"
                     value={field.value}
                     oninput={(e) => updateNodeProp(path, idx, 'value', e.target.value)}
-                    placeholder={field.source === 'fixed' ? 'valeur fixe' : 'nom du parametre'}
+                    placeholder={valuePlaceholder(field.source)}
                     aria-label="Valeur pour {field.tag}"
                     data-testid="xml-paste-builder-value-input-{testPath}"
                   />

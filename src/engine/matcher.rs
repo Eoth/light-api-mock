@@ -416,7 +416,11 @@ impl MatchEngine {
         }
     }
 
-    fn extract_xpath(body: &[u8], path: &str) -> Option<String> {
+    // pub(crate) : reutilisee telle quelle par `engine::template::resolve_variable`
+    // (variable de template `{{xpath.chemin}}`, source "XPath (XML/SOAP)" du
+    // builder de reponse XML) pour ne pas dupliquer le parsing XML corrige au
+    // sujet "SOAPAction recherche/Siret" (cf commentaire sur `walk_xml`).
+    pub(crate) fn extract_xpath(body: &[u8], path: &str) -> Option<String> {
         let text = std::str::from_utf8(body).ok()?;
         let segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
         Self::walk_xml(text, &segments)

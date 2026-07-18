@@ -682,3 +682,35 @@ test.describe('Runner data-driven (scenarios JSON) - lot 14 (restauration de la 
     expect(xml).toContain('<note>bonjour</note>');
   });
 });
+
+// Lot 15 : couverture E2E neuve (pas une migration), pour la source "XPath
+// (XML/SOAP)" ajoutee au builder de reponse XML (guide + par exemple). Avant
+// cette passe, la seule option d'extraction depuis le corps de requete
+// disponible dans ce menu etait "Echo body" (JSON pointer, non fonctionnel
+// pour un corps XML/SOAP -- silencieusement vide) ; extraire une valeur XML
+// necessitait un script Rhai complet (parse_xml_items). Configure via l'UI
+// reelle une regle dont la reponse XML guidee reinjecte une valeur XPath du
+// corps SOAP (avec un pipe substr pour ne garder que les 9 premiers
+// caracteres), verifie hors runner via une vraie requete SOAP (avec le
+// Header non-autoferme sibling de Body, cf sujet "SOAPAction recherche/Siret")
+// que la valeur extraite et tronquee se retrouve dans la reponse.
+test.describe('Runner data-driven (scenarios JSON) - lot 15 (source XPath dans le builder XML)', () => {
+  test.beforeEach(async ({ request }) => {
+    await request.delete(`${API}/config/reset`);
+    await request.post(`${API}/services`, {
+      data: validService('xpath-echo-demo', { listen_path: '/service', real_target_url: '' }),
+    });
+  });
+
+  test('la source XPath du builder XML guide extrait et tronque une valeur du corps SOAP (scenario JSON)', async ({ page, request }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Extraire une valeur du corps SOAP via la source XPath du builder XML guide'));
+
+    const resp = await request.post('http://localhost:7342/xpath-echo-demo/service', {
+      headers: { 'Content-Type': 'text/xml' },
+      data: '<SOAP:Envelope><SOAP-ENV:Header></SOAP-ENV:Header><SOAP-ENV:Body><ns3:recherche><ns3:Siret>98765432109876</ns3:Siret></ns3:recherche></SOAP-ENV:Body></SOAP:Envelope>',
+    });
+    expect(resp.status()).toBe(200);
+    const xml = await resp.text();
+    expect(xml).toContain('<siret>987654321</siret>');
+  });
+});

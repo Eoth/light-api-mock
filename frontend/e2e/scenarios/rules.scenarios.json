@@ -422,6 +422,28 @@
         { "action": "click", "target": "ruleForm.submitButton" },
         { "action": "assertVisible", "target": "ruleList.item", "params": { "name": "xml-view-rule" } }
       ]
+    },
+    {
+      "scenario": "Extraire une valeur du corps SOAP via la source XPath du builder XML guide",
+      "steps": [
+        { "action": "goto", "page": "services" },
+        { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
+        { "action": "click", "target": "serviceCard.configureButton", "params": { "name": "xpath-echo-demo" } },
+        { "action": "click", "target": "ruleList.addButton" },
+        { "action": "fill", "target": "ruleForm.nameInput", "value": "operation-recherche-echo" },
+        { "action": "selectOption", "target": "ruleForm.methodSelect", "value": "POST" },
+        { "action": "click", "target": "ruleForm.modeButton", "params": { "mode": "xml" } },
+        { "action": "click", "target": "ruleForm.openDetailButton" },
+        { "action": "fill", "target": "xmlBuilder.rootTagInput", "value": "rechercheResponse" },
+        { "action": "click", "target": "xmlBuilder.addNodeButton" },
+        { "action": "fill", "target": "xmlBuilder.tagInput", "params": { "path": "0" }, "value": "siret" },
+        { "action": "selectOption", "target": "xmlBuilder.sourceSelect", "params": { "path": "0" }, "value": "xpath" },
+        { "action": "fill", "target": "xmlBuilder.valueInput", "params": { "path": "0" }, "value": "Envelope/Body/recherche/Siret" },
+        { "action": "fill", "target": "xmlBuilder.pipeInput", "params": { "path": "0" }, "value": "substr(0,9)" },
+        { "action": "screenshot", "file": "reponse-xml-source-xpath.png" },
+        { "action": "click", "target": "ruleForm.submitButton" },
+        { "action": "assertVisible", "target": "ruleList.item", "params": { "name": "operation-recherche-echo" } }
+      ]
     }
   ]
 }

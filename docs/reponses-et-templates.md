@@ -94,12 +94,40 @@ Exemple : `{"siret":"{{path.siret}}"}` renvoie le paramètre de chemin `siret` d
 | `path.X` | Valeur du paramètre de chemin `X` (ex. `{id}` dans l'URL du service) |
 | `query.X` | Valeur du paramètre de requête `X` (`?X=...`) |
 | `header.X` | Valeur de l'en-tête HTTP `X` |
-| `body.X` | Valeur au chemin JSON `X` dans le corps de la requête reçue |
+| `body.X` | Valeur au chemin JSON `X` dans le corps de la requête reçue (JSON uniquement) |
+| `xpath.X` | Valeur au chemin XPath simplifié `X` dans le corps de la requête reçue (XML/SOAP uniquement) |
 | `fake.NomDuType` | Une donnée factice générée (voir plus bas) |
 | `uuid` | Un identifiant unique généré |
 | `now_ms` / `now_iso` / `now_epoch` | La date/heure actuelle, sous différents formats |
 | `seq` | Un compteur d'appels |
 | `script` / `pre_script` / `post_script` | Résultat d'un [script Rhai](scripts-rhai.md) associé à la règle, si vous en avez écrit un |
+
+Dans le builder (niveau détaillé, JSON comme XML), chacune de ces variables correspond à une
+option du menu déroulant **"Source"** de chaque champ : "Paramètre URL", "Query param", "Header
+HTTP", "Résultat du script", etc. Deux options méritent une clarification, car leur libellé se
+ressemble mais elles ne s'appliquent **pas au même format de corps** :
+
+- **"Echo body (JSON pointer)"** (`body.X`) : n'extrait une valeur que si le corps de la requête
+  reçue est du **JSON**. Sur un corps XML/SOAP, cette option ne renvoie jamais rien (le corps n'est
+  simplement pas du JSON valide) — c'est un choix silencieusement vide, pas une erreur affichée.
+- **"XPath (XML/SOAP)"** (`xpath.X`) : l'équivalent pour un corps **XML/SOAP**, disponible dans le
+  builder de réponse **XML** (niveau assisté comme détaillé). Le chemin suit la même syntaxe
+  simplifiée qu'une [condition XPath](regles-de-matching.md#cas-dusage--une-même-url-qui-répond-différemment-selon-lopération-soap) :
+  segments séparés par `/`, **sans préfixe d'espace de noms** (`Envelope/Body/recherche/Siret`, pas
+  `SOAP-ENV:Body/ns3:recherche`). Avant l'ajout de cette option, extraire une valeur XML nécessitait
+  un [script Rhai complet](scripts-rhai.md#cas-dusage--extraire-une-valeur-de-la-requête-soap-vers-la-réponse)
+  (`parse_xml_items`) — disproportionné pour ce cas simple ; l'option XPath du builder couvre
+  directement "prendre cette valeur de la requête et la remettre dans la réponse", sans script.
+
+**Exemple vérifié** — un champ `siret` avec la source **"XPath (XML/SOAP)"**, valeur
+`Envelope/Body/recherche/Siret`, et la transformation `substr(0,9)` (pour ne garder que les 9
+premiers caractères) :
+
+![Champ XML avec la source XPath (XML/SOAP), chemin et pipe substr renseignés](screenshots/reponse-xml-source-xpath.png)
+
+Contre une requête `POST` avec un corps SOAP contenant `<ns3:Siret>98765432109876</ns3:Siret>`
+(sous `Envelope/Body/recherche`, même avec un `<Header></Header>` non-autofermé avant `<Body>`),
+la réponse contient bien `<siret>987654321</siret>` — vérifié par une vraie requête HTTP.
 
 ### Transformations (pipes)
 

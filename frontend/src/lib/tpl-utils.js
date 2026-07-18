@@ -53,6 +53,7 @@ export function buildExpr(f) {
     case 'query': varPart = `query.${f.value}`; break;
     case 'header': varPart = `header.${f.value}`; break;
     case 'body': varPart = `body.${f.value}`; break;
+    case 'xpath': varPart = `xpath.${f.value}`; break;
     case 'fake': varPart = `fake.${f.value}`; break;
     case 'script': varPart = f.value ? `script.${f.value}` : 'script'; break;
     case 'uuid': varPart = 'uuid'; break;
@@ -246,6 +247,7 @@ export function varNameToSource(varName) {
   if (varName.startsWith('query.')) return { source: 'query', value: varName.slice(6) };
   if (varName.startsWith('header.')) return { source: 'header', value: varName.slice(7) };
   if (varName.startsWith('body.')) return { source: 'body', value: varName.slice(5) };
+  if (varName.startsWith('xpath.')) return { source: 'xpath', value: varName.slice(6) };
   if (varName.startsWith('fake.')) return { source: 'fake', value: varName.slice(5) };
   if (varName === 'script') return { source: 'script', value: '' };
   if (varName.startsWith('script.')) return { source: 'script', value: varName.slice(7) };
