@@ -186,8 +186,14 @@
 
   function emit() { onUpdate(fields); }
 
+  // 'script' doit rester dans cette liste : c'est le champ qui permet de
+  // preciser QUELLE cle du resultat de script utiliser (buildExpr produit
+  // `script.${f.value}`, ou juste `{{script}}` si vide -- cf tpl-utils.js).
+  // Absent par erreur avant ce correctif alors que la vue "par exemple"
+  // (JsonPasteBuilder.svelte) l'a toujours eu -- cf CLAUDE.md, "diagnostic
+  // reponse JSON/XML".
   function needsValueInput(source) {
-    return ['fixed', 'path', 'query', 'header', 'body'].includes(source);
+    return ['fixed', 'path', 'query', 'header', 'body', 'script'].includes(source);
   }
 
   function fieldPlaceholder(source) {
@@ -197,6 +203,7 @@
       case 'query': return 'ex: page';
       case 'header': return 'ex: x-request-id';
       case 'body': return 'ex: /user/name';
+      case 'script': return 'ex: nom (laisser vide pour {{script}} entier)';
       default: return '';
     }
   }

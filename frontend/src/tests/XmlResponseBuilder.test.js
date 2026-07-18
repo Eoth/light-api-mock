@@ -84,3 +84,26 @@ describe('XmlResponseBuilder — source "XPath (XML/SOAP)"', () => {
     expect(lastCall[0]).toMatchObject({ source: 'xpath', value: 'Envelope/Body/recherche/Siret' });
   });
 });
+
+// Correctif "diagnostic reponse JSON/XML" : `needsValueInput` n'incluait pas
+// 'script', contrairement au mode "par exemple" (XmlPasteBuilder.svelte) --
+// choisir cette source masquait le champ qui permet de preciser QUELLE cle
+// du resultat de script utiliser.
+describe('XmlResponseBuilder — source "Resultat script"', () => {
+  const flatValueField = [{ tag: 'nom', nodeType: 'value', source: 'fixed', value: '' }];
+
+  it('affiche le champ de saisie de valeur quand la source "script" est choisie', async () => {
+    const { getByLabelText } = render(XmlResponseBuilder, { props: { fields: flatValueField } });
+    await fireEvent.change(getByLabelText('Source'), { target: { value: 'script' } });
+    expect(getByLabelText('Valeur')).toBeInTheDocument();
+  });
+
+  it('transmet la cle du script saisie via onUpdate', async () => {
+    const onUpdate = vi.fn();
+    const { getByLabelText } = render(XmlResponseBuilder, { props: { fields: flatValueField, onUpdate } });
+    await fireEvent.change(getByLabelText('Source'), { target: { value: 'script' } });
+    await fireEvent.input(getByLabelText('Valeur'), { target: { value: 'total' } });
+    const lastCall = onUpdate.mock.calls.at(-1)[0];
+    expect(lastCall[0]).toMatchObject({ source: 'script', value: 'total' });
+  });
+});

@@ -22,12 +22,18 @@ les champs et vous permet ensuite de remplacer certaines valeurs par des variabl
 factices, champ par champ — chaque valeur variable peut aussi recevoir une **transformation**
 (voir "Transformations" plus bas), exactement comme au niveau détaillé.
 
-Côté JSON, tous les champs détectés s'affichent **à plat** (avec une simple indentation pour les niveaux imbriqués) — suffisant pour un JSON REST, généralement peu profond.
+Côté JSON, tous les champs détectés s'affichent **à plat** (avec une simple indentation pour les
+niveaux imbriqués) — suffisant pour un JSON REST, généralement peu profond. Un champ **objet**
+imbriqué affiche tout de même un petit **chevron** (▼/▶) à sa gauche, pour le replier
+temporairement (un indicateur "N masqué(s)" rappelle qu'il y a du contenu caché) : pratique dès
+qu'un exemple JSON collé contient plusieurs objets imbriqués et que vous voulez vous concentrer
+sur l'un d'eux sans faire défiler les autres. Comme au niveau détaillé, replier/déplier n'efface
+jamais rien — c'est un pur affichage, tout reste déplié par défaut.
 
 Côté XML (souvent plus profondément imbriqué, une enveloppe SOAP par exemple), ce niveau assisté propose en plus :
 
 - un **fil d'Ariane** (bouton "→" pour "entrer" dans un nœud, chemin cliquable pour en ressortir),
-- des **chevrons de pliage** (▼/▶),
+- des **chevrons de pliage** (▼/▶) — même mécanisme que côté JSON,
 - l'édition des **attributs XML** de chaque élément (y compris la racine) : un attribut détecté (ex. une déclaration d'espace de noms `xmlns:soap="..."`) peut, comme un contenu texte, être remplacé par une variable ou laissé tel quel.
 
 ![Mode XML assisté : fil d'Ariane après navigation dans un nœud, attributs affichés au-dessus](screenshots/reponse-xml-exemple-navigation.png)
@@ -45,9 +51,13 @@ suppression/réordonnancement de champ, changement de type (valeur/objet/tableau
 d'une structure **entièrement nouvelle** si vous n'êtes parti d'aucun exemple (le bouton reste
 disponible même sans avoir collé quoi que ce soit — cliquez dessus directement pour démarrer à
 vide). Ce passage est **sans perte** : c'est une révélation de capacités supplémentaires sur les
-données déjà là, jamais une conversion qui recommencerait de zéro. Il n'y a en revanche pas de
-retour possible vers le niveau assisté une fois le détail ouvert — un aller simple, assumé comme
-tel.
+données déjà là, jamais une conversion qui recommencerait de zéro.
+
+Un bouton **"← Revenir à la vue « par exemple »"**, visible sous l'éditeur détaillé, permet de
+faire le chemin inverse à tout moment — l'aller-retour est donc possible dans les deux sens, lui
+aussi sans perte (mêmes données, seule la vue change). Le contenu déjà construit en détail reste
+intact à l'aller comme au retour : vous pouvez alterner autant de fois que nécessaire entre les
+deux niveaux avant de sauvegarder la règle.
 
 Chaque champ **objet** ou **tableau** (JSON comme XML) affiche aussi un petit **chevron** (▼/▶) à gauche : cliquez dessus pour **replier** ce champ et masquer temporairement son contenu — pratique une fois qu'une branche est déjà configurée et que vous voulez vous concentrer sur le reste sans la faire défiler à chaque fois. Un texte ("N masqué(s)") rappelle qu'il y a du contenu caché. Replier/déplier n'efface jamais rien : c'est un pur affichage, et tout reste déplié par défaut à l'ouverture du formulaire.
 
@@ -56,6 +66,23 @@ Chaque champ **objet** ou **tableau** (JSON comme XML) affiche aussi un petit **
 Pour naviguer dans une structure profondément imbriquée sans se perdre, un fil d'Ariane (chemin cliquable, ex. `racine > adresse > ville`) au-dessus de l'éditeur permet de "rentrer" dans un sous-niveau et d'en ressortir en un clic.
 
 *(Capture manquante — aucun scénario E2E existant ne navigue dans le builder JSON détaillé avec le fil d'Ariane ; à réaliser manuellement, cf `frontend/e2e/README.md` section captures.)*
+
+### Changer de format en cours de route
+
+Il est possible de changer de format (par exemple passer de "Template avancé" à "XML") après
+avoir déjà commencé à rédiger une réponse. lightMock tente alors une **conversion automatique**
+du contenu déjà saisi vers le nouveau format, plutôt que de repartir de zéro :
+
+- **Template avancé → JSON** ou **Template avancé → XML** : si le texte déjà tapé est un JSON ou
+  un XML valide (avec ses éventuelles variables `{{...}}` déjà en place), il est repris tel quel
+  dans la vue assistée du nouveau format — champs, valeurs, pipes, et pour XML le tag racine et
+  ses attributs.
+- Si le contenu n'est **pas** syntaxiquement valide dans le format cible, un avertissement explique
+  pourquoi la conversion automatique n'est pas possible, avec le choix de "Changer quand même"
+  (démarre à vide dans le nouveau format) ou d'annuler pour corriger le contenu d'abord.
+- Certaines conversions restent volontairement non automatisées (XML → JSON, par exemple) : le
+  message d'avertissement l'indique explicitement et suggère de repasser par "Template avancé"
+  comme étape intermédiaire.
 
 ### Réouvrir une règle déjà configurée : la vue d'origine est restaurée
 
@@ -102,10 +129,9 @@ Exemple : `{"siret":"{{path.siret}}"}` renvoie le paramètre de chemin `siret` d
 | `seq` | Un compteur d'appels |
 | `script` / `pre_script` / `post_script` | Résultat d'un [script Rhai](scripts-rhai.md) associé à la règle, si vous en avez écrit un |
 
-Dans le builder (niveau détaillé, JSON comme XML), chacune de ces variables correspond à une
-option du menu déroulant **"Source"** de chaque champ : "Paramètre URL", "Query param", "Header
-HTTP", "Résultat du script", etc. Deux options méritent une clarification, car leur libellé se
-ressemble mais elles ne s'appliquent **pas au même format de corps** :
+Dans le builder (niveau assisté comme détaillé, JSON comme XML), chacune de ces variables
+correspond à une option du menu déroulant **"Source"** de chaque champ : "Paramètre URL", "Query
+param", "Header HTTP", "Résultat du script", etc. Plusieurs options méritent une clarification :
 
 - **"Echo body (JSON pointer)"** (`body.X`) : n'extrait une valeur que si le corps de la requête
   reçue est du **JSON**. Sur un corps XML/SOAP, cette option ne renvoie jamais rien (le corps n'est
@@ -118,6 +144,12 @@ ressemble mais elles ne s'appliquent **pas au même format de corps** :
   un [script Rhai complet](scripts-rhai.md#cas-dusage--extraire-une-valeur-de-la-requête-soap-vers-la-réponse)
   (`parse_xml_items`) — disproportionné pour ce cas simple ; l'option XPath du builder couvre
   directement "prendre cette valeur de la requête et la remettre dans la réponse", sans script.
+- **"Résultat du script"** (`script.X`) : dès que cette source est choisie, un champ **"Valeur"**
+  apparaît (JSON comme XML, niveau assisté comme détaillé) pour préciser **quelle clé** du résultat
+  du script utiliser — laissez-le vide pour reprendre `{{script}}` tel quel (le script entier, s'il
+  renvoie une simple chaîne), ou saisissez un nom de clé (ex. `nom`) pour obtenir `{{script.nom}}`
+  (si le script renvoie un objet `#{ nom: "...", ... }`). Ce champ de saisie est indispensable dès
+  que le script renvoie plusieurs valeurs — sans lui, impossible de choisir laquelle utiliser.
 
 **Exemple vérifié** — un champ `siret` avec la source **"XPath (XML/SOAP)"**, valeur
 `Envelope/Body/recherche/Siret`, et la transformation `substr(0,9)` (pour ne garder que les 9

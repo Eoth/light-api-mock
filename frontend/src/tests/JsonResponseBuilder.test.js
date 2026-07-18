@@ -120,3 +120,32 @@ describe('JsonResponseBuilder — pliage/depliage des noeuds imbriques', () => {
     expect(queryByLabelText('Deplier nom')).not.toBeInTheDocument();
   });
 });
+
+// Correctif "diagnostic reponse JSON/XML" : `needsValueInput` n'incluait pas
+// 'script', contrairement au mode "par exemple" (JsonPasteBuilder.svelte) --
+// choisir cette source masquait le champ qui permet de preciser QUELLE cle
+// du resultat de script utiliser (buildExpr produit `script.${valeur}`, cf
+// tpl-utils.js).
+describe('JsonResponseBuilder — source "Resultat du script"', () => {
+  const scriptField = [{ key: 'nom', fieldType: 'value', source: 'fixed', value: '', pipe: '', asNumber: false }];
+
+  it('affiche le champ de saisie de valeur quand la source "script" est choisie', async () => {
+    const { getByLabelText } = render(JsonResponseBuilder, { props: { fields: scriptField } });
+
+    await fireEvent.change(getByLabelText('Source de la valeur'), { target: { value: 'script' } });
+
+    expect(getByLabelText('Valeur')).toBeInTheDocument();
+  });
+
+  it('transmet la cle du script saisie via onUpdate', async () => {
+    const onUpdate = vi.fn();
+    const { getByLabelText } = render(JsonResponseBuilder, { props: { fields: scriptField, onUpdate } });
+
+    await fireEvent.change(getByLabelText('Source de la valeur'), { target: { value: 'script' } });
+    await fireEvent.input(getByLabelText('Valeur'), { target: { value: 'total' } });
+
+    const [updated] = onUpdate.mock.calls.at(-1);
+    expect(updated[0].source).toBe('script');
+    expect(updated[0].value).toBe('total');
+  });
+});

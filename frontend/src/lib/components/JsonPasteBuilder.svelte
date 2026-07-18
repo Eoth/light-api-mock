@@ -26,6 +26,26 @@
   let parsed = $state(untrack(() => startParsed));
   let isArrayRoot = $state(false);
 
+  // Pliage/depliage des champs 'object' (seul type imbrique reellement
+  // rendu par renderFields ci-dessous -- array-values/array-objects
+  // n'affichent qu'un badge "tableau" sans recursion, limitation
+  // preexistante et non liee a ce correctif). Meme mecanisme que
+  // XmlPasteBuilder.svelte/JsonResponseBuilder.svelte (Set en memoire, cle
+  // par testPath positionnel, tout deplie par defaut, attribut `hidden`
+  // jamais un {#if} -- cf CLAUDE.md point 64) : ce mode "par exemple" en
+  // avait ete prive par oubli lors du sujet 25 (qui n'avait touche que les
+  // vues detail JsonResponseBuilder/XmlResponseBuilder), alors que son
+  // equivalent XML (XmlPasteBuilder, sujet 27) l'a des l'origine.
+  let collapsedPaths = $state(new Set());
+
+  function isCollapsed(testPath) { return collapsedPaths.has(testPath); }
+
+  function toggleCollapse(testPath) {
+    const next = new Set(collapsedPaths);
+    if (next.has(testPath)) next.delete(testPath); else next.add(testPath);
+    collapsedPaths = next;
+  }
+
   const valueSources = [
     { value: 'fixed', label: 'Garder la valeur' },
     { value: 'path', label: 'Parametre URL' },
@@ -150,12 +170,37 @@
     {#snippet renderFields(fieldList, path, depth)}
       {#each fieldList as field, idx}
         {@const currentPath = [...path, idx]}
+        {@const testPath = currentPath.join('-')}
+        {@const isObject = field.fieldType === 'object'}
+        {@const collapsed = isObject && isCollapsed(testPath)}
         <div class="paste-field" style:margin-left="{depth * 1.25}rem">
-          <span class="paste-key">{field.key}</span>
+          <div class="paste-field-main">
+            {#if isObject}
+              <button
+                type="button"
+                class="btn-icon collapse-toggle"
+                onclick={() => toggleCollapse(testPath)}
+                aria-expanded={!collapsed}
+                aria-controls="json-paste-builder-children-{testPath}"
+                aria-label={collapsed ? `Deplier ${field.key || 'ce champ'}` : `Replier ${field.key || 'ce champ'}`}
+                title={collapsed ? 'Deplier' : 'Replier'}
+                data-testid="json-paste-builder-collapse-button-{testPath}"
+              >{collapsed ? '▶' : '▼'}</button>
+            {/if}
+            <span class="paste-key">{field.key}</span>
 
-          {#if field.fieldType === 'object'}
-            <span class="paste-type-badge">objet</span>
-            {@render renderFields(field.children, [...currentPath, 'children'], depth + 1)}
+            {#if isObject}
+              <span class="paste-type-badge">objet</span>
+              {#if collapsed}
+                <span class="collapsed-indicator" data-testid="json-paste-builder-collapsed-indicator-{testPath}">({(field.children || []).length} masque{(field.children || []).length > 1 ? 's' : ''})</span>
+              {/if}
+            {/if}
+          </div>
+
+          {#if isObject}
+            <div class="nested-block" id="json-paste-builder-children-{testPath}" hidden={collapsed}>
+              {@render renderFields(field.children, [...currentPath, 'children'], depth + 1)}
+            </div>
           {:else if field.fieldType === 'array-values' || field.fieldType === 'array-objects'}
             <span class="paste-type-badge">tableau</span>
           {:else}
@@ -234,10 +279,11 @@
   .paste-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
 
   .paste-field {
-    display: flex; flex-direction: column; gap: 0.25rem;
     padding: 0.375rem 0; border-bottom: 1px solid var(--color-border);
   }
   .paste-field:last-child { border-bottom: none; }
+
+  .paste-field-main { display: flex; flex-direction: column; gap: 0.25rem; align-items: flex-start; }
 
   .paste-key {
     font-weight: 700; font-size: 0.875rem; color: var(--color-primary);
@@ -249,6 +295,13 @@
     color: var(--color-text-muted); background: var(--color-bg);
     padding: 0.1rem 0.375rem; border-radius: 3px; width: fit-content;
   }
+
+  .collapse-toggle { flex-shrink: 0; }
+  .btn-icon { width: 1.5rem; height: 1.5rem; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface); color: var(--color-text-muted); font-size: 0.7rem; cursor: pointer; }
+  .btn-icon:hover { background: var(--color-bg); color: var(--color-text); }
+  .collapsed-indicator { font-size: 0.75rem; color: var(--color-text-muted); font-style: italic; white-space: nowrap; }
+
+  .nested-block { margin-top: 0.25rem; padding-left: 0.75rem; border-left: 2px solid var(--color-primary); }
 
   .paste-controls {
     display: flex; gap: 0.375rem; align-items: center; flex-wrap: wrap;

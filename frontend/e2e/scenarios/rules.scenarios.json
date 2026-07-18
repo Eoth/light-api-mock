@@ -444,6 +444,95 @@
         { "action": "click", "target": "ruleForm.submitButton" },
         { "action": "assertVisible", "target": "ruleList.item", "params": { "name": "operation-recherche-echo" } }
       ]
+    },
+    {
+      "scenario": "Replier un champ objet en vue JSON par exemple ne perd aucune donnee",
+      "steps": [
+        { "action": "goto", "page": "services" },
+        { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
+        { "action": "click", "target": "serviceCard.configureButton", "params": { "name": "json-fold-demo" } },
+        { "action": "click", "target": "ruleList.addButton" },
+        { "action": "fill", "target": "ruleForm.nameInput", "value": "fold-rule" },
+        { "action": "selectOption", "target": "ruleForm.methodSelect", "value": "POST" },
+        { "action": "click", "target": "ruleForm.modeButton", "params": { "mode": "json" } },
+        { "action": "fill", "target": "jsonPasteBuilder.textarea", "value": "{\"client\":{\"nom\":\"ACME\",\"siret\":\"00000000000000\"}}" },
+        { "action": "click", "target": "jsonPasteBuilder.analyzeButton" },
+        { "action": "assertVisible", "target": "jsonPasteBuilder.collapseButton", "params": { "path": "0" } },
+        { "action": "click", "target": "jsonPasteBuilder.collapseButton", "params": { "path": "0" } },
+        { "action": "assertVisible", "target": "jsonPasteBuilder.collapsedIndicator", "params": { "path": "0" } },
+        { "action": "assertHidden", "target": "jsonPasteBuilder.valueInput", "params": { "path": "0-children-0" } },
+        { "action": "click", "target": "jsonPasteBuilder.collapseButton", "params": { "path": "0" } },
+        { "action": "assertVisible", "target": "jsonPasteBuilder.valueInput", "params": { "path": "0-children-0" } },
+        { "action": "fill", "target": "jsonPasteBuilder.valueInput", "params": { "path": "0-children-1" }, "value": "12345678901234" },
+        { "action": "click", "target": "ruleForm.submitButton" },
+        { "action": "assertVisible", "target": "ruleList.item", "params": { "name": "fold-rule" } }
+      ]
+    },
+    {
+      "scenario": "Convertir un template avance XML valide vers le format XML sans avertissement",
+      "steps": [
+        { "action": "goto", "page": "services" },
+        { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
+        { "action": "click", "target": "serviceCard.configureButton", "params": { "name": "advanced-to-xml-demo" } },
+        { "action": "click", "target": "ruleList.addButton" },
+        { "action": "fill", "target": "ruleForm.nameInput", "value": "xml-conv-rule" },
+        { "action": "selectOption", "target": "ruleForm.methodSelect", "value": "POST" },
+        { "action": "click", "target": "ruleForm.modeButton", "params": { "mode": "advanced" } },
+        { "action": "selectOption", "target": "ruleForm.fragmentTypeSelect", "params": { "idx": "0" }, "value": "Template" },
+        { "action": "fill", "target": "ruleForm.fragmentTemplateTextarea", "params": { "idx": "0" }, "value": "<devisResponse ver=\"1\"><nom>ACME</nom></devisResponse>" },
+        { "action": "click", "target": "ruleForm.modeButton", "params": { "mode": "xml" } },
+        { "action": "assertVisible", "target": "xmlPasteBuilder.sourceSelect", "params": { "path": "0" } },
+        { "action": "assertVisible", "target": "xmlPasteBuilder.attrSourceSelect", "params": { "path": "root", "attrIdx": "0" } },
+        { "action": "click", "target": "ruleForm.submitButton" },
+        { "action": "assertVisible", "target": "ruleList.item", "params": { "name": "xml-conv-rule" } }
+      ]
+    },
+    {
+      "scenario": "Revenir a la vue par exemple depuis le detail JSON preserve le contenu",
+      "steps": [
+        { "action": "goto", "page": "services" },
+        { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
+        { "action": "click", "target": "serviceCard.configureButton", "params": { "name": "back-to-paste-demo" } },
+        { "action": "click", "target": "ruleList.addButton" },
+        { "action": "fill", "target": "ruleForm.nameInput", "value": "roundtrip-rule" },
+        { "action": "selectOption", "target": "ruleForm.methodSelect", "value": "POST" },
+        { "action": "click", "target": "ruleForm.modeButton", "params": { "mode": "json" } },
+        { "action": "fill", "target": "jsonPasteBuilder.textarea", "value": "{\"nom\":\"ACME\"}" },
+        { "action": "click", "target": "jsonPasteBuilder.analyzeButton" },
+        { "action": "click", "target": "ruleForm.openDetailButton" },
+        { "action": "assertVisible", "target": "jsonBuilder.keyInput", "params": { "path": "0" } },
+        { "action": "click", "target": "jsonBuilder.addFieldButton" },
+        { "action": "fill", "target": "jsonBuilder.keyInput", "params": { "path": "1" }, "value": "siret" },
+        { "action": "fill", "target": "jsonBuilder.valueInput", "params": { "path": "1" }, "value": "12345678901234" },
+        { "action": "click", "target": "ruleForm.backToPasteButton" },
+        { "action": "assertHidden", "target": "jsonPasteBuilder.textarea" },
+        { "action": "assertVisible", "target": "jsonPasteBuilder.sourceSelect", "params": { "path": "0" } },
+        { "action": "assertVisible", "target": "jsonPasteBuilder.valueInput", "params": { "path": "1" } },
+        { "action": "click", "target": "ruleForm.submitButton" },
+        { "action": "assertVisible", "target": "ruleList.item", "params": { "name": "roundtrip-rule" } }
+      ]
+    },
+    {
+      "scenario": "La source Resultat du script reste utilisable en vue JSON detail",
+      "steps": [
+        { "action": "goto", "page": "services" },
+        { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
+        { "action": "click", "target": "serviceCard.configureButton", "params": { "name": "script-value-detail-demo" } },
+        { "action": "click", "target": "ruleList.addButton" },
+        { "action": "fill", "target": "ruleForm.nameInput", "value": "script-detail-rule" },
+        { "action": "selectOption", "target": "ruleForm.methodSelect", "value": "POST" },
+        { "action": "click", "target": "toggleSwitch.switch", "params": { "label": "Script-personnalise" } },
+        { "action": "fill", "target": "rhaiScriptEditor.textarea", "params": { "id": "rule-script" }, "value": "#{ nom: \"ACME Corp\" }" },
+        { "action": "click", "target": "ruleForm.modeButton", "params": { "mode": "json" } },
+        { "action": "click", "target": "ruleForm.openDetailButton" },
+        { "action": "click", "target": "jsonBuilder.addFieldButton" },
+        { "action": "fill", "target": "jsonBuilder.keyInput", "params": { "path": "0" }, "value": "nom" },
+        { "action": "selectOption", "target": "jsonBuilder.sourceSelect", "params": { "path": "0" }, "value": "script" },
+        { "action": "assertVisible", "target": "jsonBuilder.valueInput", "params": { "path": "0" } },
+        { "action": "fill", "target": "jsonBuilder.valueInput", "params": { "path": "0" }, "value": "nom" },
+        { "action": "click", "target": "ruleForm.submitButton" },
+        { "action": "assertVisible", "target": "ruleList.item", "params": { "name": "script-detail-rule" } }
+      ]
     }
   ]
 }

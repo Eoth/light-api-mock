@@ -91,6 +91,7 @@
     "responseToggleButton": "[data-testid=\"rule-form-response-toggle-button\"]",
     "modeButton": "[data-testid=\"rule-form-mode-button-{mode}\"]",
     "openDetailButton": "[data-testid=\"rule-form-open-detail-button\"]",
+    "backToPasteButton": "[data-testid=\"rule-form-back-to-paste-button\"]",
     "modeSwitchConfirmButton": "[data-testid=\"rule-form-mode-switch-confirm-button\"]",
     "modeSwitchCancelButton": "[data-testid=\"rule-form-mode-switch-cancel-button\"]",
     "statusInput": "[data-testid=\"rule-form-status-input\"]",
@@ -203,7 +204,9 @@
     "sourceSelect": "[data-testid=\"json-paste-builder-source-select-{path}\"]",
     "fakeSelect": "[data-testid=\"json-paste-builder-fake-select-{path}\"]",
     "valueInput": "[data-testid=\"json-paste-builder-value-input-{path}\"]",
-    "pipeInput": "[data-testid=\"json-paste-builder-pipe-input-{path}\"]"
+    "pipeInput": "[data-testid=\"json-paste-builder-pipe-input-{path}\"]",
+    "collapseButton": "[data-testid=\"json-paste-builder-collapse-button-{path}\"]",
+    "collapsedIndicator": "[data-testid=\"json-paste-builder-collapsed-indicator-{path}\"]"
   },
 
   "xmlPasteBuilder": {
