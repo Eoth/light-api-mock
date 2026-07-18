@@ -30,6 +30,14 @@ describe('RHAI_FUNCTIONS (source unique)', () => {
     expect(names).toContain('date_future');
   });
 
+  it('inclut parse_date, l\'inverse de date_now/date_past/date_future', () => {
+    const parseDate = RHAI_FUNCTIONS.find((f) => f.name === 'parse_date');
+    expect(parseDate).toBeTruthy();
+    expect(parseDate.signature).toBe('parse_date(texte, "pattern")');
+    expect(parseDate.description).toContain('millisecondes');
+    expect(parseDate.description.toLowerCase()).toContain('erreur');
+  });
+
   it('inclut les 4 accesseurs de contexte de requete (path/query/headers/body)', () => {
     const names = RHAI_FUNCTIONS.map((f) => f.name);
     expect(names).toContain('request.path');

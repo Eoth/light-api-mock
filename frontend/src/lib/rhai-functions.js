@@ -86,6 +86,12 @@ export const RHAI_FUNCTIONS = [
     insertText: 'date_future(jours, "iso")',
   },
   {
+    name: 'parse_date',
+    signature: 'parse_date(texte, "pattern")',
+    description: 'Sens inverse de date_now/date_past/date_future : parse une date SAISIE selon un pattern explicite (yyyy/MM/dd/HH/mm/ss, tout autre caractere est litteral) et retourne le nombre de millisecondes depuis epoch. Ex. parse_date("15/03/2026", "dd/MM/yyyy"). Heure optionnelle (defaut 00:00:00). Erreur d\'execution si le texte ne correspond pas au pattern ou si la date est invalide (ex. 31 fevrier).',
+    insertText: 'parse_date(texte, "dd/MM/yyyy")',
+  },
+  {
     name: 'uuid',
     signature: 'uuid()',
     description: 'Identifiant UUID v4 aleatoire.',

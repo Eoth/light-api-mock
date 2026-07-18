@@ -92,6 +92,26 @@ impl ScriptEngine {
             format_date_offset(days.max(0), format)
         });
 
+        // parse_date : sens inverse de date_now/date_past/date_future — parse une
+        // date SAISIE (ex. par l'utilisateur d'une API mockee) selon un pattern
+        // EXPLICITE (jamais de detection automatique du format : ambigu, ex.
+        // dd/MM vs MM/dd) et retourne le nombre de millisecondes depuis epoch.
+        // Pattern a jetons fixes (yyyy/MM/dd/HH/mm/ss, tout autre caractere est
+        // litteral) plutot qu'une syntaxe strftime : aucune bibliotheque de date
+        // n'est presente dans le projet (cf format_date_offset ci-dessus), en
+        // ajouter une uniquement pour interpreter des patterns strftime aurait
+        // viole la contrainte de sobriete de dependances. Erreur d'execution
+        // Rhai (jamais un echec silencieux) si le texte ne correspond pas au
+        // pattern ou si la date est invalide (ex. 31 fevrier) — cf sujet
+        // "Visibilite des erreurs de script" (CLAUDE.md), meme discipline de
+        // visibilite appliquee ici.
+        engine.register_fn(
+            "parse_date",
+            |text: &str, pattern: &str| -> Result<i64, Box<rhai::EvalAltResult>> {
+                parse_date_impl(text, pattern)
+            },
+        );
+
         engine.register_fn("uuid", || -> String {
             uuid::Uuid::new_v4().to_string()
         });
@@ -228,6 +248,141 @@ fn format_date_offset(days_delta: i64, format: &str) -> String {
         "en" => format!("{mo:02}/{d:02}/{y:04}"),
         _ => format!("{y:04}-{mo:02}-{d:02}"),
     }
+}
+
+// Parse `text` selon `pattern` (jetons fixes yyyy/MM/dd/HH/mm/ss, tout autre
+// caractere est litteral et doit matcher exactement) et retourne le nombre
+// de millisecondes depuis epoch (UTC, sans decalage horaire — coherent avec
+// now_ms()/epoch_to_iso() qui n'appliquent eux non plus aucun fuseau).
+// La largeur de chaque jeton (ex. "yyyy" = 4 chiffres, "dd" = 2 chiffres) fixe
+// le nombre de chiffres lus : pas de largeur variable, pour rester previsible
+// et symetrique avec les formats "iso"/"fr"/"en" deja a largeur fixe de
+// format_date_offset. HH/mm/ss sont optionnels (defaut 00:00:00 si absents du
+// pattern) ; yyyy/MM/dd sont obligatoires.
+fn parse_date_impl(text: &str, pattern: &str) -> Result<i64, Box<rhai::EvalAltResult>> {
+    let text_chars: Vec<char> = text.chars().collect();
+    let pattern_chars: Vec<char> = pattern.chars().collect();
+
+    let mut year: Option<i64> = None;
+    let mut month: Option<u32> = None;
+    let mut day: Option<u32> = None;
+    let mut hour: u32 = 0;
+    let mut minute: u32 = 0;
+    let mut second: u32 = 0;
+
+    let mut pi = 0usize;
+    let mut ti = 0usize;
+
+    while pi < pattern_chars.len() {
+        let token = pattern_chars[pi];
+        if matches!(token, 'y' | 'M' | 'd' | 'H' | 'm' | 's') {
+            let start = pi;
+            while pi < pattern_chars.len() && pattern_chars[pi] == token {
+                pi += 1;
+            }
+            let width = pi - start;
+            if ti + width > text_chars.len() {
+                return Err(format!(
+                    "parse_date: '{text}' est trop court pour le pattern '{pattern}' (il manque {} chiffre(s) pour le champ '{}')",
+                    ti + width - text_chars.len(),
+                    token.to_string().repeat(width)
+                )
+                .into());
+            }
+            let slice: String = text_chars[ti..ti + width].iter().collect();
+            if !slice.chars().all(|c| c.is_ascii_digit()) {
+                return Err(format!(
+                    "parse_date: '{slice}' n'est pas un nombre valide pour le champ '{}' du pattern '{pattern}' (dans '{text}')",
+                    token.to_string().repeat(width)
+                )
+                .into());
+            }
+            let value: i64 = slice.parse().unwrap_or_default();
+            match token {
+                'y' => year = Some(value),
+                'M' => month = Some(value as u32),
+                'd' => day = Some(value as u32),
+                'H' => hour = value as u32,
+                'm' => minute = value as u32,
+                's' => second = value as u32,
+                _ => unreachable!(),
+            }
+            ti += width;
+        } else {
+            if ti >= text_chars.len() || text_chars[ti] != token {
+                return Err(format!(
+                    "parse_date: caractere '{token}' attendu a la position {ti} de '{text}' pour le pattern '{pattern}'"
+                )
+                .into());
+            }
+            pi += 1;
+            ti += 1;
+        }
+    }
+
+    if ti != text_chars.len() {
+        return Err(format!(
+            "parse_date: '{text}' contient des caracteres en trop apres application du pattern '{pattern}'"
+        )
+        .into());
+    }
+
+    let year = year.ok_or_else(|| {
+        format!("parse_date: le pattern '{pattern}' ne contient pas d'annee (yyyy)")
+    })?;
+    let month = month.ok_or_else(|| {
+        format!("parse_date: le pattern '{pattern}' ne contient pas de mois (MM)")
+    })?;
+    let day = day.ok_or_else(|| {
+        format!("parse_date: le pattern '{pattern}' ne contient pas de jour (dd)")
+    })?;
+
+    if !(1..=12).contains(&month) {
+        return Err(format!(
+            "parse_date: mois invalide {month:02} dans '{text}' (doit etre entre 01 et 12)"
+        )
+        .into());
+    }
+    if !(1..=31).contains(&day) {
+        return Err(format!(
+            "parse_date: jour invalide {day:02} dans '{text}' (doit etre entre 01 et 31)"
+        )
+        .into());
+    }
+    if hour > 23 {
+        return Err(format!(
+            "parse_date: heure invalide {hour:02} dans '{text}' (doit etre entre 00 et 23)"
+        )
+        .into());
+    }
+    if minute > 59 {
+        return Err(format!(
+            "parse_date: minute invalide {minute:02} dans '{text}' (doit etre entre 00 et 59)"
+        )
+        .into());
+    }
+    if second > 59 {
+        return Err(format!(
+            "parse_date: seconde invalide {second:02} dans '{text}' (doit etre entre 00 et 59)"
+        )
+        .into());
+    }
+
+    let days = crate::engine::template::days_from_civil(year, month, day);
+    // Round-trip via civil_from_days (deja existante) plutot que de dupliquer
+    // les regles de jours-par-mois/annees bissextiles : si (year,month,day)
+    // n'est pas une date calendaire reelle (ex. 31 fevrier), le decompte de
+    // jours ne re-convertit pas vers le meme triplet (cf commentaire de
+    // days_from_civil, template.rs).
+    if crate::engine::template::civil_from_days(days) != (year, month, day) {
+        return Err(format!(
+            "parse_date: '{day:02}/{month:02}/{year:04}' n'est pas une date valide (jour hors bornes pour ce mois/cette annee)"
+        )
+        .into());
+    }
+
+    let total_seconds = days * 86400 + hour as i64 * 3600 + minute as i64 * 60 + second as i64;
+    Ok(total_seconds * 1000)
 }
 
 fn seeded_int_impl(seed: &str, min: i64, max: i64) -> i64 {
@@ -714,6 +869,151 @@ mod tests {
             .value;
         assert_eq!(result.len(), 10);
         assert_eq!(result.chars().filter(|c| *c == '/').count(), 2);
+    }
+
+    #[test]
+    fn parse_date_iso_pattern_date_only() {
+        let engine = ScriptEngine::new();
+        let result = engine
+            .execute(r#"parse_date("2026-03-15", "yyyy-MM-dd")"#, &empty_ctx())
+            .unwrap()
+            .value;
+        assert_eq!(result, "1773532800000");
+    }
+
+    #[test]
+    fn parse_date_fr_pattern_date_only() {
+        let engine = ScriptEngine::new();
+        let result = engine
+            .execute(r#"parse_date("15/03/2026", "dd/MM/yyyy")"#, &empty_ctx())
+            .unwrap()
+            .value;
+        assert_eq!(result, "1773532800000");
+    }
+
+    #[test]
+    fn parse_date_fr_pattern_with_time() {
+        let engine = ScriptEngine::new();
+        let result = engine
+            .execute(
+                r#"parse_date("15/03/2026 08:30:45", "dd/MM/yyyy HH:mm:ss")"#,
+                &empty_ctx(),
+            )
+            .unwrap()
+            .value;
+        // 1773532800000 (minuit) + 8h30m45s en ms
+        assert_eq!(result, "1773563445000");
+    }
+
+    #[test]
+    fn parse_date_without_time_defaults_to_midnight() {
+        let engine = ScriptEngine::new();
+        let date_only = engine
+            .execute(r#"parse_date("2026-03-15", "yyyy-MM-dd")"#, &empty_ctx())
+            .unwrap()
+            .value;
+        let with_midnight = engine
+            .execute(
+                r#"parse_date("2026-03-15 00:00:00", "yyyy-MM-dd HH:mm:ss")"#,
+                &empty_ctx(),
+            )
+            .unwrap()
+            .value;
+        assert_eq!(date_only, with_midnight);
+    }
+
+    #[test]
+    fn parse_date_leap_year_feb_29_is_valid() {
+        let engine = ScriptEngine::new();
+        let result = engine.execute(r#"parse_date("29/02/2028", "dd/MM/yyyy")"#, &empty_ctx());
+        assert!(result.is_ok(), "29/02/2028 devrait etre valide (2028 est bissextile)");
+    }
+
+    #[test]
+    fn parse_date_non_leap_year_feb_29_is_invalid() {
+        let engine = ScriptEngine::new();
+        let result = engine.execute(r#"parse_date("29/02/2026", "dd/MM/yyyy")"#, &empty_ctx());
+        assert!(
+            result.is_err(),
+            "29/02/2026 ne devrait pas etre valide (2026 n'est pas bissextile)"
+        );
+    }
+
+    #[test]
+    fn parse_date_feb_31_is_invalid() {
+        let engine = ScriptEngine::new();
+        let result = engine.execute(r#"parse_date("31/02/2026", "dd/MM/yyyy")"#, &empty_ctx());
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(
+            err.contains("pas une date valide"),
+            "message d'erreur inattendu : {err}"
+        );
+    }
+
+    #[test]
+    fn parse_date_month_out_of_range_is_invalid() {
+        let engine = ScriptEngine::new();
+        let result = engine.execute(r#"parse_date("15/13/2026", "dd/MM/yyyy")"#, &empty_ctx());
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("mois invalide"));
+    }
+
+    #[test]
+    fn parse_date_hour_out_of_range_is_invalid() {
+        let engine = ScriptEngine::new();
+        let result = engine.execute(
+            r#"parse_date("15/03/2026 25:00:00", "dd/MM/yyyy HH:mm:ss")"#,
+            &empty_ctx(),
+        );
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("heure invalide"));
+    }
+
+    #[test]
+    fn parse_date_non_numeric_field_is_invalid() {
+        let engine = ScriptEngine::new();
+        let result = engine.execute(r#"parse_date("ab/03/2026", "dd/MM/yyyy")"#, &empty_ctx());
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("n'est pas un nombre valide"));
+    }
+
+    #[test]
+    fn parse_date_literal_separator_mismatch_is_invalid() {
+        let engine = ScriptEngine::new();
+        // Le pattern attend des "/" mais le texte utilise des "-"
+        let result = engine.execute(r#"parse_date("15-03-2026", "dd/MM/yyyy")"#, &empty_ctx());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn parse_date_text_too_short_is_invalid() {
+        let engine = ScriptEngine::new();
+        let result = engine.execute(r#"parse_date("15/03/26", "dd/MM/yyyy")"#, &empty_ctx());
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("trop court"));
+    }
+
+    #[test]
+    fn parse_date_text_too_long_is_invalid() {
+        let engine = ScriptEngine::new();
+        let result = engine.execute(
+            r#"parse_date("15/03/2026extra", "dd/MM/yyyy")"#,
+            &empty_ctx(),
+        );
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("caracteres en trop"));
+    }
+
+    #[test]
+    fn parse_date_error_is_visible_not_silent() {
+        // Coherent avec la discipline de visibilite des erreurs de script
+        // (sujet "Visibilite des erreurs de script", CLAUDE.md) : une date
+        // invalide doit produire une VRAIE erreur d'execution (Err), jamais
+        // une valeur vide/silencieuse comme le ferait une cle de map absente.
+        let engine = ScriptEngine::new();
+        let result = engine.execute(r#"parse_date("31/02/2026", "dd/MM/yyyy")"#, &empty_ctx());
+        assert!(result.is_err());
     }
 
     #[test]

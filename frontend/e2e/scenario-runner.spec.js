@@ -797,3 +797,28 @@ test.describe('Runner data-driven (scenarios JSON) - lot 16 (diagnostic reponse 
     expect(body).toEqual({ nom: 'ACME Corp' });
   });
 });
+
+// Lot 17 (1 test, couverture neuve) : sujet "parse_date" -- sens inverse de
+// date_now/date_past/date_future (§3 CLAUDE.md). Configure via l'UI reelle
+// une regle dont le script appelle parse_date(request.query.date, "dd/MM/yyyy")
+// et verifie hors runner qu'une vraie requete HTTP renvoie bien la date
+// saisie convertie en millisecondes depuis epoch -- pas seulement que le
+// formulaire se soumet sans erreur.
+test.describe('Runner data-driven (scenarios JSON) - lot 17 (parse_date)', () => {
+  test.beforeEach(async ({ request }) => {
+    await request.delete(`${API}/config/reset`);
+    await request.post(`${API}/services`, {
+      data: validService('parse-date-demo', { listen_path: '/convert', real_target_url: '' }),
+    });
+  });
+
+  test('configurer une regle avec parse_date via l UI produit bien la date en millisecondes (scenario JSON)', async ({ page, request }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Convertir une date saisie dans un format personnalise en millisecondes via parse_date (illustration doc)'));
+
+    const resp = await request.get('http://localhost:7342/parse-date-demo/convert?date=15/03/2026');
+    expect(resp.status()).toBe(200);
+    const body = await resp.json();
+    // 15/03/2026 00:00:00 UTC, cf src/engine/script.rs::parse_date_iso_pattern_date_only.
+    expect(body.ms).toBe(1773532800000);
+  });
+});
