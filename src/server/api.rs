@@ -1145,6 +1145,26 @@ struct ScriptExecutionError {
     message: String,
 }
 
+// Resultat REUSSI d'un bloc de script (value + fields, cf ScriptResult) —
+// distinct de ScriptExecutionError. Ajoute suite au signalement
+// "seeded_pick sur une liste d'objets : valeurs absentes/incorrectes sans
+// erreur" (cf CLAUDE.md) : un script peut s'executer sans la moindre erreur
+// tout en produisant un resultat que l'auteur de la regle n'attendait pas
+// (typo de cle, chemin imbrique non supporte par {{script.champ}}...).
+// AVANT cet ajout, /api/rule-test executait deja les scripts pour detecter
+// les erreurs (sujet "Visibilite des erreurs de script") mais jetait
+// silencieusement le ScriptResult en cas de succes — aucune fonctionnalite
+// du produit ne permettait alors a l'utilisateur de voir ce que son script
+// avait REELLEMENT produit avant de sauvegarder la regle. C'est le vrai
+// "trou" comble ici : pas une erreur d'execution manquee, mais une absence
+// totale de visibilite sur un resultat reussi mais errone.
+#[derive(serde::Serialize)]
+struct ScriptExecutionResult {
+    slot: &'static str,
+    value: String,
+    fields: HashMap<String, String>,
+}
+
 #[derive(serde::Serialize)]
 struct RuleTestResponse {
     method_matches: bool,
@@ -1167,6 +1187,12 @@ struct RuleTestResponse {
     // logs K8s. Ne JAMAIS faire disparaitre ce champ ou le rendre silencieux
     // : c'est le correctif du sujet "script errors" (cf CLAUDE.md).
     script_errors: Vec<ScriptExecutionError>,
+    // Resultats REUSSIS des blocs de script (value + fields), memes
+    // conditions d'execution que script_errors ci-dessus (mutuellement
+    // exclusif par slot : un slot execute apparait soit ici, soit dans
+    // script_errors, jamais les deux). Cf ScriptExecutionResult pour la
+    // justification complete.
+    script_results: Vec<ScriptExecutionResult>,
 }
 
 async fn test_rule(
@@ -1198,6 +1224,7 @@ async fn test_rule(
     // scripts : la regle doit matcher ET ne pas etre en action=Proxy (un
     // proxy ne rend jamais de template, donc n'execute jamais de script).
     let mut script_errors = Vec::new();
+    let mut script_results = Vec::new();
     if outcome.overall_matched && payload.action != RuleAction::Proxy {
         let script_ctx = ScriptContext {
             body: String::from_utf8_lossy(&req.body).into_owned(),
@@ -1211,8 +1238,13 @@ async fn test_rule(
             ("post_script", &payload.post_script),
         ] {
             if let Some(code) = script {
-                if let Err(message) = state.script_engine.execute(code, &script_ctx) {
-                    script_errors.push(ScriptExecutionError { slot, message });
+                match state.script_engine.execute(code, &script_ctx) {
+                    Err(message) => script_errors.push(ScriptExecutionError { slot, message }),
+                    Ok(result) => script_results.push(ScriptExecutionResult {
+                        slot,
+                        value: result.value,
+                        fields: result.fields,
+                    }),
                 }
             }
         }
@@ -1227,6 +1259,7 @@ async fn test_rule(
         all_of: outcome.group.all_of,
         any_of: outcome.group.any_of,
         script_errors,
+        script_results,
     })
 }
 
@@ -1816,6 +1849,119 @@ mod tests {
         let Json(result) = test_rule(State(test_state().await), Extension(anon_user()), Json(payload)).await;
         assert!(result.overall_matched);
         assert!(result.script_errors.is_empty());
+    }
+
+    // --- test_rule() : script_results (visibilite d'un resultat REUSSI mais
+    // errone, cf CLAUDE.md "seeded_pick sur une liste d'objets") ---
+    //
+    // Avant cet ajout, un script qui s'execute sans erreur mais produit un
+    // resultat inattendu (typo de cle, objet imbrique non navigable) restait
+    // totalement opaque meme via le testeur de regle : script_errors reste
+    // vide (a raison, il n'y a pas d'erreur), mais l'utilisateur n'avait
+    // aucun moyen de voir CE QUE le script avait produit pour s'en rendre
+    // compte lui-meme. Ces tests couvrent le nouveau champ `script_results`.
+
+    #[tokio::test]
+    async fn test_rule_reports_successful_script_result_fields() {
+        // Reproduction exacte du signalement : une liste d'objets ville +
+        // seeded_pick, retourne directement (le pattern qui fonctionne) —
+        // le testeur doit desormais montrer les champs produits, pas
+        // seulement l'absence d'erreur.
+        let mut captured = empty_captured("GET", "/quote/44306184100047");
+        captured.path_params.insert("siret".into(), "44306184100047".into());
+        let payload = RuleTestRequest {
+            method: "GET".into(),
+            sub_path: Some("/quote/{siret}".into()),
+            conditions: ConditionGroup::default(),
+            script: Some(
+                r#"
+                    let villes = [
+                        #{ name: "Paris", cp: "75000", insee: "75056" },
+                        #{ name: "Lyon", cp: "69000", insee: "69123" }
+                    ];
+                    seeded_pick(request.path.siret, villes)
+                "#
+                .into(),
+            ),
+            request: captured,
+            ..Default::default()
+        };
+        let Json(result) = test_rule(State(test_state().await), Extension(anon_user()), Json(payload)).await;
+        assert!(result.overall_matched);
+        assert!(result.script_errors.is_empty());
+        assert_eq!(result.script_results.len(), 1);
+        let script_result = &result.script_results[0];
+        assert_eq!(script_result.slot, "script");
+        assert!(!script_result.fields.is_empty(), "les champs de la ville piochee doivent etre exposes");
+        assert!(script_result.fields.contains_key("name"));
+        assert!(script_result.fields.contains_key("cp"));
+        assert!(script_result.fields.contains_key("insee"));
+    }
+
+    #[tokio::test]
+    async fn test_rule_script_result_exposes_nested_object_as_valid_json_field() {
+        // Variante ou l'objet pioche est imbrique sous une cle (pattern
+        // naturel des qu'on combine plusieurs infos dans un seul script) : le
+        // testeur doit montrer la valeur REELLEMENT produite pour ce champ
+        // (desormais du JSON valide suite au correctif de
+        // dynamic_field_to_string, plus la syntaxe Rhai #{...} d'avant), ce
+        // qui permet a l'utilisateur de constater immediatement qu'un chemin
+        // imbrique type {{script.ville.name}} n'y correspond pas (seule la
+        // cle plate "ville" existe).
+        let payload = RuleTestRequest {
+            method: "GET".into(),
+            sub_path: None,
+            conditions: ConditionGroup::default(),
+            script: Some(
+                r#"
+                    let ville = #{ name: "Lyon", cp: "69000" };
+                    #{ ville: ville, id: "fixed-id" }
+                "#
+                .into(),
+            ),
+            request: empty_captured("GET", "/x"),
+            ..Default::default()
+        };
+        let Json(result) = test_rule(State(test_state().await), Extension(anon_user()), Json(payload)).await;
+        assert_eq!(result.script_results.len(), 1);
+        let fields = &result.script_results[0].fields;
+        assert_eq!(fields.get("id").unwrap(), "fixed-id");
+        let ville_json: serde_json::Value = serde_json::from_str(fields.get("ville").unwrap()).unwrap();
+        assert_eq!(ville_json["name"], "Lyon");
+    }
+
+    #[tokio::test]
+    async fn test_rule_script_results_empty_when_rule_does_not_match() {
+        let payload = RuleTestRequest {
+            method: "POST".into(),
+            sub_path: None,
+            conditions: ConditionGroup::default(),
+            script: Some(r#"#{ greeting: "hi" }"#.into()),
+            request: empty_captured("GET", "/x"),
+            ..Default::default()
+        };
+        let Json(result) = test_rule(State(test_state().await), Extension(anon_user()), Json(payload)).await;
+        assert!(!result.overall_matched);
+        assert!(result.script_results.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_rule_script_results_and_errors_are_mutually_exclusive_per_slot() {
+        let payload = RuleTestRequest {
+            method: "GET".into(),
+            sub_path: None,
+            conditions: ConditionGroup::default(),
+            pre_script: Some("broken_pre()".into()),
+            script: Some(r#"#{ ok: "yes" }"#.into()),
+            request: empty_captured("GET", "/x"),
+            ..Default::default()
+        };
+        let Json(result) = test_rule(State(test_state().await), Extension(anon_user()), Json(payload)).await;
+        assert_eq!(result.script_errors.len(), 1);
+        assert_eq!(result.script_errors[0].slot, "pre_script");
+        assert_eq!(result.script_results.len(), 1);
+        assert_eq!(result.script_results[0].slot, "script");
+        assert_eq!(result.script_results[0].fields.get("ok").unwrap(), "yes");
     }
 
     // --- check_rule_conflicts (POST /api/rule-conflicts) tests ---

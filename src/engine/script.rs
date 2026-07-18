@@ -198,7 +198,7 @@ impl ScriptEngine {
             let map = result.cast::<rhai::Map>();
             let fields: HashMap<String, String> = map
                 .into_iter()
-                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .map(|(k, v)| (k.to_string(), dynamic_field_to_string(&v)))
                 .collect();
             Ok(ScriptResult {
                 value: String::new(),
@@ -246,6 +246,27 @@ fn seeded_pick_impl(seed: &str, list: &rhai::Array) -> rhai::Dynamic {
     let hash = crate::server::codegen::fnv1a_hash(seed);
     let idx = (hash % list.len() as u64) as usize;
     list[idx].clone()
+}
+
+// Stringification d'un champ de map retourne par un script, pour
+// ScriptResult.fields (consomme par {{script.champ}}/{{pre_script.champ}}/
+// {{post_script.champ}}, cf template.rs::resolve_variable — une seule cle
+// plate, jamais de chemin imbrique). Un scalaire (string/int/float/bool/
+// unit) garde le comportement historique (`Dynamic::to_string()`, texte brut
+// non-echappe, cf CLAUDE.md point 67 "jamais re-echappee"). Une valeur
+// Map/Array (typiquement un objet pioche via seeded_pick puis imbrique sous
+// une cle, ex. `#{ ville: pick, id: uuid() }`) est desormais serialisee en
+// JSON valide (via dynamic_to_json_value, deja utilisee par to_json())
+// plutot que la syntaxe Display native de Rhai (`#{"k": "v", ...}`), qui
+// n'etait ni du JSON ni du XML exploitable une fois collee dans un template
+// de reponse — cause reelle diagnostiquee du signalement "seeded_pick sur
+// une liste d'objets : valeurs incorrectes sans erreur" (cf CLAUDE.md).
+fn dynamic_field_to_string(value: &rhai::Dynamic) -> String {
+    if value.is_map() || value.is_array() {
+        serde_json::to_string(&dynamic_to_json_value(value)).unwrap_or_default()
+    } else {
+        value.to_string()
+    }
 }
 
 // --- JSON <-> Dynamic (parse_json / to_json) ---
@@ -1192,6 +1213,141 @@ mod tests {
         let result = engine.execute("totally_undefined_fn(1, 2)", &empty_ctx());
         let err = result.expect_err("un appel de fonction inexistante doit etre une erreur d'execution");
         assert!(err.contains("totally_undefined_fn"));
+    }
+
+    // --- Pattern "liste d'objets + seeded_pick + reutilisation des champs"
+    // (cf CLAUDE.md, sujet "seeded_pick sur une liste d'objets : valeurs
+    // absentes/incorrectes sans erreur"). Diagnostic verifie par reproduction
+    // AVANT tout correctif (probes jetables, retires) : le script s'execute
+    // TOUJOURS sans erreur dans les 4 variantes testees — ce n'est donc PAS
+    // un trou de detection d'erreur (sujet "Visibilite des erreurs de
+    // script" : rien a detecter, il n'y a jamais d'Err ici). Les vraies
+    // causes trouvees :
+    // (a) retourner l'objet pioche DIRECTEMENT au niveau racine du script
+    //     fonctionne parfaitement (fields = tous les champs scalaires de
+    //     l'objet, directement adressables via {{script.champ}}) ;
+    // (b) mais des qu'un script a besoin de combiner l'objet pioche avec
+    //     autre chose (cas tres naturel : `#{ ville: pick, id: uuid() }`),
+    //     la valeur de "ville" redevient un Map imbrique — AVANT ce
+    //     correctif, ScriptResult.fields le stringifiait via le Display natif
+    //     de Rhai (`#{"cp": "...", ...}`), un texte NI JSON NI XML valide :
+    //     c'est la cause reelle des "valeurs incorrectes" silencieuses.
+    // (c) un champ absent (typo, ou tentative de chemin imbrique
+    //     `{{script.ville.name}}` qui n'est pas supporte — un seul niveau,
+    //     documente) ne leve jamais d'erreur non plus (cf test
+    //     missing_map_key_access_is_not_an_error_unlike_undefined_function),
+    //     generalisation du meme constat aux maps CONSTRUITES PAR
+    //     L'UTILISATEUR (pas seulement `request.*`).
+
+    #[test]
+    fn seeded_pick_on_object_list_returned_directly_exposes_all_scalar_fields() {
+        // Le pattern qui fonctionne deja sans aucun changement : retourner
+        // l'objet pioche tel quel comme expression finale du script.
+        let engine = ScriptEngine::new();
+        let script = r#"
+            let villes = [
+                #{ name: "Paris", cp: "75000", insee: "75056" },
+                #{ name: "Lyon", cp: "69000", insee: "69123" }
+            ];
+            seeded_pick(request.path.siret, villes)
+        "#;
+        let mut path = HashMap::new();
+        path.insert("siret".into(), "44306184100047".into());
+        let ctx = ScriptContext { path_params: path, ..empty_ctx() };
+        let result = engine.execute(script, &ctx).unwrap();
+        assert_eq!(result.fields.get("name").unwrap(), "Lyon");
+        assert_eq!(result.fields.get("cp").unwrap(), "69000");
+        assert_eq!(result.fields.get("insee").unwrap(), "69123");
+    }
+
+    #[test]
+    fn seeded_pick_wrapped_in_a_map_field_serializes_to_valid_json_not_rhai_debug_syntax() {
+        // Regression du vrai defaut trouve : quand l'objet pioche est
+        // imbrique sous une cle d'un map retourne (`#{ ville: pick, ... }`,
+        // necessaire des qu'on veut combiner plusieurs informations dans un
+        // seul script), la valeur de ce champ doit etre du JSON valide
+        // (utilisable dans un fragment "Template avance"), jamais la syntaxe
+        // de Debug/Display native de Rhai (`#{"k": "v", ...}`).
+        let engine = ScriptEngine::new();
+        let script = r#"
+            let villes = [
+                #{ name: "Paris", cp: "75000", insee: "75056" },
+                #{ name: "Lyon", cp: "69000", insee: "69123" }
+            ];
+            let ville = seeded_pick(request.path.siret, villes);
+            #{ ville: ville, other: "x" }
+        "#;
+        let mut path = HashMap::new();
+        path.insert("siret".into(), "44306184100047".into());
+        let ctx = ScriptContext { path_params: path, ..empty_ctx() };
+        let result = engine.execute(script, &ctx).unwrap();
+        assert_eq!(result.fields.get("other").unwrap(), "x");
+        let raw = result.fields.get("ville").unwrap();
+        assert!(
+            !raw.starts_with('#'),
+            "le champ imbrique ne doit plus utiliser la syntaxe Rhai #{{...}}: {raw}"
+        );
+        let parsed: serde_json::Value = serde_json::from_str(raw)
+            .unwrap_or_else(|e| panic!("le champ imbrique doit etre du JSON valide, obtenu {raw:?}: {e}"));
+        assert_eq!(parsed["name"], "Lyon");
+        assert_eq!(parsed["cp"], "69000");
+        assert_eq!(parsed["insee"], "69123");
+    }
+
+    #[test]
+    fn seeded_pick_wrapped_array_of_objects_also_serializes_to_valid_json() {
+        // Meme correctif pour un tableau d'objets (pas seulement un objet
+        // seul) sous une cle de map retournee.
+        let engine = ScriptEngine::new();
+        let script = r#"
+            #{ items: [#{ sku: "A1", qty: 2 }, #{ sku: "B2", qty: 5 }] }
+        "#;
+        let result = engine.execute(script, &empty_ctx()).unwrap();
+        let raw = result.fields.get("items").unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(raw).unwrap();
+        assert_eq!(parsed.as_array().unwrap().len(), 2);
+        assert_eq!(parsed[0]["sku"], "A1");
+        assert_eq!(parsed[1]["qty"], 5);
+    }
+
+    #[test]
+    fn scalar_map_field_stringification_is_unchanged_by_the_json_fix() {
+        // Non-regression : un champ SCALAIRE (string/int/bool) d'un map
+        // retourne continue de produire du texte brut non-echappe (pas de
+        // guillemets JSON ajoutes autour d'une simple string) — seul le cas
+        // Map/Array imbrique change de comportement. Sans cette garantie,
+        // le correctif casserait {{script.champ}} pour l'immense majorite
+        // des scripts existants (scalaires).
+        let engine = ScriptEngine::new();
+        let result = engine
+            .execute(r#"#{ greeting: "hi", count: 42, active: true }"#, &empty_ctx())
+            .unwrap();
+        assert_eq!(result.fields.get("greeting").unwrap(), "hi");
+        assert_eq!(result.fields.get("count").unwrap(), "42");
+        assert_eq!(result.fields.get("active").unwrap(), "true");
+    }
+
+    #[test]
+    fn accessing_a_typo_field_or_unsupported_nested_path_never_errors_but_stays_empty() {
+        // Cause (c) : ni un typo (`ville.nom` au lieu de `ville.name`) ni une
+        // tentative de chemin imbrique cote template ({{script.ville.name}},
+        // hors du perimetre de ce test mais du meme ressort, cf
+        // resolve_variable qui ne gere qu'un seul niveau) ne produisent
+        // d'erreur — generalisation de missing_map_key_access_is_not_an_error
+        // (deja verifiee pour `request.*`) a une map CONSTRUITE PAR
+        // L'UTILISATEUR.
+        let engine = ScriptEngine::new();
+        let script = r#"
+            let villes = [ #{ name: "Paris", cp: "75000", insee: "75056" } ];
+            let ville = seeded_pick(request.path.siret, villes);
+            ville.nom
+        "#;
+        let mut path = HashMap::new();
+        path.insert("siret".into(), "44306184100047".into());
+        let ctx = ScriptContext { path_params: path, ..empty_ctx() };
+        let result = engine.execute(script, &ctx);
+        assert!(result.is_ok(), "un champ absent sur une map utilisateur ne doit jamais lever d'erreur");
+        assert_eq!(result.unwrap().value, "");
     }
 
     #[test]

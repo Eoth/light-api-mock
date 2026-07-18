@@ -203,7 +203,15 @@
       case 'query': return 'ex: page';
       case 'header': return 'ex: x-request-id';
       case 'body': return 'ex: /user/name';
-      case 'script': return 'ex: nom (laisser vide pour {{script}} entier)';
+      // Un seul niveau de cle plate est navigable ({{script.champ}}, jamais
+      // {{script.objet.champ}}) : si le script retourne un objet imbrique
+      // sous une cle (ex. `#{ ville: pick, id: uuid() }`), cette cle
+      // contiendra du JSON serialise en entier (utile en "Template avance"),
+      // pas ses propres sous-champs individuellement adressables. Utiliser
+      // le testeur de regle (bloc "Tester contre une requete reelle") pour
+      // voir les cles reellement produites par le script avant de les
+      // reference ici -- cf CLAUDE.md, "seeded_pick sur une liste d'objets".
+      case 'script': return 'ex: nom (vide = {{script}} entier ; 1 seul niveau — testez la regle pour voir les cles)';
       default: return '';
     }
   }

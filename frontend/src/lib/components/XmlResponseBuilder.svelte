@@ -114,7 +114,13 @@
   function valuePlaceholder(src) {
     if (src === 'body') return 'ex: /user/name';
     if (src === 'xpath') return 'ex: Envelope/Body/recherche/Siret';
-    if (src === 'script') return 'ex: nom (laisser vide pour {{script}} entier)';
+    // Un seul niveau de cle plate est navigable ({{script.champ}}, jamais
+    // {{script.objet.champ}}) : si le script retourne un objet imbrique
+    // sous une cle, cette cle contiendra du JSON serialise en entier, pas
+    // ses propres sous-champs adressables individuellement -- cf CLAUDE.md,
+    // "seeded_pick sur une liste d'objets". Utiliser le testeur de regle
+    // pour voir les cles reellement produites avant de les referencer ici.
+    if (src === 'script') return 'ex: nom (vide = {{script}} entier ; 1 seul niveau — testez la regle pour voir les cles)';
     return 'valeur';
   }
 

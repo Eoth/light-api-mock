@@ -18,6 +18,12 @@ C'est important car en usage normal (une fois la règle sauvegardée), une erreu
 
 ![Testeur de règle affichant un message d'erreur clair suite à l'appel d'une fonction Rhai inexistante](screenshots/testeur-regle-erreur-script.png)
 
+### Voir ce qu'un script a réellement produit (même sans erreur)
+
+Un script peut s'exécuter **sans la moindre erreur** tout en produisant un résultat différent de ce que vous attendiez — une clé mal orthographiée, ou un champ imbriqué qui ne se comporte pas comme un chemin JSON (voir [Scripts Rhai : piocher un objet complet dans une liste](scripts-rhai.md#cas-dusage--piocher-un-objet-complet-pas-juste-une-valeur-dans-une-liste)). Comme il n'y a alors aucune erreur à signaler, rien ne l'indiquerait sans une aide dédiée.
+
+Pour chaque script qui s'exécute sans erreur, le testeur affiche donc désormais **le résultat réellement produit** : chaque variable de template qu'il rend disponible (`{{script}}`, ou `{{script.champ}}` pour chacun des champs de l'objet retourné), avec sa valeur exacte. C'est le moyen le plus fiable de repérer qu'une clé que vous pensiez utiliser n'existe pas, ou qu'un champ censé contenir une valeur simple contient en réalité un bloc JSON entier.
+
 ## Le détecteur de conflits : être averti à la sauvegarde
 
 lightMock applique la **première règle qui correspond** à une requête (voir [Règles de correspondance](regles-de-matching.md)) — l'ordre des règles dans la liste compte donc directement. Avec de nombreuses règles, il devient facile d'en ajouter une qui, sans le vouloir, sera **masquée** par une règle existante plus générale placée avant elle (ou l'inverse).

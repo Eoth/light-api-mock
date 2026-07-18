@@ -182,6 +182,32 @@
           </div>
         {/if}
 
+        {#if result.script_results?.length > 0}
+          <div class="script-result-panel" data-testid="rule-tester-script-results">
+            <p class="script-result-title">
+              Résultat produit par {result.script_results.length === 1 ? 'ce script' : 'ces scripts'} (aucune erreur, mais vérifiez que ce sont bien les valeurs attendues) :
+            </p>
+            {#each result.script_results as sr}
+              <div class="script-result-slot" data-testid="rule-tester-script-result-{sr.slot}">
+                <strong>{slotLabel(sr.slot)}</strong>
+                {#if Object.keys(sr.fields).length > 0}
+                  <ul class="script-result-fields">
+                    {#each Object.entries(sr.fields) as [key, value]}
+                      <li>
+                        <code>{`{{${sr.slot}.${key}}}`}</code> = <code class="script-result-value">{value}</code>
+                      </li>
+                    {/each}
+                  </ul>
+                {:else}
+                  <p class="script-result-value-line">
+                    <code>{`{{${sr.slot}}}`}</code> = <code class="script-result-value">{sr.value}</code>
+                  </p>
+                {/if}
+              </div>
+            {/each}
+          </div>
+        {/if}
+
         {#if showBodyTruncationWarning}
           <p class="body-truncation-warning">
             ⚠ Le corps de cette requête a été tronqué dans le journal — la comparaison sur le corps peut être invalide.
@@ -293,6 +319,50 @@
     gap: 0.25rem;
     font-size: 0.8125rem;
     word-break: break-word;
+  }
+
+  .script-result-panel {
+    margin: 0.5rem 0;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius);
+    background: var(--color-bg-secondary, #f5f5f5);
+    border: 1px solid var(--color-border);
+  }
+
+  .script-result-title {
+    margin: 0 0 0.375rem;
+    font-size: 0.8125rem;
+    color: var(--color-text-muted, inherit);
+  }
+
+  .script-result-slot {
+    font-size: 0.8125rem;
+    margin: 0.375rem 0;
+  }
+
+  .script-result-slot:first-of-type {
+    margin-top: 0;
+  }
+
+  .script-result-fields {
+    list-style: none;
+    padding: 0;
+    margin: 0.25rem 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    word-break: break-word;
+  }
+
+  .script-result-value-line {
+    margin: 0.25rem 0 0;
+    word-break: break-word;
+  }
+
+  .script-result-value {
+    background: var(--color-bg);
+    padding: 0.05rem 0.3rem;
+    border-radius: 0.2rem;
   }
 
   .condition-group-result h4 {
