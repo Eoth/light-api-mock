@@ -79,6 +79,22 @@ describe('ConditionForm: autocompletion query param', () => {
   });
 });
 
+describe('ConditionForm: libelles distincts edition vs ajout', () => {
+  it('affiche "Valider" et un aria-label d\'ajout quand condition est absente', () => {
+    const { getByRole } = render(ConditionForm, { props: {} });
+    expect(getByRole('form', { name: 'Ajouter une condition' })).toBeInTheDocument();
+    expect(getByRole('button', { name: 'Valider' })).toBeInTheDocument();
+  });
+
+  it('affiche "Enregistrer" et un aria-label d\'edition quand une condition existante est fournie', () => {
+    const { getByRole } = render(ConditionForm, {
+      props: { condition: { source: { type: 'Header', key: 'X-Trace' }, operator: { type: 'Exists' } } },
+    });
+    expect(getByRole('form', { name: 'Modifier la condition' })).toBeInTheDocument();
+    expect(getByRole('button', { name: 'Enregistrer' })).toBeInTheDocument();
+  });
+});
+
 describe('ConditionForm: distinction visuelle des sources', () => {
   it('utilise des libelles distincts pour PathParam et QueryParam', () => {
     const { getByLabelText } = render(ConditionForm, { props: { availablePathParams: ['id'] } });

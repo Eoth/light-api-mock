@@ -46,6 +46,14 @@ Plusieurs conditions peuvent être combinées :
 
 Pour un paramètre de chemin, l'interface propose une liste fermée des noms de paramètres réellement présents dans l'URL du service (pas de faute de frappe possible). Pour un paramètre de requête, une liste de suggestions apparaît à partir des paramètres vus dans le [journal des requêtes](journal-des-requetes.md) récentes — mais vous restez libre de saisir une valeur qui n'y figure pas encore.
 
+### Modifier une condition existante
+
+Une condition déjà ajoutée à une règle **se modifie directement** : cliquez sur la condition dans la liste (elle est affichée comme un bouton, pas un simple texte) pour rouvrir le même formulaire que celui utilisé pour l'ajouter, pré-rempli avec sa source, sa clé, son opérateur et sa valeur actuels. Changez ce qu'il faut — y compris le type de source (par exemple passer d'un paramètre de requête à un en-tête HTTP) — puis validez pour l'enregistrer à sa place : les autres conditions de la règle ne sont ni déplacées ni modifiées. "Annuler" referme le formulaire sans rien changer.
+
+![Edition en place d'une condition existante](screenshots/regle-condition-edition-en-place.png)
+
+Avant cette fonctionnalité, la seule façon de changer une condition était de la supprimer puis d'en recréer une nouvelle (perdant l'ordre relatif et obligeant à ressaisir l'intégralité des champs). Ce n'est plus nécessaire.
+
 ## Cas d'usage : une même URL qui répond différemment selon l'opération SOAP
 
 Question fréquente pour les services SOAP/XML : peut-on faire répondre **la même URL** différemment selon l'en-tête `SOAPAction`, ou selon le contenu de l'enveloppe envoyée ? **Oui, sans aucun développement** — il suffit de créer plusieurs règles sur le même service, chacune avec sa propre condition. Comme les règles sont évaluées dans l'ordre et que la première qui correspond gagne (voir plus bas), chaque opération SOAP obtient sa propre réponse simulée.
