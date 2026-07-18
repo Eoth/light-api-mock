@@ -1,6 +1,7 @@
 // Moteur de template : remplace les expressions {{var}} ou {{var | pipe}} dans le texte.
 // Syntaxe : { et } sont des caracteres normaux (JSON/XML), {{ et }} delimitent les variables.
-// Variables disponibles : path.*, query.*, header.*, body.*, fake.*, uuid, now_ms, seq, script.*
+// Variables disponibles : path.*, query.*, header.*, body.* (JSON pointer), xpath.*
+//   (chemin XPath simplifie, XML/SOAP), fake.*, uuid, now_ms, seq, script.*
 // Pipes disponibles : lower, upper, trim, capitalize, length, first(N), last(N),
 //   substr(s,l), default("v"), replace("a","b"), prepend("p"), append("s")
 use crate::engine::renderer::TemplateRenderer;
@@ -91,6 +92,9 @@ fn resolve_variable(name: &str, ctx: &TemplateContext) -> String {
     }
     if let Some(pointer) = name.strip_prefix("body.") {
         return extract_body_json(ctx.request_body, pointer);
+    }
+    if let Some(path) = name.strip_prefix("xpath.") {
+        return extract_body_xpath(ctx.request_body, path);
     }
     if let Some(kind_str) = name.strip_prefix("fake.") {
         return resolve_fake(kind_str);
@@ -185,6 +189,17 @@ fn extract_body_json(body: &[u8], pointer: &str) -> String {
         Some(other) => other.to_string(),
         None => String::new(),
     }
+}
+
+// Equivalent XML/SOAP de extract_body_json ci-dessus : source "XPath
+// (XML/SOAP)" du builder de reponse (variable de template {{xpath.chemin}}).
+// Reutilise MatchEngine::extract_xpath telle quelle (meme parsing/meme
+// correctif que ConditionSource::XPath, cf CLAUDE.md "SOAPAction
+// recherche/Siret") plutot que de dupliquer un second parseur XML — le
+// chemin ne contient jamais de prefixe de namespace (deja decape par
+// local_name()), tout comme pour une condition XPath.
+fn extract_body_xpath(body: &[u8], path: &str) -> String {
+    crate::engine::matcher::MatchEngine::extract_xpath(body, path).unwrap_or_default()
 }
 
 fn apply_pipes(value: &str, pipes_str: &str, ctx: &TemplateContext) -> String {
@@ -536,6 +551,61 @@ mod tests {
         let body = br#"{"id":99}"#;
         let ctx = make_ctx(&p, &q, &h, body, 0);
         assert_eq!(render_template("{{body.id}}", &ctx), "99");
+    }
+
+    // --- xpath.chemin : equivalent XML/SOAP de body.pointeur ci-dessus
+    // (source "XPath (XML/SOAP)" du builder de reponse XML, cf CLAUDE.md
+    // "Extraction XPath dans le builder de reponse XML"). Reutilise
+    // MatchEngine::extract_xpath (meme correctif walk_xml que le sujet
+    // "SOAPAction recherche/Siret") plutot qu'un parsing XML duplique.
+
+    #[test]
+    fn xpath_echo_extracts_value_from_xml_body() {
+        let (p, q, h) = empty_ctx();
+        let body = br#"<Envelope><Body><id>123</id></Body></Envelope>"#;
+        let ctx = make_ctx(&p, &q, &h, body, 0);
+        assert_eq!(render_template("{{xpath.Envelope/Body/id}}", &ctx), "123");
+    }
+
+    #[test]
+    fn xpath_echo_ignores_namespace_prefixes_in_body() {
+        let (p, q, h) = empty_ctx();
+        let body = br#"<soap:Envelope><soap:Body><ns:id>abc</ns:id></soap:Body></soap:Envelope>"#;
+        let ctx = make_ctx(&p, &q, &h, body, 0);
+        assert_eq!(render_template("{{xpath.Envelope/Body/id}}", &ctx), "abc");
+    }
+
+    #[test]
+    fn xpath_echo_survives_non_self_closing_sibling_before_target() {
+        // Regression du meme bug corrige au sujet "SOAPAction recherche/Siret"
+        // (walk_xml, matcher.rs) : un <Header></Header> non-autoferme, sibling
+        // de <Body>, ne doit pas casser l'extraction d'un ancetre deja matche.
+        let (p, q, h) = empty_ctx();
+        let body = br#"<SOAP:Envelope><SOAP-ENV:Header></SOAP-ENV:Header><SOAP-ENV:Body><ns3:recherche><ns3:Siret>12345678901234</ns3:Siret></ns3:recherche></SOAP-ENV:Body></SOAP:Envelope>"#;
+        let ctx = make_ctx(&p, &q, &h, body, 0);
+        assert_eq!(
+            render_template("{{xpath.Envelope/Body/recherche/Siret}}", &ctx),
+            "12345678901234"
+        );
+    }
+
+    #[test]
+    fn xpath_echo_with_substr_pipe_truncates_value() {
+        let (p, q, h) = empty_ctx();
+        let body = br#"<Envelope><Body><recherche><Siret>12345678901234</Siret></recherche></Body></Envelope>"#;
+        let ctx = make_ctx(&p, &q, &h, body, 0);
+        assert_eq!(
+            render_template("{{xpath.Envelope/Body/recherche/Siret | substr(0,9)}}", &ctx),
+            "123456789"
+        );
+    }
+
+    #[test]
+    fn xpath_echo_no_match_renders_empty() {
+        let (p, q, h) = empty_ctx();
+        let body = br#"<Envelope><Body><mode>x</mode></Body></Envelope>"#;
+        let ctx = make_ctx(&p, &q, &h, body, 0);
+        assert_eq!(render_template("{{xpath.Envelope/Body/recherche}}", &ctx), "");
     }
 
     #[test]

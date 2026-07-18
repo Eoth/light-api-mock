@@ -252,6 +252,13 @@ Notez que `unitPrice` vaut `445` pour `REF-001` dans les deux exemples (JSON et 
 
 ## Cas d'usage : extraire une valeur de la requête SOAP vers la réponse
 
+> **Pour le cas le plus simple** (une seule valeur à recopier, éventuellement transformée par un
+> pipe comme `substr`), le builder de réponse XML propose directement une source
+> **"XPath (XML/SOAP)"** — voir [Réponses dynamiques et templates](reponses-et-templates.md), aucun
+> script nécessaire. Le script ci-dessous reste utile pour des besoins que le builder seul ne couvre
+> pas : plusieurs valeurs combinées, une logique conditionnelle, ou une valeur réutilisée par
+> plusieurs champs de la réponse.
+
 Besoin fréquent avec un client SOAP : récupérer **une seule valeur** envoyée dans l'enveloppe (par exemple un numéro SIRET dans `<ns3:Siret>`) et la renvoyer telle quelle dans la réponse simulée, sans forcément passer par une [condition XPath](regles-de-matching.md#cas-dusage--une-même-url-qui-répond-différemment-selon-lopération-soap) — c'est une extraction, pas une comparaison.
 
 Utilisez `parse_xml_items(texte, "chemin/vers/element")` **jusqu'à l'élément qui contient la valeur recherchée** (pas jusqu'à la valeur elle-même) — comme cet élément n'apparaît normalement qu'une seule fois dans une requête SOAP, la liste renvoyée n'a qu'un élément, dont vous lisez le champ voulu à l'index `0` :

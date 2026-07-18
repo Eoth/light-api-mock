@@ -13,7 +13,8 @@
     { value: 'path', label: 'Parametre URL' },
     { value: 'query', label: 'Query param' },
     { value: 'header', label: 'Header HTTP' },
-    { value: 'body', label: 'Echo body' },
+    { value: 'body', label: 'Echo body (JSON pointer)' },
+    { value: 'xpath', label: 'XPath (XML/SOAP)' },
     { value: 'fake', label: 'Donnee fictive' },
     { value: 'uuid', label: 'UUID' },
     { value: 'now_ms', label: 'Timestamp (ms)' },
@@ -104,7 +105,13 @@
 
   function emit() { onUpdate(fields); }
 
-  function needsValueInput(src) { return ['fixed','path','query','header','body'].includes(src); }
+  function needsValueInput(src) { return ['fixed','path','query','header','body','xpath'].includes(src); }
+
+  function valuePlaceholder(src) {
+    if (src === 'body') return 'ex: /user/name';
+    if (src === 'xpath') return 'ex: Envelope/Body/recherche/Siret';
+    return 'valeur';
+  }
 
   // Pliage/depliage des noeuds parents (memes principes que
   // JsonResponseBuilder.svelte : Set en memoire, cle par testPath
@@ -141,7 +148,7 @@
         {#each fakeOptions as fo}<option value={fo}>{fo}</option>{/each}
       </select>
     {:else if needsValueInput(field.source)}
-      <input type="text" class="value-input" value={field.value} oninput={(e) => updateProp(path, idx, 'value', e.target.value)} placeholder="valeur" aria-label="Valeur" data-testid="xml-builder-value-input-{testPath}" />
+      <input type="text" class="value-input" value={field.value} oninput={(e) => updateProp(path, idx, 'value', e.target.value)} placeholder={valuePlaceholder(field.source)} aria-label="Valeur" data-testid="xml-builder-value-input-{testPath}" />
     {/if}
     {#if field.source !== 'fixed'}
       <input type="text" class="pipe-input" value={field.pipe || ''} oninput={(e) => updateProp(path, idx, 'pipe', e.target.value)} placeholder="ex: lower | first(5)" aria-label="Pipe" list="dl-xml-pipes" autocomplete="off" data-testid="xml-builder-pipe-input-{testPath}" />
