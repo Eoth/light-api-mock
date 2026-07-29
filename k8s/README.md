@@ -83,3 +83,68 @@ A adapter selon votre configuration DNS/domaine interne. Pour ajouter a un Virtu
 ## Persistence
 
 Le fichier `mock-config.yaml` est stocke sur le PVC monte en `/data`. L'ecriture est atomique (temp file + rename) pour garantir l'integrite en cas de crash.
+
+## Front et back exposes separement (ingress/VirtualService distincts)
+
+Le pod lightMock sert TOUJOURS l'API (`/api/*`) et le frontend (assets statiques) depuis le
+**meme** processus (cf `## Architecture reseau` ci-dessus) — mais rien n'empeche l'infrastructure
+d'exposer ce meme pod via **deux entrees de routage distinctes**, potentiellement sur des domaines
+differents (cas reel rapporte : un `VirtualService` pour le front, un `RouteTable`/`Upstream`
+separe pour le back). Le frontend, servi par la premiere entree, doit alors savoir joindre l'API
+via la seconde — c'est exactement ce que `API_BASE_URL` resout (voir `README.md`, "Deploiement :
+URL de l'API independante du Host du frontend").
+
+Exemple : le meme `Upstream`/pod `lightmock` (inchange, cf `upstream.yaml`) expose via deux
+domaines Gloo Edge, l'un pour le front, l'autre pour l'API :
+
+```yaml
+# VirtualService pour le FRONT (domaine public de la SPA)
+apiVersion: gateway.solo.io/v1
+kind: VirtualService
+metadata:
+  name: lightmock-front
+  namespace: entreprise-tools
+spec:
+  virtualHost:
+    domains:
+      - lightmock.example.com
+    routes:
+      - matchers:
+          - prefix: /
+        delegateAction:
+          ref:
+            name: lightmock
+            namespace: entreprise-tools
+---
+# VirtualService pour le BACK (domaine public de l'API, memes RouteTable/Upstream)
+apiVersion: gateway.solo.io/v1
+kind: VirtualService
+metadata:
+  name: lightmock-api
+  namespace: entreprise-tools
+spec:
+  virtualHost:
+    domains:
+      - lightmock-api.example.com
+    routes:
+      - matchers:
+          - prefix: /
+        delegateAction:
+          ref:
+            name: lightmock
+            namespace: entreprise-tools
+```
+
+Puis, dans `configmap.yaml` (le ConfigMap consomme par le pod qui sert le front) :
+
+```yaml
+API_BASE_URL: "https://lightmock-api.example.com"
+```
+
+Le frontend, quel que soit le domaine depuis lequel il a ete charge, appellera alors toujours
+`/api/*` sur `https://lightmock-api.example.com` — jamais son propre Host. Aucune modification du
+`Deployment`/`Upstream`/PVC n'est necessaire : c'est le meme pod unique (`replicas: 1`) qui
+repond aux deux domaines.
+
+**Verifier** : `curl https://lightmock.example.com/runtime-config.json` doit renvoyer
+`{"api_base_url":"https://lightmock-api.example.com"}`.

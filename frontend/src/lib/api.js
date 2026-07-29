@@ -2,7 +2,14 @@
 // Toutes les fonctions exportees appellent le backend via fetch().
 // Le token Keycloak (si auth activee) est injecte automatiquement.
 // En dev, le proxy Vite redirige /api vers http://localhost:7342.
+//
+// L'URL de base de l'API (getApiBaseUrl()) est '' par defaut (chemin relatif
+// /api/..., derive du Host courant par le navigateur — comportement
+// historique) sauf si /runtime-config.json en fournit une autre au
+// demarrage de l'app (voir runtime-config.js) : permet de cibler une API
+// exposee sur une origine distincte de celle qui sert la SPA.
 import { auth, logout } from './auth.svelte.js';
+import { getApiBaseUrl } from './runtime-config.js';
 
 const BASE = '/api';
 
@@ -17,7 +24,7 @@ async function request(method, path, body) {
   if (body !== undefined) {
     opts.body = JSON.stringify(body);
   }
-  const res = await fetch(`${BASE}${path}`, opts);
+  const res = await fetch(`${getApiBaseUrl()}${BASE}${path}`, opts);
   if (res.status === 401 && auth.enabled) {
     logout();
     throw new Error('Session expiree, veuillez vous reconnecter');

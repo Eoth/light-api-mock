@@ -6,6 +6,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': 'http://localhost:7342',
+      '/runtime-config.json': 'http://localhost:7342',
     },
   },
   build: {
