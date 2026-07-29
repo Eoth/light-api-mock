@@ -1,10 +1,11 @@
 use crate::models::Service;
 
-const RESERVED_NAMES: &[&str] = &["api", "auth", "index.html", "assets", "favicon.ico"];
+const RESERVED_NAMES: &[&str] =
+    &["api", "auth", "index.html", "assets", "favicon.ico", "runtime-config.json"];
 const VALID_METHODS: &[&str] = &["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"];
 
 const RESERVED_PATH_PREFIXES: &[&str] = &[
-    "/api/", "/api", "/index.html", "/assets/", "/favicon.ico",
+    "/api/", "/api", "/index.html", "/assets/", "/favicon.ico", "/runtime-config.json",
 ];
 
 static NAME_CHARSET_RE: std::sync::LazyLock<regex::Regex> =
@@ -42,8 +43,12 @@ pub fn is_internal_route(path: &str) -> bool {
 // exactement l'affaiblissement de la protection API que ce bypass doit
 // eviter. Les 4 routes /api/auth/* deja exemptees dans auth_middleware
 // restent gerees separement, par egalite stricte de chemin (pas par ce
-// prefixe).
-const STATIC_ASSET_PATH_PREFIXES: &[&str] = &["/index.html", "/assets/", "/favicon.ico"];
+// prefixe). `/runtime-config.json` (sujet "URL API configurable", cf
+// CLAUDE.md) est inclus ici pour la meme raison que les assets statiques :
+// le frontend doit pouvoir le lire AVANT de savoir s'il est authentifie
+// (c'est ce fichier qui lui indique ou se trouve l'API).
+const STATIC_ASSET_PATH_PREFIXES: &[&str] =
+    &["/index.html", "/assets/", "/favicon.ico", "/runtime-config.json"];
 
 pub fn is_static_asset_route(path: &str) -> bool {
     if path == "/" || path.is_empty() {
@@ -260,6 +265,10 @@ mod tests {
         assert!(validate_service(&svc("index.html", "/foo")).is_err());
         assert!(validate_service(&svc("assets", "/foo")).is_err());
         assert!(validate_service(&svc("favicon.ico", "/foo")).is_err());
+        // Meme si le charset (pas de '.') rejetterait deja ce nom, la liste
+        // reservee le documente explicitement (defense en profondeur, meme
+        // logique que "index.html"/"favicon.ico" ci-dessus).
+        assert!(validate_service(&svc("runtime-config.json", "/foo")).is_err());
     }
 
     #[test]
@@ -357,6 +366,7 @@ mod tests {
         assert!(is_internal_route("/api"));
         assert!(is_internal_route("/index.html"));
         assert!(is_internal_route("/assets/main.js"));
+        assert!(is_internal_route("/runtime-config.json"));
         assert!(!is_internal_route("/my-svc/foo"));
         assert!(!is_internal_route("/insee/v4/sirene/123"));
     }
@@ -369,6 +379,7 @@ mod tests {
         assert!(is_static_asset_route("/assets/main.js"));
         assert!(is_static_asset_route("/assets/index-B2Cp0FJn.css"));
         assert!(is_static_asset_route("/favicon.ico"));
+        assert!(is_static_asset_route("/runtime-config.json"));
     }
 
     #[test]

@@ -253,6 +253,76 @@ curl http://localhost:7342/demo/v1/anything
 | `KAFKA_REPLY_TOPIC` | *(vide, optionnel)* | Topic sur lequel publier la reponse mockee rendue. Si absent, aucune publication n'est tentee. |
 | `MESSAGE_LOG_TTL_MS` | `86400000` (24h) | Duree de retention des entrees du journal des messages Kafka avant purge. |
 | `MESSAGE_LOG_MAX_BODY_SIZE` | `16384` (16 Ko) | Taille au-dela de laquelle le corps d'un message est tronque dans le journal (les metadonnees restent completes). |
+| `API_BASE_URL` | *(vide)* | URL de base que le **frontend** utilise pour appeler l'API, independamment du Host sur lequel la SPA elle-meme est chargee. Vide = comportement historique (chemin relatif `/api/...`, deduit du Host courant par le navigateur). Voir "Deploiement : URL de l'API independante du Host du frontend" ci-dessous. |
+
+## Deploiement : URL de l'API independante du Host du frontend
+
+Par defaut, le frontend appelle l'API via un chemin **relatif** (`/api/...`) : le navigateur
+resout automatiquement cette URL par rapport au Host depuis lequel la page a ete chargee. Ca
+fonctionne sans aucune configuration tant que le frontend et l'API sont **co-localises** (le cas
+par defaut de lightMock : un seul binaire sert les deux, cf Dockerfile) — c'est le comportement
+de tous les exemples de ce README.
+
+Ca casse en revanche des que l'infrastructure route l'API vers une **origine differente** de
+celle qui sert les assets statiques du frontend (ex. Kubernetes/Gloo Edge avec un VirtualService
+pour le front et un RouteTable/Upstream separe pour le back, potentiellement sur un domaine
+different). Dans ce cas, configurer `API_BASE_URL` sur le **processus qui sert la SPA** (pas
+besoin de le configurer sur celui qui ne sert que l'API) :
+
+```bash
+API_BASE_URL=https://api.example.com
+```
+
+**Configuration au niveau du conteneur, pas du build** : cette variable est lue au moment de
+chaque requete `GET /runtime-config.json` (servi par le backend, en dehors de `/api` pour rester
+joignable meme si `/api` est route separement, et sans authentification requise puisque le
+frontend doit pouvoir le lire avant meme de savoir s'il est connecte). Le frontend le charge au
+demarrage de l'app, avant tout appel API. Consequence pratique : **la meme image Docker, buildee
+une seule fois, peut etre configuree differemment par environnement de deploiement** — pas besoin
+de rebuild le frontend avec une variable d'environnement Vite figee au build (`VITE_...`).
+
+### Exemples par topologie
+
+**Docker Compose ou binaire nu, front et back co-localises (cas par defaut)** — rien a
+configurer :
+
+```bash
+# API_BASE_URL absent -> le frontend deduit l'URL de l'API de son propre Host
+./light-mock
+```
+
+**Kubernetes avec ingress separes (front et back sur des domaines/chemins distincts)** — definir
+`API_BASE_URL` sur le Deployment/ConfigMap qui sert la SPA, pointant vers l'URL publique de
+l'API :
+
+```yaml
+# ConfigMap ou variable d'environnement du Deployment qui sert le frontend
+API_BASE_URL: "https://lightmock-api.example.com"
+```
+
+Voir `k8s/README.md` pour un exemple complet avec deux VirtualServices Gloo Edge.
+
+**Docker Compose avec deux services distincts** (front expose sur un port, back sur un autre) :
+
+```yaml
+services:
+  lightmock-front:
+    image: lightmock:latest
+    ports: ["8080:7342"]
+    environment:
+      API_BASE_URL: "http://localhost:9000"
+  lightmock-api:
+    image: lightmock:latest
+    ports: ["9000:7342"]
+```
+
+### Verifier la configuration
+
+```bash
+curl http://<host-du-front>/runtime-config.json
+# {"api_base_url":""}                          <- rien configure (defaut)
+# {"api_base_url":"https://api.example.com"}   <- API_BASE_URL configure
+```
 
 ## Sauvegardes et rollback
 
@@ -276,16 +346,16 @@ redemarrer le service.
 ## Tests
 
 ```bash
-# Rust (262 tests par defaut)
+# Rust (390 tests par defaut)
 cargo test
 
 # Rust + Kafka (feature optionnelle, necessite cmake + toolchain C, +31 tests)
 cargo test --features messaging-kafka messaging::
 
-# Frontend unitaires (211 tests Vitest)
+# Frontend unitaires (390 tests Vitest)
 cd frontend && npm test
 
-# E2E navigateur (77 tests Playwright, serveur doit tourner)
+# E2E navigateur (123 tests Playwright, dont 4 skip sans la feature Kafka, serveur doit tourner)
 cd frontend && npm run test:e2e
 ```
 
