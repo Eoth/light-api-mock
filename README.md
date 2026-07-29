@@ -26,6 +26,84 @@ Un seul binaire Rust qui intercepte les requetes HTTP, les mock ou les proxifie 
 - **Zero dependance externe obligatoire** : pas de base de donnees, persistance fichier YAML (ecriture asynchrone en arriere-plan, mutation en memoire instantanee)
 - **Interface accessible** : conformite RGAA niveau AA
 
+## Sécurité et confidentialité
+
+Section volontairement visible et explicite : lightMock est destiné à être déployé derrière un
+pare-feu d'entreprise, souvent par des équipes qui doivent justifier chaque flux réseau sortant.
+
+### Comportement réseau — exhaustif, rien de caché
+
+**Aucune télémétrie.** lightMock n'envoie jamais de métriques d'usage, de rapport de crash, de
+statistiques de version ou toute autre donnée vers un serveur de l'éditeur — il n'existe
+d'ailleurs aucun serveur de l'éditeur : le logiciel est un binaire autonome, sans "phone home".
+
+Le binaire n'émet du trafic réseau sortant que dans exactement 4 cas, tous **déclenchés par une
+action explicite de l'utilisateur ou une configuration qu'il a lui-même renseignée** :
+
+| Flux | Déclencheur | Portée | Détail |
+|---|---|---|---|
+| Test de connexion ("ping") | Clic manuel sur "Tester la cible" | `real_target_url` du service, configuré par l'utilisateur | **Connexion TCP pure** (`tokio::net::TcpStream::connect`, timeout 3s) — jamais de requête HTTP (pas de GET/HEAD), jamais de handshake TLS applicatif. Un cache en mémoire (TTL 2 min) évite même de répéter ce test TCP à chaque clic. |
+| Proxy | Une requête entrante correspond à un service configuré en proxy (`is_mocked=false` ou règle `action=proxy`) | `real_target_url` du service concerné, configuré par l'utilisateur — **jamais une autre destination** | Requête HTTP forwardée telle quelle (streaming, sans buffering) vers la cible choisie par l'utilisateur pour ce service précis. Aucun service sans cible configurée ("purement mocké") ne déclenche jamais de proxy. |
+| Authentification Keycloak | Uniquement si `AUTH_ENABLED=true` (désactivé par défaut) | `KEYCLOAK_URL` configuré par l'utilisateur | Login (ROPC), validation JWT (JWKS), rafraîchissement de token — vers le serveur Keycloak que l'utilisateur a lui-même renseigné. |
+| Kafka (messaging) | Uniquement si le binaire est compilé avec `--features messaging-kafka` (**non activée par défaut**, `cargo build`/`cargo test` standards ne téléchargent ni ne compilent la dépendance Kafka) ET `KAFKA_ENABLED=true` | `KAFKA_BROKERS` configuré par l'utilisateur | Consumer/producer vers les brokers renseignés par l'utilisateur. |
+
+**Aucun autre appel réseau sortant n'existe dans le code** — vérifiable directement : les seuls
+usages de `reqwest::Client`/`TcpStream::connect` en dehors des tests se trouvent dans
+`src/auth/keycloak.rs` (Keycloak), `src/engine/proxy.rs` (proxy + ping TCP) et `src/messaging/`
+(Kafka, feature-gated). Aucun appel vers un domaine en dur dans le code.
+
+### Signaler une vulnérabilité
+
+Voir [SECURITY.md](SECURITY.md) — signalement privé via GitHub Security Advisories, délais de
+réponse visés, périmètre couvert.
+
+### Chaîne d'approvisionnement (supply chain)
+
+**Build reproductible** : `Cargo.lock` et `frontend/package-lock.json` sont commités et
+versionnés — un `cargo build`/`npm ci` reproduit exactement le même graphe de dépendances.
+
+**Aucun pipeline CI/CD n'est fourni avec ce projet à ce jour** ; les commandes ci-dessous sont
+donc à exécuter manuellement (ou à intégrer dans le pipeline CI de votre choix une fois mis en
+place — voir la note en tête de chaque commande).
+
+<a id="audit-des-dépendances"></a>
+**Audit des dépendances connues (CVE)** :
+
+```bash
+# Backend (Rust)
+cargo install cargo-audit
+cargo audit
+
+# Frontend (npm)
+cd frontend && npm audit
+```
+
+**Génération d'un SBOM (Software Bill of Materials)** — format CycloneDX pour les deux piles :
+
+```bash
+# Backend (Rust) — CycloneDX
+cargo install cargo-cyclonedx
+cargo cyclonedx --format json
+# Alternative SPDX, sans compiler le projet (lecture de Cargo.lock uniquement) :
+#   cargo install cargo-sbom && cargo sbom > sbom.spdx.json
+
+# Frontend (npm) — CycloneDX
+cd frontend && npx @cyclonedx/cyclonedx-npm --output-file sbom.json
+```
+
+**Scan de vulnérabilités de l'image Docker** ([Trivy](https://aquasecurity.github.io/trivy/)) :
+
+```bash
+docker build -t lightmock:local .
+trivy image lightmock:local
+```
+
+**Image Docker** : build multi-stage, image finale `alpine` (base minimale, pas d'outillage de
+build résiduel), utilisateur non-root dédié (`app`, uid 1000, jamais `root`) — voir
+[Dockerfile](Dockerfile). Les manifests Kubernetes fournis (`k8s/deployment.yaml`) renforcent
+encore la posture : `runAsNonRoot`, `readOnlyRootFilesystem`, `allowPrivilegeEscalation: false`,
+toutes les capabilities Linux retirées (`drop: [ALL]`).
+
 ## Prerequis
 
 | Outil    | Version min | Notes |
@@ -351,4 +429,4 @@ kubectl apply -k k8s/
 
 ## Licence
 
-MIT
+MIT — voir [LICENSE](LICENSE).
