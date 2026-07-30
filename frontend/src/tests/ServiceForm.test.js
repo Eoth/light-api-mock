@@ -201,7 +201,7 @@ describe('ServiceForm validation', () => {
   });
 });
 
-describe('ServiceForm service purement mocké (sujet 22)', () => {
+describe('ServiceForm service purement mocké', () => {
   it('cocher la case masque le champ cible et permet la creation sans cible', async () => {
     const onSave = vi.fn().mockResolvedValue({});
     const { getByLabelText, getByRole, queryByLabelText, container } = render(ServiceForm, { props: { onSave } });

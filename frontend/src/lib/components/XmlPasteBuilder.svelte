@@ -1,18 +1,16 @@
 <script>
-  // Mode "coller un exemple" pour XML (sujet portage JSON->XML). Miroir
-  // fonctionnel de JsonPasteBuilder.svelte (paste -> exampleXmlToFields ->
-  // assignation de source champ par champ, jamais de renommage/ajout/
-  // suppression de structure ici -- pour ces retouches, repasser par le
-  // mode "XML guide" habituel, cf docs/reponses-et-templates.md) mais avec
-  // DEUX ajouts volontaires par rapport a la parite stricte JSON :
+  // Mode "coller un exemple" pour XML. Miroir fonctionnel de
+  // JsonPasteBuilder.svelte (paste -> exampleXmlToFields -> assignation de
+  // source champ par champ, jamais de renommage/ajout/suppression de
+  // structure ici -- pour ces retouches, repasser par le mode "XML guide"
+  // habituel, cf docs/reponses-et-templates.md) mais avec DEUX ajouts
+  // volontaires par rapport a la parite stricte JSON :
   //  - navigation par fil d'Ariane (focusPath) + chevrons de pliage
   //    (collapsedPaths, meme mecanisme `hidden` que XmlResponseBuilder.svelte
-  //    -- jamais un {#if} qui demonterait le contenu, cf CLAUDE.md point 64) :
-  //    un XML colle (typiquement une enveloppe SOAP) est generalement bien
-  //    plus imbrique qu'un JSON REST plat, un rendu recursif entierement a
-  //    plat (comme JsonPasteBuilder) serait illisible. Ces deux mecanismes
-  //    sont repris tels quels de JsonResponseBuilder.svelte/
-  //    XmlResponseBuilder.svelte plutot que reinventes.
+  //    -- jamais un {#if} qui demonterait le contenu) : un XML colle
+  //    (typiquement une enveloppe SOAP) est generalement bien plus imbrique
+  //    qu'un JSON REST plat, un rendu recursif entierement a plat (comme
+  //    JsonPasteBuilder) serait illisible.
   //  - edition des ATTRIBUTS XML (absents du modele JSON) : chaque noeud
   //    (racine incluse) peut porter des attributs, chacun avec sa propre
   //    source (fixe/variable), meme mecanisme de source que le contenu
@@ -67,11 +65,10 @@
     'BoolRandom', 'LoremSentence', 'CountryFR', 'IbanFR',
   ];
 
-  // Pipes (retour beta-testeur, cf JsonPasteBuilder.svelte) : uniquement sur
-  // le CONTENU d'un noeud valeur (memes options que XmlResponseBuilder.svelte
-  // guide) -- pas sur les attributs, qui n'ont deja aucun equivalent dans le
-  // mode guide (l'edition d'attributs est une capacite propre au mode
-  // "par exemple", cf CLAUDE.md).
+  // Pipes : uniquement sur le CONTENU d'un noeud valeur (memes options que
+  // XmlResponseBuilder.svelte guide) -- pas sur les attributs, qui n'ont
+  // aucun equivalent dans le mode guide (l'edition d'attributs est une
+  // capacite propre au mode "par exemple").
   const pipeOptions = [
     { value: 'lower', label: 'lower' },
     { value: 'upper', label: 'upper' },
@@ -220,9 +217,8 @@
   function valuePlaceholder(src) {
     if (src === 'fixed') return 'valeur fixe';
     if (src === 'xpath') return 'ex: Envelope/Body/recherche/Siret';
-    // Meme clarification que XmlResponseBuilder.svelte (cf CLAUDE.md,
-    // "seeded_pick sur une liste d'objets") : un seul niveau de cle plate
-    // est navigable ({{script.champ}}), jamais un chemin imbrique.
+    // Meme clarification que XmlResponseBuilder.svelte : un seul niveau de
+    // cle plate est navigable ({{script.champ}}), jamais un chemin imbrique.
     if (src === 'script') return 'ex: nom (vide = {{script}} entier ; 1 seul niveau — testez la regle pour voir les cles)';
     return 'nom du parametre';
   }

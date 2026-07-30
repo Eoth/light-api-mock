@@ -3,8 +3,7 @@
   // (nom/methode/sous-chemin), l'action (mock/proxy) et les conditions,
   // et pilote le flux de sauvegarde (validation locale, avertissement
   // proxy->mock obsolete, detecteur de conflit). Le detail de chaque
-  // section est delegue a un sous-composant dedie (cf CLAUDE.md, "RuleForm
-  // decoupe en sous-composants") :
+  // section est delegue a un sous-composant dedie :
   //   - RuleActionSelector.svelte  : selecteur Mock/Proxy
   //   - RuleConditionsEditor.svelte: fieldsets Conditions ET/OU
   //   - RuleResponseSection.svelte : fieldset "Reponse mockee" complet
@@ -37,7 +36,7 @@
     serviceName = null,
     groupName = null,
     listenPath = '',
-    // Service "purement mocke" (sujet 22, cf CLAUDE.md §3) : quand vrai,
+    // Service "purement mocke" : quand vrai,
     // l'action "Proxy" n'a plus de sens (aucune cible vers laquelle
     // relayer) — masquee ci-dessous plutot que simplement desactivee.
     isPurelyMocked = false,
@@ -115,8 +114,8 @@
   let pendingRulePayload = $state(null);
   let checkingConflicts = $state(false);
 
-  // Avertissement de changement d'action reelle (complement sujet 22, cf
-  // CLAUDE.md §3) : ne concerne QUE `isStaleProxyRule` (valeur stockee
+  // Avertissement de changement d'action reelle : ne concerne QUE
+  // `isStaleProxyRule` (valeur stockee
   // "proxy", forcee a "mock" a l'ouverture parce que le service est
   // purement mocke) — jamais affiche pour une regle mock ordinaire ni pour
   // une regle proxy sur un service qui a une cible. Meme pattern non
@@ -279,8 +278,7 @@
         // Inclut les 3 blocs de script (pre_script/script/post_script) et
         // l'action en plus de method/subPath/conditions : le testeur de
         // regle doit pouvoir rejouer les scripts contre la vraie requete
-        // capturee choisie, pas seulement le matching (cf CLAUDE.md,
-        // "Visibilite des erreurs de script"). responseSectionRef peut etre
+        // capturee choisie, pas seulement le matching. responseSectionRef peut etre
         // null avant le premier rendu complet (bind:this) — improbable au
         // moment ou l'utilisateur clique "Tester", mais garde defensive.
         const payload = responseSectionRef?.getPayload() ?? {};

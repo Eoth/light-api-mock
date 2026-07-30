@@ -3,7 +3,7 @@
   // etat interne, la valeur courante et les changements transitent par
   // props/callback (meme convention que les autres composants du dossier,
   // cf ConditionForm.svelte). L'option Proxy est retiree du DOM (pas juste
-  // desactivee) quand `isPurelyMocked` est vrai (cf CLAUDE.md §5 point 61).
+  // desactivee) quand `isPurelyMocked` est vrai.
   let {
     action = 'mock',
     isPurelyMocked = false,

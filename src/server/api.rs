@@ -1113,21 +1113,14 @@ struct RuleTestRequest {
     // avec un frontend qui n'enverrait pas encore ces champs. `action` par
     // defaut Mock (RuleAction::default()), coherent avec le modele Rule.
     //
-    // Pourquoi ces champs existent (cf CLAUDE.md, "Visibilite des erreurs de
-    // script") : avant cette extension, /api/rule-test ne rejouait QUE le
-    // matching (method/sub_path/conditions) — jamais les scripts. Un script
-    // qui echoue a l'execution (fonction inexistante, erreur de type...)
-    // etait donc invisible du testeur de regle, alors meme que c'est
-    // EXACTEMENT ce que ce testeur doit permettre de detecter avant
-    // sauvegarde. `pre_script`/`script`/`post_script` sont desormais
-    // executes (si la regle matche et n'est pas en action=Proxy, memes
-    // conditions que la production, cf run_rule_script dans intercept.rs)
-    // contre la VRAIE requete capturee choisie par l'utilisateur — jamais
-    // contre un contexte synthetique/vide, ce qui evite tout faux positif
-    // (contrairement a une validation "a vide" qui ferait planter a tort un
-    // script comme `parse_json(request.body).len()` des que le corps de
-    // test est absent/invalide, cf le pattern de repetition JSON/XML deja
-    // documente).
+    // `pre_script`/`script`/`post_script` sont executes (si la regle matche
+    // et n'est pas en action=Proxy, memes conditions que la production, cf
+    // run_rule_script dans intercept.rs) contre la VRAIE requete capturee
+    // choisie par l'utilisateur — jamais contre un contexte synthetique/vide,
+    // ce qui evite tout faux positif (contrairement a une validation "a vide"
+    // qui ferait planter a tort un script comme
+    // `parse_json(request.body).len()` des que le corps de test est
+    // absent/invalide).
     #[serde(default)]
     action: RuleAction,
     #[serde(default)]
@@ -1146,18 +1139,14 @@ struct ScriptExecutionError {
 }
 
 // Resultat REUSSI d'un bloc de script (value + fields, cf ScriptResult) —
-// distinct de ScriptExecutionError. Ajoute suite au signalement
-// "seeded_pick sur une liste d'objets : valeurs absentes/incorrectes sans
-// erreur" (cf CLAUDE.md) : un script peut s'executer sans la moindre erreur
-// tout en produisant un resultat que l'auteur de la regle n'attendait pas
-// (typo de cle, chemin imbrique non supporte par {{script.champ}}...).
-// AVANT cet ajout, /api/rule-test executait deja les scripts pour detecter
-// les erreurs (sujet "Visibilite des erreurs de script") mais jetait
-// silencieusement le ScriptResult en cas de succes — aucune fonctionnalite
-// du produit ne permettait alors a l'utilisateur de voir ce que son script
-// avait REELLEMENT produit avant de sauvegarder la regle. C'est le vrai
-// "trou" comble ici : pas une erreur d'execution manquee, mais une absence
-// totale de visibilite sur un resultat reussi mais errone.
+// distinct de ScriptExecutionError : un script peut s'executer sans la
+// moindre erreur tout en produisant un resultat que l'auteur de la regle
+// n'attendait pas (typo de cle, chemin imbrique non supporte par
+// {{script.champ}}...). /api/rule-test executait deja les scripts pour
+// detecter les erreurs mais jetait silencieusement le ScriptResult en cas de
+// succes — aucune fonctionnalite du produit ne permettait alors a
+// l'utilisateur de voir ce que son script avait REELLEMENT produit avant de
+// sauvegarder la regle.
 #[derive(serde::Serialize)]
 struct ScriptExecutionResult {
     slot: &'static str,
@@ -1184,8 +1173,7 @@ struct RuleTestResponse {
     // deliberement avalee en soft-fail (repli sur un ScriptResult vide, la
     // requete n'est jamais bloquee par un script casse) et seulement
     // journalisee cote serveur (tracing::warn!) — invisible sans acces aux
-    // logs K8s. Ne JAMAIS faire disparaitre ce champ ou le rendre silencieux
-    // : c'est le correctif du sujet "script errors" (cf CLAUDE.md).
+    // logs K8s. Ne jamais faire disparaitre ce champ ou le rendre silencieux.
     script_errors: Vec<ScriptExecutionError>,
     // Resultats REUSSIS des blocs de script (value + fields), memes
     // conditions d'execution que script_errors ci-dessus (mutuellement
@@ -1758,8 +1746,8 @@ mod tests {
     // Avant cette extension, /api/rule-test ne rejouait QUE le matching —
     // un script casse (fonction Rhai inexistante, erreur de type...) restait
     // invisible du testeur de regle, exactement comme en production
-    // (run_rule_script soft-fail + log serveur uniquement, cf CLAUDE.md).
-    // Ces tests couvrent le nouveau champ `script_errors`.
+    // (run_rule_script soft-fail + log serveur uniquement).
+    // Ces tests couvrent le champ `script_errors`.
 
     #[tokio::test]
     async fn test_rule_reports_script_execution_error_when_rule_matches() {
@@ -1852,14 +1840,14 @@ mod tests {
     }
 
     // --- test_rule() : script_results (visibilite d'un resultat REUSSI mais
-    // errone, cf CLAUDE.md "seeded_pick sur une liste d'objets") ---
+    // errone) ---
     //
-    // Avant cet ajout, un script qui s'execute sans erreur mais produit un
-    // resultat inattendu (typo de cle, objet imbrique non navigable) restait
-    // totalement opaque meme via le testeur de regle : script_errors reste
-    // vide (a raison, il n'y a pas d'erreur), mais l'utilisateur n'avait
-    // aucun moyen de voir CE QUE le script avait produit pour s'en rendre
-    // compte lui-meme. Ces tests couvrent le nouveau champ `script_results`.
+    // Un script qui s'execute sans erreur mais produit un resultat inattendu
+    // (typo de cle, objet imbrique non navigable) reste totalement opaque
+    // meme via le testeur de regle : script_errors reste vide (a raison, il
+    // n'y a pas d'erreur), mais l'utilisateur n'a aucun moyen de voir CE QUE
+    // le script a produit pour s'en rendre compte lui-meme. Ces tests
+    // couvrent le champ `script_results`.
 
     #[tokio::test]
     async fn test_rule_reports_successful_script_result_fields() {

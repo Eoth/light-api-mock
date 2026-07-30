@@ -11,7 +11,7 @@ independamment de la maniere dont on les satisfait :
 
 1. **Le frontend doit pouvoir joindre `/runtime-config.json` et l'API a l'URL qu'il expose.**
    Concretement : le navigateur qui a charge la SPA doit pouvoir atteindre `GET /runtime-config.json`
-   (sans authentification, cf `CLAUDE.md` §5 point 88) sur le meme Host que celui qui a servi
+   (sans authentification) sur le meme Host que celui qui a servi
    la SPA, et cette reponse doit annoncer une URL d'API (`api_base_url`) reellement joignable
    depuis ce navigateur — vide si front et API partagent le meme Host (cas par defaut), ou une
    URL absolue si l'infrastructure les separe. Voir `README.md`, section "Deploiement : URL de

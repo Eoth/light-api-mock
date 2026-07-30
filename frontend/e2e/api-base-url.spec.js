@@ -6,9 +6,9 @@ import { createServer } from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// Sujet "URL de l'API configurable independamment du Host du frontend" (cf
-// CLAUDE.md) : avant cette passe, le frontend deduisait toujours l'URL de
-// l'API de son propre Host (chemin relatif /api/...). Ca casse des que
+// URL de l'API configurable independamment du Host du frontend : avant
+// cette passe, le frontend deduisait toujours l'URL de l'API de son propre
+// Host (chemin relatif /api/...). Ca casse des que
 // l'infrastructure route /api vers une origine distincte de celle qui sert
 // les assets statiques (ex. Kubernetes/Gloo Edge avec un VirtualService pour
 // le front et un RouteTable/Upstream separe pour le back, cas reel
@@ -153,8 +153,8 @@ test.describe('URL de l API configurable independamment du Host du frontend', ()
       // frontend a bien appele l'API configuree, pas son propre Host.
       await page.goto(frontBaseUrl + '/');
       // Le groupe "Sans groupe" est replie par defaut (etat non persiste
-      // au-dela de la session, cf CLAUDE.md) : le deplier avant de chercher
-      // la carte de service.
+      // au-dela de la session) : le deplier avant de chercher la carte de
+      // service.
       await page.locator('[data-testid="service-group-header-ungrouped"]').click();
       await expect(page.locator('[data-testid="service-card-cross-origin-demo"]')).toBeVisible();
 

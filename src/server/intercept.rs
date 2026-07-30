@@ -95,14 +95,13 @@ async fn do_proxy(
     req: Request<Body>,
     captured: Option<CapturedRequest>,
 ) -> Response {
-    // Service "purement mocke" (sujet 22, real_target_url vide, cf CLAUDE.md
-    // §3) : ne jamais tenter de proxifier vers une URL vide. `validate_service`
-    // bloque deja cette combinaison a la sauvegarde quand is_mocked=false,
-    // mais une regle action=Proxy peut matcher meme si le service est
-    // is_mocked=true et sans cible (bascule a posteriori non bloquante,
-    // §3 point "bascule a posteriori") : garde defensive ici pour renvoyer
-    // une erreur claire plutot qu'une erreur technique confuse (URL invalide,
-    // echec DNS...).
+    // Service "purement mocke" (real_target_url vide) : ne jamais tenter de
+    // proxifier vers une URL vide. `validate_service` bloque deja cette
+    // combinaison a la sauvegarde quand is_mocked=false, mais une regle
+    // action=Proxy peut matcher meme si le service est is_mocked=true et sans
+    // cible (bascule a posteriori non bloquante) : garde defensive ici pour
+    // renvoyer une erreur claire plutot qu'une erreur technique confuse (URL
+    // invalide, echec DNS...).
     if service.real_target_url.trim().is_empty() {
         tracing::warn!(
             service_key = %service.name, method = %method_str, path = %path,
@@ -243,12 +242,11 @@ async fn handle_service(
         state
             .request_log
             .log_no_rule(&service.name, &method_str, path, captured);
-        // Message explicite (sujet 22) : un service "purement mocke" (aucune
-        // cible, cf CLAUDE.md §3) n'a de toute facon jamais tente de proxy de
-        // repli ici (is_mocked=true => uniquement les regles sont evaluees,
-        // voir plus haut) — mais sans message, l'absence de reponse restait
-        // silencieuse. Le message differencie ce cas d'un service avec cible
-        // qui manque juste une regle, pour orienter le diagnostic.
+        // Un service "purement mocke" (aucune cible) n'a de toute facon jamais
+        // tente de proxy de repli ici (is_mocked=true => uniquement les regles
+        // sont evaluees, voir plus haut). Le message differencie ce cas d'un
+        // service avec cible qui manque juste une regle, pour orienter le
+        // diagnostic.
         let message = if service.real_target_url.trim().is_empty() {
             "Aucune regle ne correspond a cette requete : ce service est purement mocke (aucune cible configuree)."
         } else {
@@ -1045,11 +1043,10 @@ mod tests {
         std::fs::remove_dir_all(&data_dir).ok();
     }
 
-    // --- Service "purement mocke" (sujet 22, real_target_url vide) ---
+    // --- Service "purement mocke" (real_target_url vide) ---
     // Helper partage par les 3 tests ci-dessous : construit un vrai serveur
-    // Axum (meme routeur qu'en production) pour une config donnee. Factorise
-    // ici (contrairement aux tests precedents, ecrits avant ce sujet) car
-    // les 3 scenarios suivants ne different que par la config initiale.
+    // Axum (meme routeur qu'en production) pour une config donnee — factorise
+    // ici car les 3 scenarios suivants ne different que par la config initiale.
     async fn spawn_test_server(config: MockConfig) -> (u16, crate::server::request_log::RequestLog, std::path::PathBuf) {
         let data_dir = temp_dir_for_intercept_test();
         let store = MockStore::new(data_dir.join("mock-config.yaml"));
@@ -1181,7 +1178,7 @@ mod tests {
         // sauvegarde (is_mocked=false + cible vide), mais atteignable si la
         // config a ete modifiee hors de l'API (edition manuelle du YAML) :
         // le garde-fou runtime de do_proxy doit rester la derniere ligne de
-        // defense, cf CLAUDE.md §3/§5.
+        // defense.
         let mut service = purely_mocked_service(vec![]);
         service.is_mocked = false;
         let (port, request_log_handle, data_dir) = spawn_test_server(MockConfig {
@@ -1208,11 +1205,11 @@ mod tests {
 
     #[tokio::test]
     async fn rule_level_proxy_action_with_empty_target_returns_clear_error() {
-        // Bascule a posteriori (sujet 22, §3) : un service devenu "purement
-        // mocke" peut encore contenir une regle action=Proxy (avertissement
-        // non-bloquant a la sauvegarde) — si cette regle matche malgre tout
-        // en production, la requete ne doit jamais atteindre un vrai appel
-        // proxy vers une URL vide.
+        // Bascule a posteriori : un service devenu "purement mocke" peut
+        // encore contenir une regle action=Proxy (avertissement non-bloquant
+        // a la sauvegarde) — si cette regle matche malgre tout en production,
+        // la requete ne doit jamais atteindre un vrai appel proxy vers une
+        // URL vide.
         let rule = Rule {
             name: "stale-proxy-rule".into(),
             method: "GET".into(),
@@ -1242,9 +1239,9 @@ mod tests {
     }
 
     // --- Pattern "repetition JSON/XML" (parse_json/to_json/parse_xml_items/
-    // xml_element, cf CLAUDE.md §3) : la requete contient une liste d'objets,
-    // la reponse doit contenir le meme nombre d'elements construits par
-    // position. Verifie bout-en-bout (vrai serveur Axum + vraie requete HTTP)
+    // xml_element) : la requete contient une liste d'objets, la reponse doit
+    // contenir le meme nombre d'elements construits par position. Verifie
+    // bout-en-bout (vrai serveur Axum + vraie requete HTTP)
     // pour N=2, N=1 et N=0, en JSON (REST) et en XML (SOAP) — memes scripts
     // que ceux documentes dans docs/scripts-rhai.md, pour garantir qu'un
     // utilisateur qui copie-colle l'exemple obtient bien ce comportement.
@@ -1475,12 +1472,11 @@ mod tests {
     }
 
     // --- Cas d'usage "map de correspondance + lookup par path param, reponse
-    // XML" (cf CLAUDE.md, "Visibilite des erreurs de script") : verifie
-    // bout-en-bout que la VRAIE syntaxe Rhai correcte pour ce pattern (map
-    // literale #{...}, `.contains(cle)` + indexation `mapping[cle]`,
-    // fallback via if/else) fonctionne, y compris la branche de repli quand
-    // la cle est absente — meme script que celui documente dans
-    // docs/scripts-rhai.md, pour garantir qu'un copier-coller fonctionne.
+    // XML" : verifie bout-en-bout que la VRAIE syntaxe Rhai correcte pour ce
+    // pattern (map literale #{...}, `.contains(cle)` + indexation
+    // `mapping[cle]`, fallback via if/else) fonctionne, y compris la branche
+    // de repli quand la cle est absente — meme script que celui documente
+    // dans docs/scripts-rhai.md, pour garantir qu'un copier-coller fonctionne.
     fn service_lookup_rule() -> Rule {
         Rule {
             name: "lookup-service".into(),
@@ -1558,15 +1554,14 @@ mod tests {
         std::fs::remove_dir_all(&data_dir).ok();
     }
 
-    // --- Condition XPath sur XML SOAP namespace + extraction requete->reponse
-    // (sujet "SOAPAction recherche/Siret") : verifie bout-en-bout que la
-    // condition XPath "Envelope/Body/recherche" (sans prefixe de namespace, cf
-    // MatchEngine::local_name) route correctement selon l'operation SOAP
-    // presente dans le corps, meme avec un <Header></Header> non-autoferme
-    // sibling de <Body> (structure SOAP realiste qui declenchait le bug
-    // corrige de walk_xml — cf commentaire sur MatchEngine::walk_xml). Verifie
-    // aussi que le script d'extraction (parse_xml_items) recupere une valeur
-    // du corps de requete (Siret) et la reinjecte dans la reponse.
+    // --- Condition XPath sur XML SOAP namespace + extraction requete->reponse :
+    // verifie bout-en-bout que la condition XPath "Envelope/Body/recherche"
+    // (sans prefixe de namespace, cf MatchEngine::local_name) route
+    // correctement selon l'operation SOAP presente dans le corps, meme avec
+    // un <Header></Header> non-autoferme sibling de <Body> (structure SOAP
+    // realiste, cf commentaire sur MatchEngine::walk_xml). Verifie aussi que
+    // le script d'extraction (parse_xml_items) recupere une valeur du corps
+    // de requete (Siret) et la reinjecte dans la reponse.
     fn soap_condition_rules() -> Vec<Rule> {
         vec![
             Rule {

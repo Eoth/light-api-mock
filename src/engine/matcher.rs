@@ -268,7 +268,7 @@ impl MatchEngine {
     /// Detecteur de conflit a la SAUVEGARDE d'une regle (POST
     /// `/api/rule-conflicts`, endpoint stateless comme `/api/rule-test`) —
     /// JAMAIS appele sur le chemin de matching HTTP de production
-    /// (`first_match`), qui reste totalement inchange par ce sujet. Deux
+    /// (`first_match`), qui reste totalement inchange. Deux
     /// regles "pourraient entrer en conflit" si une meme requete pourrait
     /// satisfaire les DEUX a la fois (meme method, sub_path compatible,
     /// conditions qui se recoupent) — auquel cas seule la premiere dans
@@ -418,23 +418,19 @@ impl MatchEngine {
 
     // pub(crate) : reutilisee telle quelle par `engine::template::resolve_variable`
     // (variable de template `{{xpath.chemin}}`, source "XPath (XML/SOAP)" du
-    // builder de reponse XML) pour ne pas dupliquer le parsing XML corrige au
-    // sujet "SOAPAction recherche/Siret" (cf commentaire sur `walk_xml`).
+    // builder de reponse XML) pour ne pas dupliquer le parsing XML.
     pub(crate) fn extract_xpath(body: &[u8], path: &str) -> Option<String> {
         let text = std::str::from_utf8(body).ok()?;
         let segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
         Self::walk_xml(text, &segments)
     }
 
-    // Correctif (sujet "SOAPAction recherche/Siret") : suit la VRAIE pile d'ancetres XML
-    // (`stack`, local names dans l'ordre d'imbrication reelle) plutot qu'un compteur plat.
-    // L'ancienne version decrementait `depth_match` sur N'IMPORTE QUEL evenement End des
-    // qu'un match partiel etait en cours, meme si l'element ferme n'avait rien a voir avec
-    // le chemin recherche (ex. un <Header></Header> non-autoferme, sibling de <Body>) — un
-    // tel sibling cassait silencieusement le matching de tout chemin XPath dont un ancetre
-    // avait deja matche. La comparaison se fait desormais sur la pile REELLE complete
-    // (stack == segments), donc un sibling non-matchant n'affecte jamais un ancetre deja
-    // matche : seul son propre passage pile/depile est concerne.
+    // Suit une VRAIE pile d'ancetres (`stack`, local names dans l'ordre d'imbrication
+    // reelle) et compare la pile ENTIERE aux segments attendus, plutot qu'un compteur
+    // plat de profondeur : un compteur incremente/decremente sur n'importe quel evenement
+    // End casserait le matching des qu'un element frere non lie au chemin recherche (ex.
+    // un <Header></Header> non-autoferme, sibling de <Body>) se referme entre deux
+    // segments deja matches.
     fn walk_xml(xml: &str, segments: &[&str]) -> Option<String> {
         use quick_xml::events::Event;
         use quick_xml::reader::Reader;
@@ -486,8 +482,8 @@ impl MatchEngine {
     }
 
     // pub(crate) : reutilise tel quel par engine::script::parse_xml_items_impl
-    // (fonction native Rhai `parse_xml_items`, sujet "repetition JSON/XML") pour
-    // ne pas dupliquer le decapage de prefixe de namespace XML (`soap:Body` -> `Body`).
+    // (fonction native Rhai `parse_xml_items`) pour ne pas dupliquer le decapage
+    // de prefixe de namespace XML (`soap:Body` -> `Body`).
     pub(crate) fn local_name(e: &quick_xml::events::BytesStart<'_>) -> String {
         let full = String::from_utf8_lossy(e.name().as_ref()).to_string();
         full.split(':').last().unwrap_or(&full).to_string()
@@ -791,9 +787,8 @@ mod tests {
 
     #[test]
     fn xpath_soap_with_header_sibling_before_body() {
-        // Regression pour le bug corrige (sujet "SOAPAction recherche/Siret") : un
-        // <Header></Header> non-autoferme, sibling de <Body> sous <Envelope>, ne doit
-        // plus casser le matching d'un ancetre deja matche (Envelope).
+        // Regression : un <Header></Header> non-autoferme, sibling de <Body> sous
+        // <Envelope>, ne doit plus casser le matching d'un ancetre deja matche (Envelope).
         let body = br#"<SOAP:Envelope><SOAP-ENV:Header></SOAP-ENV:Header><SOAP-ENV:Body><ns3:recherche><ns3:Siret>12345678901234</ns3:Siret></ns3:recherche></SOAP-ENV:Body></SOAP:Envelope>"#;
         let rules = vec![simple_rule(
             "soap-header-sibling",
@@ -1136,7 +1131,7 @@ mod tests {
 
     #[test]
     fn evaluate_group_hint_query_param_found_as_path_param() {
-        // Cas exact du sujet : l'utilisateur voulait un path param mais a
+        // Cas typique : l'utilisateur voulait un path param mais a
         // choisi query param par erreur.
         let group = cg(
             vec![Condition {

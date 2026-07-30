@@ -219,12 +219,12 @@ test.describe('Testeur de regle : condition mal choisie contre une vraie requete
   });
 });
 
-// Visibilite des erreurs d'execution de script (cf CLAUDE.md, "Visibilite
-// des erreurs de script") : avant cette extension, /api/rule-test ne
-// rejouait que le matching, jamais les scripts — un script casse (fonction
-// Rhai inexistante) restait invisible du testeur, exactement comme en
-// production (soft-fail + log serveur uniquement). Ces 2 tests couvrent le
-// cas d'erreur ET le cas nominal (map/lookup correct) demandes en E2E.
+// Visibilite des erreurs d'execution de script : avant cette extension,
+// /api/rule-test ne rejouait que le matching, jamais les scripts — un
+// script casse (fonction Rhai inexistante) restait invisible du testeur,
+// exactement comme en production (soft-fail + log serveur uniquement). Ces
+// 2 tests couvrent le cas d'erreur ET le cas nominal (map/lookup correct)
+// demandes en E2E.
 test.describe('Testeur de regle : execution des scripts', () => {
   test.beforeEach(async ({ request }) => {
     await request.delete(`${API}/config/reset`);
@@ -264,8 +264,8 @@ test.describe('Testeur de regle : execution des scripts', () => {
 
   test('un script de correspondance (map/lookup) correct ne produit aucune erreur', async ({ page, request }) => {
     // listen_path avec {name} : le path param est deja extrait au niveau
-    // SERVICE (cf CLAUDE.md, capture du detail de requete), donc disponible
-    // via request.path.name des la capture, sans meme avoir besoin d'un
+    // SERVICE (capture du detail de requete), donc disponible via
+    // request.path.name des la capture, sans meme avoir besoin d'un
     // sous-chemin de regle.
     await request.post(`${API}/services`, {
       data: validService('lookup-e2e-svc', { listen_path: '/lookup/{name}' }),
@@ -299,14 +299,13 @@ test.describe('Testeur de regle : execution des scripts', () => {
     await expect(page.getByTestId('rule-tester-script-errors')).not.toBeVisible();
   });
 
-  // Visibilite d'un resultat REUSSI mais errone (cf CLAUDE.md, "seeded_pick
-  // sur une liste d'objets : valeurs absentes/incorrectes sans erreur") :
-  // un script sans la moindre erreur d'execution peut quand meme produire
-  // un resultat que l'auteur de la regle n'attendait pas. Ce test reproduit
-  // exactement le signalement (liste de villes + seeded_pick, objet pioche
-  // imbrique sous une cle) et verifie que le testeur montre desormais le
-  // contenu REEL produit, y compris le champ imbrique serialise en JSON
-  // valide (correctif de dynamic_field_to_string, src/engine/script.rs).
+  // Visibilite d'un resultat REUSSI mais errone : un script sans la moindre
+  // erreur d'execution peut quand meme produire un resultat que l'auteur de
+  // la regle n'attendait pas. Ce test reproduit exactement ce cas (liste de
+  // villes + seeded_pick, objet pioche imbrique sous une cle) et verifie que
+  // le testeur montre desormais le contenu REEL produit, y compris le champ
+  // imbrique serialise en JSON valide (correctif de dynamic_field_to_string,
+  // src/engine/script.rs).
   test('affiche le resultat reel d\'un script reussi (seeded_pick sur une liste d\'objets)', async ({ page, request }) => {
     await request.post(`${API}/services`, {
       data: validService('seeded-pick-object-svc', { listen_path: '/quote/{siret}' }),

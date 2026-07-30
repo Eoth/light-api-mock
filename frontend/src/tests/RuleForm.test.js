@@ -320,7 +320,7 @@ describe('RuleForm: detecteur de conflit a la sauvegarde', () => {
   });
 });
 
-describe('RuleForm: action Proxy masquee pour un service purement mocke (sujet 22)', () => {
+describe('RuleForm: action Proxy masquee pour un service purement mocke', () => {
   it('affiche les deux actions (Mock et Proxy) quand le service a une cible', () => {
     const { getByTestId, queryByTestId } = render(RuleForm, {
       props: { isPurelyMocked: false },
@@ -363,7 +363,7 @@ describe('RuleForm: action Proxy masquee pour un service purement mocke (sujet 2
   });
 });
 
-describe('RuleForm: avertissement avant de persister le changement proxy -> mock (complement sujet 22)', () => {
+describe('RuleForm: avertissement avant de persister le changement proxy -> mock', () => {
   function staleProxyRule(overrides = {}) {
     return {
       name: 'stale-proxy-rule',
@@ -450,8 +450,7 @@ describe('RuleForm: avertissement avant de persister le changement proxy -> mock
   });
 });
 
-// Restauration de la vue d'origine a l'edition (retour 1, cf CLAUDE.md
-// "Restauration de la vue d'origine a l'edition d'une reponse"). Avant cette
+// Restauration de la vue d'origine a l'edition (retour 1). Avant cette
 // passe, TOUTE regle deja construite via un mode structure atterrissait en
 // "Template avance" a la reouverture -- Rule.response_mode (backend) leve
 // l'ambiguite.
@@ -527,7 +526,7 @@ describe('RuleForm: restauration de la vue d\'origine a l\'edition (retour 1)', 
     expect(queryByTestId('xml-paste-builder-textarea')).not.toBeInTheDocument();
   });
 
-  it('une regle sans response_mode (sauvegardee avant ce sujet) degrade gracieusement vers l\'ancienne heuristique (Template avance)', () => {
+  it('une regle sans response_mode (sauvegardee avant l\'ajout de ce champ) degrade gracieusement vers l\'ancienne heuristique (Template avance)', () => {
     const rule = {
       name: 'existing',
       action: 'mock',
@@ -563,10 +562,10 @@ describe('RuleForm: restauration de la vue d\'origine a l\'edition (retour 1)', 
   });
 });
 
-// Fusion Format x Assiste/Detail (retour 3, cf CLAUDE.md). 5 boutons de
-// Format au lieu de 7 boutons de mode a plat ; JSON/XML se declinent en 2
-// sous-modes via un bouton "Modifier en detail" plutot qu'un second niveau
-// de bouton visible d'emblee.
+// Fusion Format x Assiste/Detail (retour 3). 5 boutons de Format au lieu de
+// 7 boutons de mode a plat ; JSON/XML se declinent en 2 sous-modes via un
+// bouton "Modifier en detail" plutot qu'un second niveau de bouton visible
+// d'emblee.
 describe('RuleForm: fusion Format x Assiste/Detail (retour 3)', () => {
   it('affiche 5 boutons de format (JSON/XML/Texte/Template avance/Vide), pas 7', () => {
     const { container } = render(RuleForm);
@@ -729,9 +728,9 @@ describe('RuleForm: retour vers la vue "par exemple" depuis le detail (correctif
   });
 });
 
-// Pipes en mode "par exemple" (retour 2, cf CLAUDE.md). Round-trip complet :
-// coller un exemple, assigner une source + un pipe, verifier que le payload
-// final envoye au backend contient bien `{{expr | pipe}}`.
+// Pipes en mode "par exemple" (retour 2). Round-trip complet : coller un
+// exemple, assigner une source + un pipe, verifier que le payload final
+// envoye au backend contient bien `{{expr | pipe}}`.
 describe('RuleForm: pipes en mode "par exemple" (retour 2)', () => {
   it('un pipe applique en mode JSON par exemple se retrouve dans le template du payload', async () => {
     checkRuleConflicts.mockResolvedValue({ conflicts: [] });

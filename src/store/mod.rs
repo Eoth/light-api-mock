@@ -877,26 +877,17 @@ mod tests {
         std::fs::remove_dir_all(&dir).ok();
     }
 
-    /// Regression pour la cause racine du flaky E2E write-behind (sujets
-    /// 24/27, cf CLAUDE.md §7) : `backups/protected/` n'a AUCUNE rotation par
-    /// quantite (contrairement a `backups/`, cape a BACKUP_MAX_COUNT) — seule
+    /// `backups/protected/` n'a AUCUNE rotation par quantite (contrairement a
+    /// `backups/`, cape a BACKUP_MAX_COUNT) — seule
     /// `purge_expired_protected_backups` (appelee sous verrou, sur CHAQUE
-    /// mutation) le borne, par age. En dev local/E2E ou `DELETE
-    /// /api/config/reset` est appele avant quasi chaque test (donc chaque run
-    /// de la suite ajoute des dizaines de backups proteges, jamais vieux de
-    /// 30 jours entre deux sessions), ce dossier avait grossi a >1300
-    /// entrees sur cette machine — reproduit ici avec 1500 entrees fraiches +
-    /// 1 expiree. Avant le passage de `path.is_file()` (un `stat()` par
-    /// fichier) a `entry.file_type()` (deja connu de l'enumeration du
-    /// repertoire, gratuit sur Windows), cette fonction faisait ~1500 appels
-    /// systeme synchrones SOUS LE VERROU D'ECRITURE a CHAQUE mutation de
-    /// l'appli (pas seulement les resets) — mesure directement responsable
-    /// (avec la latence intrinseque d'un dossier synchronise OneDrive) de
-    /// ralentissements suffisants pour occasionnellement depasser la fenetre
-    /// de polling (5s) des tests E2E write-behind. Ce test ne mesure pas le
-    /// temps (fragile en CI) mais verifie la CORRECTION a l'echelle : seule
-    /// l'entree expiree est purgee parmi 1501, aucune des fraiches n'est
-    /// touchee.
+    /// mutation) le borne, par age. Ce dossier peut grossir a plusieurs
+    /// milliers d'entrees en usage prolonge : `entry.file_type()` (deja connu
+    /// de l'enumeration du repertoire) est utilise plutot que `path.is_file()`
+    /// (un `stat()` par fichier) pour que le cout de ce scan, appele SOUS LE
+    /// VERROU D'ECRITURE a chaque mutation, reste negligeable meme a grande
+    /// echelle. Ce test ne mesure pas le temps (fragile en CI) mais verifie la
+    /// CORRECTION a l'echelle : seule l'entree expiree est purgee parmi 1501,
+    /// aucune des fraiches n'est touchee.
     #[tokio::test]
     async fn purge_expired_protected_backups_correct_with_many_entries() {
         let dir = temp_dir();

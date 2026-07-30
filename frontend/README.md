@@ -57,8 +57,7 @@ Source unique de verite pour le format template lightMock. Centralise :
 Le selecteur expose 5 boutons de **Format** (JSON, XML, Texte, Template avance, Vide) ; JSON et
 XML se declinent chacun en 2 sous-modes internes (`responseMode`), jamais visibles comme 2 boutons
 distincts : le format demarre toujours en `*-paste` (assiste), et un bouton "Modifier en detail"
-revele `*-guided` (detail) SANS conversion (memes Fields, juste plus de capacites d'edition -- cf
-CLAUDE.md "Fusion Format x Assiste/Detail").
+revele `*-guided` (detail) SANS conversion (memes Fields, juste plus de capacites d'edition).
 
 | responseMode (interne) | Description |
 |---|---|

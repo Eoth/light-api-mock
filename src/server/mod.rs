@@ -64,9 +64,8 @@ struct RuntimeConfig {
 
 // Permet de configurer l'URL de base que le frontend utilise pour appeler
 // l'API (`/api/*`) INDEPENDAMMENT du Host sur lequel la SPA elle-meme est
-// chargee (voir CLAUDE.md, "URL de l'API configurable independamment du Host
-// du frontend"). Sans configuration, le frontend continue de deriver l'URL
-// de l'API de son propre Host (comportement historique, URL relative) : ca
+// chargee. Sans configuration, le frontend continue de deriver l'URL de
+// l'API de son propre Host (comportement historique, URL relative) : ca
 // fonctionne quand front et back sont co-localises (deploiement par defaut),
 // mais casse des que l'infrastructure route `/api` vers une origine
 // distincte de celle qui sert les assets statiques (ex. K8s/Gloo Edge avec
@@ -85,15 +84,13 @@ struct RuntimeConfig {
 //
 // Configuration au niveau du CONTENEUR (variable d'environnement
 // `API_BASE_URL`, lue directement ici a chaque requete), pas au moment du
-// BUILD (pas de `VITE_API_BASE_URL`) : la meme image Docker, buildee une
-// seule fois, peut ainsi etre configuree differemment par environnement de
-// deploiement sans rebuild ("build once, configure per environment"),
-// cf CLAUDE.md sujet posture securite/conformite (reproductibilite du
-// build). Lu directement via `std::env::var` plutot que mis en cache dans
+// BUILD : la meme image Docker, buildee une seule fois, peut ainsi etre
+// configuree differemment par environnement de deploiement sans rebuild.
+// Lu directement via `std::env::var` plutot que mis en cache dans
 // `AppState` : evite d'ajouter un champ a AppState et a ses ~11 sites de
 // construction dans les tests, pour un parametre qui ne varie jamais en
 // cours d'execution d'un pod — meme discipline que BACKUP_MAX_COUNT/
-// MESSAGE_LOG_TTL_MS (cf CLAUDE.md §7).
+// MESSAGE_LOG_TTL_MS.
 async fn runtime_config_handler() -> axum::Json<RuntimeConfig> {
     let api_base_url = std::env::var("API_BASE_URL")
         .unwrap_or_default()
@@ -139,8 +136,7 @@ mod tests {
     use super::*;
 
     // API_BASE_URL est une variable d'environnement process-wide : les tests
-    // qui la mutent doivent tenir ce mutex pour tout leur corps (meme pattern
-    // que BACKUP_MAX_COUNT/MESSAGE_LOG_TTL_MS, cf CLAUDE.md §7) sans quoi deux
+    // qui la mutent doivent tenir ce mutex pour tout leur corps sans quoi deux
     // tests concurrents (cargo test lance les fns de test en parallele) se
     // marchent dessus de facon intermittente.
     static ENV_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
@@ -171,11 +167,9 @@ mod tests {
         assert_eq!(config.api_base_url, "https://api.example.com");
     }
 
-    // Suite des sites de construction litterale d'AppState deja repertories
-    // dans CLAUDE.md (§5 point 28) : un nouveau champ obligatoire y ajouterait
-    // un site de plus a maintenir. runtime_config_handler n'a volontairement
-    // aucune dependance a AppState (lit l'env directement), donc ce helper
-    // reste identique aux ~10 autres deja existants dans le projet.
+    // runtime_config_handler n'a volontairement aucune dependance a AppState
+    // (lit l'env directement) : un nouveau champ obligatoire sur AppState
+    // ajouterait un site de construction de plus a maintenir dans les tests.
     async fn spawn_test_app(auth_config: crate::auth::AuthConfig) -> String {
         let data_dir = std::env::temp_dir().join(format!(
             "lightmock-servermod-test-{}",

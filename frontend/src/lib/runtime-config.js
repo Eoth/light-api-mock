@@ -4,8 +4,8 @@
 // chargee — necessaire des que l'infrastructure route /api vers une origine
 // distincte de celle qui sert les assets statiques (ex. Kubernetes/Gloo Edge
 // avec un VirtualService pour le front et un RouteTable/Upstream separe pour
-// le back). Voir CLAUDE.md pour le detail de la decision (config au niveau
-// du conteneur plutot qu'au build, comme AuthConfig cote backend).
+// le back). Config resolue au niveau du conteneur plutot qu'au build, comme
+// AuthConfig cote backend.
 //
 // Servi par le backend a /runtime-config.json (PAS sous /api : doit rester
 // joignable meme quand /api est route separement par l'infrastructure — ce

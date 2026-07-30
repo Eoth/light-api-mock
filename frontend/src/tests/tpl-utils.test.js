@@ -486,7 +486,7 @@ describe('xmlFieldsToTemplate avec attributs', () => {
     expect(xmlFieldsToTemplate(fields)).toBe('<response><client id="7"><nom>ACME</nom></client></response>');
   });
 
-  it('un champ/racine sans attributes produit exactement le meme texte qu\'avant ce sujet (retro-compat)', () => {
+  it('un champ/racine sans attributes produit exactement le meme texte qu\'avant l\'ajout des attributs (retro-compat)', () => {
     const fields = [{ tag: 'id', nodeType: 'value', source: 'uuid', value: '', pipe: '' }];
     expect(xmlFieldsToTemplate(fields, 'root')).toBe('<root><id>{{uuid}}</id></root>');
   });

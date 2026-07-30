@@ -37,8 +37,8 @@ entre versions mineures.
 - Support Kafka optionnel (feature Cargo `messaging-kafka`, non compilée par défaut).
 - Interface Svelte 5 accessible (RGAA niveau AA), mode sombre.
 
-Voir [CLAUDE.md](CLAUDE.md) pour le détail exhaustif des décisions d'architecture et l'historique
-complet des évolutions ayant mené à cette version.
+Voir l'historique des commits pour le détail des décisions d'architecture ayant mené à cette
+version.
 
 [Unreleased]: https://github.com/eoth/light-api-mock/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/eoth/light-api-mock/releases/tag/v0.1.0

@@ -1,17 +1,17 @@
 # Infrastructure E2E data-driven
 
-Cette page documente l'infrastructure ajoutee au sujet 9b (JSON de selecteurs + runner de
-scenarios) et son format de regroupement par domaine (sujet 9c). Elle vit **a cote** de la
-suite Playwright classique (fichiers `*.spec.js`/`*.spec.mjs` de ce dossier) sans la remplacer
-entierement — seuls les parcours qui pilotent reellement l'UI sont candidats a la migration (voir
-la section "Suite existante vs infrastructure data-driven" plus bas pour le detail des tests
-API-only volontairement non-candidats).
+Cette page documente l'infrastructure E2E data-driven (JSON de selecteurs + runner de scenarios,
+regroupes par domaine fonctionnel). Elle vit **a cote** de la suite Playwright classique
+(fichiers `*.spec.js`/`*.spec.mjs` de ce dossier) sans la remplacer entierement — seuls les
+parcours qui pilotent reellement l'UI sont candidats a la migration (voir la section "Suite
+existante vs infrastructure data-driven" plus bas pour le detail des tests API-only
+volontairement non-candidats).
 
 ## Vue d'ensemble
 
 ```
 frontend/e2e/
-  selectors.json           <- SOURCE UNIQUE des selecteurs (voir sujet 9a, data-testid)
+  selectors.json           <- SOURCE UNIQUE des selecteurs (generee a partir des data-testid)
   scenario-runner.js        <- interpreteur JSON minimal (pas de cucumber/parseur Gherkin)
   scenario-runner.spec.js   <- fichier Playwright qui charge et rejoue les scenarios ci-dessous
   scenarios/
@@ -31,9 +31,9 @@ selecteur en dur — le nom logique est resolu vers un vrai selecteur CSS `[data
 
 ## Format d'un fichier de domaine (`*.scenarios.json`)
 
-**Un fichier par domaine fonctionnel, PAS un fichier par scenario individuel** (revu au sujet
-9c — l'ancien format "un scenario = un fichier" a produit ~24 petits fichiers difficiles a
-retrouver a l'echelle ; la lecon a ete tiree). Chaque fichier de domaine contient un objet
+**Un fichier par domaine fonctionnel, PAS un fichier par scenario individuel** (un ancien format
+"un scenario = un fichier" a produit ~24 petits fichiers difficiles a retrouver a l'echelle ; la
+lecon a ete tiree). Chaque fichier de domaine contient un objet
 `{domain, scenarios: [...]}` :
 
 ```json
@@ -96,9 +96,9 @@ fichier `*.spec.js` d'origine) :
 - `services.scenarios.json` : CRUD de service, recherche, toggle mock/proxy, identite
   inter-groupes.
 
-Si aucun domaine existant ne convient a un nouveau lot de migration (sujet 9c, lots futurs),
-c'est une decision explicite a documenter en ajoutant une entree a la liste ci-dessus — ne pas
-trancher silencieusement en ajoutant un 5e fichier sans mettre a jour cette liste.
+Si aucun domaine existant ne convient a un nouveau lot de migration, c'est une decision explicite
+a documenter en ajoutant une entree a la liste ci-dessus — ne pas trancher silencieusement en
+ajoutant un 5e fichier sans mettre a jour cette liste.
 
 Ajouter l'entree `{scenario, steps}` dans le tableau `scenarios` du fichier de domaine choisi,
 avec un nom de scenario (`scenario`) unique DANS ce fichier — `loadScenario(filename,
@@ -165,11 +165,11 @@ coherence humaine est la garde-fou, pas une CI dediee). En cas de doute sur un d
 grep -rhoE 'data-testid="[^"]*"' frontend/src --include="*.svelte" | sort -u
 ```
 
-## Captures d'écran pour docs/ (sujet 13b)
+## Captures d'écran pour docs/
 
-`docs/` (sujet 13a) contient des marqueurs `<!-- SCREENSHOT: ... -->` remplacés par de vraies
-images générées à partir de la suite E2E existante, pour qu'une capture reste à jour
-automatiquement au lieu de se périmer au premier changement d'UI.
+`docs/` contient des marqueurs `<!-- SCREENSHOT: ... -->` remplacés par de vraies images
+générées à partir de la suite E2E existante, pour qu'une capture reste à jour automatiquement au
+lieu de se périmer au premier changement d'UI.
 
 - **`docs-screenshot.js`** exporte `docsScreenshot(page, filename)` : no-op tant que la variable
   d'environnement `DOCS_SCREENSHOTS` n'est pas positionnée (donc **zéro coût sur la suite E2E

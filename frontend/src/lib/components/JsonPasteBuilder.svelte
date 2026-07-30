@@ -3,12 +3,11 @@
   // pipe) des champs deja detectes par l'analyse de l'exemple colle -- ni
   // renommage de cle, ni ajout/suppression/reordonnancement, ni changement
   // de type (contrairement au mode guide, JsonResponseBuilder.svelte, qui
-  // partage la MEME forme de Fields mais permet l'edition complete). Voir
-  // CLAUDE.md, "Fusion Format x Assiste/Detail" pour la relation entre les
-  // deux : RuleResponseSection.svelte affiche un bouton "Modifier en detail"
-  // qui reutilise TEL QUEL le tableau `fields` de ce composant pour ouvrir
+  // partage la MEME forme de Fields mais permet l'edition complete).
+  // RuleResponseSection.svelte affiche un bouton "Modifier en detail" qui
+  // reutilise TEL QUEL le tableau `fields` de ce composant pour ouvrir
   // JsonResponseBuilder, transition sans perte puisque la structure de
-  // donnees est identique (verifie en etape 0 de ce sujet).
+  // donnees est identique.
   import { untrack } from 'svelte';
   import { buildExpr as sharedBuildExpr, fieldsToTemplate, exampleJsonToFields } from '../tpl-utils.js';
 
@@ -29,13 +28,10 @@
   // Pliage/depliage des champs 'object' (seul type imbrique reellement
   // rendu par renderFields ci-dessous -- array-values/array-objects
   // n'affichent qu'un badge "tableau" sans recursion, limitation
-  // preexistante et non liee a ce correctif). Meme mecanisme que
-  // XmlPasteBuilder.svelte/JsonResponseBuilder.svelte (Set en memoire, cle
+  // preexistante non liee a ce mecanisme). Meme approche que
+  // XmlPasteBuilder.svelte/JsonResponseBuilder.svelte : Set en memoire, cle
   // par testPath positionnel, tout deplie par defaut, attribut `hidden`
-  // jamais un {#if} -- cf CLAUDE.md point 64) : ce mode "par exemple" en
-  // avait ete prive par oubli lors du sujet 25 (qui n'avait touche que les
-  // vues detail JsonResponseBuilder/XmlResponseBuilder), alors que son
-  // equivalent XML (XmlPasteBuilder, sujet 27) l'a des l'origine.
+  // jamais un {#if} (demonter perdrait le contenu du sous-arbre replie).
   let collapsedPaths = $state(new Set());
 
   function isCollapsed(testPath) { return collapsedPaths.has(testPath); }
@@ -67,11 +63,9 @@
     'BoolRandom', 'LoremSentence', 'CountryFR', 'IbanFR',
   ];
 
-  // Pipes (retour beta-testeur : presents en mode guide, absents ici alors
-  // que ce mode est juge excellent par ailleurs) -- memes options que
-  // JsonResponseBuilder.svelte, dans la limite du raisonnable : uniquement
-  // la liste deja existante, aucune nouvelle transformation inventee pour ce
-  // sujet.
+  // Pipes : memes options que JsonResponseBuilder.svelte, dans la limite du
+  // raisonnable -- uniquement la liste deja existante, aucune nouvelle
+  // transformation inventee ici.
   const pipeOptions = [
     { value: 'lower', label: 'lower — minuscules' },
     { value: 'upper', label: 'upper — majuscules' },
@@ -134,9 +128,9 @@
     return ['fixed', 'path', 'query', 'header', 'body', 'script'].includes(src);
   }
 
-  // Meme clarification que JsonResponseBuilder.svelte/XmlResponseBuilder.svelte
-  // (cf CLAUDE.md, "seeded_pick sur une liste d'objets") : un seul niveau de
-  // cle plate est navigable ({{script.champ}}), jamais un chemin imbrique.
+  // Meme clarification que JsonResponseBuilder.svelte/XmlResponseBuilder.svelte :
+  // un seul niveau de cle plate est navigable ({{script.champ}}), jamais un
+  // chemin imbrique.
   function valuePlaceholder(src) {
     if (src === 'fixed') return 'valeur fixe';
     if (src === 'script') return 'ex: nom (vide = {{script}} entier ; 1 seul niveau — testez la regle pour voir les cles)';

@@ -151,8 +151,7 @@ describe('XmlPasteBuilder — attributs XML (specificite absente du modele JSON)
 });
 
 // startParsed/rootTag/rootAttributes : seedent l'etat initial pour la
-// restauration d'une regle existante (cf CLAUDE.md, "Restauration de la vue
-// d'origine..."), miroir de JsonPasteBuilder.test.js.
+// restauration d'une regle existante, miroir de JsonPasteBuilder.test.js.
 describe('XmlPasteBuilder — startParsed/rootTag (restauration a l\'edition, retour 1)', () => {
   it('affiche directement la liste de noeuds quand startParsed=true, sans repasser par la zone de collage', () => {
     const fields = [{ tag: 'siret', nodeType: 'value', source: 'path', value: 'siret', pipe: '', attributes: [] }];
@@ -173,8 +172,8 @@ describe('XmlPasteBuilder — startParsed/rootTag (restauration a l\'edition, re
   });
 });
 
-// Pipes (retour 2, cf CLAUDE.md) : sur le contenu d'un noeud valeur
-// uniquement (pas les attributs, cf commentaire du composant).
+// Pipes (retour 2) : sur le contenu d'un noeud valeur uniquement (pas les
+// attributs, cf commentaire du composant).
 describe('XmlPasteBuilder — pipes (retour 2)', () => {
   it('n\'affiche pas de champ pipe pour une source "fixed"', async () => {
     const { getByLabelText, getByText, queryByLabelText } = render(XmlPasteBuilder);

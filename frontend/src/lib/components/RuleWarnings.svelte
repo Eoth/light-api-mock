@@ -1,7 +1,6 @@
 <script>
   // Orchestration purement presentationnelle des deux avertissements NON
-  // BLOQUANTS affiches a la sauvegarde d'une regle (cf CLAUDE.md §3/§5
-  // points 56 et 62) :
+  // BLOQUANTS affiches a la sauvegarde d'une regle :
   // - stale-proxy : une regle heritee action=proxy rouverte alors que le
   //   service est devenu purement mocke (l'enregistrer la fera basculer
   //   reellement en mock) ;
