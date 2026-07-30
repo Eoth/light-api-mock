@@ -1,8 +1,8 @@
 # lightMock
 
-Mock & Proxy Intelligent pour environnements Kubernetes.
+Mock & Proxy HTTP intelligent, deployable partout : Kubernetes, Docker Compose ou binaire natif.
 
-Un seul binaire Rust qui intercepte les requetes HTTP, les mock ou les proxifie vers le vrai backend, configurable en temps reel via une interface web. Chaque service est expose sous `/{service_name}/...` (ou `/{group_code}/{service_name}/...` s'il appartient a un groupe), sans redemarrage de pod.
+Un seul binaire Rust qui intercepte les requetes HTTP, les mock ou les proxifie vers le vrai backend, configurable en temps reel via une interface web. Chaque service est expose sous `/{service_name}/...` (ou `/{group_code}/{service_name}/...` s'il appartient a un groupe), sans redemarrer le binaire.
 
 ## Fonctionnalites
 
