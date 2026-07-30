@@ -265,13 +265,11 @@ describe('RuleTester: appel API et affichage du resultat', () => {
     expect(queryByTestId('rule-tester-script-errors')).not.toBeInTheDocument();
   });
 
-  // --- script_results : visibilite d'un resultat REUSSI mais errone (cf
-  // CLAUDE.md "seeded_pick sur une liste d'objets : valeurs
-  // absentes/incorrectes sans erreur"). Un script sans erreur d'execution
-  // peut quand meme produire un resultat inattendu (typo de cle, objet
-  // imbrique non navigable) — ces tests verifient que le testeur montre
-  // desormais CE QUE le script a reellement produit, pas seulement l'absence
-  // d'erreur.
+  // --- script_results : visibilite d'un resultat REUSSI mais errone. Un
+  // script sans erreur d'execution peut quand meme produire un resultat
+  // inattendu (typo de cle, objet imbrique non navigable) — ces tests
+  // verifient que le testeur montre desormais CE QUE le script a reellement
+  // produit, pas seulement l'absence d'erreur.
 
   it('affiche les champs produits par un script reussi (ex: objet pioche via seeded_pick)', async () => {
     testRule.mockResolvedValue({

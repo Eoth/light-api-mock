@@ -5,8 +5,7 @@ import { loadRuntimeConfig, _resetForTests } from '../lib/runtime-config.js';
 // Verifie que api.js compose reellement ses appels avec l'URL de base
 // resolue par runtime-config.js (defaut '' -> chemin relatif, ou l'URL
 // fournie par /runtime-config.json) — le point de raccordement concret pour
-// le sujet "URL de l'API configurable independamment du Host du frontend",
-// cf CLAUDE.md.
+// rendre l'URL de l'API configurable independamment du Host du frontend.
 describe('api.js — resolution de l URL de base', () => {
   beforeEach(() => {
     _resetForTests();

@@ -93,18 +93,13 @@ impl ScriptEngine {
         });
 
         // parse_date : sens inverse de date_now/date_past/date_future — parse une
-        // date SAISIE (ex. par l'utilisateur d'une API mockee) selon un pattern
-        // EXPLICITE (jamais de detection automatique du format : ambigu, ex.
-        // dd/MM vs MM/dd) et retourne le nombre de millisecondes depuis epoch.
-        // Pattern a jetons fixes (yyyy/MM/dd/HH/mm/ss, tout autre caractere est
-        // litteral) plutot qu'une syntaxe strftime : aucune bibliotheque de date
-        // n'est presente dans le projet (cf format_date_offset ci-dessus), en
-        // ajouter une uniquement pour interpreter des patterns strftime aurait
-        // viole la contrainte de sobriete de dependances. Erreur d'execution
+        // date SAISIE selon un pattern EXPLICITE (jamais de detection automatique
+        // du format : ambigu, ex. dd/MM vs MM/dd) et retourne le nombre de
+        // millisecondes depuis epoch. Pattern a jetons fixes (yyyy/MM/dd/HH/mm/ss,
+        // tout autre caractere est litteral) plutot qu'une syntaxe strftime, pour
+        // ne pas ajouter de dependance de formatage de date. Erreur d'execution
         // Rhai (jamais un echec silencieux) si le texte ne correspond pas au
-        // pattern ou si la date est invalide (ex. 31 fevrier) — cf sujet
-        // "Visibilite des erreurs de script" (CLAUDE.md), meme discipline de
-        // visibilite appliquee ici.
+        // pattern ou si la date est invalide (ex. 31 fevrier).
         engine.register_fn(
             "parse_date",
             |text: &str, pattern: &str| -> Result<i64, Box<rhai::EvalAltResult>> {
@@ -408,14 +403,12 @@ fn seeded_pick_impl(seed: &str, list: &rhai::Array) -> rhai::Dynamic {
 // {{post_script.champ}}, cf template.rs::resolve_variable — une seule cle
 // plate, jamais de chemin imbrique). Un scalaire (string/int/float/bool/
 // unit) garde le comportement historique (`Dynamic::to_string()`, texte brut
-// non-echappe, cf CLAUDE.md point 67 "jamais re-echappee"). Une valeur
-// Map/Array (typiquement un objet pioche via seeded_pick puis imbrique sous
-// une cle, ex. `#{ ville: pick, id: uuid() }`) est desormais serialisee en
-// JSON valide (via dynamic_to_json_value, deja utilisee par to_json())
-// plutot que la syntaxe Display native de Rhai (`#{"k": "v", ...}`), qui
-// n'etait ni du JSON ni du XML exploitable une fois collee dans un template
-// de reponse — cause reelle diagnostiquee du signalement "seeded_pick sur
-// une liste d'objets : valeurs incorrectes sans erreur" (cf CLAUDE.md).
+// jamais re-echappe). Une valeur Map/Array (typiquement un objet pioche via
+// seeded_pick puis imbrique sous une cle, ex. `#{ ville: pick, id: uuid() }`)
+// est serialisee en JSON valide (via dynamic_to_json_value, deja utilisee par
+// to_json()) plutot que la syntaxe Display native de Rhai (`#{"k": "v", ...}`),
+// qui n'est ni du JSON ni du XML exploitable une fois collee dans un template
+// de reponse.
 fn dynamic_field_to_string(value: &rhai::Dynamic) -> String {
     if value.is_map() || value.is_array() {
         serde_json::to_string(&dynamic_to_json_value(value)).unwrap_or_default()
@@ -492,7 +485,7 @@ fn dynamic_to_json_value(value: &rhai::Dynamic) -> serde_json::Value {
 // seul le PREMIER niveau d'enfants de chaque item est capture ; une
 // structure imbriquee plus profonde a l'interieur d'un item n'est pas
 // supportee (ignoree silencieusement) — un vrai parseur XML->arbre generique
-// serait disproportionne pour ce besoin (cf CLAUDE.md, sobriete des API).
+// serait disproportionne pour ce besoin.
 fn parse_xml_items_impl(xml: &str, path: &str) -> rhai::Array {
     use quick_xml::events::Event;
     use quick_xml::reader::Reader;
@@ -1007,10 +1000,8 @@ mod tests {
 
     #[test]
     fn parse_date_error_is_visible_not_silent() {
-        // Coherent avec la discipline de visibilite des erreurs de script
-        // (sujet "Visibilite des erreurs de script", CLAUDE.md) : une date
-        // invalide doit produire une VRAIE erreur d'execution (Err), jamais
-        // une valeur vide/silencieuse comme le ferait une cle de map absente.
+        // Une date invalide doit produire une VRAIE erreur d'execution (Err),
+        // jamais une valeur vide/silencieuse comme le ferait une cle de map absente.
         let engine = ScriptEngine::new();
         let result = engine.execute(r#"parse_date("31/02/2026", "dd/MM/yyyy")"#, &empty_ctx());
         assert!(result.is_err());
@@ -1273,10 +1264,10 @@ mod tests {
 
     #[test]
     fn parse_xml_items_extracts_single_soap_operation_value_with_header_sibling() {
-        // Cas d'usage verifie (sujet "SOAPAction recherche/Siret") : extraire UNE
-        // valeur (pas une liste) du corps d'une requete SOAP realiste, avec un
-        // <Header></Header> non-autoferme sibling de <Body> (structure SOAP typique)
-        // et plusieurs champs enfants (Nom + Siret) dans l'element d'operation.
+        // Cas d'usage : extraire UNE valeur (pas une liste) du corps d'une requete
+        // SOAP realiste, avec un <Header></Header> non-autoferme sibling de <Body>
+        // (structure SOAP typique) et plusieurs champs enfants (Nom + Siret) dans
+        // l'element d'operation.
         // Pattern retenu : parse_xml_items() sur le chemin qui mene a l'element
         // d'operation lui-meme (pas jusqu'a la feuille), puis `[0].Champ` — l'element
         // d'operation n'a qu'UNE occurrence sous Body, donc l'array a toujours une
@@ -1372,15 +1363,12 @@ mod tests {
         assert!(result.value.contains("<doubledQty>18</doubledQty>"));
     }
 
-    // --- Scripts "complexes" representatifs (cf CLAUDE.md, "Visibilite des
-    // erreurs de script" + docs/scripts-rhai.md) : map/lookup, boucle avec
-    // condition, acces combine a plusieurs sources de contexte. Objectif :
-    // securiser ces usages a l'avenir (pas seulement le cas precis
-    // remonte), en couvrant la VRAIE syntaxe correcte (verifiee au moment du
-    // diagnostic : indexation de map `#{}` par cle, `.contains()`, `in`,
-    // `.get()`, `switch` fonctionnent tous sans erreur, y compris sur une
-    // cle absente qui renvoie simplement une valeur vide plutot que de
-    // lever une exception).
+    // --- Scripts "complexes" representatifs (cf docs/scripts-rhai.md) :
+    // map/lookup, boucle avec condition, acces combine a plusieurs sources de
+    // contexte. Couvre la VRAIE syntaxe correcte : indexation de map `#{}` par
+    // cle, `.contains()`, `in`, `.get()`, `switch` fonctionnent tous sans
+    // erreur, y compris sur une cle absente qui renvoie simplement une valeur
+    // vide plutot que de lever une exception.
 
     #[test]
     fn map_lookup_returns_mapped_value_for_known_key() {
@@ -1496,16 +1484,12 @@ mod tests {
         assert_eq!(result.fields.get("note").unwrap(), "hello");
     }
 
-    // --- Visibilite des erreurs d'execution (cause racine du sujet
-    // "Visibilite des erreurs de script") : appeler une fonction Rhai
-    // inexistante EST une vraie erreur d'execution (contrairement a un
-    // acces a une cle de map absente, qui renvoie silencieusement une
-    // valeur vide sans jamais lever d'erreur, cf tests ci-dessus). C'est
-    // cette classe d'erreur que engine.execute() remonte via Err(...), et
-    // que run_rule_script (intercept.rs) avale en soft-fail, et que
-    // /api/rule-test (server/api.rs) rend desormais visible au testeur de
-    // regle. Ne pas supprimer ce test : c'est la preuve que le mecanisme de
-    // detection a une vraie erreur a se mettre sous la dent.
+    // Appeler une fonction Rhai inexistante EST une vraie erreur d'execution
+    // (contrairement a un acces a une cle de map absente, qui renvoie
+    // silencieusement une valeur vide sans jamais lever d'erreur, cf tests
+    // ci-dessus). engine.execute() remonte cette classe d'erreur via Err(...),
+    // que run_rule_script (intercept.rs) avale en soft-fail et que
+    // /api/rule-test (server/api.rs) rend visible au testeur de regle.
 
     #[test]
     fn calling_undefined_function_is_a_real_execution_error() {
@@ -1515,29 +1499,21 @@ mod tests {
         assert!(err.contains("totally_undefined_fn"));
     }
 
-    // --- Pattern "liste d'objets + seeded_pick + reutilisation des champs"
-    // (cf CLAUDE.md, sujet "seeded_pick sur une liste d'objets : valeurs
-    // absentes/incorrectes sans erreur"). Diagnostic verifie par reproduction
-    // AVANT tout correctif (probes jetables, retires) : le script s'execute
-    // TOUJOURS sans erreur dans les 4 variantes testees — ce n'est donc PAS
-    // un trou de detection d'erreur (sujet "Visibilite des erreurs de
-    // script" : rien a detecter, il n'y a jamais d'Err ici). Les vraies
-    // causes trouvees :
+    // --- Pattern "liste d'objets + seeded_pick + reutilisation des champs" :
+    // le script s'execute TOUJOURS sans erreur dans les variantes ci-dessous
+    // (pas un trou de detection d'erreur, il n'y a jamais d'Err ici).
     // (a) retourner l'objet pioche DIRECTEMENT au niveau racine du script
     //     fonctionne parfaitement (fields = tous les champs scalaires de
     //     l'objet, directement adressables via {{script.champ}}) ;
-    // (b) mais des qu'un script a besoin de combiner l'objet pioche avec
-    //     autre chose (cas tres naturel : `#{ ville: pick, id: uuid() }`),
-    //     la valeur de "ville" redevient un Map imbrique — AVANT ce
-    //     correctif, ScriptResult.fields le stringifiait via le Display natif
-    //     de Rhai (`#{"cp": "...", ...}`), un texte NI JSON NI XML valide :
-    //     c'est la cause reelle des "valeurs incorrectes" silencieuses.
-    // (c) un champ absent (typo, ou tentative de chemin imbrique
-    //     `{{script.ville.name}}` qui n'est pas supporte — un seul niveau,
-    //     documente) ne leve jamais d'erreur non plus (cf test
-    //     missing_map_key_access_is_not_an_error_unlike_undefined_function),
-    //     generalisation du meme constat aux maps CONSTRUITES PAR
-    //     L'UTILISATEUR (pas seulement `request.*`).
+    // (b) mais des qu'un script combine l'objet pioche avec autre chose
+    //     (ex. `#{ ville: pick, id: uuid() }`), la valeur de "ville" redevient
+    //     un Map imbrique, serialise en JSON valide par dynamic_field_to_string
+    //     (voir plus haut) plutot que via le Display natif de Rhai ;
+    // (c) un champ absent (typo, ou chemin imbrique `{{script.ville.name}}`,
+    //     non supporte — un seul niveau) ne leve jamais d'erreur non plus (cf
+    //     test missing_map_key_access_is_not_an_error_unlike_undefined_function),
+    //     meme constat que pour les maps CONSTRUITES PAR L'UTILISATEUR (pas
+    //     seulement `request.*`).
 
     #[test]
     fn seeded_pick_on_object_list_returned_directly_exposes_all_scalar_fields() {

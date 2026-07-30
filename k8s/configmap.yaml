@@ -15,7 +15,7 @@ data:
   # KEYCLOAK_URL: "https://keycloak.example.com"
   # KEYCLOAK_REALM: "entreprise"
   # KEYCLOAK_CLIENT_ID: "lightmock"
-  # SUPER_ADMINS: "c95tnak"
+  # SUPER_ADMINS: "admin-demo"
   # A definir uniquement si le front est expose sur un domaine/ingress distinct
   # de celui qui route /api (cf k8s/README.md, "Front et back exposes separement") :
   # API_BASE_URL: "https://lightmock-api.example.com"

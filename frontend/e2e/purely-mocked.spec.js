@@ -1,10 +1,10 @@
 import { test, expect } from '@playwright/test';
 
-// Service "purement mocke" (real_target_url vide, sujet 22, cf CLAUDE.md
-// §3). Ce fichier ne pilote jamais l'UI (que des `request.get/post`,
-// assertions sur le code HTTP/le corps de reponse) : un test API-only n'a
-// pas sa place dans un scenario JSON data-driven (aucune etape UI reelle a
-// modeliser) -- meme convention que les tests API-only deja presents dans
+// Service "purement mocke" (real_target_url vide). Ce fichier ne pilote
+// jamais l'UI (que des `request.get/post`, assertions sur le code HTTP/le
+// corps de reponse) : un test API-only n'a pas sa place dans un scenario
+// JSON data-driven (aucune etape UI reelle a modeliser) -- meme convention
+// que les tests API-only deja presents dans
 // critical-flows.spec.js/insee.spec.mjs/security.spec.js, cf
 // frontend/e2e/README.md.
 const BASE = 'http://localhost:7342';

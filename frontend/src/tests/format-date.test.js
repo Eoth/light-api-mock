@@ -3,8 +3,8 @@ import { formatDateTime, formatDateTimePrecise } from '../lib/format-date.js';
 
 // Source unique de verite pour le formatage date/heure, regroupant les 3
 // fidelites d'affichage historiquement dupliquees (RequestLog/MessagingLog,
-// BackupManager, RuleTester) — cf CLAUDE.md. Chaque site d'appel doit
-// continuer a produire exactement le meme rendu qu'avant la centralisation.
+// BackupManager, RuleTester). Chaque site d'appel doit continuer a produire
+// exactement le meme rendu qu'avant la centralisation.
 describe('formatDateTime', () => {
   const ts = new Date('2026-01-10T12:05:09').getTime();
 

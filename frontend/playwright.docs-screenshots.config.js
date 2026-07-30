@@ -1,5 +1,5 @@
-// Config Playwright dediee a la regeneration des captures d'ecran de docs/
-// (sujet 13b). Volontairement SEPAREE de playwright.config.js (utilise par
+// Config Playwright dediee a la regeneration des captures d'ecran de docs/.
+// Volontairement SEPAREE de playwright.config.js (utilise par
 // `npm run test:e2e`) : positionner DOCS_SCREENSHOTS ici, dans le module de
 // config (execute par Node avant le chargement des fichiers de test, donc
 // fonctionne a l'identique sous PowerShell/cmd/bash sans syntaxe shell

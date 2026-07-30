@@ -63,16 +63,13 @@
 
   let focusedFields = $derived(getByPathSafe(fields, focusPath) ?? []);
 
-  // Pliage/depliage des noeuds imbriques (objet/tableau), style IDE (retour
-  // beta-testeur : les arbres profonds fatiguent a parcourir sans pouvoir
-  // replier une branche deja comprise). Etat purement local a la session
-  // d'edition (un simple Set en memoire, jamais persiste — cf CLAUDE.md,
-  // meme sobriete que le niveau 1 de group-expansion-state.svelte.js mais
-  // sans meme le besoin de survivre a un demontage de composant ici). Cle
-  // par testPath (chemin positionnel, identique a celui deja utilise pour
+  // Pliage/depliage des noeuds imbriques (objet/tableau), style IDE. Etat
+  // purement local a la session d'edition (un simple Set en memoire, jamais
+  // persiste — meme sobriete que le niveau 1 de group-expansion-state.svelte.js
+  // mais sans meme le besoin de survivre a un demontage de composant ici).
+  // Cle par testPath (chemin positionnel, identique a celui deja utilise pour
   // les data-testid) : comme le breadcrumb ci-dessus, ne suit pas un champ
-  // au-dela d'un reordonnancement/suppression — limitation mineure assumee,
-  // deja implicitement acceptee par le mecanisme de breadcrumb existant.
+  // au-dela d'un reordonnancement/suppression — limitation mineure assumee.
   // Par defaut tout est deplie (Set vide) : comportement inchange tant que
   // l'utilisateur ne replie rien explicitement.
   let collapsedPaths = $state(new Set());
@@ -189,9 +186,7 @@
   // 'script' doit rester dans cette liste : c'est le champ qui permet de
   // preciser QUELLE cle du resultat de script utiliser (buildExpr produit
   // `script.${f.value}`, ou juste `{{script}}` si vide -- cf tpl-utils.js).
-  // Absent par erreur avant ce correctif alors que la vue "par exemple"
-  // (JsonPasteBuilder.svelte) l'a toujours eu -- cf CLAUDE.md, "diagnostic
-  // reponse JSON/XML".
+  // La vue "par exemple" (JsonPasteBuilder.svelte) l'a toujours eu.
   function needsValueInput(source) {
     return ['fixed', 'path', 'query', 'header', 'body', 'script'].includes(source);
   }
@@ -210,7 +205,7 @@
       // pas ses propres sous-champs individuellement adressables. Utiliser
       // le testeur de regle (bloc "Tester contre une requete reelle") pour
       // voir les cles reellement produites par le script avant de les
-      // reference ici -- cf CLAUDE.md, "seeded_pick sur une liste d'objets".
+      // referencer ici.
       case 'script': return 'ex: nom (vide = {{script}} entier ; 1 seul niveau — testez la regle pour voir les cles)';
       default: return '';
     }

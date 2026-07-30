@@ -8,9 +8,8 @@
   // matche, execute reellement les 3 blocs de script (pre_script/script/
   // post_script) contre la VRAIE requete capturee choisie.
   //
-  // Pourquoi l'execution de script est ici et pas ailleurs (cf CLAUDE.md,
-  // "Visibilite des erreurs de script") : en production, une erreur
-  // d'execution de script (fonction Rhai inexistante, erreur de type...)
+  // Pourquoi l'execution de script est ici et pas ailleurs : en production,
+  // une erreur d'execution de script (fonction Rhai inexistante, erreur de type...)
   // est deliberement avalee en soft-fail (intercept.rs::run_rule_script) —
   // la requete n'est jamais bloquee par un script casse, seul un
   // tracing::warn! cote serveur en garde trace. Ce testeur est le SEUL

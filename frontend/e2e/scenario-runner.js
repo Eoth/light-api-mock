@@ -3,12 +3,12 @@
 // cucumber, pas de parseur Gherkin reel). Les scenarios sont regroupes par
 // domaine fonctionnel dans frontend/e2e/scenarios/*.scenarios.json : un
 // fichier de domaine est {domain, scenarios: [{scenario, steps[]}, ...]}
-// (pas un fichier par scenario individuel, sujet 9c). Les
+// (pas un fichier par scenario individuel). Les
 // selecteurs ne sont JAMAIS en dur dans un scenario : `target` est un nom
 // logique "composant.cle" resolu via selectors.json (SOURCE UNIQUE des
 // selecteurs). Voir frontend/e2e/README.md pour le format complet et
-// comment ajouter un nouveau scenario/selecteur. L'action "screenshot" (sujet 13b, docs/
-// screenshots) est un no-op sauf regeneration explicite -- voir
+// comment ajouter un nouveau scenario/selecteur. L'action "screenshot"
+// (docs/screenshots) est un no-op sauf regeneration explicite -- voir
 // docs-screenshot.js et frontend/e2e/README.md, section captures.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -89,7 +89,7 @@ async function runStep(page, step) {
       return;
     }
     case 'screenshot': {
-      // No-op sauf regeneration explicite des captures docs/ (sujet 13b, cf
+      // No-op sauf regeneration explicite des captures docs/ (cf
       // docs-screenshot.js) -- ne ralentit jamais la suite E2E standard.
       // `step.file` est un nom de fichier simple (pas un chemin), ecrit dans
       // docs/screenshots/.

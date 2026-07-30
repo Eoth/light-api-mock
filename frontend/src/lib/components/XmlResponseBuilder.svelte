@@ -106,9 +106,8 @@
   function emit() { onUpdate(fields); }
 
   // 'script' doit rester dans cette liste : c'est le champ qui permet de
-  // preciser QUELLE cle du resultat de script utiliser. Absent par erreur
-  // avant ce correctif alors que la vue "par exemple" (XmlPasteBuilder.svelte)
-  // l'a toujours eu -- cf CLAUDE.md, "diagnostic reponse JSON/XML".
+  // preciser QUELLE cle du resultat de script utiliser. La vue "par exemple"
+  // (XmlPasteBuilder.svelte) l'a toujours eu.
   function needsValueInput(src) { return ['fixed','path','query','header','body','xpath','script'].includes(src); }
 
   function valuePlaceholder(src) {
@@ -117,17 +116,16 @@
     // Un seul niveau de cle plate est navigable ({{script.champ}}, jamais
     // {{script.objet.champ}}) : si le script retourne un objet imbrique
     // sous une cle, cette cle contiendra du JSON serialise en entier, pas
-    // ses propres sous-champs adressables individuellement -- cf CLAUDE.md,
-    // "seeded_pick sur une liste d'objets". Utiliser le testeur de regle
-    // pour voir les cles reellement produites avant de les referencer ici.
+    // ses propres sous-champs adressables individuellement. Utiliser le
+    // testeur de regle pour voir les cles reellement produites avant de les
+    // referencer ici.
     if (src === 'script') return 'ex: nom (vide = {{script}} entier ; 1 seul niveau — testez la regle pour voir les cles)';
     return 'valeur';
   }
 
   // Pliage/depliage des noeuds parents (memes principes que
   // JsonResponseBuilder.svelte : Set en memoire, cle par testPath
-  // positionnel, tout deplie par defaut). Voir ce fichier pour le detail
-  // de la decision (CLAUDE.md, "Chevrons repliables JSON/XML").
+  // positionnel, tout deplie par defaut).
   let collapsedPaths = $state(new Set());
 
   function isCollapsed(testPath) { return collapsedPaths.has(testPath); }

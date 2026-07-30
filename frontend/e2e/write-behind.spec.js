@@ -46,7 +46,7 @@ test.describe('Write-behind: persistence after a simulated store restart', () =>
 
   // "a service mutation made through the UI survives a re-read of the on-disk config" migre vers
   // frontend/e2e/scenario-runner.spec.js (scenario "Basculer le mode mock/proxy d'un
-  // service via l'UI" dans frontend/e2e/scenarios/services.scenarios.json) -- sujet 9c lot 4.
+  // service via l'UI" dans frontend/e2e/scenarios/services.scenarios.json).
 
   test('a service deleted through the API disappears from the on-disk config once persisted', async ({ request }) => {
     await request.post(`${API}/services`, { data: validService('write-behind-delete-svc') });

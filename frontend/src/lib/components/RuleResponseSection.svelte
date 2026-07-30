@@ -3,29 +3,21 @@
   // (JSON par exemple/guide, XML guide, texte, template avance, vide),
   // en-tetes, corps de reponse, PLUS les 3 blocs de script (pre_script/
   // script/post_script) et le mode Chaos — regroupes ici car ils partagent
-  // le meme fieldset repliable dans le rendu original (voir CLAUDE.md,
-  // "Scripts rhai multi-blocs" : ces champs sont geographiquement dans la
-  // section Reponse bien que ce soient des champs de Rule independants de
-  // la reponse elle-meme).
+  // le meme fieldset repliable dans le rendu original (ces champs sont
+  // geographiquement dans la section Reponse bien que ce soient des champs
+  // de Rule independants de la reponse elle-meme).
   //
   // Reste MONTE en permanence par RuleForm.svelte (jamais derriere un
   // {#if}) : c'est `visible` (derive de `ruleAction === 'mock'` cote
-  // parent) qui gate uniquement l'AFFICHAGE ci-dessous. Ce choix est
-  // deliberement different d'un simple {#if} au niveau du parent : il
-  // preserve le comportement d'origine ou tout cet etat (fragments,
-  // en-tetes, scripts, chaos) vivait dans le scope jamais demonte de
-  // RuleForm.svelte et survivait donc a un aller-retour mock -> proxy ->
-  // mock sur le selecteur d'action avant sauvegarde. Si ce composant etait
-  // demonte/remonte via un {#if} cote parent, cet etat serait perdu a
-  // chaque bascule — regression silencieuse a ne jamais introduire.
+  // parent) qui gate uniquement l'AFFICHAGE ci-dessous. Demonter/remonter
+  // ce composant via un {#if} cote parent perdrait tout son etat (fragments,
+  // en-tetes, scripts, chaos) a chaque bascule mock<->proxy avant
+  // sauvegarde — regression silencieuse a ne jamais introduire.
   //
   // Expose getPayload()/validate() via bind:this (meme pattern que
   // JsonResponseBuilder.svelte/XmlResponseBuilder.svelte/toTemplate()).
-  // getPayload() est appelee INCONDITIONNELLEMENT par RuleForm (meme
-  // raison que ci-dessus : l'origine calculait deja response/scripts sans
-  // egard a ruleAction) ; validate() n'est appelee par RuleForm que si
-  // ruleAction === 'mock' (seule partie de la logique originale qui etait
-  // deja conditionnee sur l'action).
+  // getPayload() est appelee INCONDITIONNELLEMENT par RuleForm ; validate()
+  // n'est appelee que si ruleAction === 'mock'.
   import { untrack } from 'svelte';
   import JsonResponseBuilder from './JsonResponseBuilder.svelte';
   import JsonPasteBuilder from './JsonPasteBuilder.svelte';
@@ -49,33 +41,26 @@
 
   let responseOpen = $state(true);
 
-  // Options avancees (pre_script/post_script) repliees par defaut (retour
-  // beta-testeur : ces deux blocs, peu utilises, ajoutaient de la charge
-  // visuelle permanente pour une fonctionnalite que la plupart des
-  // utilisateurs n'exploitent pas). Le script principal (`script`) reste
-  // toujours visible, jamais concerne par ce repli. Ouverture automatique
-  // si une regle EXISTANTE a deja du contenu dans l'un des deux (ne jamais
-  // cacher une configuration deja faite par l'utilisateur sans qu'il la
-  // voie) — calcule une seule fois a l'ouverture, comme `responseMode`
-  // ci-dessus. Le contenu de pre_script/post_script (preScriptCode/
-  // postScriptCode plus bas) vit dans CE composant, jamais dans
-  // RuleScriptSlot lui-meme : replier/deplier ne fait que masquer
-  // l'affichage (attribut `hidden`, jamais un `{#if}` qui demonterait
-  // RuleScriptSlot) et ne perd donc jamais de donnees deja saisies.
+  // Options avancees (pre_script/post_script) repliees par defaut -- le
+  // script principal (`script`) reste toujours visible, jamais concerne par
+  // ce repli. Ouverture automatique si une regle EXISTANTE a deja du
+  // contenu dans l'un des deux (ne jamais cacher une configuration deja
+  // faite par l'utilisateur), calcule une seule fois a l'ouverture comme
+  // `responseMode` ci-dessus. Le contenu de pre_script/post_script vit dans
+  // CE composant, jamais dans RuleScriptSlot lui-meme : replier/deplier ne
+  // fait que masquer l'affichage (attribut `hidden`, jamais un `{#if}` qui
+  // demonterait RuleScriptSlot) et ne perd donc jamais de donnees saisies.
   let advancedOpen = $state(!!init?.pre_script?.trim() || !!init?.post_script?.trim());
 
-  // Restauration de la vue d'origine a l'edition (retour 1, cf CLAUDE.md
-  // "Restauration de la vue d'origine..."). Avant cette passe, une regle
-  // deja construite via n'importe lequel des 4 modes structures (json-paste/
-  // json-guided/xml-paste/xml-guided) retombait TOUJOURS sur 'advanced' des
-  // que response.body etait un unique fragment Template — exactement la
-  // forme que ces 4 modes produisent tous, indiscernables entre eux ET du
-  // "vrai" mode avance a la seule lecture du corps. `Rule.response_mode`
-  // (backend, src/models/mod.rs, EXCEPTION documentee au point 16 -- champ
-  // purement UI) leve cette ambiguite en memorisant explicitement quelle vue
-  // a produit ce template. `computeInitialEditorState()` degrade
-  // gracieusement vers l'ancienne heuristique par forme si `response_mode`
-  // est absent (regle sauvegardee avant cette passe) et retombe sur
+  // Restauration de la vue d'origine a l'edition : une regle deja construite
+  // via l'un des 4 modes structures (json-paste/json-guided/xml-paste/
+  // xml-guided) produit toujours la MEME forme de corps (un unique fragment
+  // Template), indiscernable entre ces modes ET du "vrai" mode avance a la
+  // seule lecture du corps. `Rule.response_mode` (backend, src/models/mod.rs,
+  // champ purement UI) leve cette ambiguite en memorisant explicitement
+  // quelle vue a produit ce template. `computeInitialEditorState()` degrade
+  // gracieusement vers une heuristique par forme si `response_mode` est
+  // absent (regle sauvegardee avant l'ajout de ce champ) et retombe sur
   // 'advanced' des qu'une restauration echoue (JSON invalide, XML invalide,
   // ou racine tableau JSON -- limite assumee, cf tpl-utils.js::
   // templateToFields, seul le mode "par exemple" JSON peut produire cette
@@ -104,9 +89,7 @@
         // configuree) : rien a restaurer, la vue demarre a vide (paste zone
         // ou detail vide selon le mode) -- ce n'est PAS une incoherence a
         // degrader, sans quoi TOUTE regle neuve retomberait a tort sur
-        // 'advanced' (bug rencontre et corrige pendant ce sujet : une regle
-        // neuve doit demarrer sur le format JSON assiste par defaut, comme
-        // avant cette passe).
+        // 'advanced' au lieu du format JSON assiste par defaut.
       } else if (singleTemplate === null) {
         // Un corps existe mais ne correspond pas a la forme structuree
         // attendue (config editee hors UI) -- degrade plutot que de planter.
@@ -142,12 +125,11 @@
   // .length > 0}` au point d'usage (plus bas) -- jamais deduit du seul mode
   // courant (une regle NEUVE demarre aussi en 'json-paste'/'xml-paste' mais
   // n'a RIEN a restaurer : la zone de collage doit s'afficher, pas une
-  // liste de champs vide, cf CLAUDE.md point 78). Cette longueur reste
-  // correcte y compris apres un aller-retour "Modifier en detail" <->
-  // "Revenir a la vue par exemple" (revealDetailMode/backToPasteMode plus
-  // bas), puisque Svelte demonte/remonte le builder assiste a chaque fois
-  // qu'on rentre dans sa branche {:else if} et relit `startParsed` a cet
-  // instant precis.
+  // liste de champs vide). Reste correct apres un aller-retour "Modifier en
+  // detail" <-> "Revenir a la vue par exemple" (revealDetailMode/
+  // backToPasteMode plus bas), puisque Svelte demonte/remonte le builder
+  // assiste a chaque fois qu'on rentre dans sa branche {:else if} et relit
+  // `startParsed` a cet instant precis.
   let jsonFields = $state(initialMode === 'json-guided' ? (initialStructured.fields ?? []) : []);
   let jsonBuilderRef = $state(null);
   let jsonPasteFields = $state(initialMode === 'json-paste' ? (initialStructured.fields ?? []) : []);
@@ -304,11 +286,10 @@
     modeKey++;
   }
 
-  // "Modifier en detail" (retour 3, fusion Format x Assiste/Detail, cf
-  // CLAUDE.md) : bascule depuis le sous-mode assiste (json-paste/xml-paste)
-  // vers le sous-mode detail (json-guided/xml-guided) EN CONSERVANT le meme
-  // tableau `fields` (structure identique entre les deux, verifie en etape 0
-  // de ce sujet) -- DELIBEREMENT hors du systeme d'avertissement de
+  // "Modifier en detail" : bascule depuis le sous-mode assiste (json-paste/
+  // xml-paste) vers le sous-mode detail (json-guided/xml-guided) EN
+  // CONSERVANT le meme tableau `fields` (structure identique entre les
+  // deux) -- DELIBEREMENT hors du systeme d'avertissement de
   // requestModeSwitch/tryConvert : c'est une REVELATION de capacites
   // supplementaires sur les MEMES donnees, jamais une conversion avec risque
   // de perte, donc zero avertissement.
@@ -322,20 +303,16 @@
     }
   }
 
-  // Chemin retour, symetrique de revealDetailMode() ci-dessus (correctif
-  // "diagnostic reponse JSON/XML" : la fusion Format x Assiste/Detail
-  // n'offrait jusqu'ici qu'un aller simple vers le detail, aucun moyen de
-  // revenir a la vue "par exemple" sans perdre le travail en cours -- cf
-  // CLAUDE.md). Meme principe : structure de Fields identique entre les
-  // deux sous-modes, donc copie directe SANS avertissement de perte (memes
-  // raisons que revealDetailMode : ceci est une REDUCTION de capacites
-  // visibles sur les MEMES donnees, pas une conversion avec perte reelle).
-  // `jsonPasteFields`/`xmlPasteFields` sont lus reactivement (pas geles a
-  // l'ouverture) par les vues assistees ci-dessous via
+  // Chemin retour, symetrique de revealDetailMode() ci-dessus : meme
+  // principe, structure de Fields identique entre les deux sous-modes, donc
+  // copie directe SANS avertissement de perte (ceci est une REDUCTION de
+  // capacites visibles sur les MEMES donnees, pas une conversion avec perte
+  // reelle). `jsonPasteFields`/`xmlPasteFields` sont lus reactivement (pas
+  // geles a l'ouverture) par les vues assistees ci-dessous via
   // `startParsed={jsonPasteFields.length > 0}` : au remontage du composant
-  // assiste (Svelte demonte/remonte en changeant de branche {:else if}),
-  // la liste de champs deja peuplee s'affiche directement plutot que la
-  // zone de collage vide.
+  // assiste (Svelte demonte/remonte en changeant de branche {:else if}), la
+  // liste de champs deja peuplee s'affiche directement plutot que la zone de
+  // collage vide.
   function backToPasteMode() {
     if (responseMode === 'json-guided') {
       jsonPasteFields = jsonFields;
@@ -346,9 +323,9 @@
     }
   }
 
-  // Regroupement des 4 modes structures en 2 "Format" (JSON/XML), cf CLAUDE.md
-  // "Fusion Format x Assiste/Detail" -- Texte/Avance/Vide restent 1 bouton
-  // = 1 mode (pas de distinction assiste/detail pour eux, rien a fusionner).
+  // Regroupement des 4 modes structures en 2 "Format" (JSON/XML) --
+  // Texte/Avance/Vide restent 1 bouton = 1 mode (pas de distinction
+  // assiste/detail pour eux, rien a fusionner).
   function formatOfMode(mode) {
     if (mode === 'json-paste' || mode === 'json-guided') return 'json';
     if (mode === 'xml-paste' || mode === 'xml-guided') return 'xml';
@@ -435,9 +412,8 @@
     }
     if (from === 'json-paste' && to === 'xml-paste') {
       // Meme conversion, sourcee sur jsonPasteFields (structure identique a
-      // jsonFields, cf etape 0 de ce sujet) -- capacite nouvelle, aucune
-      // regression a preserver ici (json-paste n'existait pas comme cible/
-      // source de conversion avant cette passe).
+      // jsonFields) -- json-paste n'existait pas comme cible/source de
+      // conversion auparavant.
       const r = tryJsonFieldsToXmlFields(jsonPasteFields);
       return r.ok ? { ok: true, xmlPasteFields: r.xmlFields ?? [] } : r;
     }
@@ -465,19 +441,11 @@
     }
   }
 
-  // Corrige (sujet "diagnostic reponse JSON/XML") : cette fonction etait un
-  // stub qui echouait TOUJOURS, meme pour un template XML parfaitement
-  // valide -- `xmlErr` n'etait teste que pour produire un message d'erreur
-  // different, jamais pour autoriser la conversion. Consequence concrete :
-  // une regle dont le contenu XML avait ete tape/colle en mode "Template
-  // avance" ne pouvait JAMAIS rejoindre la vue XML (ni assistee ni detail)
-  // sans perdre son contenu, alors que coller le MEME texte directement
-  // dans la zone de collage du mode "par exemple" fonctionnait sans
-  // probleme (ce dernier ne passe jamais par cette fonction). Desormais
-  // alignee sur `tryAdvancedToJsonGuided` ci-dessus : reutilise
-  // `templateToXmlFields` (deja utilisee pour restaurer la vue d'origine a
-  // la reouverture d'une regle, cf CLAUDE.md "Restauration de la vue
-  // d'origine...") pour reanalyser le template `{{expr | pipe}}` en Fields
+  // Doit reussir pour tout template XML syntaxiquement valide, jamais
+  // retourner `{ ok: false }` inconditionnellement -- alignee sur
+  // `tryAdvancedToJsonGuided` ci-dessus : reutilise `templateToXmlFields`
+  // (deja utilisee pour restaurer la vue d'origine a la reouverture d'une
+  // regle) pour reanalyser le template `{{expr | pipe}}` en Fields
   // structures, y compris le tag racine et les attributs de racine.
   function tryAdvancedToXmlGuided() {
     const tpl = getAdvancedTemplate();
@@ -494,10 +462,9 @@
     }
   }
 
-  // Generalisee (retour 3) pour accepter n'importe quel tableau de Fields
-  // JSON en source -- jsonFields (mode detail) OU jsonPasteFields (mode
-  // assiste), structurellement identiques (cf etape 0 de ce sujet) -- au
-  // lieu de ne lire que jsonFields comme avant cette passe.
+  // Accepte n'importe quel tableau de Fields JSON en source -- jsonFields
+  // (mode detail) OU jsonPasteFields (mode assiste), structurellement
+  // identiques.
   function tryJsonFieldsToXmlFields(sourceFields) {
     if (!sourceFields.length) return { ok: true, xmlFields: [] };
     try {
@@ -621,10 +588,10 @@
       script: scriptEnabled && scriptCode.trim() ? scriptCode.trim() : null,
       post_script: postScriptEnabled && postScriptCode.trim() ? postScriptCode.trim() : null,
       // Memorise la vue d'origine pour la restaurer a la prochaine edition
-      // (retour 1, cf CLAUDE.md) -- meme valeur que le discriminant interne
-      // `responseMode` (les 7 chaines correspondent deja aux variants
-      // kebab-case de ResponseEditorMode cote backend, cf src/models/mod.rs,
-      // aucune table de correspondance necessaire).
+      // -- meme valeur que le discriminant interne `responseMode` (les 7
+      // chaines correspondent deja aux variants kebab-case de
+      // ResponseEditorMode cote backend, cf src/models/mod.rs, aucune table
+      // de correspondance necessaire).
       response_mode: responseMode,
     };
   }
@@ -672,14 +639,14 @@
   {#if responseOpen}
     {#key modeKey}
     <!--
-      Fusion Format x Assiste/Detail (retour 3, cf CLAUDE.md) : remplace les
-      7 boutons de mode a plat par 5 boutons de FORMAT (JSON/XML se
-      declinent chacun en 2 sous-modes -- assiste "par exemple"/detail
-      "guide" -- geres via le bouton "Modifier en detail" plus bas, jamais
-      un second niveau de bouton visible d'emblee, cf revealDetailMode()).
-      `data-testid` inchange (`rule-form-mode-button-{val}`, cf selectors.json)
-      -- seules les VALEURS acceptees changent (json/xml/text/advanced/empty
-      au lieu des 7 anciennes).
+      Fusion Format x Assiste/Detail : remplace les 7 boutons de mode a plat
+      par 5 boutons de FORMAT (JSON/XML se declinent chacun en 2 sous-modes
+      -- assiste "par exemple"/detail "guide" -- geres via le bouton
+      "Modifier en detail" plus bas, jamais un second niveau de bouton
+      visible d'emblee, cf revealDetailMode()). `data-testid` inchange
+      (`rule-form-mode-button-{val}`, cf selectors.json) -- seules les
+      VALEURS acceptees changent (json/xml/text/advanced/empty au lieu des
+      7 anciennes).
     -->
     <div class="mode-selector" role="radiogroup" aria-label="Format de la reponse">
       {#each [['json','JSON'],['xml','XML'],['text','Texte'],['advanced','Template avance'],['empty','Vide (204)']] as [val, label]}
@@ -946,8 +913,8 @@
 
   /* .section : le fieldset racine lui-meme (section-response ci-dessus
      l'affine), duplique volontairement depuis RuleActionSelector.svelte/
-     RuleConditionsEditor.svelte plutot que centralise (cf CLAUDE.md,
-     "CSS Design System" — pas encore fait a l'echelle du projet). */
+     RuleConditionsEditor.svelte plutot que centralise (design system CSS
+     pas encore fait a l'echelle du projet). */
   .section { border: 1px solid var(--color-border); border-radius: var(--radius); padding: 0.75rem; margin-bottom: 1rem; }
   .section legend { font-weight: 600; font-size: 0.875rem; padding: 0 0.375rem; }
 </style>

@@ -1,5 +1,5 @@
 {
-  "_comment": "SOURCE UNIQUE des selecteurs pour les scenarios E2E data-driven (frontend/e2e/scenarios/*.json). Genere a partir des data-testid poses sur les composants Svelte au sujet 9a. Un objet par composant/page, cle logique -> selecteur CSS [data-testid=...]. Les entrees comportant un discriminant (element repete dans une boucle) utilisent un template avec des placeholders {nom} resolus par scenario-runner.js a partir de step.params -- voir frontend/e2e/README.md.",
+  "_comment": "SOURCE UNIQUE des selecteurs pour les scenarios E2E data-driven (frontend/e2e/scenarios/*.json). Genere a partir des data-testid poses sur les composants Svelte. Un objet par composant/page, cle logique -> selecteur CSS [data-testid=...]. Les entrees comportant un discriminant (element repete dans une boucle) utilisent un template avec des placeholders {nom} resolus par scenario-runner.js a partir de step.params -- voir frontend/e2e/README.md.",
 
   "app": {
     "titleButton": "[data-testid=\"app-title-button\"]",

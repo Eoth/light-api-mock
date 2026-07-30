@@ -45,10 +45,10 @@ describe('JsonPasteBuilder (exampleJsonToFields via tpl-utils.js)', () => {
 });
 
 // startParsed : seede l'etat initial pour la restauration d'une regle
-// existante (cf CLAUDE.md, "Restauration de la vue d'origine..."). Sans
-// cette prop (comportement par defaut, teste ci-dessus), le composant
-// affiche toujours la zone de collage en premier, meme avec des `fields`
-// deja peuples -- exactement le comportement a eviter a la restauration.
+// existante. Sans cette prop (comportement par defaut, teste ci-dessus), le
+// composant affiche toujours la zone de collage en premier, meme avec des
+// `fields` deja peuples -- exactement le comportement a eviter a la
+// restauration.
 describe('JsonPasteBuilder — startParsed (restauration a l\'edition, retour 1)', () => {
   it('affiche directement la liste de champs quand startParsed=true et fields deja peuple', () => {
     const fields = [{ key: 'siret', fieldType: 'value', source: 'path', value: 'siret', pipe: '', asNumber: false }];
@@ -67,13 +67,11 @@ describe('JsonPasteBuilder — startParsed (restauration a l\'edition, retour 1)
   });
 });
 
-// Pliage des champs 'object' (correctif "diagnostic reponse JSON/XML", cf
-// CLAUDE.md) : ce mode "par exemple" en etait prive par oubli depuis le
-// sujet 25 (qui n'avait touche que les vues detail JsonResponseBuilder/
-// XmlResponseBuilder), alors que son equivalent XML (XmlPasteBuilder,
-// sujet 27) l'a des l'origine. Contrairement a XmlPasteBuilder, ce
+// Pliage des champs 'object' (correctif "diagnostic reponse JSON/XML") : ce
+// mode "par exemple" en etait prive par oubli, alors que son equivalent XML
+// (XmlPasteBuilder) l'a des l'origine. Contrairement a XmlPasteBuilder, ce
 // composant n'a pas de fil d'Ariane (rendu recursif a plat, divergence
-// deja assumee, cf CLAUDE.md point 68) -- seul le pliage est ajoute ici.
+// assumee) -- seul le pliage est ajoute ici.
 describe('JsonPasteBuilder — pliage des champs objet (correctif diagnostic)', () => {
   const nestedJson = '{"client":{"nom":"ACME","siret":"123"}}';
 
@@ -120,9 +118,9 @@ describe('JsonPasteBuilder — pliage des champs objet (correctif diagnostic)', 
   });
 });
 
-// Pipes (retour 2, cf CLAUDE.md) : absents avant cette passe, ajoutes en
-// coherence avec le mode guide (JsonResponseBuilder.svelte). Visible
-// uniquement pour une source non-fixe (meme regle que le mode guide).
+// Pipes : absents avant cette passe, ajoutes en coherence avec le mode
+// guide (JsonResponseBuilder.svelte). Visible uniquement pour une source
+// non-fixe (meme regle que le mode guide).
 describe('JsonPasteBuilder — pipes (retour 2)', () => {
   it('n\'affiche pas de champ pipe pour une source "fixed"', async () => {
     const { getByLabelText, getByText, queryByLabelText } = render(JsonPasteBuilder);

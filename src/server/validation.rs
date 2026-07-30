@@ -43,10 +43,9 @@ pub fn is_internal_route(path: &str) -> bool {
 // exactement l'affaiblissement de la protection API que ce bypass doit
 // eviter. Les 4 routes /api/auth/* deja exemptees dans auth_middleware
 // restent gerees separement, par egalite stricte de chemin (pas par ce
-// prefixe). `/runtime-config.json` (sujet "URL API configurable", cf
-// CLAUDE.md) est inclus ici pour la meme raison que les assets statiques :
-// le frontend doit pouvoir le lire AVANT de savoir s'il est authentifie
-// (c'est ce fichier qui lui indique ou se trouve l'API).
+// prefixe). `/runtime-config.json` est inclus ici pour la meme raison que
+// les assets statiques : le frontend doit pouvoir le lire AVANT de savoir
+// s'il est authentifie (c'est ce fichier qui lui indique ou se trouve l'API).
 const STATIC_ASSET_PATH_PREFIXES: &[&str] =
     &["/index.html", "/assets/", "/favicon.ico", "/runtime-config.json"];
 
@@ -132,12 +131,12 @@ pub fn validate_service(service: &Service) -> Result<(), ValidationError> {
         });
     }
 
-    // Service "purement mocke" (sujet 22) : real_target_url vide est une
-    // valeur volontaire ("aucune cible configuree"), pas une omission a
-    // rejeter — voir CLAUDE.md §3. En revanche is_mocked=false (proxy pur
-    // niveau service) sans cible n'a aucun sens : ce serait forcement un
-    // proxy vers une URL vide a chaque requete. Bloque a la source plutot
-    // que de laisser cette combinaison invalide atteindre le pipeline HTTP.
+    // Service "purement mocke" : real_target_url vide est une valeur
+    // volontaire ("aucune cible configuree"), pas une omission a rejeter. En
+    // revanche is_mocked=false (proxy pur niveau service) sans cible n'a
+    // aucun sens : ce serait forcement un proxy vers une URL vide a chaque
+    // requete. Bloque a la source plutot que de laisser cette combinaison
+    // invalide atteindre le pipeline HTTP.
     if !service.is_mocked && service.real_target_url.trim().is_empty() {
         return Err(ValidationError {
             field: "real_target_url",
@@ -329,9 +328,9 @@ mod tests {
 
     #[test]
     fn accept_empty_target_when_purely_mocked() {
-        // Service "purement mocke" (sujet 22) : real_target_url vide est
-        // accepte tant que is_mocked reste true (les regles sont toujours
-        // evaluees, aucun proxy n'est jamais tente).
+        // Service "purement mocke" : real_target_url vide est accepte tant
+        // que is_mocked reste true (les regles sont toujours evaluees, aucun
+        // proxy n'est jamais tente).
         let mut s = svc("purely-mocked", "/v1/*");
         s.real_target_url = "".into();
         s.is_mocked = true;

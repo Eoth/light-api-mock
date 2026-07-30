@@ -24,8 +24,8 @@
   // fois). Aucun contenu n'est jamais perdu par ce mecanisme : ConditionForm
   // est demontee/remontee via {#if}, mais elle ne fait que RE-INITIALISER ses
   // champs a partir de la condition deja sauvegardee a chaque ouverture — rien
-  // n'est jamais tape "dans le vide" avant que ce {#if} ne bascule, contrairement
-  // au piege des sujets 24/25 (perte d'une saisie en cours par demontage).
+  // n'est jamais tape "dans le vide" avant que ce {#if} ne bascule : le
+  // demontage/remontage ne perd donc jamais de contenu utilisateur.
   let editingCondition = $state(null);
 
   function addCondition(group, condition) {

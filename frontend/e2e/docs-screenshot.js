@@ -1,8 +1,8 @@
-// Capture de captures d'ecran pour docs/ (sujet 13b) a partir de la suite E2E
-// existante (sujet 13a a pose les marqueurs <!-- SCREENSHOT: ... --> dans
-// docs/*.md). Reutilise par scenario-runner.js (action "screenshot" dans les
-// scenarios JSON) et par les fichiers *.spec.js/.mjs classiques qui capturent
-// un etat non modelisable en scenario JSON pur.
+// Capture de captures d'ecran pour docs/ a partir de la suite E2E existante
+// (les marqueurs <!-- SCREENSHOT: ... --> dans docs/*.md indiquent ou une
+// vraie image doit s'inserer). Reutilise par scenario-runner.js (action
+// "screenshot" dans les scenarios JSON) et par les fichiers *.spec.js/.mjs
+// classiques qui capturent un etat non modelisable en scenario JSON pur.
 //
 // Desactive par defaut (no-op) : ne prend une vraie capture que si
 // DOCS_SCREENSHOTS est positionne (fait par playwright.docs-screenshots.config.js,

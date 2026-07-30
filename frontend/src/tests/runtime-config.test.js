@@ -4,8 +4,9 @@ import { loadRuntimeConfig, getApiBaseUrl, _resetForTests } from '../lib/runtime
 // Verifie la logique de resolution de l'URL de l'API (defaut vs configure) :
 // getApiBaseUrl() est '' tant que /runtime-config.json n'a jamais ete lu ou
 // n'a rien fourni d'exploitable, et refletera la valeur configuree sinon.
-// Voir CLAUDE.md pour le detail de la decision (config runtime plutot que
-// build-time).
+// Config runtime plutot que build-time : une meme image Docker doit
+// pouvoir pointer vers des URLs d'API differentes selon l'environnement de
+// deploiement.
 describe('runtime-config', () => {
   beforeEach(() => {
     _resetForTests();

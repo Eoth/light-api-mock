@@ -402,15 +402,14 @@ function splitTplArray(inner) {
 
 // ── XML: Fields → Template string ────────────────────────────────────
 //
-// `attributes` (optionnel, nouveau) : liste de {name, source, value, pipe}
-// portee par un noeud (racine incluse via `rootAttributes`) ou par un
-// champ value/parent. Retro-compatible : un champ/racine sans `attributes`
-// (tout le XML construit avant ce sujet) produit exactement le meme texte
-// qu'avant, `xmlAttrsToTpl` renvoyant '' pour une liste vide/absente.
-// Aucun echappement des valeurs d'attribut (guillemets compris) : coherent
-// avec le choix deliberement fait pour le contenu texte des elements
-// (CLAUDE.md, "resolve_variable... jamais re-echappee") -- le template
-// reste du texte brut de bout en bout.
+// `attributes` (optionnel) : liste de {name, source, value, pipe} portee
+// par un noeud (racine incluse via `rootAttributes`) ou par un champ
+// value/parent. Retro-compatible : un champ/racine sans `attributes`
+// produit exactement le meme texte qu'avant, `xmlAttrsToTpl` renvoyant ''
+// pour une liste vide/absente. Aucun echappement des valeurs d'attribut
+// (guillemets compris) : coherent avec le choix deliberement fait pour le
+// contenu texte des elements (resolve_variable ne re-echappe jamais) --
+// le template reste du texte brut de bout en bout.
 
 export function xmlFieldsToTemplate(fields, rootTag = 'response', rootAttributes = []) {
   const attrs = xmlAttrsToTpl(rootAttributes);
@@ -443,11 +442,10 @@ function xmlNodeToTpl(field) {
 // rootAttributes, fields } ou `fields` est la liste des ELEMENTS ENFANTS
 // DIRECTS de la racine, au meme format que celui consomme par
 // XmlResponseBuilder.svelte (tag/nodeType/source/value/children), etendu
-// avec `attributes` (nouveau, cf CLAUDE.md "Mode 'coller un exemple' XML").
+// avec `attributes`.
 //
 // Limites assumees et documentees (pas des bugs a corriger silencieusement,
-// meme esprit que la limite deja assumee pour parse_xml_items cote Rhai,
-// CLAUDE.md point 66) :
+// meme esprit que la limite deja assumee pour parse_xml_items cote Rhai) :
 //  - Prefixes de namespace ("soap:Envelope") et declarations xmlns/xmlns:*
 //    sont preserves TELS QUELS comme du texte litteral dans le nom de
 //    tag/attribut (DOMParser les restitue deja ainsi via .tagName/.name) --
@@ -495,11 +493,11 @@ export function exampleXmlToFields(xmlString) {
 // la structure Fields (tag/nodeType/source/value/pipe/children/attributes)
 // consommee aussi bien par XmlResponseBuilder.svelte (guide) que
 // XmlPasteBuilder.svelte (par exemple) — ces deux modes partagent la meme
-// forme de Fields, cf CLAUDE.md "Restauration de la vue d'origine a
-// l'edition d'une reponse". Utilise DOMParser comme exampleXmlToFields (les
-// caracteres {, }, |, ( ) sont du texte XML litteral valide, aucun echappement
-// necessaire) ; seule la lecture de la feuille differe : on y detecte un
-// eventuel {{expr | pipe}} au lieu de toujours traiter comme une valeur fixe.
+// forme de Fields. Utilise DOMParser comme exampleXmlToFields (les
+// caracteres {, }, |, ( ) sont du texte XML litteral valide, aucun
+// echappement necessaire) ; seule la lecture de la feuille differe : on y
+// detecte un eventuel {{expr | pipe}} au lieu de toujours traiter comme une
+// valeur fixe.
 export function templateToXmlFields(tpl) {
   const text = tpl.trim();
   if (!text) {

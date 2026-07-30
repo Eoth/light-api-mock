@@ -23,7 +23,7 @@ test.beforeEach(async ({ request }) => {
 
 // "bouton demo charge le service quand liste vide" migre vers frontend/e2e/scenario-runner.spec.js
 // (scenario "Charger le service de demo depuis la liste vide" dans
-// frontend/e2e/scenarios/home.scenarios.json) -- sujet 9c lot 2.
+// frontend/e2e/scenarios/home.scenarios.json).
 
 test('demo service repond avec les path params', async ({ page, request }) => {
   await page.goto('/');

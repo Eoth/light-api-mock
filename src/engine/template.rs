@@ -193,9 +193,8 @@ fn extract_body_json(body: &[u8], pointer: &str) -> String {
 
 // Equivalent XML/SOAP de extract_body_json ci-dessus : source "XPath
 // (XML/SOAP)" du builder de reponse (variable de template {{xpath.chemin}}).
-// Reutilise MatchEngine::extract_xpath telle quelle (meme parsing/meme
-// correctif que ConditionSource::XPath, cf CLAUDE.md "SOAPAction
-// recherche/Siret") plutot que de dupliquer un second parseur XML — le
+// Reutilise MatchEngine::extract_xpath telle quelle (meme parsing que
+// ConditionSource::XPath) plutot que de dupliquer un second parseur XML — le
 // chemin ne contient jamais de prefixe de namespace (deja decape par
 // local_name()), tout comme pour une condition XPath.
 fn extract_body_xpath(body: &[u8], path: &str) -> String {
@@ -359,8 +358,8 @@ pub(crate) fn civil_from_days(days: i64) -> (i64, u32, u32) {
 // Inverse exacte de civil_from_days (meme algorithme, Howard Hinnant :
 // http://howardhinnant.github.io/date_algorithms.html#days_from_civil).
 // pub(crate) : reutilisee telle quelle par engine::script::parse_date_impl
-// (sujet "parse_date", conversion inverse de date_now/date_past/date_future)
-// pour ne jamais dupliquer le calcul calendaire — meme discipline que
+// (conversion inverse de date_now/date_past/date_future) pour ne jamais
+// dupliquer le calcul calendaire — meme discipline que
 // civil_from_days ci-dessus. `m` doit etre dans [1,12] et `d` dans [1,31] :
 // l'appelant valide ces bornes avant d'appeler cette fonction ; un `d`
 // hors des jours reels du mois (ex. 31 fevrier) ne panique pas mais produit
@@ -576,10 +575,8 @@ mod tests {
     }
 
     // --- xpath.chemin : equivalent XML/SOAP de body.pointeur ci-dessus
-    // (source "XPath (XML/SOAP)" du builder de reponse XML, cf CLAUDE.md
-    // "Extraction XPath dans le builder de reponse XML"). Reutilise
-    // MatchEngine::extract_xpath (meme correctif walk_xml que le sujet
-    // "SOAPAction recherche/Siret") plutot qu'un parsing XML duplique.
+    // (source "XPath (XML/SOAP)" du builder de reponse XML). Reutilise
+    // MatchEngine::extract_xpath plutot qu'un parsing XML duplique.
 
     #[test]
     fn xpath_echo_extracts_value_from_xml_body() {
@@ -599,9 +596,8 @@ mod tests {
 
     #[test]
     fn xpath_echo_survives_non_self_closing_sibling_before_target() {
-        // Regression du meme bug corrige au sujet "SOAPAction recherche/Siret"
-        // (walk_xml, matcher.rs) : un <Header></Header> non-autoferme, sibling
-        // de <Body>, ne doit pas casser l'extraction d'un ancetre deja matche.
+        // Regression (walk_xml, matcher.rs) : un <Header></Header> non-autoferme,
+        // sibling de <Body>, ne doit pas casser l'extraction d'un ancetre deja matche.
         let (p, q, h) = empty_ctx();
         let body = br#"<SOAP:Envelope><SOAP-ENV:Header></SOAP-ENV:Header><SOAP-ENV:Body><ns3:recherche><ns3:Siret>12345678901234</ns3:Siret></ns3:recherche></SOAP-ENV:Body></SOAP:Envelope>"#;
         let ctx = make_ctx(&p, &q, &h, body, 0);

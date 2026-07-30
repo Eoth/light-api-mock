@@ -1,76 +1,36 @@
-// Tests E2E migres vers l'infrastructure data-driven (selectors.json +
-// scenario-runner.js, cf frontend/e2e/README.md). Chaque test ici REMPLACE
-// un test equivalent qui existait auparavant dans un fichier
-// *.spec.js/*.spec.mjs classique (migration sujet 9c, voir le detail par
-// lot ci-dessous).
+// Tests E2E utilisant l'infrastructure data-driven (selectors.json +
+// scenario-runner.js, cf frontend/e2e/README.md). Beaucoup de ces tests
+// REMPLACENT un test equivalent qui pilotait auparavant l'UI directement
+// dans un fichier *.spec.js/*.spec.mjs classique (rules.spec.mjs,
+// critical-flows.spec.js, insee.spec.mjs, write-behind.spec.js,
+// security.spec.js, group-expansion-persistence.spec.js, config.spec.mjs) --
+// l'ancien test est supprime de son fichier source une fois son equivalent
+// JSON valide vert, pour eviter un doublon testant deux fois le meme
+// parcours. Seuls les parcours qui pilotent reellement l'UI sont candidats
+// a cette migration (un test purement API-only n'a rien a gagner au format
+// scenario JSON).
 //
 // Les scenarios eux-memes sont regroupes par domaine fonctionnel dans
-// frontend/e2e/scenarios/{home,groups,rules,services}.scenarios.json
-// (un fichier par domaine, un tableau de scenarios par fichier -- pas un
-// fichier par scenario individuel, sujet 9c "regroupement par
-// domaine"). `loadScenario(domainFile, scenarioName)` en extrait un seul.
+// frontend/e2e/scenarios/{home,groups,rules,services}.scenarios.json (un
+// fichier par domaine, un tableau de scenarios par fichier).
+// `loadScenario(domainFile, scenarioName)` en extrait un seul.
 //
-// Lot 1 :
-//   - "creer un service"               <- ex rules.spec.mjs "ajouter un service via le formulaire"
-//   - "creer une regle simple"         <- ex rules.spec.mjs "creer une nouvelle regle via le formulaire"
-//   - "afficher les regles existantes" <- ex rules.spec.mjs "affiche les regles existantes"
-//
-// Lot 2 :
-//   - "charge le service de demo"                    <- ex config.spec.mjs "bouton demo charge le service quand liste vide"
-//   - "page d accueil affiche le titre"               <- ex critical-flows.spec.js "homepage loads with breadcrumb navigation"
-//   - "liste affiche un service cree via l API"       <- ex critical-flows.spec.js "service list shows created services in group"
-//   - "page groupes accessible depuis la nav"         <- ex critical-flows.spec.js "groups page is accessible to all"
-//   - "groupe deplie persiste apres retour d edition" <- ex group-expansion-persistence.spec.js "un groupe deplie reste visible apres retour depuis l edition d un service"
-//   - "groupe deplie reinitialise apres rechargement" <- ex group-expansion-persistence.spec.js "un rechargement complet de la page (F5) reinitialise l etat deplie"
-//
-// Lot 3 (rules.spec.mjs migre integralement -> fichier supprime + 2 tests
-// security.spec.js reutilisant homepage-loads.scenario.json) :
-//   - "regle: bouton ajouter fonctionne avec regles existantes" <- ex rules.spec.mjs "bouton ajouter une regle fonctionne avec regles existantes"
-//   - "regle: bouton modifier ouvre le formulaire"               <- ex rules.spec.mjs "bouton modifier (crayon) ouvre le formulaire"
-//   - "regle: bouton supprimer retire la regle"                  <- ex rules.spec.mjs "bouton supprimer retire la regle"
-//   - "service: toggle mock/proxy fonctionne"                    <- ex rules.spec.mjs "toggle mock/proxy fonctionne"
-//   - "liste: recherche filtre les services"                     <- ex rules.spec.mjs "recherche filtre les services"
-//   - "regle: annuler le formulaire revient a la liste"          <- ex rules.spec.mjs "annuler le formulaire de regle revient a la liste"
-//   - "UI servie sans aucun service (scenario JSON)"              <- ex security.spec.js "UI is served on / even with no services"
-//   - "UI accessible apres creation d un service (scenario JSON)" <- ex security.spec.js "UI remains accessible after creating a valid service"
-//
-// Lot 4 (critical-flows.spec.js Groups/Service identity + insee.spec.mjs +
-// write-behind.spec.js, partiel -- seuls les parcours qui pilotent
-// reellement l'UI sont candidats, cf frontend/e2e/README.md) :
-//   - "groupe: formulaire ne demande que le nom"            <- ex critical-flows.spec.js "UI: creation form only asks for a name, code is auto-generated"
-//   - "groupe: nom accentue accepte"                        <- ex critical-flows.spec.js "UI: accented/spaced group name is accepted and still produces a valid URL code"
-//   - "groupe: creer plusieurs groupes a la suite"           <- ex critical-flows.spec.js "UI: creating several groups in a row never surfaces a code-collision error"
-//   - "identite: suppression ne supprime pas l homonyme"     <- ex critical-flows.spec.js "supprimer un service dans un groupe ne supprime pas le service homonyme d un autre groupe"
-//   - "identite: suppression sans fausse erreur"             <- ex critical-flows.spec.js "la suppression d un service n affiche pas de fausse erreur ..."
-//   - "insee: service visible dans l UI"                     <- ex insee.spec.mjs "service visible in UI"
-//   - "write-behind: toggle mock persiste sur disque"        <- ex write-behind.spec.js "a service mutation made through the UI survives a re-read of the on-disk config"
-// Note : "l URL de test affichee en edition correspond a celle de la vue
-// liste..." (critical-flows.spec.js) N'A PAS ete migre -- compare une URL
+// Exception non migree : "l'URL de test affichee en edition correspond a
+// celle de la vue liste..." (critical-flows.spec.js) compare une URL
 // affichee a une valeur dynamique (code de groupe) connue seulement a
-// l'execution, pas modelisable avec des assertions JSON statiques sans
+// l'execution -- pas modelisable avec des assertions JSON statiques sans
 // nouvelle capacite de valeur dynamique dans le runner. Reste un test
 // Playwright classique.
 //
-// Les tests d'origine sont supprimes du fichier source une fois leur
-// equivalent JSON valide vert (pas de doublon testant deux fois le meme
-// parcours).
-//
-// Lot 5 : couverture E2E neuve (pas une migration) pour le detecteur de
-// conflit de regles (sujet 14).
-// Lot 6 : couverture E2E neuve (pas une migration) pour le service
-// "purement mocke" (sujet 22).
-// Lot 7 : couverture E2E neuve (pas une migration) pour le pliage des
-// arbres JSON/XML et le repli par defaut des Options avancees
-// pre_script/post_script (sujet 25).
-// Lot 10 : couverture E2E neuve (pas une migration) pour le portage du mode
-// "coller un exemple" au XML (XmlPasteBuilder.svelte).
-// Lot 16 : couverture E2E neuve (pas une migration) pour les 4 correctifs du
-// sujet "diagnostic reponse JSON/XML" -- cf CLAUDE.md pour le detail de
-// chaque cause : (1) chevrons de pliage absents en vue JSON "par exemple",
-// (2) conversion "Template avance" -> XML permanentement cassee (stub qui
-// echouait toujours), (3) aucun bouton retour de la vue detail vers la vue
-// "par exemple", (4) source "Resultat du script" masquait son champ de
-// valeur dans les vues detail JSON/XML.
+// Les sections "Lot N" ci-dessous, chacune juste au-dessus des tests
+// qu'elle introduit, documentent au fil de l'eau la couverture E2E ajoutee :
+// detecteur de conflit de regles, service "purement mocke", pliage des
+// arbres JSON/XML + repli par defaut des Options avancees pre_script/
+// post_script, illustrations pour la documentation utilisateur, portage du
+// mode "coller un exemple" au XML, condition XPath sur un corps SOAP,
+// edition en place d'une condition de regle, restauration de la vue
+// d'origine a l'edition d'une reponse, source "XPath (XML/SOAP)" du builder
+// de reponse, correctifs de rendu JSON/XML, et `parse_date`.
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -339,7 +299,7 @@ test.describe('Runner data-driven (scenarios JSON) - lot 5 (detecteur de conflit
 });
 
 // Lot 6 : couverture E2E neuve (pas une migration) pour le service
-// "purement mocke" (real_target_url vide, sujet 22, cf CLAUDE.md §3).
+// "purement mocke" (real_target_url vide).
 test.describe('Runner data-driven (scenarios JSON) - lot 6 (service purement mocke)', () => {
   test.beforeEach(async ({ request }) => {
     await request.delete(`${API}/config/reset`);
@@ -393,9 +353,8 @@ test.describe('Runner data-driven (scenarios JSON) - lot 6 (service purement moc
 
 // Lot 7 : couverture E2E neuve (pas une migration) pour le pliage des
 // arbres JSON/XML et le repli par defaut des Options avancees
-// (pre_script/post_script), sujet 25 -- cf CLAUDE.md, "Chevrons repliables
-// JSON/XML" / "Options avancees pre/post script". Seul le pliage JSON est
-// couvert ici en E2E (le mecanisme XML est strictement identique --
+// (pre_script/post_script). Seul le pliage JSON est couvert ici en E2E (le
+// mecanisme XML est strictement identique --
 // meme composant de pliage, meme attribut `hidden` -- deja verifie en
 // profondeur par XmlResponseBuilder.test.js ; dupliquer un parcours UI
 // quasi identique en E2E n'aurait ajoute aucune garantie supplementaire).
@@ -502,8 +461,8 @@ test.describe('Runner data-driven (scenarios JSON) - lot 9 (repetition JSON/XML)
 
 // Lot 10 : couverture E2E neuve (pas une migration) pour le portage du mode
 // "coller un exemple" au XML (XmlPasteBuilder.svelte, miroir de
-// JsonPasteBuilder.svelte avec breadcrumb/pliage/attributs XML en plus, cf
-// CLAUDE.md "Mode 'coller un exemple' XML"). Colle un exemple XML imbrique
+// JsonPasteBuilder.svelte avec breadcrumb/pliage/attributs XML en plus).
+// Colle un exemple XML imbrique
 // (enveloppe avec un attribut de namespace), navigue dans le noeud enfant
 // via le fil d'Ariane, transforme une valeur en variable de path param, puis
 // verifie hors runner qu'une vraie requete HTTP produit bien le XML attendu
@@ -537,12 +496,11 @@ test.describe('Runner data-driven (scenarios JSON) - lot 10 (XML par exemple)', 
 });
 
 // Lot 11 : couverture E2E neuve (pas une migration), comble un trou constate
-// a l'audit documentaire du sujet "illustrer la doc" -- le mode "exemple
-// d'abord" JSON (JsonPasteBuilder.svelte) preexistait au sujet 13a mais
-// n'avait jamais ete illustre par une capture, contrairement a sa variante
-// XML (lot 10) qui l'a ete des le sujet 27. Colle un exemple JSON plat, verifie
-// la detection des champs, puis reassigne un champ en parametre de chemin et
-// verifie hors runner qu'une vraie requete HTTP produit bien la valeur
+// a l'audit documentaire de docs/ -- le mode "exemple d'abord" JSON
+// (JsonPasteBuilder.svelte) n'avait jamais ete illustre par une capture,
+// contrairement a sa variante XML (lot 10). Colle un exemple JSON plat,
+// verifie la detection des champs, puis reassigne un champ en parametre de
+// chemin et verifie hors runner qu'une vraie requete HTTP produit bien la valeur
 // substituee -- pas seulement que le formulaire se soumet sans erreur.
 test.describe('Runner data-driven (scenarios JSON) - lot 11 (JSON par exemple)', () => {
   test.beforeEach(async ({ request }) => {
@@ -564,9 +522,9 @@ test.describe('Runner data-driven (scenarios JSON) - lot 11 (JSON par exemple)',
   });
 });
 
-// Lot 12 : couverture E2E neuve (pas une migration), pour le sujet "SOAPAction
-// recherche/Siret" -- configure via l'UI une condition XPath sur un XML SOAP
-// namespace (Envelope/Body/recherche) et un script d'extraction
+// Lot 12 : couverture E2E neuve (pas une migration) -- configure via l'UI
+// une condition XPath sur un XML SOAP namespace (Envelope/Body/recherche)
+// et un script d'extraction
 // (parse_xml_items) qui reinjecte le Siret de la requete dans la reponse.
 // Verifie hors runner (vraie requete HTTP avec un corps SOAP realiste,
 // Header non-autoferme sibling de Body) que la condition matche bien et que
@@ -638,9 +596,9 @@ test.describe('Runner data-driven (scenarios JSON) - lot 13 (edition en place d 
   });
 });
 
-// Lot 14 : couverture E2E neuve (pas une migration), pour le sujet "restauration
-// de la vue d'origine a l'edition d'une reponse" (cf CLAUDE.md). Avant cette
-// passe, editer une regle construite via n'importe quel mode structure
+// Lot 14 : couverture E2E neuve (pas une migration), pour la restauration
+// de la vue d'origine a l'edition d'une reponse. Avant cette passe, editer
+// une regle construite via n'importe quel mode structure
 // (JSON/XML, par exemple/guide) atterrissait TOUJOURS en "Template avance",
 // meme heuristique retour 1 corrigee par Rule.response_mode (backend) +
 // RuleResponseSection.svelte::computeInitialEditorState(). Verifie aussi le
@@ -698,9 +656,10 @@ test.describe('Runner data-driven (scenarios JSON) - lot 14 (restauration de la 
 // necessitait un script Rhai complet (parse_xml_items). Configure via l'UI
 // reelle une regle dont la reponse XML guidee reinjecte une valeur XPath du
 // corps SOAP (avec un pipe substr pour ne garder que les 9 premiers
-// caracteres), verifie hors runner via une vraie requete SOAP (avec le
-// Header non-autoferme sibling de Body, cf sujet "SOAPAction recherche/Siret")
-// que la valeur extraite et tronquee se retrouve dans la reponse.
+// caracteres), verifie hors runner via une vraie requete SOAP (avec un
+// Header non-autoferme sibling de Body, structure qui declenchait auparavant
+// un bug de matching XPath desormais corrige) que la valeur extraite et
+// tronquee se retrouve dans la reponse.
 test.describe('Runner data-driven (scenarios JSON) - lot 15 (source XPath dans le builder XML)', () => {
   test.beforeEach(async ({ request }) => {
     await request.delete(`${API}/config/reset`);
@@ -722,10 +681,10 @@ test.describe('Runner data-driven (scenarios JSON) - lot 15 (source XPath dans l
   });
 });
 
-// Lot 16 (4 tests, couverture neuve) : un scenario par symptome corrige du
-// sujet "diagnostic reponse JSON/XML" (cf CLAUDE.md pour le diagnostic
-// complet). Chacun verifie explicitement le cas qui echouait avant le
-// correctif, pas seulement que le formulaire se soumet sans erreur.
+// Lot 16 (4 tests, couverture neuve) : un scenario par symptome corrige dans
+// le rendu des reponses JSON/XML. Chacun verifie explicitement le cas qui
+// echouait avant le correctif, pas seulement que le formulaire se soumet
+// sans erreur.
 test.describe('Runner data-driven (scenarios JSON) - lot 16 (diagnostic reponse JSON/XML)', () => {
   test.beforeEach(async ({ request }) => {
     await request.delete(`${API}/config/reset`);
@@ -798,8 +757,8 @@ test.describe('Runner data-driven (scenarios JSON) - lot 16 (diagnostic reponse 
   });
 });
 
-// Lot 17 (1 test, couverture neuve) : sujet "parse_date" -- sens inverse de
-// date_now/date_past/date_future (§3 CLAUDE.md). Configure via l'UI reelle
+// Lot 17 (1 test, couverture neuve) : `parse_date`, sens inverse de
+// date_now/date_past/date_future. Configure via l'UI reelle
 // une regle dont le script appelle parse_date(request.query.date, "dd/MM/yyyy")
 // et verifie hors runner qu'une vraie requete HTTP renvoie bien la date
 // saisie convertie en millisecondes depuis epoch -- pas seulement que le

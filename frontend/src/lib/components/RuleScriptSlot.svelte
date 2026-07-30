@@ -1,8 +1,8 @@
 <script>
   // Un bloc script Rhai independant (toggle + editeur + validation + aide
   // contextuelle). Reutilise 3 fois par RuleResponseSection.svelte pour
-  // pre_script/script/post_script (cf CLAUDE.md, "Scripts rhai multi-blocs" :
-  // meme structure, execution independante, pas de chainage). Le contenu
+  // pre_script/script/post_script (meme structure, execution independante,
+  // pas de chainage). Le contenu
   // d'aide differe selon le slot (texte court partage pour pre_script/
   // post_script, doc etendue avec exemples/RHAI_FUNCTIONS pour le script
   // principal) — fourni par l'appelant via le snippet `help`, jamais

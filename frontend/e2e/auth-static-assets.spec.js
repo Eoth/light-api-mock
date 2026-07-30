@@ -12,9 +12,8 @@ import { fileURLToPath } from 'node:url';
 // ce spec demarre SA PROPRE instance de lightMock, sur un port dedie, avec
 // AUTH_ENABLED=true. Impossible de reutiliser l'instance partagee pour ce
 // besoin : activer l'auth dessus casserait tous les 80+ autres tests de la
-// suite, qui supposent tous AUTH_ENABLED=false (cf CLAUDE.md, "l'environnement
-// E2E tourne avec AUTH_ENABLED=false"). Necessite le binaire deja compile
-// (`cargo build`, target/debug/light-mock(.exe)) et frontend/dist deja
+// suite, qui supposent tous AUTH_ENABLED=false. Necessite le binaire deja
+// compile (`cargo build`, target/debug/light-mock(.exe)) et frontend/dist deja
 // buildee (memes prerequis que `npm run build`/`cargo build`) -- pas de build
 // automatique dans ce spec, comme le reste de la suite E2E qui suppose deja
 // un environnement pret.

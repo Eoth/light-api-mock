@@ -70,15 +70,13 @@ pub struct Rule {
     // `response.body` (json-paste/json-guided/xml-paste/xml-guided/text/
     // advanced/empty), pour que RuleResponseSection.svelte puisse restaurer
     // la vue d'origine a l'edition plutot que de systematiquement retomber
-    // sur "Template avance" (cf CLAUDE.md, "Restauration de la vue d'origine
-    // a l'edition d'une reponse"). EXCEPTION DELIBEREE au point 16 (pas de
-    // #[serde(default)] sur les champs obligatoires de Rule) : contrairement
-    // a pre_script/script/post_script (comportement fonctionnel reel),
+    // sur "Template avance". EXCEPTION DELIBEREE (contrairement aux autres
+    // champs de Rule, pas de retrocompat serde) : contrairement a
+    // pre_script/script/post_script (comportement fonctionnel reel),
     // response_mode ne pilote QUE l'affichage du formulaire d'edition —
-    // l'absence de la cle (YAML/JSON pre-existant a cette passe) degrade
-    // gracieusement vers l'ancienne heuristique de detection par forme du
-    // corps, jamais une erreur de chargement. Memes precedent deja en place
-    // pour group_name/wsdl_mode (point 10).
+    // l'absence de la cle (YAML/JSON pre-existant) degrade gracieusement vers
+    // l'ancienne heuristique de detection par forme du corps, jamais une
+    // erreur de chargement. Meme precedent que group_name/wsdl_mode.
     #[serde(default)]
     pub response_mode: Option<ResponseEditorMode>,
     pub conditions: ConditionGroup,
