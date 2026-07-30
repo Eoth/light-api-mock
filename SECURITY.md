@@ -22,7 +22,7 @@ contournement d'authentification, injection, traversée de répertoire, déni de
 Canal recommandé : [GitHub Security Advisories](https://github.com/eoth/light-api-mock/security/advisories/new)
 (signalement privé, natif à GitHub, avec suivi de conversation dédié).
 
-Si ce canal n'est pas accessible, contacter directement : **tnak49@yahoo.fr**.
+Si ce canal n'est pas accessible, contacter directement : **etokan.devs@gmail.com**.
 
 Merci d'inclure, dans la mesure du possible :
 - Une description du problème et de son impact

@@ -2,7 +2,7 @@
 name = "light-mock"
 version = "0.1.0"
 edition = "2024"
-description = "Mock & Proxy HTTP intelligent pour Kubernetes"
+description = "Mock & Proxy HTTP intelligent, deployable en Kubernetes, Docker Compose ou binaire natif"
 license = "MIT"
 repository = "https://github.com/eoth/light-api-mock"
 

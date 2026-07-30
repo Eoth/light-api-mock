@@ -22,8 +22,8 @@ entre versions mineures.
 ## [0.1.0] - 2026-07-29
 
 ### Added
-- Première version versionnée de lightMock : mock & proxy HTTP intelligent pour Kubernetes, un
-  seul binaire Rust (Axum) servant une UI Svelte 5.
+- Première version versionnée de lightMock : mock & proxy HTTP intelligent, un seul binaire Rust
+  (Axum) servant une UI Svelte 5, déployable en Kubernetes, Docker Compose ou nativement.
 - Moteur de règles first-match (conditions ET/OU sur path/query/header/body JSON/XML/form),
   bascule mock/proxy par service et par règle, testeur de règle et détecteur de conflits.
 - Templates dynamiques (`{{variable | pipe}}`), 19 types de données factices, scripts Rhai
