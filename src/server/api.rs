@@ -304,6 +304,11 @@ async fn reset_config(
         .replace(MockConfig::empty())
         .await
         .map_err(AppError::Store)?;
+    // Meme raison que delete_service_impl : sans ca, un service recree apres
+    // un reset heriterait silencieusement du statut "observe" d'un service
+    // disparu (ObservationToggle est independant du cycle de vie de
+    // MockConfig).
+    state.observation.toggle.clear_all();
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -932,6 +937,12 @@ async fn delete_service_impl(
     {
         Err(AppError::NotFound)
     } else {
+        // Sans ca, un futur service RECREE sous le meme (group, name)
+        // heriterait silencieusement du statut "observe" d'un service deja
+        // supprime (ObservationToggle est ephemere mais totalement
+        // independant du cycle de vie de MockConfig) -- confusion pure pour
+        // l'utilisateur, aucune donnee sensible en jeu.
+        state.observation.toggle.disable(group.as_deref(), &name);
         Ok(StatusCode::NO_CONTENT)
     }
 }
@@ -2726,6 +2737,90 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn deleting_a_service_clears_its_observation_toggle() {
+        let svc = Service {
+            is_mocked: false,
+            ..svc_named("proxy-svc", None)
+        };
+        let base = spawn_test_app(MockConfig {
+            services: vec![svc.clone()],
+            groups: vec![],
+        })
+        .await;
+        let client = reqwest::Client::new();
+
+        client
+            .post(format!("{base}/services/proxy-svc/observe"))
+            .send()
+            .await
+            .unwrap();
+        client
+            .delete(format!("{base}/services/proxy-svc"))
+            .send()
+            .await
+            .unwrap();
+
+        // Un service RECREE sous le meme nom ne doit pas heriter du statut
+        // "observe" du service supprime.
+        client
+            .post(format!("{base}/services"))
+            .json(&svc)
+            .send()
+            .await
+            .unwrap();
+        let status = client
+            .get(format!("{base}/observation/status"))
+            .send()
+            .await
+            .unwrap()
+            .json::<Vec<ObservationStatusEntry>>()
+            .await
+            .unwrap();
+        assert!(status.is_empty());
+    }
+
+    #[tokio::test]
+    async fn resetting_config_clears_all_observation_toggles() {
+        let svc = Service {
+            is_mocked: false,
+            ..svc_named("proxy-svc", None)
+        };
+        let base = spawn_test_app(MockConfig {
+            services: vec![svc.clone()],
+            groups: vec![],
+        })
+        .await;
+        let client = reqwest::Client::new();
+
+        client
+            .post(format!("{base}/services/proxy-svc/observe"))
+            .send()
+            .await
+            .unwrap();
+        client
+            .delete(format!("{base}/config/reset"))
+            .send()
+            .await
+            .unwrap();
+
+        client
+            .post(format!("{base}/services"))
+            .json(&svc)
+            .send()
+            .await
+            .unwrap();
+        let status = client
+            .get(format!("{base}/observation/status"))
+            .send()
+            .await
+            .unwrap()
+            .json::<Vec<ObservationStatusEntry>>()
+            .await
+            .unwrap();
+        assert!(status.is_empty());
     }
 
     // --- CRUD TCP (feature "tcp-mock") : meme infra spawn_test_app que le

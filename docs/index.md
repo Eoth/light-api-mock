@@ -30,6 +30,7 @@ Cette page est une **vue d'ensemble rapide** : une ligne ou deux par fonctionnal
 | Fonctionnalité | En bref |
 |---|---|
 | [Journal des requêtes](journal-des-requetes.md) | Historique des dernières requêtes reçues par lightMock, consultable dans l'interface — utile pour comprendre pourquoi une règle a (ou n'a pas) matché. |
+| [Observation de trafic et suggestions de règles](observation-de-trafic.md) | Pour un service en mode proxy pur : observer le trafic réel (activé à la demande) et se faire proposer des règles de mock à partir des appels réellement vus. |
 
 ## Sauvegarde & administration
 
