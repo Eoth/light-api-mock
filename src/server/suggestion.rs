@@ -538,3 +538,131 @@ mod tests {
         assert!(matches!(suggestion, Suggestion::VarianceUnexplained { .. }));
     }
 }
+
+// Property-based testing (surface non fiable : corps de reponse d'un vrai
+// backend proxifie, potentiellement hostile) — pas de cargo-fuzz/libFuzzer
+// ici, faute de toolchain nightly et de support Windows fiable sur ce poste
+// (decide avec l'utilisateur) ; `proptest` couvre le meme objectif en pur
+// Rust, portable sur toute plateforme stable. Genere des observations
+// aleatoires/adversariales (statuts, corps JSON ou non, en-tetes bruyants
+// inclus) et verifie des invariants qu'aucun cas manuel ne couvre tous a la
+// fois : jamais de panique, jamais d'en-tete calcule (content-length/date)
+// ou d'en-tete de bruit dans une regle suggeree.
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use proptest::prelude::*;
+    use std::collections::HashMap;
+
+    fn arb_body() -> impl Strategy<Value = String> {
+        prop_oneof![
+            "[\\PC]{0,40}",
+            "\\{\"[a-z]{1,5}\":\"[a-zA-Z0-9]{0,10}\"\\}",
+            Just(String::new()),
+            Just("not json at all {{{".to_string()),
+        ]
+    }
+
+    fn arb_small_map() -> impl Strategy<Value = HashMap<String, String>> {
+        prop::collection::hash_map(
+            prop_oneof![
+                Just("id".to_string()),
+                Just("x-env".to_string()),
+                Just("x-request-id".to_string()),
+                Just("authorization".to_string()),
+                "[a-z-]{1,8}",
+            ],
+            "[a-zA-Z0-9 ]{0,10}",
+            0..3,
+        )
+    }
+
+    fn arb_exchange() -> impl Strategy<Value = ObservedExchange> {
+        (
+            arb_small_map(),
+            arb_small_map(),
+            arb_body(),
+            100u16..600,
+            arb_small_map(),
+            arb_body(),
+        )
+            .prop_map(
+                |(query, headers, req_body, status, resp_headers, resp_body)| {
+                    ObservedExchange::new(
+                        query,
+                        headers,
+                        req_body.as_bytes(),
+                        Some("application/json".into()),
+                        status,
+                        resp_headers,
+                        resp_body.as_bytes(),
+                        Some("application/json".into()),
+                    )
+                },
+            )
+    }
+
+    fn suggestion_rules(s: &Suggestion) -> Vec<&SuggestedRule> {
+        match s {
+            Suggestion::Unconditional { rule } => vec![rule.as_ref()],
+            Suggestion::Conditional { rules } => rules.iter().collect(),
+            Suggestion::VarianceUnexplained { .. } => vec![],
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn suggest_never_panics(obs in prop::collection::vec(arb_exchange(), 0..15)) {
+            let _ = suggest("GET", "/fuzz", &obs);
+        }
+
+        #[test]
+        fn identical_responses_always_suggest_unconditional(
+            status in 100u16..600,
+            body in arb_body(),
+            n in 3usize..10,
+        ) {
+            let obs: Vec<ObservedExchange> = (0..n)
+                .map(|_| {
+                    ObservedExchange::new(
+                        HashMap::new(), HashMap::new(), body.as_bytes(), None,
+                        status, HashMap::new(), body.as_bytes(), None,
+                    )
+                })
+                .collect();
+            let suggestion = suggest("GET", "/fuzz", &obs);
+            let is_unconditional = matches!(suggestion, Some(Suggestion::Unconditional { .. }));
+            prop_assert!(is_unconditional);
+        }
+
+        #[test]
+        fn suggested_headers_never_contain_content_length_or_date(
+            obs in prop::collection::vec(arb_exchange(), 3..15)
+        ) {
+            if let Some(suggestion) = suggest("GET", "/fuzz", &obs) {
+                for rule in suggestion_rules(&suggestion) {
+                    for h in &rule.response.headers {
+                        let lower = h.name.to_lowercase();
+                        prop_assert_ne!(lower.as_str(), "content-length");
+                        prop_assert_ne!(lower.as_str(), "date");
+                    }
+                }
+            }
+        }
+
+        #[test]
+        fn suggested_condition_never_uses_a_noisy_header(
+            obs in prop::collection::vec(arb_exchange(), 3..15)
+        ) {
+            if let Some(suggestion) = suggest("GET", "/fuzz", &obs) {
+                for rule in suggestion_rules(&suggestion) {
+                    if let Some(cond) = &rule.condition
+                        && let ConditionSource::Header(k) = &cond.source
+                    {
+                        prop_assert!(!NOISY_HEADERS.contains(&k.to_lowercase().as_str()));
+                    }
+                }
+            }
+        }
+    }
+}
