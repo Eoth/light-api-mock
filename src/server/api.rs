@@ -61,6 +61,9 @@ pub fn routes() -> Router<AppState> {
         .route("/messaging/logs", get(get_messaging_logs))
         .route("/messaging/simulate", post(simulate_message));
 
+    #[cfg(feature = "tcp-proxy")]
+    let router = router.route("/tcp/status", get(get_tcp_status));
+
     router
 }
 
@@ -381,6 +384,18 @@ async fn simulate_message(
     )
     .await;
     StatusCode::NO_CONTENT
+}
+
+// --------------- TCP brut (protocoles binaires non-HTTP) ---------------
+// Feature-gated, meme garde que /health et /messaging/status : pas d'auth,
+// lecture seule, aucune donnee sensible au-dela de ce que l'operateur a deja
+// ecrit lui-meme dans tcp-config.yaml (nom/port/succes du bind).
+
+#[cfg(feature = "tcp-proxy")]
+async fn get_tcp_status(
+    State(state): State<AppState>,
+) -> Json<Vec<crate::tcp::TcpServiceStatus>> {
+    Json((*state.tcp_status).clone())
 }
 
 // --------------- Services ---------------
@@ -1483,6 +1498,8 @@ mod tests {
             reply_topic: None,
             publisher: crate::messaging::consumer::Publisher::None,
         };
+        #[cfg(feature = "tcp-proxy")]
+        let tcp_status = Arc::new(Vec::new());
         let state = AppState {
             store,
             proxy: crate::engine::ProxyClient::new(),
@@ -1501,6 +1518,8 @@ mod tests {
             ping_cache: crate::server::ping::PingCache::new(),
             #[cfg(feature = "messaging-kafka")]
             messaging,
+            #[cfg(feature = "tcp-proxy")]
+            tcp_status,
         };
         let app = crate::server::build_router(state, &data_dir);
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -1628,6 +1647,8 @@ mod tests {
             reply_topic: None,
             publisher: crate::messaging::consumer::Publisher::None,
         };
+        #[cfg(feature = "tcp-proxy")]
+        let tcp_status = Arc::new(Vec::new());
         AppState {
             store,
             proxy: crate::engine::ProxyClient::new(),
@@ -1646,6 +1667,8 @@ mod tests {
             ping_cache: crate::server::ping::PingCache::new(),
             #[cfg(feature = "messaging-kafka")]
             messaging,
+            #[cfg(feature = "tcp-proxy")]
+            tcp_status,
         }
     }
 
