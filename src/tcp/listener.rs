@@ -1,0 +1,343 @@
+// Ecoute TCP brute, une tache tokio par service configure, en parallele du
+// serveur HTTP principal (jamais sur le meme port : un protocole binaire ne
+// se multiplexe pas par chemin d'URL, cf la note d'etude "TCP brut" du
+// handoff de reprise). Un service TCP existe hors du routeur Axum -- pas
+// d'auth, pas de CORS, pas de middleware HTTP : ce sont des concepts qui ne
+// s'appliquent pas a une socket brute.
+use crate::tcp::config::{TcpRuleAction, TcpService};
+use crate::tcp::{hex, matcher};
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::{TcpListener, TcpStream};
+use tokio::task::JoinHandle;
+
+const READ_TIMEOUT: Duration = Duration::from_secs(5);
+const DEFAULT_MAX_MESSAGE_SIZE: usize = 16 * 1024;
+
+/// Meme idiome que `request_log::max_body_size`/`message_log::max_body_size`
+/// (env var, defaut 16 Ko) : borne la lecture initiale d'une connexion pour
+/// eviter qu'un client hostile ne fasse grossir la memoire sans limite avant
+/// tout matching (cf le principe de limites de ressources explicites pour le
+/// parsing d'entree non fiable).
+pub fn max_message_size() -> usize {
+    std::env::var("TCP_PROXY_MAX_MESSAGE_SIZE")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(DEFAULT_MAX_MESSAGE_SIZE)
+}
+
+/// Demarre un accept-loop par service TCP configure au demarrage du
+/// processus. Config figee pour toute la duree du process (pas d'API pour
+/// la modifier a chaud dans cette premiere tranche, cf `tcp::config`) :
+/// chaque tache capture directement le `TcpService` dont elle a besoin, pas
+/// de re-lecture d'un store partage a chaque connexion.
+///
+/// Un service dont le port ne peut pas etre bind (deja pris, permissions...)
+/// est logge en erreur et simplement ignore -- ne doit jamais empecher le
+/// demarrage du serveur HTTP principal ni des autres services TCP.
+pub async fn spawn_tcp_services(config: &crate::tcp::config::TcpConfig) -> Vec<JoinHandle<()>> {
+    let mut handles = Vec::with_capacity(config.services.len());
+
+    for service in &config.services {
+        let addr = format!("0.0.0.0:{}", service.listen_port);
+        let listener = match TcpListener::bind(&addr).await {
+            Ok(l) => l,
+            Err(e) => {
+                tracing::error!(
+                    service = %service.name,
+                    addr = %addr,
+                    error = %e,
+                    "tcp-proxy: failed to bind, service skipped"
+                );
+                continue;
+            }
+        };
+        tracing::info!(service = %service.name, addr = %addr, "tcp-proxy: listening");
+
+        let service = Arc::new(service.clone());
+        handles.push(tokio::spawn(async move {
+            loop {
+                let (stream, peer) = match listener.accept().await {
+                    Ok(pair) => pair,
+                    Err(e) => {
+                        tracing::warn!(service = %service.name, error = %e, "tcp-proxy: accept failed");
+                        continue;
+                    }
+                };
+                let service = service.clone();
+                tokio::spawn(async move {
+                    tracing::debug!(service = %service.name, peer = %peer, "tcp-proxy: connection accepted");
+                    handle_connection(stream, service).await;
+                });
+            }
+        }));
+    }
+
+    handles
+}
+
+async fn handle_connection(mut stream: TcpStream, service: Arc<TcpService>) {
+    let mut buf = vec![0u8; max_message_size()];
+    let n = match tokio::time::timeout(READ_TIMEOUT, stream.read(&mut buf)).await {
+        Ok(Ok(0)) => return,
+        Ok(Ok(n)) => n,
+        Ok(Err(e)) => {
+            tracing::debug!(service = %service.name, error = %e, "tcp-proxy: read failed");
+            return;
+        }
+        Err(_) => {
+            tracing::debug!(service = %service.name, "tcp-proxy: read timeout, closing");
+            return;
+        }
+    };
+    let data = &buf[..n];
+
+    match matcher::match_rule(&service.rules, data) {
+        Some(rule) if rule.action == TcpRuleAction::Mock => match hex::decode(&rule.response_hex) {
+            Ok(response) => {
+                if let Err(e) = stream.write_all(&response).await {
+                    tracing::debug!(
+                        service = %service.name, rule = %rule.name, error = %e,
+                        "tcp-proxy: mock write failed"
+                    );
+                }
+            }
+            Err(e) => {
+                tracing::error!(
+                    service = %service.name, rule = %rule.name, error = %e,
+                    "tcp-proxy: invalid response_hex in matched rule, closing without reply"
+                );
+            }
+        },
+        Some(rule) => {
+            debug_assert_eq!(rule.action, TcpRuleAction::Proxy);
+            proxy_raw(stream, data, &service).await;
+        }
+        None if !service.is_mocked => {
+            proxy_raw(stream, data, &service).await;
+        }
+        None => {
+            tracing::debug!(service = %service.name, "tcp-proxy: no rule matched, closing");
+        }
+    }
+}
+
+/// Proxy TCP transparent : rejoue d'abord les octets deja lus pour le
+/// matching (sinon ils seraient perdus pour la cible reelle), puis relaie le
+/// reste de la session dans les deux sens jusqu'a fermeture. Contrairement au
+/// proxy HTTP (`engine/proxy.rs`), aucune inspection/reecriture du contenu :
+/// le protocole n'est pas decode, il n'y a rien a reecrire (pas d'equivalent
+/// X-Forwarded-*).
+async fn proxy_raw(mut client: TcpStream, already_read: &[u8], service: &TcpService) {
+    let Some(target) = service.real_target_addr.as_deref() else {
+        tracing::error!(
+            service = %service.name,
+            "tcp-proxy: proxy action but real_target_addr is not configured, closing"
+        );
+        return;
+    };
+
+    let mut upstream = match TcpStream::connect(target).await {
+        Ok(s) => s,
+        Err(e) => {
+            tracing::warn!(
+                service = %service.name, target = %target, error = %e,
+                "tcp-proxy: upstream connect failed"
+            );
+            return;
+        }
+    };
+
+    if let Err(e) = upstream.write_all(already_read).await {
+        tracing::debug!(
+            service = %service.name, error = %e,
+            "tcp-proxy: failed to replay initial bytes to upstream"
+        );
+        return;
+    }
+
+    if let Err(e) = tokio::io::copy_bidirectional(&mut client, &mut upstream).await {
+        tracing::debug!(service = %service.name, error = %e, "tcp-proxy: session ended");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tcp::config::{TcpMatcher, TcpRule};
+
+    fn svc(
+        real_target_addr: Option<String>,
+        is_mocked: bool,
+        rules: Vec<TcpRule>,
+    ) -> Arc<TcpService> {
+        Arc::new(TcpService {
+            name: "svc".into(),
+            listen_port: 0,
+            real_target_addr,
+            is_mocked,
+            rules,
+        })
+    }
+
+    #[tokio::test]
+    async fn mock_rule_replies_with_configured_bytes() {
+        let service = svc(
+            None,
+            true,
+            vec![TcpRule {
+                name: "hello".into(),
+                matcher: TcpMatcher::Any,
+                action: TcpRuleAction::Mock,
+                response_hex: hex::encode(b"pong"),
+            }],
+        );
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.unwrap();
+            handle_connection(stream, service).await;
+        });
+
+        let mut client = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+        client.write_all(b"ping").await.unwrap();
+        let mut resp = [0u8; 4];
+        client.read_exact(&mut resp).await.unwrap();
+        assert_eq!(&resp, b"pong");
+    }
+
+    #[tokio::test]
+    async fn no_matching_rule_closes_connection_without_reply() {
+        let service = svc(
+            None,
+            true,
+            vec![TcpRule {
+                name: "specific".into(),
+                matcher: TcpMatcher::Prefix(hex::encode(b"X")),
+                action: TcpRuleAction::Mock,
+                response_hex: hex::encode(b"nope-should-not-see-this"),
+            }],
+        );
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.unwrap();
+            handle_connection(stream, service).await;
+        });
+
+        let mut client = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+        client.write_all(b"ping").await.unwrap();
+        let mut resp = Vec::new();
+        let n = tokio::time::timeout(Duration::from_millis(300), client.read_to_end(&mut resp))
+            .await
+            .unwrap_or(Ok(0))
+            .unwrap_or(0);
+        assert_eq!(n, 0);
+        assert!(resp.is_empty());
+    }
+
+    #[tokio::test]
+    async fn proxy_action_forwards_bytes_to_real_target_including_prefix() {
+        // Cible reelle factice : un simple echo server TCP.
+        let upstream = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let upstream_port = upstream.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            let (mut s, _) = upstream.accept().await.unwrap();
+            let mut buf = [0u8; 64];
+            let n = s.read(&mut buf).await.unwrap();
+            s.write_all(&buf[..n]).await.unwrap();
+        });
+
+        let service = svc(
+            Some(format!("127.0.0.1:{upstream_port}")),
+            true,
+            vec![TcpRule {
+                name: "always-proxy".into(),
+                matcher: TcpMatcher::Any,
+                action: TcpRuleAction::Proxy,
+                response_hex: String::new(),
+            }],
+        );
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.unwrap();
+            handle_connection(stream, service).await;
+        });
+
+        let mut client = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+        client.write_all(b"round-trip").await.unwrap();
+        let mut resp = [0u8; 10];
+        client.read_exact(&mut resp).await.unwrap();
+        assert_eq!(&resp, b"round-trip");
+    }
+
+    #[tokio::test]
+    async fn is_mocked_false_proxies_even_without_a_matching_rule() {
+        let upstream = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let upstream_port = upstream.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            let (mut s, _) = upstream.accept().await.unwrap();
+            let mut buf = [0u8; 64];
+            let n = s.read(&mut buf).await.unwrap();
+            s.write_all(&buf[..n]).await.unwrap();
+        });
+
+        let service = svc(Some(format!("127.0.0.1:{upstream_port}")), false, vec![]);
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.unwrap();
+            handle_connection(stream, service).await;
+        });
+
+        let mut client = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+        client.write_all(b"passthru").await.unwrap();
+        let mut resp = [0u8; 8];
+        client.read_exact(&mut resp).await.unwrap();
+        assert_eq!(&resp, b"passthru");
+    }
+
+    #[tokio::test]
+    async fn proxy_action_without_real_target_addr_closes_without_panicking() {
+        let service = svc(
+            None,
+            true,
+            vec![TcpRule {
+                name: "always-proxy".into(),
+                matcher: TcpMatcher::Any,
+                action: TcpRuleAction::Proxy,
+                response_hex: String::new(),
+            }],
+        );
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.unwrap();
+            handle_connection(stream, service).await;
+        });
+
+        let mut client = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+        client.write_all(b"ping").await.unwrap();
+        let mut resp = Vec::new();
+        let n = tokio::time::timeout(Duration::from_millis(300), client.read_to_end(&mut resp))
+            .await
+            .unwrap_or(Ok(0))
+            .unwrap_or(0);
+        assert_eq!(n, 0);
+    }
+
+    #[test]
+    fn max_message_size_defaults_to_16kb() {
+        // SAFETY-note (pas d'unsafe ici) : simple lecture d'env var absente ;
+        // cette variable n'est fixee par aucun autre test de la suite.
+        unsafe { std::env::remove_var("TCP_PROXY_MAX_MESSAGE_SIZE") };
+        assert_eq!(max_message_size(), 16 * 1024);
+    }
+}

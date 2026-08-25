@@ -14,6 +14,8 @@ pub mod store;
 pub mod server;
 #[cfg(feature = "messaging-kafka")]
 pub mod messaging;
+#[cfg(feature = "tcp-proxy")]
+pub mod tcp;
 
 use crate::auth::AuthConfig;
 use crate::auth::keycloak::KeycloakClient;
@@ -100,6 +102,26 @@ async fn main() {
         #[cfg(feature = "messaging-kafka")]
         messaging,
     };
+
+    // Ecoutes TCP brutes (protocoles binaires non-HTTP), en parallele du
+    // serveur HTTP : jamais sur le meme port, un service TCP a le sien.
+    // Taches detachees (tokio::spawn) : a l'arret gracieux, seul le serveur
+    // HTTP est draine proprement (with_graceful_shutdown ci-dessous) puis la
+    // config flush(ee) ; les connexions TCP brutes en cours sont coupees net
+    // avec le runtime, comme le serait un SIGKILL. Raisonnable pour cette
+    // premiere tranche : un protocole binaire n'a pas de mecanisme generique
+    // de "fin de session propre" a declencher cote client de toute facon.
+    #[cfg(feature = "tcp-proxy")]
+    {
+        let tcp_config = crate::tcp::config::TcpConfig::load(&data_dir);
+        if !tcp_config.services.is_empty() {
+            tracing::info!(
+                count = tcp_config.services.len(),
+                "tcp-proxy: starting configured services"
+            );
+        }
+        crate::tcp::spawn_tcp_services(&tcp_config).await;
+    }
 
     let store_for_shutdown = state.store.clone();
     let app = build_router(state, &static_dir);
