@@ -29,7 +29,12 @@ pub async fn auth_middleware(
 ) -> Response {
     let path = req.uri().path().to_string();
 
-    let no_auth_paths = ["/api/health", "/api/auth/status", "/api/auth/login", "/api/auth/validate"];
+    let no_auth_paths = [
+        "/api/health",
+        "/api/auth/status",
+        "/api/auth/login",
+        "/api/auth/validate",
+    ];
     // Assets statiques de la SPA (index.html, bundle JS/CSS, favicon) : voir
     // `is_static_asset_route` (src/server/validation.rs) pour la justification
     // complete. Sans ce bypass, un navigateur sans token ne peut meme pas
@@ -37,7 +42,9 @@ pub async fn auth_middleware(
     // AUTH_ENABLED=true. Volontairement distinct de `no_auth_paths` ci-dessus
     // (egalite stricte) : ce bypass ne doit JAMAIS etre etendu a un prefixe
     // "/api" — voir les tests de non-regression dans validation.rs.
-    if no_auth_paths.iter().any(|p| path == *p) || crate::server::validation::is_static_asset_route(&path) {
+    if no_auth_paths.iter().any(|p| path == *p)
+        || crate::server::validation::is_static_asset_route(&path)
+    {
         req.extensions_mut().insert(AuthUser::anonymous());
         return next.run(req).await;
     }
@@ -143,10 +150,8 @@ mod tests {
     // auth_middleware exactement comme il tourne en production (layer Axum
     // reel), pas une version isolee reimplementee pour le test.
     async fn spawn_test_app(auth_config: AuthConfig, keycloak: Option<KeycloakClient>) -> String {
-        let data_dir = std::env::temp_dir().join(format!(
-            "lightmock-auth-mw-test-{}",
-            fastrand::u64(..)
-        ));
+        let data_dir =
+            std::env::temp_dir().join(format!("lightmock-auth-mw-test-{}", fastrand::u64(..)));
         std::fs::create_dir_all(&data_dir).unwrap();
         let store = crate::store::MockStore::new(data_dir.join("mock-config.yaml"));
         store
@@ -177,6 +182,7 @@ mod tests {
             keycloak,
             script_engine: crate::engine::script::ScriptEngine::new(),
             ping_cache: crate::server::ping::PingCache::new(),
+            observation: crate::server::observation::ObservationState::new(),
             #[cfg(feature = "messaging-kafka")]
             messaging,
             #[cfg(feature = "tcp-mock")]
@@ -247,11 +253,7 @@ mod tests {
         let base = spawn_test_app(auth_config, keycloak).await;
 
         let client = reqwest::Client::new();
-        let resp = client
-            .get(format!("{base}/services"))
-            .send()
-            .await
-            .unwrap();
+        let resp = client.get(format!("{base}/services")).send().await.unwrap();
         assert_eq!(resp.status().as_u16(), 401);
         let body: serde_json::Value = resp.json().await.unwrap();
         assert_eq!(body["error"], "Token manquant");
@@ -336,14 +338,22 @@ mod tests {
         let client = reqwest::Client::new();
 
         let health = client.get(format!("{base}/health")).send().await.unwrap();
-        assert_eq!(health.status().as_u16(), 200, "/api/health doit etre exempt d'auth");
+        assert_eq!(
+            health.status().as_u16(),
+            200,
+            "/api/health doit etre exempt d'auth"
+        );
 
         let status = client
             .get(format!("{base}/auth/status"))
             .send()
             .await
             .unwrap();
-        assert_eq!(status.status().as_u16(), 200, "/api/auth/status doit etre exempt d'auth");
+        assert_eq!(
+            status.status().as_u16(),
+            200,
+            "/api/auth/status doit etre exempt d'auth"
+        );
 
         // /auth/login et /auth/validate atteignent bien leur handler (qui
         // echoue ensuite pour une tout autre raison : Keycloak non
@@ -356,7 +366,11 @@ mod tests {
             .send()
             .await
             .unwrap();
-        assert_eq!(login.status().as_u16(), 400, "/api/auth/login doit etre exempt d'auth (echoue ensuite sur Keycloak non configure, pas sur le token)");
+        assert_eq!(
+            login.status().as_u16(),
+            400,
+            "/api/auth/login doit etre exempt d'auth (echoue ensuite sur Keycloak non configure, pas sur le token)"
+        );
 
         let validate = client
             .post(format!("{base}/auth/validate"))
@@ -364,7 +378,11 @@ mod tests {
             .send()
             .await
             .unwrap();
-        assert_eq!(validate.status().as_u16(), 400, "/api/auth/validate doit etre exempt d'auth (meme raisonnement que /auth/login)");
+        assert_eq!(
+            validate.status().as_u16(),
+            400,
+            "/api/auth/validate doit etre exempt d'auth (meme raisonnement que /auth/login)"
+        );
     }
 
     #[tokio::test]
@@ -406,11 +424,7 @@ mod tests {
         let base = spawn_test_app(auth_config, keycloak).await;
         let client = reqwest::Client::new();
 
-        let resp = client
-            .get(format!("{base}/services"))
-            .send()
-            .await
-            .unwrap();
+        let resp = client.get(format!("{base}/services")).send().await.unwrap();
         assert_eq!(
             resp.status().as_u16(),
             401,
@@ -443,11 +457,7 @@ mod tests {
         let auth_config = enabled_auth_config("http://127.0.0.1:1".into(), vec![]);
         let base = spawn_test_app(auth_config, None).await;
         let client = reqwest::Client::new();
-        let resp = client
-            .get(format!("{base}/services"))
-            .send()
-            .await
-            .unwrap();
+        let resp = client.get(format!("{base}/services")).send().await.unwrap();
         assert_eq!(resp.status().as_u16(), 500);
     }
 }

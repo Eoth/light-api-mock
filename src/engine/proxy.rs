@@ -3,6 +3,7 @@ use axum::http::{Request, Response, StatusCode};
 use futures_util::StreamExt;
 use reqwest::Client;
 use serde::Serialize;
+use std::collections::HashMap;
 use std::time::Duration;
 
 const PING_TIMEOUT: Duration = Duration::from_secs(3);
@@ -103,8 +104,8 @@ impl ProxyClient {
             query,
         );
 
-        let method =
-            reqwest::Method::from_bytes(parts.method.as_str().as_bytes()).unwrap_or(reqwest::Method::GET);
+        let method = reqwest::Method::from_bytes(parts.method.as_str().as_bytes())
+            .unwrap_or(reqwest::Method::GET);
         let mut builder = self.client.request(method, &url);
 
         let original_host = parts
@@ -161,6 +162,180 @@ impl ProxyClient {
             .body(Body::from_stream(resp_stream))
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
     }
+
+    /// Variante de `forward()` qui tente, EN PLUS de relayer la requete,
+    /// de capturer requete+reponse pour l'observation de trafic (cf
+    /// `server::observation`). Ne change RIEN au chemin par defaut : cette
+    /// methode n'est appelee que quand l'utilisateur a explicitement active
+    /// l'observation d'un service (jamais automatique).
+    ///
+    /// La capture n'est tentee que si la taille est connue et sure a l'avance
+    /// (`Content-Length` present et <= `max_buffer`), sur CHAQUE cote
+    /// independamment :
+    /// - requete non capturable (Content-Length absent/trop grand) : bascule
+    ///   integralement sur `forward()` (streaming inchange), retourne `None`.
+    /// - reponse non capturable (meme critere, verifie APRES connexion a la
+    ///   cible via `upstream_resp.content_length()`) : la reponse est quand
+    ///   meme relayee en streaming normalement, mais la capture retournee est
+    ///   `None` (echange partiel jamais retenu par l'appelant, cf
+    ///   `ObservationStore`).
+    ///
+    /// Dans les deux cas de repli, la reponse renvoyee au client est
+    /// STRICTEMENT identique a ce que `forward()` aurait produit — aucune
+    /// perte fonctionnelle pour l'utilisateur final, seulement une capture en
+    /// moins.
+    pub async fn forward_with_capture(
+        &self,
+        target_base: &str,
+        remaining_path: &str,
+        req: Request<Body>,
+        max_buffer: usize,
+    ) -> Result<(Response<Body>, Option<ProxyCaptureRaw>), StatusCode> {
+        let (parts, body) = req.into_parts();
+
+        let request_content_length = parts
+            .headers
+            .get(axum::http::header::CONTENT_LENGTH)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.parse::<usize>().ok());
+
+        if !matches!(request_content_length, Some(n) if n <= max_buffer) {
+            let rebuilt = Request::from_parts(parts, body);
+            let resp = self.forward(target_base, remaining_path, rebuilt).await?;
+            return Ok((resp, None));
+        }
+
+        let request_query_params: HashMap<String, String> = parts
+            .uri
+            .query()
+            .map(|q| {
+                url::form_urlencoded::parse(q.as_bytes())
+                    .map(|(k, v)| (k.into_owned(), v.into_owned()))
+                    .collect()
+            })
+            .unwrap_or_default();
+        let query = parts
+            .uri
+            .query()
+            .map(|q| format!("?{q}"))
+            .unwrap_or_default();
+        let url = format!(
+            "{}/{}{}",
+            target_base.trim_end_matches('/'),
+            remaining_path.trim_start_matches('/'),
+            query,
+        );
+
+        let method = reqwest::Method::from_bytes(parts.method.as_str().as_bytes())
+            .unwrap_or(reqwest::Method::GET);
+        let mut builder = self.client.request(method, &url);
+
+        let original_host = parts
+            .headers
+            .get("host")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("")
+            .to_string();
+        let request_content_type = parts
+            .headers
+            .get("content-type")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string());
+
+        let mut request_headers = HashMap::new();
+        for (name, value) in &parts.headers {
+            let name_str = name.as_str();
+            if is_hop_by_hop(name_str) {
+                continue;
+            }
+            if let Ok(v) = value.to_str() {
+                builder = builder.header(name_str, v);
+                request_headers.insert(name_str.to_string(), v.to_string());
+            }
+        }
+        if !original_host.is_empty() {
+            builder = builder.header("X-Forwarded-Host", &original_host);
+        }
+        builder = builder.header("X-Forwarded-Proto", "http");
+
+        let body_bytes = axum::body::to_bytes(body, max_buffer).await.map_err(|e| {
+            tracing::error!(error = %e, "observed request body exceeds capture buffer");
+            StatusCode::PAYLOAD_TOO_LARGE
+        })?;
+        builder = builder.body(body_bytes.to_vec());
+
+        let upstream_resp = builder.send().await.map_err(|e| {
+            tracing::error!(error = %e, url = %url, "proxy forward (observed) failed");
+            StatusCode::BAD_GATEWAY
+        })?;
+
+        let status = StatusCode::from_u16(upstream_resp.status().as_u16())
+            .unwrap_or(StatusCode::BAD_GATEWAY);
+        let response_content_type = upstream_resp
+            .headers()
+            .get("content-type")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.to_string());
+        let response_content_length = upstream_resp.content_length();
+
+        let mut response_builder = Response::builder().status(status);
+        let mut response_headers = HashMap::new();
+        for (name, value) in upstream_resp.headers() {
+            let name_str = name.as_str();
+            if is_hop_by_hop(name_str) {
+                continue;
+            }
+            if let Ok(v) = value.to_str() {
+                response_builder = response_builder.header(name_str, v);
+                response_headers.insert(name_str.to_string(), v.to_string());
+            }
+        }
+
+        if !matches!(response_content_length, Some(n) if (n as usize) <= max_buffer) {
+            let resp_stream = upstream_resp.bytes_stream();
+            let resp = response_builder
+                .body(Body::from_stream(resp_stream))
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            return Ok((resp, None));
+        }
+
+        let response_bytes = upstream_resp.bytes().await.map_err(|e| {
+            tracing::error!(error = %e, url = %url, "reading observed response body failed");
+            StatusCode::BAD_GATEWAY
+        })?;
+        let resp = response_builder
+            .body(Body::from(response_bytes.clone()))
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+        let capture = ProxyCaptureRaw {
+            request_query_params,
+            request_headers,
+            request_body: body_bytes.to_vec(),
+            request_content_type,
+            response_status: status.as_u16(),
+            response_headers,
+            response_body: response_bytes.to_vec(),
+            response_content_type,
+        };
+        Ok((resp, Some(capture)))
+    }
+}
+
+/// Requete + reponse brutes capturees par `ProxyClient::forward_with_capture`
+/// quand les deux cotes etaient surs a bufferiser. La troncature pour
+/// stockage/affichage (cf `server::observation::max_body_size`) est la
+/// responsabilite de l'appelant, pas de ce type — celui-ci porte les octets
+/// complets tels que recus.
+#[derive(Debug, Clone)]
+pub struct ProxyCaptureRaw {
+    pub request_query_params: HashMap<String, String>,
+    pub request_headers: HashMap<String, String>,
+    pub request_body: Vec<u8>,
+    pub request_content_type: Option<String>,
+    pub response_status: u16,
+    pub response_headers: HashMap<String, String>,
+    pub response_body: Vec<u8>,
+    pub response_content_type: Option<String>,
 }
 
 /// Extrait host+port d'une URL pour le test de connectivite TCP. Port
@@ -246,7 +421,8 @@ mod tests {
         // parse_host_port ne fait que du parsing d'URL, aucun I/O reseau —
         // garantit que la resolution host/port ne declenche jamais elle-meme
         // un appel HTTP (contrairement a l'ancienne implementation HEAD).
-        let (host, port) = parse_host_port("http://example.invalid:1234/some/business/path").unwrap();
+        let (host, port) =
+            parse_host_port("http://example.invalid:1234/some/business/path").unwrap();
         assert_eq!(host, "example.invalid");
         assert_eq!(port, 1234);
     }
@@ -388,5 +564,129 @@ mod tests {
             raw.contains("payload-body"),
             "body missing/incomplete:\n{raw}"
         );
+    }
+
+    /// Petit serveur axum local pour les tests de `forward_with_capture` :
+    /// contrairement a `capture_raw_request` (parsing bas niveau au fil de
+    /// l'eau), on a besoin ici d'une VRAIE reponse HTTP avec un
+    /// Content-Length maitrise (present ou volontairement absent) pour
+    /// exercer les deux branches capturable/non-capturable.
+    async fn spawn_test_target(
+        body: &'static str,
+        chunked: bool,
+    ) -> (String, tokio::task::JoinHandle<()>) {
+        use axum::response::IntoResponse;
+        use axum::routing::any;
+
+        async fn respond_fixed(
+            axum::extract::State(body): axum::extract::State<&'static str>,
+        ) -> impl IntoResponse {
+            ([("content-type", "application/json")], body)
+        }
+
+        async fn respond_chunked(
+            axum::extract::State(body): axum::extract::State<&'static str>,
+        ) -> impl IntoResponse {
+            let stream = futures_util::stream::once(async move {
+                Ok::<_, std::io::Error>(axum::body::Bytes::from_static(body.as_bytes()))
+            });
+            axum::body::Body::from_stream(stream)
+        }
+
+        let app = if chunked {
+            axum::Router::new()
+                .route("/*rest", any(respond_chunked))
+                .with_state(body)
+        } else {
+            axum::Router::new()
+                .route("/*rest", any(respond_fixed))
+                .with_state(body)
+        };
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let handle = tokio::spawn(async move {
+            axum::serve(listener, app).await.unwrap();
+        });
+        (format!("http://{addr}"), handle)
+    }
+
+    #[tokio::test]
+    async fn forward_with_capture_captures_small_request_and_response() {
+        let (target_base, _server) = spawn_test_target(r#"{"id":1}"#, false).await;
+        let client = ProxyClient::new();
+        let req = Request::builder()
+            .method("POST")
+            .uri("/svc/orders?id=1")
+            .header("content-type", "application/json")
+            .header("content-length", r#"{"q":true}"#.len().to_string())
+            .body(Body::from(r#"{"q":true}"#))
+            .unwrap();
+
+        let (resp, capture) = client
+            .forward_with_capture(&target_base, "/orders", req, 10 * 1024)
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status(), StatusCode::OK);
+        let capture = capture.expect("small request+response must be captured");
+        assert_eq!(capture.request_query_params.get("id").unwrap(), "1");
+        assert_eq!(capture.request_body, br#"{"q":true}"#);
+        assert_eq!(capture.response_status, 200);
+        assert_eq!(capture.response_body, br#"{"id":1}"#);
+        assert_eq!(
+            capture.response_content_type.as_deref(),
+            Some("application/json")
+        );
+
+        let body = axum::body::to_bytes(resp.into_body(), 1024).await.unwrap();
+        assert_eq!(&body[..], br#"{"id":1}"#);
+    }
+
+    #[tokio::test]
+    async fn forward_with_capture_skips_when_request_too_large_for_buffer() {
+        let (target_base, _server) = spawn_test_target(r#"{"id":1}"#, false).await;
+        let client = ProxyClient::new();
+        let req = Request::builder()
+            .method("POST")
+            .uri("/svc/orders")
+            .body(Body::from("0123456789"))
+            .unwrap();
+
+        let (resp, capture) = client
+            .forward_with_capture(&target_base, "/orders", req, 4)
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert!(
+            capture.is_none(),
+            "requete au-dela du buffer max ne doit jamais etre capturee"
+        );
+    }
+
+    #[tokio::test]
+    async fn forward_with_capture_skips_when_response_has_no_content_length() {
+        let (target_base, _server) = spawn_test_target(r#"{"id":1}"#, true).await;
+        let client = ProxyClient::new();
+        let req = Request::builder()
+            .method("GET")
+            .uri("/svc/orders")
+            .body(Body::empty())
+            .unwrap();
+
+        let (resp, capture) = client
+            .forward_with_capture(&target_base, "/orders", req, 10 * 1024)
+            .await
+            .unwrap();
+
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert!(
+            capture.is_none(),
+            "reponse sans Content-Length ne doit jamais etre capturee"
+        );
+        // Mais le trafic doit rester relaye correctement au client.
+        let body = axum::body::to_bytes(resp.into_body(), 1024).await.unwrap();
+        assert_eq!(&body[..], br#"{"id":1}"#);
     }
 }
