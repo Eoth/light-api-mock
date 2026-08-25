@@ -1,5 +1,5 @@
 <script>
-  import { getServices, getConfig, putConfig, toggleService, createService, updateService, resetConfig, getAuthStatus, validateToken, getGroups, createGroup, getMessagingStatus } from './lib/api.js';
+  import { getServices, getConfig, putConfig, toggleService, createService, updateService, resetConfig, getAuthStatus, validateToken, getGroups, createGroup, getMessagingStatus, getTcpStatus } from './lib/api.js';
   import { auth, isLoggedIn, setAuth, logout, restoreAuth } from './lib/auth.svelte.js';
   import ServiceList from './lib/components/ServiceList.svelte';
   import ServiceDetail from './lib/components/ServiceDetail.svelte';
@@ -7,6 +7,7 @@
   import Notification from './lib/components/Notification.svelte';
   import RequestLog from './lib/components/RequestLog.svelte';
   import MessagingLog from './lib/components/MessagingLog.svelte';
+  import TcpServiceManager from './lib/components/TcpServiceManager.svelte';
   import LoginForm from './lib/components/LoginForm.svelte';
   import GroupManager from './lib/components/GroupManager.svelte';
   import BackupManager from './lib/components/BackupManager.svelte';
@@ -18,6 +19,8 @@
   // Absent (binaire compile sans la feature "messaging-kafka") -> le bouton
   // "Messages Kafka" reste cache plutot que de mener a une vue en echec (404).
   let messagingAvailable = $state(false);
+  // Meme garde que messagingAvailable, pour la feature "tcp-mock".
+  let tcpAvailable = $state(false);
   let notification = $state({ message: '', type: 'info', visible: false });
   let selectedService = $state(null);
   // Le nom seul ne suffit pas a identifier un service (deux services
@@ -97,6 +100,16 @@
       // 404 sur un binaire compile sans la feature "messaging-kafka" : c'est
       // l'etat par defaut attendu, pas une erreur a notifier a l'utilisateur.
       messagingAvailable = false;
+    }
+
+    try {
+      // getTcpStatus() renvoie toujours 200 (liste eventuellement vide) sur
+      // un binaire compile avec "tcp-mock" ; 404 sinon -- meme detection que
+      // messagingAvailable ci-dessus.
+      await getTcpStatus();
+      tcpAvailable = true;
+    } catch {
+      tcpAvailable = false;
     }
 
     const params = new URLSearchParams(window.location.search);
@@ -326,6 +339,9 @@
         {#if messagingAvailable}
           <button type="button" class="btn btn-sm btn-outline" onclick={() => view = 'messaging'} title="Journal des messages Kafka" data-testid="app-nav-messaging-button">Messages Kafka</button>
         {/if}
+        {#if tcpAvailable}
+          <button type="button" class="btn btn-sm btn-outline" onclick={() => view = 'tcp'} title="Mock TCP brut" data-testid="app-nav-tcp-button">Mock TCP</button>
+        {/if}
         <button type="button" class="btn btn-sm btn-outline" onclick={() => view = 'groups'} title="Gestion des groupes" data-testid="app-nav-groups-button">Groupes</button>
         <button type="button" class="btn btn-sm btn-outline" onclick={exportConfig} title="Telecharger la configuration" data-testid="app-export-button">Export</button>
         <button type="button" class="btn btn-sm btn-outline" onclick={importConfig} title="Charger une configuration" data-testid="app-import-button">Import</button>
@@ -352,6 +368,7 @@
         <li aria-current="page">
           {#if view === 'logs'}Journal des requetes
           {:else if view === 'messaging'}Messages Kafka
+          {:else if view === 'tcp'}Mock TCP brut
           {:else if view === 'groups'}Groupes de services
           {:else if view === 'backups'}Sauvegardes de configuration
           {:else if view === 'add'}Ajouter un service
@@ -402,6 +419,8 @@
       <RequestLog />
     {:else if view === 'messaging'}
       <MessagingLog onNotify={showNotification} onBack={handleBack} />
+    {:else if view === 'tcp'}
+      <TcpServiceManager onNotify={showNotification} onBack={handleBack} />
     {:else if view === 'groups'}
       <GroupManager {services} authEnabled={auth.enabled} onNotify={showNotification} onBack={handleBack} onServiceUpdate={handleServiceUpdate} onGroupsChange={(g) => groups = g} />
     {:else if view === 'backups'}
