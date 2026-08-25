@@ -207,6 +207,20 @@ impl ObservationStore {
     pub fn key_count(&self) -> usize {
         self.inner.read().unwrap().buckets.len()
     }
+
+    /// Toutes les cles (endpoints distincts) suivies pour un service donne,
+    /// utilisee par le calcul de suggestions (`server::suggestion`) pour
+    /// savoir quels (method, sub_path) examiner sans que l'appelant ait deja
+    /// besoin de les connaitre a l'avance.
+    pub fn keys_for_service(&self, group: Option<&str>, service_name: &str) -> Vec<ObservationKey> {
+        let inner = self.inner.read().unwrap();
+        inner
+            .buckets
+            .keys()
+            .filter(|k| k.group_name.as_deref() == group && k.service_name == service_name)
+            .cloned()
+            .collect()
+    }
 }
 
 impl Default for ObservationStore {

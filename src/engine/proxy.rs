@@ -169,11 +169,13 @@ impl ProxyClient {
     /// methode n'est appelee que quand l'utilisateur a explicitement active
     /// l'observation d'un service (jamais automatique).
     ///
-    /// La capture n'est tentee que si la taille est connue et sure a l'avance
-    /// (`Content-Length` present et <= `max_buffer`), sur CHAQUE cote
-    /// independamment :
-    /// - requete non capturable (Content-Length absent/trop grand) : bascule
+    /// La capture n'est tentee que si la taille est connue et sure a l'avance,
+    /// sur CHAQUE cote independamment :
+    /// - requete non capturable (Content-Length > `max_buffer`, ou
+    ///   Transfer-Encoding: chunked — taille reellement inconnue) : bascule
     ///   integralement sur `forward()` (streaming inchange), retourne `None`.
+    ///   Une requete SANS Content-Length ET sans chunked (GET/DELETE typique
+    ///   sans corps) est traitee comme un corps vide, capturable.
     /// - reponse non capturable (meme critere, verifie APRES connexion a la
     ///   cible via `upstream_resp.content_length()`) : la reponse est quand
     ///   meme relayee en streaming normalement, mais la capture retournee est
@@ -183,7 +185,11 @@ impl ProxyClient {
     /// Dans les deux cas de repli, la reponse renvoyee au client est
     /// STRICTEMENT identique a ce que `forward()` aurait produit — aucune
     /// perte fonctionnelle pour l'utilisateur final, seulement une capture en
-    /// moins.
+    /// moins. Seule exception theorique : une requete sans Content-Length ET
+    /// sans chunked qui porterait malgre tout un corps au-dela de
+    /// `max_buffer` (HTTP mal forme — hyper ne laisse jamais passer ce cas
+    /// sur une vraie connexion reseau) recevrait un 413 au lieu d'etre
+    /// relayee telle quelle.
     pub async fn forward_with_capture(
         &self,
         target_base: &str,
@@ -198,8 +204,21 @@ impl ProxyClient {
             .get(axum::http::header::CONTENT_LENGTH)
             .and_then(|v| v.to_str().ok())
             .and_then(|v| v.parse::<usize>().ok());
+        // Une requete sans Content-Length ET sans Transfer-Encoding: chunked
+        // (typiquement GET/DELETE sans corps) est, par construction HTTP,
+        // un corps vide -- sure a bufferiser (0 octet) sans avoir besoin
+        // d'une taille annoncee. Seule une requete VRAIMENT de taille
+        // inconnue (chunked) bascule sur le streaming pur.
+        let is_chunked = parts
+            .headers
+            .get(axum::http::header::TRANSFER_ENCODING)
+            .is_some();
+        let capturable_request = match request_content_length {
+            Some(n) => n <= max_buffer,
+            None => !is_chunked,
+        };
 
-        if !matches!(request_content_length, Some(n) if n <= max_buffer) {
+        if !capturable_request {
             let rebuilt = Request::from_parts(parts, body);
             let resp = self.forward(target_base, remaining_path, rebuilt).await?;
             return Ok((resp, None));
@@ -650,6 +669,7 @@ mod tests {
         let req = Request::builder()
             .method("POST")
             .uri("/svc/orders")
+            .header("content-length", "10")
             .body(Body::from("0123456789"))
             .unwrap();
 
