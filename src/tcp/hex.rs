@@ -2,7 +2,7 @@
 // corps de reponse mock) stockes dans le YAML. Prefere a une dependance
 // `hex`/`base64` externe : quelques lignes suffisent, zero crate
 // supplementaire a auditer pour cette premiere tranche du mock TCP (cf
-// Cargo.toml, feature "tcp-proxy").
+// Cargo.toml, feature "tcp-mock").
 
 pub fn encode(bytes: &[u8]) -> String {
     let mut out = String::with_capacity(bytes.len() * 2);

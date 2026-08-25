@@ -1,4 +1,4 @@
-// Schema + chargement du mock/proxy TCP brut. Delibrement HORS de
+// Schema + chargement du mock TCP brut. Delibrement HORS de
 // `models::MockConfig` (contrairement a une premiere version de cette
 // tranche) : ce module aurait alors force `MockConfig` a exposer un
 // nouveau champ, obligatoire dans TOUT literal `MockConfig { .. }` du
@@ -13,6 +13,15 @@
 // write-behind/backup/rotation (ce que fournit `MockStore` pour la config
 // HTTP) tant qu'aucune API ne permet de la modifier a chaud -- rien a
 // proteger en ecriture qui n'existe pas encore.
+//
+// AUCUN mode proxy (retire de la premiere version de cette tranche, cf
+// `tcp::mod` pour la decision complete) : un relais TCP brut sans matching
+// n'ajoute aucune valeur de mock, et fait passer le trafic par un
+// intermediaire qui ira de toute facon vers la meme cible relle -- l'
+// appelant peut s'y connecter directement, ce que lightMock imposer un
+// saut reseau supplementaire sans contrepartie contredit. Chaque
+// `TcpService` n'a donc PAS de cible reelle a configurer : uniquement des
+// regles de mock.
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
@@ -26,30 +35,17 @@ pub struct TcpConfig {
 pub struct TcpService {
     pub name: String,
     pub listen_port: u16,
-    /// "host:port" de la vraie cible. Requis des qu'une regle utilise
-    /// `TcpRuleAction::Proxy`, ou si `is_mocked` est false (proxy direct,
-    /// meme convention que `Service::is_mocked` cote HTTP).
-    #[serde(default)]
-    pub real_target_addr: Option<String>,
-    #[serde(default = "default_true")]
-    pub is_mocked: bool,
     #[serde(default)]
     pub rules: Vec<TcpRule>,
-}
-
-fn default_true() -> bool {
-    true
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TcpRule {
     pub name: String,
     pub matcher: TcpMatcher,
-    #[serde(default)]
-    pub action: TcpRuleAction,
-    /// Reponse brute renvoyee au client si `action == Mock`. Ignore si
-    /// `action == Proxy`. Encodage hexadecimal (pas base64) : evite une
-    /// dependance externe supplementaire, cf `tcp::hex`.
+    /// Reponse brute renvoyee au client quand cette regle matche. Encodage
+    /// hexadecimal (pas base64) : evite une dependance externe
+    /// supplementaire, cf `tcp::hex`.
     #[serde(default)]
     pub response_hex: String,
 }
@@ -61,22 +57,13 @@ pub struct TcpRule {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", content = "value")]
 pub enum TcpMatcher {
-    /// Prefixe attendu, encode en hexadecimal (ex: trame BER LDAP
-    /// commencant par 0x30 = SEQUENCE).
+    /// Prefixe attendu, encode en hexadecimal.
     Prefix(String),
     /// Pattern `regex::bytes::Regex` applique aux octets bruts (pas d'UTF-8
     /// garanti).
     Regex(String),
     /// Matche toujours : utile comme regle de repli en fin de liste.
     Any,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
-#[serde(rename_all = "lowercase")]
-pub enum TcpRuleAction {
-    #[default]
-    Mock,
-    Proxy,
 }
 
 impl TcpConfig {
@@ -104,14 +91,14 @@ impl TcpConfig {
         let content = match std::fs::read_to_string(&file) {
             Ok(c) => c,
             Err(e) => {
-                tracing::error!(path = %file.display(), error = %e, "tcp-proxy: failed to read tcp-config.yaml, falling back to empty config");
+                tracing::error!(path = %file.display(), error = %e, "tcp-mock: failed to read tcp-config.yaml, falling back to empty config");
                 return Self::default();
             }
         };
         match serde_yaml::from_str(&content) {
             Ok(config) => config,
             Err(e) => {
-                tracing::error!(path = %file.display(), error = %e, "tcp-proxy: failed to parse tcp-config.yaml, falling back to empty config");
+                tracing::error!(path = %file.display(), error = %e, "tcp-mock: failed to parse tcp-config.yaml, falling back to empty config");
                 Self::default()
             }
         }
@@ -149,21 +136,17 @@ mod tests {
     fn roundtrip_yaml_serialization() {
         let config = TcpConfig {
             services: vec![TcpService {
-                name: "ldap-directory".into(),
-                listen_port: 3890,
-                real_target_addr: Some("ldap.internal:389".into()),
-                is_mocked: true,
+                name: "heartbeat-mock".into(),
+                listen_port: 9000,
                 rules: vec![
                     TcpRule {
-                        name: "bind-request".into(),
-                        matcher: TcpMatcher::Prefix("300c02010060070201".into()),
-                        action: TcpRuleAction::Mock,
-                        response_hex: "300c02010161070a010000040400".into(),
+                        name: "ping".into(),
+                        matcher: TcpMatcher::Prefix("50494e47".into()),
+                        response_hex: "504f4e47".into(),
                     },
                     TcpRule {
                         name: "fallback".into(),
                         matcher: TcpMatcher::Any,
-                        action: TcpRuleAction::Proxy,
                         response_hex: String::new(),
                     },
                 ],
@@ -183,7 +166,6 @@ mod tests {
 services:
   - name: svc
     listen_port: 9999
-    is_mocked: true
     rules:
       - name: r
         matcher: { type: Any }
@@ -192,28 +174,15 @@ services:
         let config = TcpConfig::load(&dir);
         assert_eq!(config.services.len(), 1);
         assert_eq!(config.services[0].listen_port, 9999);
-        assert_eq!(config.services[0].rules[0].action, TcpRuleAction::Mock);
     }
 
     #[test]
-    fn tcp_rule_action_defaults_to_mock_and_response_hex_defaults_to_empty() {
+    fn response_hex_defaults_to_empty() {
         let yaml = r#"
 name: r
 matcher: { type: Any }
 "#;
         let rule: TcpRule = serde_yaml::from_str(yaml).expect("deserialize");
-        assert_eq!(rule.action, TcpRuleAction::Mock);
         assert_eq!(rule.response_hex, "");
-    }
-
-    #[test]
-    fn is_mocked_defaults_to_true() {
-        let yaml = r#"
-name: svc
-listen_port: 1
-rules: []
-"#;
-        let service: TcpService = serde_yaml::from_str(yaml).expect("deserialize");
-        assert!(service.is_mocked);
     }
 }

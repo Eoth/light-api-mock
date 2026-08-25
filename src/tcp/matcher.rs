@@ -29,13 +29,11 @@ fn matches(matcher: &TcpMatcher, data: &[u8]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tcp::config::TcpRuleAction;
 
     fn rule(name: &str, matcher: TcpMatcher) -> TcpRule {
         TcpRule {
             name: name.into(),
             matcher,
-            action: TcpRuleAction::Mock,
             response_hex: String::new(),
         }
     }

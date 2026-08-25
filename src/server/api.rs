@@ -61,7 +61,7 @@ pub fn routes() -> Router<AppState> {
         .route("/messaging/logs", get(get_messaging_logs))
         .route("/messaging/simulate", post(simulate_message));
 
-    #[cfg(feature = "tcp-proxy")]
+    #[cfg(feature = "tcp-mock")]
     let router = router.route("/tcp/status", get(get_tcp_status));
 
     router
@@ -391,7 +391,7 @@ async fn simulate_message(
 // lecture seule, aucune donnee sensible au-dela de ce que l'operateur a deja
 // ecrit lui-meme dans tcp-config.yaml (nom/port/succes du bind).
 
-#[cfg(feature = "tcp-proxy")]
+#[cfg(feature = "tcp-mock")]
 async fn get_tcp_status(
     State(state): State<AppState>,
 ) -> Json<Vec<crate::tcp::TcpServiceStatus>> {
@@ -1498,7 +1498,7 @@ mod tests {
             reply_topic: None,
             publisher: crate::messaging::consumer::Publisher::None,
         };
-        #[cfg(feature = "tcp-proxy")]
+        #[cfg(feature = "tcp-mock")]
         let tcp_status = Arc::new(Vec::new());
         let state = AppState {
             store,
@@ -1518,7 +1518,7 @@ mod tests {
             ping_cache: crate::server::ping::PingCache::new(),
             #[cfg(feature = "messaging-kafka")]
             messaging,
-            #[cfg(feature = "tcp-proxy")]
+            #[cfg(feature = "tcp-mock")]
             tcp_status,
         };
         let app = crate::server::build_router(state, &data_dir);
@@ -1647,7 +1647,7 @@ mod tests {
             reply_topic: None,
             publisher: crate::messaging::consumer::Publisher::None,
         };
-        #[cfg(feature = "tcp-proxy")]
+        #[cfg(feature = "tcp-mock")]
         let tcp_status = Arc::new(Vec::new());
         AppState {
             store,
@@ -1667,7 +1667,7 @@ mod tests {
             ping_cache: crate::server::ping::PingCache::new(),
             #[cfg(feature = "messaging-kafka")]
             messaging,
-            #[cfg(feature = "tcp-proxy")]
+            #[cfg(feature = "tcp-mock")]
             tcp_status,
         }
     }

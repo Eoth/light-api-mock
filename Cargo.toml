@@ -68,15 +68,16 @@ rdkafka = { version = "0.36", features = ["cmake-build"], optional = true }
 # "Messaging Kafka" de README.md.
 messaging-kafka = ["dep:rdkafka"]
 
-# Mock/proxy TCP brut pour des protocoles binaires non-HTTP (LDAP, SMTP,
-# protocoles proprietaires...). NON active par defaut, zero impact sur le
+# Mock TCP brut pour des protocoles binaires non-HTTP simples, un message ->
+# une reponse fixe (PAS de relais/proxy : un relais sans mock n'ajoute aucune
+# valeur et route inutilement le trafic vers un intermediaire, cf src/tcp/mod.rs
+# pour la decision complete). NON active par defaut, zero impact sur le
 # binaire/tests tant que non activee (le module src/tcp/ ne compile meme
 # pas sinon). Aucune dependance externe nouvelle : le matching bytes/regex
 # binaire s'appuie sur `regex::bytes` (deja fourni par la dependance `regex`
 # ci-dessus), volontairement pour ne pas introduire de crate a auditer
-# (licence, mainteneurs, unsafe interne) pour cette premiere tranche. Voir
-# la section "TCP brut (etude)" de README.md.
-tcp-proxy = ["tokio/io-util"]
+# (licence, mainteneurs, unsafe interne) pour cette premiere tranche.
+tcp-mock = ["tokio/io-util"]
 
 [profile.release]
 opt-level = 3
