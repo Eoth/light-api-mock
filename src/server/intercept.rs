@@ -778,7 +778,7 @@ mod tests {
             reply_topic: None,
             publisher: crate::messaging::consumer::Publisher::None,
         };
-        #[cfg(feature = "tcp-proxy")]
+        #[cfg(feature = "tcp-mock")]
         let tcp_status = std::sync::Arc::new(Vec::new());
         let state = AppState {
             store,
@@ -791,7 +791,7 @@ mod tests {
             ping_cache: crate::server::ping::PingCache::new(),
             #[cfg(feature = "messaging-kafka")]
             messaging,
-            #[cfg(feature = "tcp-proxy")]
+            #[cfg(feature = "tcp-mock")]
             tcp_status,
         };
         let request_log_handle = state.request_log.clone();
@@ -898,7 +898,7 @@ mod tests {
             reply_topic: None,
             publisher: crate::messaging::consumer::Publisher::None,
         };
-        #[cfg(feature = "tcp-proxy")]
+        #[cfg(feature = "tcp-mock")]
         let tcp_status = std::sync::Arc::new(Vec::new());
         let state = AppState {
             store,
@@ -911,7 +911,7 @@ mod tests {
             ping_cache: crate::server::ping::PingCache::new(),
             #[cfg(feature = "messaging-kafka")]
             messaging,
-            #[cfg(feature = "tcp-proxy")]
+            #[cfg(feature = "tcp-mock")]
             tcp_status,
         };
         let request_log_handle = state.request_log.clone();
@@ -1012,7 +1012,7 @@ mod tests {
             reply_topic: None,
             publisher: crate::messaging::consumer::Publisher::None,
         };
-        #[cfg(feature = "tcp-proxy")]
+        #[cfg(feature = "tcp-mock")]
         let tcp_status = std::sync::Arc::new(Vec::new());
         let state = AppState {
             store,
@@ -1025,7 +1025,7 @@ mod tests {
             ping_cache: crate::server::ping::PingCache::new(),
             #[cfg(feature = "messaging-kafka")]
             messaging,
-            #[cfg(feature = "tcp-proxy")]
+            #[cfg(feature = "tcp-mock")]
             tcp_status,
         };
         let request_log_handle = state.request_log.clone();
@@ -1071,7 +1071,7 @@ mod tests {
             reply_topic: None,
             publisher: crate::messaging::consumer::Publisher::None,
         };
-        #[cfg(feature = "tcp-proxy")]
+        #[cfg(feature = "tcp-mock")]
         let tcp_status = std::sync::Arc::new(Vec::new());
         let state = AppState {
             store,
@@ -1084,7 +1084,7 @@ mod tests {
             ping_cache: crate::server::ping::PingCache::new(),
             #[cfg(feature = "messaging-kafka")]
             messaging,
-            #[cfg(feature = "tcp-proxy")]
+            #[cfg(feature = "tcp-mock")]
             tcp_status,
         };
         let request_log_handle = state.request_log.clone();

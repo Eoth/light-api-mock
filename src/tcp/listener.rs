@@ -4,7 +4,15 @@
 // handoff de reprise). Un service TCP existe hors du routeur Axum -- pas
 // d'auth, pas de CORS, pas de middleware HTTP : ce sont des concepts qui ne
 // s'appliquent pas a une socket brute.
-use crate::tcp::config::{TcpRuleAction, TcpService};
+//
+// MOCK UNIQUEMENT (pas de relais/proxy) -- decision explicite, cf
+// `tcp::mod` : un relais qui ne fait que retransmettre n'ajoute aucune
+// valeur de mock, et route le trafic vers un intermediaire qui de toute
+// facon rejoint la meme cible reelle -- l'appelant peut s'y connecter
+// directement, ce qui rend le detour par lightMock a la fois inutile et
+// contraire au principe de sobriete (un saut reseau de plus pour un
+// resultat identique).
+use crate::tcp::config::TcpService;
 use crate::tcp::{hex, matcher};
 use std::sync::Arc;
 use std::time::Duration;
@@ -21,7 +29,7 @@ const DEFAULT_MAX_MESSAGE_SIZE: usize = 16 * 1024;
 /// tout matching (cf le principe de limites de ressources explicites pour le
 /// parsing d'entree non fiable).
 pub fn max_message_size() -> usize {
-    std::env::var("TCP_PROXY_MAX_MESSAGE_SIZE")
+    std::env::var("TCP_MOCK_MAX_MESSAGE_SIZE")
         .ok()
         .and_then(|v| v.parse().ok())
         .unwrap_or(DEFAULT_MAX_MESSAGE_SIZE)
@@ -63,7 +71,7 @@ pub async fn spawn_tcp_services(
                     service = %service.name,
                     addr = %addr,
                     error = %e,
-                    "tcp-proxy: failed to bind, service skipped"
+                    "tcp-mock: failed to bind, service skipped"
                 );
                 statuses.push(TcpServiceStatus {
                     name: service.name.clone(),
@@ -74,7 +82,7 @@ pub async fn spawn_tcp_services(
                 continue;
             }
         };
-        tracing::info!(service = %service.name, addr = %addr, "tcp-proxy: listening");
+        tracing::info!(service = %service.name, addr = %addr, "tcp-mock: listening");
         statuses.push(TcpServiceStatus {
             name: service.name.clone(),
             listen_port: service.listen_port,
@@ -88,13 +96,13 @@ pub async fn spawn_tcp_services(
                 let (stream, peer) = match listener.accept().await {
                     Ok(pair) => pair,
                     Err(e) => {
-                        tracing::warn!(service = %service.name, error = %e, "tcp-proxy: accept failed");
+                        tracing::warn!(service = %service.name, error = %e, "tcp-mock: accept failed");
                         continue;
                     }
                 };
                 let service = service.clone();
                 tokio::spawn(async move {
-                    tracing::debug!(service = %service.name, peer = %peer, "tcp-proxy: connection accepted");
+                    tracing::debug!(service = %service.name, peer = %peer, "tcp-mock: connection accepted");
                     handle_connection(stream, service).await;
                 });
             }
@@ -104,88 +112,48 @@ pub async fn spawn_tcp_services(
     (handles, statuses)
 }
 
+/// Une connexion = lit un message, matche, repond si une regle matche, puis
+/// ferme. Pas de boucle multi-echanges (cf limitation documentee dans
+/// `tcp::mod`) : suffisant pour un protocole simple requete/reponse, pas
+/// pour une sequence de plusieurs messages sur la meme connexion. Aucun
+/// repli proxy si rien ne matche : sans regle, la connexion ferme
+/// simplement (pas de destination a atteindre, il n'y en a plus).
 async fn handle_connection(mut stream: TcpStream, service: Arc<TcpService>) {
     let mut buf = vec![0u8; max_message_size()];
     let n = match tokio::time::timeout(READ_TIMEOUT, stream.read(&mut buf)).await {
         Ok(Ok(0)) => return,
         Ok(Ok(n)) => n,
         Ok(Err(e)) => {
-            tracing::debug!(service = %service.name, error = %e, "tcp-proxy: read failed");
+            tracing::debug!(service = %service.name, error = %e, "tcp-mock: read failed");
             return;
         }
         Err(_) => {
-            tracing::debug!(service = %service.name, "tcp-proxy: read timeout, closing");
+            tracing::debug!(service = %service.name, "tcp-mock: read timeout, closing");
             return;
         }
     };
     let data = &buf[..n];
 
-    match matcher::match_rule(&service.rules, data) {
-        Some(rule) if rule.action == TcpRuleAction::Mock => match hex::decode(&rule.response_hex) {
-            Ok(response) => {
-                if let Err(e) = stream.write_all(&response).await {
-                    tracing::debug!(
-                        service = %service.name, rule = %rule.name, error = %e,
-                        "tcp-proxy: mock write failed"
-                    );
-                }
-            }
-            Err(e) => {
-                tracing::error!(
+    let Some(rule) = matcher::match_rule(&service.rules, data) else {
+        tracing::debug!(service = %service.name, "tcp-mock: no rule matched, closing");
+        return;
+    };
+
+    match hex::decode(&rule.response_hex) {
+        Ok(response) => {
+            if let Err(e) = stream.write_all(&response).await {
+                tracing::debug!(
                     service = %service.name, rule = %rule.name, error = %e,
-                    "tcp-proxy: invalid response_hex in matched rule, closing without reply"
+                    "tcp-mock: mock write failed"
                 );
             }
-        },
-        Some(rule) => {
-            debug_assert_eq!(rule.action, TcpRuleAction::Proxy);
-            proxy_raw(stream, data, &service).await;
         }
-        None if !service.is_mocked => {
-            proxy_raw(stream, data, &service).await;
-        }
-        None => {
-            tracing::debug!(service = %service.name, "tcp-proxy: no rule matched, closing");
-        }
-    }
-}
-
-/// Proxy TCP transparent : rejoue d'abord les octets deja lus pour le
-/// matching (sinon ils seraient perdus pour la cible reelle), puis relaie le
-/// reste de la session dans les deux sens jusqu'a fermeture. Contrairement au
-/// proxy HTTP (`engine/proxy.rs`), aucune inspection/reecriture du contenu :
-/// le protocole n'est pas decode, il n'y a rien a reecrire (pas d'equivalent
-/// X-Forwarded-*).
-async fn proxy_raw(mut client: TcpStream, already_read: &[u8], service: &TcpService) {
-    let Some(target) = service.real_target_addr.as_deref() else {
-        tracing::error!(
-            service = %service.name,
-            "tcp-proxy: proxy action but real_target_addr is not configured, closing"
-        );
-        return;
-    };
-
-    let mut upstream = match TcpStream::connect(target).await {
-        Ok(s) => s,
         Err(e) => {
-            tracing::warn!(
-                service = %service.name, target = %target, error = %e,
-                "tcp-proxy: upstream connect failed"
+            tracing::error!(
+                service = %service.name, rule = %rule.name, error = %e,
+                "tcp-mock: invalid response_hex in matched rule, closing without reply"
             );
-            return;
         }
-    };
-
-    if let Err(e) = upstream.write_all(already_read).await {
-        tracing::debug!(
-            service = %service.name, error = %e,
-            "tcp-proxy: failed to replay initial bytes to upstream"
-        );
-        return;
-    }
-
-    if let Err(e) = tokio::io::copy_bidirectional(&mut client, &mut upstream).await {
-        tracing::debug!(service = %service.name, error = %e, "tcp-proxy: session ended");
     }
 }
 
@@ -194,32 +162,21 @@ mod tests {
     use super::*;
     use crate::tcp::config::{TcpMatcher, TcpRule};
 
-    fn svc(
-        real_target_addr: Option<String>,
-        is_mocked: bool,
-        rules: Vec<TcpRule>,
-    ) -> Arc<TcpService> {
+    fn svc(rules: Vec<TcpRule>) -> Arc<TcpService> {
         Arc::new(TcpService {
             name: "svc".into(),
             listen_port: 0,
-            real_target_addr,
-            is_mocked,
             rules,
         })
     }
 
     #[tokio::test]
     async fn mock_rule_replies_with_configured_bytes() {
-        let service = svc(
-            None,
-            true,
-            vec![TcpRule {
-                name: "hello".into(),
-                matcher: TcpMatcher::Any,
-                action: TcpRuleAction::Mock,
-                response_hex: hex::encode(b"pong"),
-            }],
-        );
+        let service = svc(vec![TcpRule {
+            name: "hello".into(),
+            matcher: TcpMatcher::Any,
+            response_hex: hex::encode(b"pong"),
+        }]);
 
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let port = listener.local_addr().unwrap().port();
@@ -237,16 +194,11 @@ mod tests {
 
     #[tokio::test]
     async fn no_matching_rule_closes_connection_without_reply() {
-        let service = svc(
-            None,
-            true,
-            vec![TcpRule {
-                name: "specific".into(),
-                matcher: TcpMatcher::Prefix(hex::encode(b"X")),
-                action: TcpRuleAction::Mock,
-                response_hex: hex::encode(b"nope-should-not-see-this"),
-            }],
-        );
+        let service = svc(vec![TcpRule {
+            name: "specific".into(),
+            matcher: TcpMatcher::Prefix(hex::encode(b"X")),
+            response_hex: hex::encode(b"nope-should-not-see-this"),
+        }]);
 
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let port = listener.local_addr().unwrap().port();
@@ -267,81 +219,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn proxy_action_forwards_bytes_to_real_target_including_prefix() {
-        // Cible reelle factice : un simple echo server TCP.
-        let upstream = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let upstream_port = upstream.local_addr().unwrap().port();
-        tokio::spawn(async move {
-            let (mut s, _) = upstream.accept().await.unwrap();
-            let mut buf = [0u8; 64];
-            let n = s.read(&mut buf).await.unwrap();
-            s.write_all(&buf[..n]).await.unwrap();
-        });
-
-        let service = svc(
-            Some(format!("127.0.0.1:{upstream_port}")),
-            true,
-            vec![TcpRule {
-                name: "always-proxy".into(),
-                matcher: TcpMatcher::Any,
-                action: TcpRuleAction::Proxy,
-                response_hex: String::new(),
-            }],
-        );
-
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let port = listener.local_addr().unwrap().port();
-        tokio::spawn(async move {
-            let (stream, _) = listener.accept().await.unwrap();
-            handle_connection(stream, service).await;
-        });
-
-        let mut client = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
-        client.write_all(b"round-trip").await.unwrap();
-        let mut resp = [0u8; 10];
-        client.read_exact(&mut resp).await.unwrap();
-        assert_eq!(&resp, b"round-trip");
-    }
-
-    #[tokio::test]
-    async fn is_mocked_false_proxies_even_without_a_matching_rule() {
-        let upstream = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let upstream_port = upstream.local_addr().unwrap().port();
-        tokio::spawn(async move {
-            let (mut s, _) = upstream.accept().await.unwrap();
-            let mut buf = [0u8; 64];
-            let n = s.read(&mut buf).await.unwrap();
-            s.write_all(&buf[..n]).await.unwrap();
-        });
-
-        let service = svc(Some(format!("127.0.0.1:{upstream_port}")), false, vec![]);
-
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let port = listener.local_addr().unwrap().port();
-        tokio::spawn(async move {
-            let (stream, _) = listener.accept().await.unwrap();
-            handle_connection(stream, service).await;
-        });
-
-        let mut client = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
-        client.write_all(b"passthru").await.unwrap();
-        let mut resp = [0u8; 8];
-        client.read_exact(&mut resp).await.unwrap();
-        assert_eq!(&resp, b"passthru");
-    }
-
-    #[tokio::test]
-    async fn proxy_action_without_real_target_addr_closes_without_panicking() {
-        let service = svc(
-            None,
-            true,
-            vec![TcpRule {
-                name: "always-proxy".into(),
-                matcher: TcpMatcher::Any,
-                action: TcpRuleAction::Proxy,
-                response_hex: String::new(),
-            }],
-        );
+    async fn no_rules_at_all_closes_connection_without_reply() {
+        let service = svc(vec![]);
 
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let port = listener.local_addr().unwrap().port();
@@ -364,7 +243,7 @@ mod tests {
     fn max_message_size_defaults_to_16kb() {
         // SAFETY-note (pas d'unsafe ici) : simple lecture d'env var absente ;
         // cette variable n'est fixee par aucun autre test de la suite.
-        unsafe { std::env::remove_var("TCP_PROXY_MAX_MESSAGE_SIZE") };
+        unsafe { std::env::remove_var("TCP_MOCK_MAX_MESSAGE_SIZE") };
         assert_eq!(max_message_size(), 16 * 1024);
     }
 
@@ -377,8 +256,6 @@ mod tests {
             services: vec![TcpService {
                 name: "free-port".into(),
                 listen_port: 0,
-                real_target_addr: None,
-                is_mocked: true,
                 rules: vec![],
             }],
         };
@@ -404,8 +281,6 @@ mod tests {
             services: vec![TcpService {
                 name: "taken-port".into(),
                 listen_port: taken_port,
-                real_target_addr: None,
-                is_mocked: true,
                 rules: vec![],
             }],
         };

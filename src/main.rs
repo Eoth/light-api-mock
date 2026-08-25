@@ -14,7 +14,7 @@ pub mod store;
 pub mod server;
 #[cfg(feature = "messaging-kafka")]
 pub mod messaging;
-#[cfg(feature = "tcp-proxy")]
+#[cfg(feature = "tcp-mock")]
 pub mod tcp;
 
 use crate::auth::AuthConfig;
@@ -101,13 +101,13 @@ async fn main() {
     // Demarre AVANT la construction d'AppState : le statut par service
     // (`tcp_status`, expose via GET /tcp/status) est fige a cet instant et
     // porte dans l'etat partage, comme le reste.
-    #[cfg(feature = "tcp-proxy")]
+    #[cfg(feature = "tcp-mock")]
     let tcp_status = {
         let tcp_config = crate::tcp::config::TcpConfig::load(&data_dir);
         if !tcp_config.services.is_empty() {
             tracing::info!(
                 count = tcp_config.services.len(),
-                "tcp-proxy: starting configured services"
+                "tcp-mock: starting configured services"
             );
         }
         let (_handles, statuses) = crate::tcp::spawn_tcp_services(&tcp_config).await;
@@ -125,7 +125,7 @@ async fn main() {
         ping_cache: PingCache::new(),
         #[cfg(feature = "messaging-kafka")]
         messaging,
-        #[cfg(feature = "tcp-proxy")]
+        #[cfg(feature = "tcp-mock")]
         tcp_status,
     };
 
