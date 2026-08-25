@@ -38,7 +38,7 @@ pub struct AppState {
     #[cfg(feature = "messaging-kafka")]
     pub messaging: crate::messaging::MessagingState,
     #[cfg(feature = "tcp-mock")]
-    pub tcp_status: Arc<Vec<crate::tcp::TcpServiceStatus>>,
+    pub tcp_runtime: crate::tcp::TcpRuntime,
 }
 
 impl AppState {
@@ -192,7 +192,7 @@ mod tests {
             publisher: crate::messaging::consumer::Publisher::None,
         };
         #[cfg(feature = "tcp-mock")]
-        let tcp_status = Arc::new(Vec::new());
+        let tcp_runtime = crate::tcp::TcpRuntime::load_and_spawn(&data_dir).await;
         let state = AppState {
             store,
             proxy: crate::engine::ProxyClient::new(),
@@ -205,7 +205,7 @@ mod tests {
             #[cfg(feature = "messaging-kafka")]
             messaging,
             #[cfg(feature = "tcp-mock")]
-            tcp_status,
+            tcp_runtime,
         };
         let app = build_router(state, &data_dir);
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();

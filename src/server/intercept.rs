@@ -779,7 +779,7 @@ mod tests {
             publisher: crate::messaging::consumer::Publisher::None,
         };
         #[cfg(feature = "tcp-mock")]
-        let tcp_status = std::sync::Arc::new(Vec::new());
+        let tcp_runtime = crate::tcp::TcpRuntime::load_and_spawn(&data_dir).await;
         let state = AppState {
             store,
             proxy: crate::engine::ProxyClient::new(),
@@ -792,7 +792,7 @@ mod tests {
             #[cfg(feature = "messaging-kafka")]
             messaging,
             #[cfg(feature = "tcp-mock")]
-            tcp_status,
+            tcp_runtime,
         };
         let request_log_handle = state.request_log.clone();
         let app = crate::server::build_router(state, &data_dir);
@@ -899,7 +899,7 @@ mod tests {
             publisher: crate::messaging::consumer::Publisher::None,
         };
         #[cfg(feature = "tcp-mock")]
-        let tcp_status = std::sync::Arc::new(Vec::new());
+        let tcp_runtime = crate::tcp::TcpRuntime::load_and_spawn(&data_dir).await;
         let state = AppState {
             store,
             proxy: crate::engine::ProxyClient::new(),
@@ -912,7 +912,7 @@ mod tests {
             #[cfg(feature = "messaging-kafka")]
             messaging,
             #[cfg(feature = "tcp-mock")]
-            tcp_status,
+            tcp_runtime,
         };
         let request_log_handle = state.request_log.clone();
         let app = crate::server::build_router(state, &data_dir);
@@ -1013,7 +1013,7 @@ mod tests {
             publisher: crate::messaging::consumer::Publisher::None,
         };
         #[cfg(feature = "tcp-mock")]
-        let tcp_status = std::sync::Arc::new(Vec::new());
+        let tcp_runtime = crate::tcp::TcpRuntime::load_and_spawn(&data_dir).await;
         let state = AppState {
             store,
             proxy: crate::engine::ProxyClient::new(),
@@ -1026,7 +1026,7 @@ mod tests {
             #[cfg(feature = "messaging-kafka")]
             messaging,
             #[cfg(feature = "tcp-mock")]
-            tcp_status,
+            tcp_runtime,
         };
         let request_log_handle = state.request_log.clone();
         let app = crate::server::build_router(state, &data_dir);
@@ -1072,7 +1072,7 @@ mod tests {
             publisher: crate::messaging::consumer::Publisher::None,
         };
         #[cfg(feature = "tcp-mock")]
-        let tcp_status = std::sync::Arc::new(Vec::new());
+        let tcp_runtime = crate::tcp::TcpRuntime::load_and_spawn(&data_dir).await;
         let state = AppState {
             store,
             proxy: crate::engine::ProxyClient::new(),
@@ -1085,7 +1085,7 @@ mod tests {
             #[cfg(feature = "messaging-kafka")]
             messaging,
             #[cfg(feature = "tcp-mock")]
-            tcp_status,
+            tcp_runtime,
         };
         let request_log_handle = state.request_log.clone();
         let app = crate::server::build_router(state, &data_dir);
