@@ -22,6 +22,7 @@ export default defineConfig({
     'messaging.spec.js',
     'config.spec.mjs',
     'rhai-autocomplete.spec.js',
+    'observation-suggestions.spec.js',
   ],
   timeout: 15000,
   workers: 1,

@@ -278,6 +278,13 @@ impl ObservationToggle {
     pub fn active_services(&self) -> Vec<ServiceKey> {
         self.active.read().unwrap().iter().cloned().collect()
     }
+
+    /// Utilisee uniquement par `reset_config` (suppression de TOUS les
+    /// services) : sans ca, un service recree apres coup heriterait
+    /// silencieusement du statut "observe" d'un service disparu.
+    pub fn clear_all(&self) {
+        self.active.write().unwrap().clear();
+    }
 }
 
 impl Default for ObservationToggle {
@@ -375,6 +382,17 @@ mod tests {
                 (Some("g".to_string()), "svc-b".to_string())
             ]
         );
+    }
+
+    #[test]
+    fn toggle_clear_all_disables_every_service() {
+        let toggle = ObservationToggle::new();
+        toggle.enable(None, "svc-a");
+        toggle.enable(Some("g"), "svc-b");
+        toggle.clear_all();
+        assert!(toggle.active_services().is_empty());
+        assert!(!toggle.is_enabled(None, "svc-a"));
+        assert!(!toggle.is_enabled(Some("g"), "svc-b"));
     }
 
     #[test]

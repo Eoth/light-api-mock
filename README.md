@@ -17,6 +17,7 @@ Un seul binaire Rust qui intercepte les requetes HTTP, les mock ou les proxifie 
 - **SOAP/WSDL** : mode par service (`Auto`/`Proxy`/`Mock`) pour choisir si les requetes WSDL bypassent le mock ou non
 - **Mode Chaos** : injection de latence (fixe ou plage) et d'erreurs HTTP
 - **Journal des requetes** : historique consultable dans l'IHM avec filtre par service
+- **Observation de trafic proxy + suggestions de regles** : pour un service en mode proxy pur, active a la demande par service ; propose des regles de mock a partir du trafic reellement observe (regle inconditionnelle si aucune variance, une regle par valeur discriminante sinon, jamais de regle figee sur une premiere reponse en cas de variance non expliquee) — voir [Observation de trafic](docs/observation-de-trafic.md)
 - **Ping de disponibilite** : test de connexion TCP a la demande vers `real_target_url` (jamais de requete HTTP fonctionnelle)
 - **Sauvegardes et restauration** : rotation automatique des backups YAML + restauration depuis l'UI (voir [Sauvegardes et rollback](#sauvegardes-et-rollback))
 - **Auth Keycloak (optionnelle)** : desactivee par defaut ; une fois activee, roles et permissions par groupe de services
