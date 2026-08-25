@@ -37,6 +37,8 @@ pub struct AppState {
     pub ping_cache: PingCache,
     #[cfg(feature = "messaging-kafka")]
     pub messaging: crate::messaging::MessagingState,
+    #[cfg(feature = "tcp-proxy")]
+    pub tcp_status: Arc<Vec<crate::tcp::TcpServiceStatus>>,
 }
 
 impl AppState {
@@ -189,6 +191,8 @@ mod tests {
             reply_topic: None,
             publisher: crate::messaging::consumer::Publisher::None,
         };
+        #[cfg(feature = "tcp-proxy")]
+        let tcp_status = Arc::new(Vec::new());
         let state = AppState {
             store,
             proxy: crate::engine::ProxyClient::new(),
@@ -200,6 +204,8 @@ mod tests {
             ping_cache: PingCache::new(),
             #[cfg(feature = "messaging-kafka")]
             messaging,
+            #[cfg(feature = "tcp-proxy")]
+            tcp_status,
         };
         let app = build_router(state, &data_dir);
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();

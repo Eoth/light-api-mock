@@ -25,4 +25,4 @@ pub mod hex;
 pub mod listener;
 pub mod matcher;
 
-pub use listener::spawn_tcp_services;
+pub use listener::{TcpServiceStatus, spawn_tcp_services};

@@ -27,6 +27,18 @@ pub fn max_message_size() -> usize {
         .unwrap_or(DEFAULT_MAX_MESSAGE_SIZE)
 }
 
+/// Statut d'un service TCP au demarrage -- expose via `GET /tcp/status`
+/// (`server/api.rs`) pour que l'operateur puisse voir sans grep-er les logs
+/// si un port a effectivement pu etre bind. Fige a l'instant du demarrage,
+/// comme la config elle-meme (pas de re-verification periodique).
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct TcpServiceStatus {
+    pub name: String,
+    pub listen_port: u16,
+    pub listening: bool,
+    pub error: Option<String>,
+}
+
 /// Demarre un accept-loop par service TCP configure au demarrage du
 /// processus. Config figee pour toute la duree du process (pas d'API pour
 /// la modifier a chaud dans cette premiere tranche, cf `tcp::config`) :
@@ -36,8 +48,11 @@ pub fn max_message_size() -> usize {
 /// Un service dont le port ne peut pas etre bind (deja pris, permissions...)
 /// est logge en erreur et simplement ignore -- ne doit jamais empecher le
 /// demarrage du serveur HTTP principal ni des autres services TCP.
-pub async fn spawn_tcp_services(config: &crate::tcp::config::TcpConfig) -> Vec<JoinHandle<()>> {
+pub async fn spawn_tcp_services(
+    config: &crate::tcp::config::TcpConfig,
+) -> (Vec<JoinHandle<()>>, Vec<TcpServiceStatus>) {
     let mut handles = Vec::with_capacity(config.services.len());
+    let mut statuses = Vec::with_capacity(config.services.len());
 
     for service in &config.services {
         let addr = format!("0.0.0.0:{}", service.listen_port);
@@ -50,10 +65,22 @@ pub async fn spawn_tcp_services(config: &crate::tcp::config::TcpConfig) -> Vec<J
                     error = %e,
                     "tcp-proxy: failed to bind, service skipped"
                 );
+                statuses.push(TcpServiceStatus {
+                    name: service.name.clone(),
+                    listen_port: service.listen_port,
+                    listening: false,
+                    error: Some(e.to_string()),
+                });
                 continue;
             }
         };
         tracing::info!(service = %service.name, addr = %addr, "tcp-proxy: listening");
+        statuses.push(TcpServiceStatus {
+            name: service.name.clone(),
+            listen_port: service.listen_port,
+            listening: true,
+            error: None,
+        });
 
         let service = Arc::new(service.clone());
         handles.push(tokio::spawn(async move {
@@ -74,7 +101,7 @@ pub async fn spawn_tcp_services(config: &crate::tcp::config::TcpConfig) -> Vec<J
         }));
     }
 
-    handles
+    (handles, statuses)
 }
 
 async fn handle_connection(mut stream: TcpStream, service: Arc<TcpService>) {
@@ -339,5 +366,56 @@ mod tests {
         // cette variable n'est fixee par aucun autre test de la suite.
         unsafe { std::env::remove_var("TCP_PROXY_MAX_MESSAGE_SIZE") };
         assert_eq!(max_message_size(), 16 * 1024);
+    }
+
+    #[tokio::test]
+    async fn spawn_reports_listening_true_for_a_free_port() {
+        // Port 0 = attribue par l'OS, toujours libre par construction ; on ne
+        // peut donc pas exprimer "port deja pris" avec ce meme mecanisme (cf
+        // le test suivant, qui reserve explicitement un port avant coup).
+        let config = crate::tcp::config::TcpConfig {
+            services: vec![TcpService {
+                name: "free-port".into(),
+                listen_port: 0,
+                real_target_addr: None,
+                is_mocked: true,
+                rules: vec![],
+            }],
+        };
+        let (_handles, statuses) = spawn_tcp_services(&config).await;
+        assert_eq!(statuses.len(), 1);
+        assert!(statuses[0].listening);
+        assert!(statuses[0].error.is_none());
+    }
+
+    #[tokio::test]
+    async fn spawn_reports_listening_false_when_port_already_taken() {
+        // Reserve un port reel en le bindant nous-memes AVANT d'appeler
+        // spawn_tcp_services avec ce meme port -- garantit un conflit
+        // deterministe (contrairement a un port fixe au hasard, qui pourrait
+        // etre libre sur la machine de CI). "0.0.0.0" et pas "127.0.0.1" :
+        // spawn_tcp_services bind sur "0.0.0.0:{port}" (toutes interfaces),
+        // reserver seulement l'interface loopback ne cree pas toujours un
+        // conflit reel selon l'OS (observe sur Windows).
+        let reserved = TcpListener::bind("0.0.0.0:0").await.unwrap();
+        let taken_port = reserved.local_addr().unwrap().port();
+
+        let config = crate::tcp::config::TcpConfig {
+            services: vec![TcpService {
+                name: "taken-port".into(),
+                listen_port: taken_port,
+                real_target_addr: None,
+                is_mocked: true,
+                rules: vec![],
+            }],
+        };
+        let (handles, statuses) = spawn_tcp_services(&config).await;
+        assert_eq!(statuses.len(), 1);
+        assert!(!statuses[0].listening);
+        assert!(statuses[0].error.is_some());
+        // Aucune tache d'ecoute demarree pour ce service en echec.
+        assert!(handles.is_empty());
+
+        drop(reserved);
     }
 }

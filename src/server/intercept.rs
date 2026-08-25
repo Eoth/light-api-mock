@@ -778,6 +778,8 @@ mod tests {
             reply_topic: None,
             publisher: crate::messaging::consumer::Publisher::None,
         };
+        #[cfg(feature = "tcp-proxy")]
+        let tcp_status = std::sync::Arc::new(Vec::new());
         let state = AppState {
             store,
             proxy: crate::engine::ProxyClient::new(),
@@ -789,6 +791,8 @@ mod tests {
             ping_cache: crate::server::ping::PingCache::new(),
             #[cfg(feature = "messaging-kafka")]
             messaging,
+            #[cfg(feature = "tcp-proxy")]
+            tcp_status,
         };
         let request_log_handle = state.request_log.clone();
         let app = crate::server::build_router(state, &data_dir);
@@ -894,6 +898,8 @@ mod tests {
             reply_topic: None,
             publisher: crate::messaging::consumer::Publisher::None,
         };
+        #[cfg(feature = "tcp-proxy")]
+        let tcp_status = std::sync::Arc::new(Vec::new());
         let state = AppState {
             store,
             proxy: crate::engine::ProxyClient::new(),
@@ -905,6 +911,8 @@ mod tests {
             ping_cache: crate::server::ping::PingCache::new(),
             #[cfg(feature = "messaging-kafka")]
             messaging,
+            #[cfg(feature = "tcp-proxy")]
+            tcp_status,
         };
         let request_log_handle = state.request_log.clone();
         let app = crate::server::build_router(state, &data_dir);
@@ -1004,6 +1012,8 @@ mod tests {
             reply_topic: None,
             publisher: crate::messaging::consumer::Publisher::None,
         };
+        #[cfg(feature = "tcp-proxy")]
+        let tcp_status = std::sync::Arc::new(Vec::new());
         let state = AppState {
             store,
             proxy: crate::engine::ProxyClient::new(),
@@ -1015,6 +1025,8 @@ mod tests {
             ping_cache: crate::server::ping::PingCache::new(),
             #[cfg(feature = "messaging-kafka")]
             messaging,
+            #[cfg(feature = "tcp-proxy")]
+            tcp_status,
         };
         let request_log_handle = state.request_log.clone();
         let app = crate::server::build_router(state, &data_dir);
@@ -1059,6 +1071,8 @@ mod tests {
             reply_topic: None,
             publisher: crate::messaging::consumer::Publisher::None,
         };
+        #[cfg(feature = "tcp-proxy")]
+        let tcp_status = std::sync::Arc::new(Vec::new());
         let state = AppState {
             store,
             proxy: crate::engine::ProxyClient::new(),
@@ -1070,6 +1084,8 @@ mod tests {
             ping_cache: crate::server::ping::PingCache::new(),
             #[cfg(feature = "messaging-kafka")]
             messaging,
+            #[cfg(feature = "tcp-proxy")]
+            tcp_status,
         };
         let request_log_handle = state.request_log.clone();
         let app = crate::server::build_router(state, &data_dir);

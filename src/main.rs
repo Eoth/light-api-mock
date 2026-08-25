@@ -90,6 +90,30 @@ async fn main() {
         }
     };
 
+    // Ecoutes TCP brutes (protocoles binaires non-HTTP), en parallele du
+    // serveur HTTP : jamais sur le meme port, un service TCP a le sien.
+    // Taches detachees (tokio::spawn) : a l'arret gracieux, seul le serveur
+    // HTTP est draine proprement (with_graceful_shutdown ci-dessous) puis la
+    // config flush(ee) ; les connexions TCP brutes en cours sont coupees net
+    // avec le runtime, comme le serait un SIGKILL. Raisonnable pour cette
+    // premiere tranche : un protocole binaire n'a pas de mecanisme generique
+    // de "fin de session propre" a declencher cote client de toute facon.
+    // Demarre AVANT la construction d'AppState : le statut par service
+    // (`tcp_status`, expose via GET /tcp/status) est fige a cet instant et
+    // porte dans l'etat partage, comme le reste.
+    #[cfg(feature = "tcp-proxy")]
+    let tcp_status = {
+        let tcp_config = crate::tcp::config::TcpConfig::load(&data_dir);
+        if !tcp_config.services.is_empty() {
+            tracing::info!(
+                count = tcp_config.services.len(),
+                "tcp-proxy: starting configured services"
+            );
+        }
+        let (_handles, statuses) = crate::tcp::spawn_tcp_services(&tcp_config).await;
+        Arc::new(statuses)
+    };
+
     let state = AppState {
         store,
         proxy: ProxyClient::new(),
@@ -101,27 +125,9 @@ async fn main() {
         ping_cache: PingCache::new(),
         #[cfg(feature = "messaging-kafka")]
         messaging,
+        #[cfg(feature = "tcp-proxy")]
+        tcp_status,
     };
-
-    // Ecoutes TCP brutes (protocoles binaires non-HTTP), en parallele du
-    // serveur HTTP : jamais sur le meme port, un service TCP a le sien.
-    // Taches detachees (tokio::spawn) : a l'arret gracieux, seul le serveur
-    // HTTP est draine proprement (with_graceful_shutdown ci-dessous) puis la
-    // config flush(ee) ; les connexions TCP brutes en cours sont coupees net
-    // avec le runtime, comme le serait un SIGKILL. Raisonnable pour cette
-    // premiere tranche : un protocole binaire n'a pas de mecanisme generique
-    // de "fin de session propre" a declencher cote client de toute facon.
-    #[cfg(feature = "tcp-proxy")]
-    {
-        let tcp_config = crate::tcp::config::TcpConfig::load(&data_dir);
-        if !tcp_config.services.is_empty() {
-            tracing::info!(
-                count = tcp_config.services.len(),
-                "tcp-proxy: starting configured services"
-            );
-        }
-        crate::tcp::spawn_tcp_services(&tcp_config).await;
-    }
 
     let store_for_shutdown = state.store.clone();
     let app = build_router(state, &static_dir);
