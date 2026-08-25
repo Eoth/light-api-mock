@@ -104,6 +104,33 @@ export function reorderRules(serviceName, groupName, order) {
   return request('PUT', servicePath(serviceName, groupName, '/rules/reorder'), { order });
 }
 
+// Observation de trafic proxy (niveau service, is_mocked=false uniquement) :
+// active/desactive EXPLICITEMENT par l'utilisateur, jamais automatique.
+// getObservationStatus() liste TOUS les services actuellement observes
+// (visibles par l'utilisateur courant, filtre cote backend) — pas de
+// endpoint "statut d'un seul service", le composant filtre localement.
+export function observeService(name, groupName = null) {
+  return request('POST', servicePath(name, groupName, '/observe'));
+}
+
+export function unobserveService(name, groupName = null) {
+  return request('DELETE', servicePath(name, groupName, '/observe'));
+}
+
+export function getObservationStatus() {
+  return request('GET', '/observation/status');
+}
+
+// Recalculee a la demande cote backend (aucun etat en cache) : chaque appel
+// relit le trafic reellement observe depuis le dernier appel a
+// observeService(). `outcome` de chaque element : "Unconditional" (une seule
+// regle, sans condition), "Conditional" (une regle par valeur distincte
+// d'un champ discriminant), "VarianceUnexplained" (signal seul, rien a
+// proposer).
+export function getServiceSuggestions(name, groupName = null) {
+  return request('GET', servicePath(name, groupName, '/suggestions'));
+}
+
 // Config
 export function getConfig() {
   return request('GET', '/config');
