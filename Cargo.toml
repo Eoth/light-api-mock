@@ -61,6 +61,15 @@ url = "2"
 # "Messaging Kafka" de README.md pour les prerequis de build (cmake + toolchain C).
 rdkafka = { version = "0.36", features = ["cmake-build"], optional = true }
 
+[dev-dependencies]
+# Property-based testing (dev uniquement, jamais dans le binaire livre) :
+# cargo-fuzz/libFuzzer ecarte pour la surface non fiable de server::suggestion
+# (corps de reponse d'un vrai backend proxifie) faute de toolchain nightly et
+# de support Windows fiable pour libFuzzer sur ce poste — proptest est pur
+# Rust, fonctionne sur toute plateforme stable, meme objectif (entrees
+# adversariales/aleatoires sur suggest() et le parsing JSON qu'il declenche).
+proptest = "1"
+
 [features]
 # Support Kafka fonctionnel (consumer + publisher + journal des messages) :
 # NON active par defaut, zero impact sur le binaire/tests tant que non
