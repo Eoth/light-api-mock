@@ -62,7 +62,13 @@ pub fn routes() -> Router<AppState> {
         .route("/messaging/simulate", post(simulate_message));
 
     #[cfg(feature = "tcp-mock")]
-    let router = router.route("/tcp/status", get(get_tcp_status));
+    let router = router
+        .route("/tcp/status", get(get_tcp_status))
+        .route("/tcp/services", get(list_tcp_services).post(create_tcp_service))
+        .route(
+            "/tcp/services/:name",
+            put(update_tcp_service).delete(delete_tcp_service),
+        );
 
     router
 }
@@ -387,15 +393,125 @@ async fn simulate_message(
 }
 
 // --------------- TCP brut (protocoles binaires non-HTTP) ---------------
-// Feature-gated, meme garde que /health et /messaging/status : pas d'auth,
-// lecture seule, aucune donnee sensible au-dela de ce que l'operateur a deja
-// ecrit lui-meme dans tcp-config.yaml (nom/port/succes du bind).
+// Feature-gated. /tcp/status reste sans auth (meme garde que /health et
+// /messaging/status : lecture seule, aucune donnee sensible au-dela de ce
+// que l'operateur a deja ecrit dans tcp-config.yaml). Le CRUD sur
+// /tcp/services EXPOSE le contenu des regles (matchers, reponses en hex) et
+// PEUT OUVRIR/FERMER des ports reseau -- traite comme une operation
+// sensible : lecture requiert un utilisateur authentifie (quand l'auth est
+// active), toute mutation requiert super-admin, meme garde que
+// reset_config/restore_backup. Chaque mutation reussie appelle
+// TcpRuntime::replace(), qui persiste sur disque PUIS relance les listeners
+// concernes -- effective immediatement, aucun redemarrage du processus
+// necessaire (contrairement a un edit manuel du YAML).
 
 #[cfg(feature = "tcp-mock")]
 async fn get_tcp_status(
     State(state): State<AppState>,
 ) -> Json<Vec<crate::tcp::TcpServiceStatus>> {
-    Json((*state.tcp_status).clone())
+    Json(state.tcp_runtime.statuses().await)
+}
+
+#[cfg(feature = "tcp-mock")]
+async fn list_tcp_services(
+    State(state): State<AppState>,
+    Extension(_user): Extension<AuthUser>,
+) -> Json<Vec<crate::tcp::config::TcpService>> {
+    Json(state.tcp_runtime.snapshot_config().await.services)
+}
+
+#[cfg(feature = "tcp-mock")]
+async fn create_tcp_service(
+    State(state): State<AppState>,
+    Extension(user): Extension<AuthUser>,
+    Json(service): Json<crate::tcp::config::TcpService>,
+) -> Result<(StatusCode, Json<crate::tcp::config::TcpService>), AppError> {
+    if state.auth_config.enabled {
+        require_super_admin(&user)?;
+    }
+
+    let mut config = state.tcp_runtime.snapshot_config().await;
+
+    if let Err(e) = crate::tcp::validation::validate_tcp_service(&service, &config.services) {
+        tracing::warn!(service = %service.name, field = %e.field, reason = %e.message, "tcp service rejected");
+        return Err(AppError::Validation(e.message));
+    }
+
+    config.services.push(service.clone());
+    state
+        .tcp_runtime
+        .replace(config)
+        .await
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+
+    Ok((StatusCode::CREATED, Json(service)))
+}
+
+#[cfg(feature = "tcp-mock")]
+async fn update_tcp_service(
+    State(state): State<AppState>,
+    Extension(user): Extension<AuthUser>,
+    Path(name): Path<String>,
+    Json(service): Json<crate::tcp::config::TcpService>,
+) -> Result<Json<crate::tcp::config::TcpService>, AppError> {
+    if state.auth_config.enabled {
+        require_super_admin(&user)?;
+    }
+
+    let mut config = state.tcp_runtime.snapshot_config().await;
+    let Some(idx) = config.services.iter().position(|s| s.name == name) else {
+        return Err(AppError::NotFound);
+    };
+
+    // Exclut le service qu'on est en train de remplacer de la verification
+    // d'unicite nom/port -- sinon un PUT qui ne change rien se rejetterait
+    // lui-meme (cf doc de validate_tcp_service).
+    let others: Vec<_> = config
+        .services
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| *i != idx)
+        .map(|(_, s)| s.clone())
+        .collect();
+    if let Err(e) = crate::tcp::validation::validate_tcp_service(&service, &others) {
+        tracing::warn!(service = %name, field = %e.field, reason = %e.message, "tcp service rejected");
+        return Err(AppError::Validation(e.message));
+    }
+
+    config.services[idx] = service.clone();
+    state
+        .tcp_runtime
+        .replace(config)
+        .await
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+
+    Ok(Json(service))
+}
+
+#[cfg(feature = "tcp-mock")]
+async fn delete_tcp_service(
+    State(state): State<AppState>,
+    Extension(user): Extension<AuthUser>,
+    Path(name): Path<String>,
+) -> Result<StatusCode, AppError> {
+    if state.auth_config.enabled {
+        require_super_admin(&user)?;
+    }
+
+    let mut config = state.tcp_runtime.snapshot_config().await;
+    let before = config.services.len();
+    config.services.retain(|s| s.name != name);
+    if config.services.len() == before {
+        return Err(AppError::NotFound);
+    }
+
+    state
+        .tcp_runtime
+        .replace(config)
+        .await
+        .map_err(|e| AppError::Validation(e.to_string()))?;
+
+    Ok(StatusCode::NO_CONTENT)
 }
 
 // --------------- Services ---------------
@@ -1499,7 +1615,7 @@ mod tests {
             publisher: crate::messaging::consumer::Publisher::None,
         };
         #[cfg(feature = "tcp-mock")]
-        let tcp_status = Arc::new(Vec::new());
+        let tcp_runtime = crate::tcp::TcpRuntime::load_and_spawn(&data_dir).await;
         let state = AppState {
             store,
             proxy: crate::engine::ProxyClient::new(),
@@ -1519,7 +1635,7 @@ mod tests {
             #[cfg(feature = "messaging-kafka")]
             messaging,
             #[cfg(feature = "tcp-mock")]
-            tcp_status,
+            tcp_runtime,
         };
         let app = crate::server::build_router(state, &data_dir);
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -1648,7 +1764,7 @@ mod tests {
             publisher: crate::messaging::consumer::Publisher::None,
         };
         #[cfg(feature = "tcp-mock")]
-        let tcp_status = Arc::new(Vec::new());
+        let tcp_runtime = crate::tcp::TcpRuntime::load_and_spawn(&data_dir).await;
         AppState {
             store,
             proxy: crate::engine::ProxyClient::new(),
@@ -1668,7 +1784,7 @@ mod tests {
             #[cfg(feature = "messaging-kafka")]
             messaging,
             #[cfg(feature = "tcp-mock")]
-            tcp_status,
+            tcp_runtime,
         }
     }
 
@@ -2062,5 +2178,197 @@ mod tests {
         let Json(result) = check_rule_conflicts(Extension(anon_user()), Json(payload)).await;
         assert_eq!(result.conflicts.len(), 1);
         assert_eq!(result.conflicts[0].winner, ConflictWinner::Draft);
+    }
+
+    // --- CRUD TCP (feature "tcp-mock") : meme infra spawn_test_app que le
+    // reste de ce fichier (vrai routeur, vrai port TCP), auth desactivee
+    // (spawn_test_app force auth_config.enabled: false) donc les gardes
+    // require_super_admin ne sont pas exercees ici -- couvertes indirectement
+    // par require_super_admin_rejects_non_admin plus haut, meme fonction que
+    // le reste du CRUD HTTP utilise.
+
+    #[cfg(feature = "tcp-mock")]
+    #[tokio::test]
+    async fn tcp_services_crud_roundtrip() {
+        use crate::tcp::config::{TcpMatcher, TcpRule, TcpService};
+
+        let base = spawn_test_app(MockConfig { services: vec![], groups: vec![] }).await;
+        let client = reqwest::Client::new();
+
+        let created = client
+            .post(format!("{base}/tcp/services"))
+            .json(&TcpService {
+                name: "heartbeat".into(),
+                listen_port: 0,
+                rules: vec![TcpRule {
+                    name: "ping".into(),
+                    matcher: TcpMatcher::Any,
+                    response_hex: "706f6e67".into(),
+                }],
+            })
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(created.status(), StatusCode::CREATED);
+
+        let list: Vec<TcpService> = client
+            .get(format!("{base}/tcp/services"))
+            .send()
+            .await
+            .unwrap()
+            .json()
+            .await
+            .unwrap();
+        assert_eq!(list.len(), 1);
+        assert_eq!(list[0].name, "heartbeat");
+
+        let updated = client
+            .put(format!("{base}/tcp/services/heartbeat"))
+            .json(&TcpService {
+                name: "heartbeat".into(),
+                listen_port: 0,
+                rules: vec![TcpRule {
+                    name: "ping2".into(),
+                    matcher: TcpMatcher::Any,
+                    response_hex: "706f6e6732".into(),
+                }],
+            })
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(updated.status(), StatusCode::OK);
+        let updated_service: TcpService = updated.json().await.unwrap();
+        assert_eq!(updated_service.rules[0].name, "ping2");
+
+        let deleted = client
+            .delete(format!("{base}/tcp/services/heartbeat"))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(deleted.status(), StatusCode::NO_CONTENT);
+
+        let list_after: Vec<TcpService> = client
+            .get(format!("{base}/tcp/services"))
+            .send()
+            .await
+            .unwrap()
+            .json()
+            .await
+            .unwrap();
+        assert!(list_after.is_empty());
+    }
+
+    #[cfg(feature = "tcp-mock")]
+    #[tokio::test]
+    async fn tcp_service_create_rejects_duplicate_port() {
+        use crate::tcp::config::{TcpMatcher, TcpRule, TcpService};
+
+        let base = spawn_test_app(MockConfig { services: vec![], groups: vec![] }).await;
+        let client = reqwest::Client::new();
+
+        let service = |name: &str| TcpService {
+            name: name.into(),
+            listen_port: 19999,
+            rules: vec![TcpRule {
+                name: "r".into(),
+                matcher: TcpMatcher::Any,
+                response_hex: String::new(),
+            }],
+        };
+
+        let first = client
+            .post(format!("{base}/tcp/services"))
+            .json(&service("svc-a"))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(first.status(), StatusCode::CREATED);
+
+        let second = client
+            .post(format!("{base}/tcp/services"))
+            .json(&service("svc-b"))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(second.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[cfg(feature = "tcp-mock")]
+    #[tokio::test]
+    async fn tcp_service_update_missing_returns_404() {
+        use crate::tcp::config::TcpService;
+
+        let base = spawn_test_app(MockConfig { services: vec![], groups: vec![] }).await;
+        let client = reqwest::Client::new();
+
+        let resp = client
+            .put(format!("{base}/tcp/services/does-not-exist"))
+            .json(&TcpService {
+                name: "does-not-exist".into(),
+                listen_port: 0,
+                rules: vec![],
+            })
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[cfg(feature = "tcp-mock")]
+    #[tokio::test]
+    async fn tcp_service_delete_missing_returns_404() {
+        let base = spawn_test_app(MockConfig { services: vec![], groups: vec![] }).await;
+        let client = reqwest::Client::new();
+
+        let resp = client
+            .delete(format!("{base}/tcp/services/does-not-exist"))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[cfg(feature = "tcp-mock")]
+    #[tokio::test]
+    async fn tcp_service_created_via_api_is_immediately_reachable_over_raw_tcp() {
+        // Preuve bout-en-bout que TcpRuntime::replace() relance vraiment les
+        // listeners : cree un service via l'API HTTP, puis se connecte en
+        // TCP brut sur le port declare et verifie la reponse mockee -- sans
+        // redemarrer le processus entre les deux.
+        use crate::tcp::config::{TcpMatcher, TcpRule, TcpService};
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        let base = spawn_test_app(MockConfig { services: vec![], groups: vec![] }).await;
+        let client = reqwest::Client::new();
+
+        // Port 0 refuse cote validation (aucune contrainte dessus), mais on a
+        // besoin d'un port REEL pour s'y connecter ensuite : en reserve un.
+        let probe = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = probe.local_addr().unwrap().port();
+        drop(probe);
+
+        let created = client
+            .post(format!("{base}/tcp/services"))
+            .json(&TcpService {
+                name: "live-check".into(),
+                listen_port: port,
+                rules: vec![TcpRule {
+                    name: "always".into(),
+                    matcher: TcpMatcher::Any,
+                    response_hex: crate::tcp::hex::encode(b"live"),
+                }],
+            })
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(created.status(), StatusCode::CREATED);
+
+        let mut tcp_client = tokio::net::TcpStream::connect(("127.0.0.1", port))
+            .await
+            .unwrap();
+        tcp_client.write_all(b"ping").await.unwrap();
+        let mut resp = [0u8; 4];
+        tcp_client.read_exact(&mut resp).await.unwrap();
+        assert_eq!(&resp, b"live");
     }
 }

@@ -51,14 +51,18 @@
 //   - Le mode "proxifier vers un vrai serveur" : retire (voir ci-dessus),
 //     jamais reintroduit sans une vraie contrepartie de mock/matching.
 //
-// Le port ecoute par service est fige au demarrage du processus (pas de
-// rebind a chaud, pas de rechargement du fichier YAML a chaud). Configurable
-// UNIQUEMENT via un fichier YAML ecrit a la main
-// (`{DATA_PATH}/tcp-config.yaml`) aujourd'hui -- pas encore d'endpoints API
-// ni d'UI.
+// Reconfigurable a chaud via l'API REST (`GET/POST/PUT/DELETE /tcp/services`,
+// `server/api.rs`, feature-gated) : `TcpRuntime::replace()` persiste la
+// nouvelle config sur disque puis relance TOUS les listeners (pas de diff
+// fin service par service -- volume attendu faible, cout negligeable). Le
+// serveur HTTP principal n'est jamais affecte par ce redemarrage, qui ne
+// touche que les ecoutes TCP. Pas encore d'UI Svelte au-dessus de cette API.
 pub mod config;
 pub mod hex;
 pub mod listener;
 pub mod matcher;
+pub mod runtime;
+pub mod validation;
 
 pub use listener::{TcpServiceStatus, spawn_tcp_services};
+pub use runtime::TcpRuntime;
