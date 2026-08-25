@@ -153,10 +153,21 @@ pub fn suggest(
     })
 }
 
+/// En-tetes de reponse jamais reportees dans une regle SUGGEREE (mais
+/// conservees telles quelles dans `ObservedExchange` pour l'inspection brute)
+/// : `content-length` est recalculee par le moteur de rendu a partir du
+/// corps reel de la regle (une valeur figee deviendrait fausse des que
+/// l'utilisateur edite le corps suggere), `date` fige un horodatage qui n'a
+/// aucun sens une fois transforme en donnee statique de config.
+const NEVER_SUGGESTED_RESPONSE_HEADERS: &[&str] = &["content-length", "date"];
+
 fn build_response(exchange: &ObservedExchange) -> MockResponse {
     let headers = exchange
         .response_headers
         .iter()
+        .filter(|(name, _)| {
+            !NEVER_SUGGESTED_RESPONSE_HEADERS.contains(&name.to_lowercase().as_str())
+        })
         .map(|(name, value)| HeaderEntry {
             name: name.clone(),
             value: value.clone(),
@@ -370,6 +381,42 @@ mod tests {
                 assert!(rule.condition.is_none());
                 assert_eq!(rule.sample_count, 3);
                 assert_eq!(rule.response.status, 200);
+            }
+            other => panic!("expected Unconditional, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn suggested_response_never_includes_content_length_or_date() {
+        // Vues sur le fil reel (proxy) : content-length et date sont
+        // presentes cote reponse captured, mais n'ont pas leur place dans
+        // une regle SAUVEGARDEE (content-length recalculee par le moteur de
+        // rendu, date figerait un horodatage sans aucun sens en config
+        // statique). Un en-tete "legitime" comme x-env doit lui survivre.
+        let mut e = exchange(200, "ok");
+        e.response_headers
+            .insert("content-length".into(), "2".into());
+        e.response_headers
+            .insert("Date".into(), "Tue, 25 Aug 2026 00:00:00 GMT".into());
+        e.response_headers.insert("x-env".into(), "prod".into());
+        let obs = vec![e.clone(), e.clone(), e];
+
+        let suggestion = suggest("GET", "/orders", &obs).unwrap();
+        match suggestion {
+            Suggestion::Unconditional { rule } => {
+                let names: Vec<&str> = rule
+                    .response
+                    .headers
+                    .iter()
+                    .map(|h| h.name.as_str())
+                    .collect();
+                assert!(
+                    !names
+                        .iter()
+                        .any(|n| n.eq_ignore_ascii_case("content-length"))
+                );
+                assert!(!names.iter().any(|n| n.eq_ignore_ascii_case("date")));
+                assert!(names.contains(&"x-env"));
             }
             other => panic!("expected Unconditional, got {other:?}"),
         }

@@ -3,6 +3,7 @@
   import RuleList from './RuleList.svelte';
   import RuleForm from './RuleForm.svelte';
   import UrlHealthBadge from './UrlHealthBadge.svelte';
+  import ObservationSuggestions from './ObservationSuggestions.svelte';
   import ConfirmDialog from './ConfirmDialog.svelte';
   import { updateService, deleteService, reorderRules } from '../api.js';
 
@@ -91,6 +92,16 @@
     editingRuleIdx = null;
     addingRule = true;
     clonedRule = source;
+  }
+
+  // Meme flux que handleCloneRule : pre-remplit le formulaire de creation
+  // avec le brouillon de regle suggere, l'utilisateur reste maitre de la
+  // relecture/edition/sauvegarde (RuleForm inchange, meme validation, meme
+  // detecteur de conflit).
+  function handleUseSuggestion(ruleDraft) {
+    editingRuleIdx = null;
+    addingRule = true;
+    clonedRule = ruleDraft;
   }
 
   let clonedRule = $state(null);
@@ -202,6 +213,12 @@
       onDeleteRule={handleDeleteRule}
       onCloneRule={handleCloneRule}
       onAddRule={() => { addingRule = true; clonedRule = null; }}
+    />
+    <ObservationSuggestions
+      serviceName={service.name}
+      groupName={service.group_name}
+      isMocked={service.is_mocked}
+      onUseSuggestion={handleUseSuggestion}
     />
   {/if}
 </div>
