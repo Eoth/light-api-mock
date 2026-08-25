@@ -9,6 +9,7 @@ mod intercept;
 pub mod observation;
 pub mod ping;
 pub mod request_log;
+pub mod suggestion;
 pub mod validation;
 
 use crate::auth::AuthConfig;

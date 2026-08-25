@@ -68,6 +68,11 @@ pub fn routes() -> Router<AppState> {
             "/groups/:group/services/:name/observe",
             post(observe_service_grouped).delete(unobserve_service_grouped),
         )
+        .route("/services/:name/suggestions", get(get_service_suggestions))
+        .route(
+            "/groups/:group/services/:name/suggestions",
+            get(get_service_suggestions_grouped),
+        )
         .route("/groups", get(list_groups).post(create_group))
         .route(
             "/groups/:name",
@@ -462,6 +467,60 @@ async fn unobserve_service_grouped(
     Path((group, name)): Path<(String, String)>,
 ) -> Result<StatusCode, AppError> {
     observe_service_impl(state, user, Some(group), name, false).await
+}
+
+/// Recalcule TOUJOURS a la demande depuis `ObservationStore` (cf commentaire
+/// de module de `server::suggestion`) : aucun etat de suggestion separe a
+/// tenir a jour. Ne renvoie que les cles avec assez d'observations
+/// (`suggestion::min_samples()`) — une cle en-dessous du seuil est
+/// silencieusement omise, pas signalee comme "en cours".
+async fn get_service_suggestions_impl(
+    state: AppState,
+    user: AuthUser,
+    group: Option<String>,
+    name: String,
+) -> Result<Json<Vec<crate::server::suggestion::Suggestion>>, AppError> {
+    let config = state.store.snapshot().await;
+    let svc = config
+        .services
+        .iter()
+        .find(|s| service_matches(s, group.as_deref(), &name))
+        .ok_or(AppError::NotFound)?;
+
+    if state.auth_config.enabled
+        && !can_access_service(&user.username, user.is_super_admin, svc, &config.groups)
+    {
+        return Err(AppError::Forbidden);
+    }
+
+    let keys = state
+        .observation
+        .store
+        .keys_for_service(group.as_deref(), &name);
+    let suggestions = keys
+        .into_iter()
+        .filter_map(|key| {
+            let observations = state.observation.store.observations(&key);
+            crate::server::suggestion::suggest(&key.method, &key.sub_path, &observations)
+        })
+        .collect();
+    Ok(Json(suggestions))
+}
+
+async fn get_service_suggestions(
+    State(state): State<AppState>,
+    Extension(user): Extension<AuthUser>,
+    Path(name): Path<String>,
+) -> Result<Json<Vec<crate::server::suggestion::Suggestion>>, AppError> {
+    get_service_suggestions_impl(state, user, None, name).await
+}
+
+async fn get_service_suggestions_grouped(
+    State(state): State<AppState>,
+    Extension(user): Extension<AuthUser>,
+    Path((group, name)): Path<(String, String)>,
+) -> Result<Json<Vec<crate::server::suggestion::Suggestion>>, AppError> {
+    get_service_suggestions_impl(state, user, Some(group), name).await
 }
 
 // --------------- Messaging (Kafka) ---------------
@@ -2577,6 +2636,79 @@ mod tests {
             .unwrap();
         assert_eq!(status.len(), 1);
         assert_eq!(status[0].group_name.as_deref(), Some("team-a"));
+    }
+
+    #[tokio::test]
+    async fn suggestions_end_to_end_through_real_proxy_traffic() {
+        // Vraie cible : renvoie 200 pour id=1, 404 pour id=2, sur le meme
+        // (method, sub_path) -- exactement le cas piege (variance legitime,
+        // discriminee ici par le query param `id`).
+        async fn target(
+            axum::extract::Query(params): axum::extract::Query<HashMap<String, String>>,
+        ) -> axum::response::Response {
+            match params.get("id").map(String::as_str) {
+                Some("1") => (StatusCode::OK, "found").into_response(),
+                _ => (StatusCode::NOT_FOUND, "missing").into_response(),
+            }
+        }
+        let target_app = axum::Router::new().route("/*rest", axum::routing::any(target));
+        let target_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let target_port = target_listener.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            axum::serve(target_listener, target_app).await.unwrap();
+        });
+
+        let svc = Service {
+            is_mocked: false,
+            real_target_url: format!("http://127.0.0.1:{target_port}"),
+            ..svc_named("proxy-svc", None)
+        };
+        let base = spawn_test_app(MockConfig {
+            services: vec![svc],
+            groups: vec![],
+        })
+        .await;
+        let client = reqwest::Client::new();
+
+        client
+            .post(format!("{base}/services/proxy-svc/observe"))
+            .send()
+            .await
+            .unwrap();
+
+        let proxy_base = base.trim_end_matches("/api");
+        for _ in 0..2 {
+            client
+                .get(format!("{proxy_base}/proxy-svc/orders?id=1"))
+                .send()
+                .await
+                .unwrap();
+            client
+                .get(format!("{proxy_base}/proxy-svc/orders?id=2"))
+                .send()
+                .await
+                .unwrap();
+        }
+
+        let suggestions: Vec<serde_json::Value> = client
+            .get(format!("{base}/services/proxy-svc/suggestions"))
+            .send()
+            .await
+            .unwrap()
+            .json()
+            .await
+            .unwrap();
+
+        assert_eq!(suggestions.len(), 1);
+        assert_eq!(suggestions[0]["outcome"], "Conditional");
+        let rules = suggestions[0]["rules"].as_array().unwrap();
+        assert_eq!(rules.len(), 2);
+        let statuses: Vec<u64> = rules
+            .iter()
+            .map(|r| r["response"]["status"].as_u64().unwrap())
+            .collect();
+        assert!(statuses.contains(&200));
+        assert!(statuses.contains(&404));
     }
 
     #[tokio::test]
