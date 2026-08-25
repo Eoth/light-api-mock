@@ -154,6 +154,32 @@ export function validateScript(script) {
   return request('POST', '/script/validate', { script });
 }
 
+// TCP brut (protocoles binaires non-HTTP, mock seul — pas de proxy). Routes
+// absentes (404) sur un binaire compile sans la feature "tcp-mock" ; les
+// appelants doivent gerer cet echec (meme pattern que Messaging, voir
+// App.svelte). /tcp/status est en lecture seule et sans auth cote backend ;
+// /tcp/services est le CRUD, mutation reservee aux super-admins si l'auth
+// est active.
+export function getTcpStatus() {
+  return request('GET', '/tcp/status');
+}
+
+export function getTcpServices() {
+  return request('GET', '/tcp/services');
+}
+
+export function createTcpService(service) {
+  return request('POST', '/tcp/services', service);
+}
+
+export function updateTcpService(name, service) {
+  return request('PUT', `/tcp/services/${encodeURIComponent(name)}`, service);
+}
+
+export function deleteTcpService(name) {
+  return request('DELETE', `/tcp/services/${encodeURIComponent(name)}`);
+}
+
 export function resetConfig() {
   return request('DELETE', '/config/reset');
 }
