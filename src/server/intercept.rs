@@ -1,6 +1,6 @@
 use crate::engine::matcher::match_path;
 use crate::engine::script::{ScriptContext, ScriptEngine, ScriptResult};
-use crate::engine::{apply_chaos_and_render, MatchEngine, RequestData, TemplateContext};
+use crate::engine::{MatchEngine, RequestData, TemplateContext, apply_chaos_and_render};
 use crate::models::{RuleAction, Service, WsdlMode};
 use crate::server::AppState;
 use crate::server::request_log::CapturedRequest;
@@ -54,17 +54,31 @@ pub async fn intercept_layer(
 
     let matched = config.services.iter().find_map(|s| {
         let group_code = s.group_name.as_ref().and_then(|gn| {
-            config.groups.iter().find(|g| &g.name == gn)
+            config
+                .groups
+                .iter()
+                .find(|g| &g.name == gn)
                 .map(|g| g.code.clone())
                 .filter(|c| !c.trim().is_empty())
         });
         let effective = build_effective_pattern(group_code.as_deref(), &s.name, &s.listen_path);
-        match_path(&effective, &path).map(|(params, remaining)| (s.clone(), params, remaining, group_code))
+        match_path(&effective, &path)
+            .map(|(params, remaining)| (s.clone(), params, remaining, group_code))
     });
 
     match matched {
         Some((service, path_params, remaining, group_code)) => {
-            handle_service(&state, &service, &path, path_params, remaining, group_code, &method, req).await
+            handle_service(
+                &state,
+                &service,
+                &path,
+                path_params,
+                remaining,
+                group_code,
+                &method,
+                req,
+            )
+            .await
         }
         None => next.run(req).await,
     }
@@ -85,6 +99,10 @@ fn build_effective_pattern(group_code: Option<&str>, name: &str, listen_path: &s
     }
 }
 
+// clippy::too_many_arguments deja present avant ce chantier (8 parametres,
+// au-dela du seuil par defaut) ; `observe` en ajoute un neuvieme plutot que
+// de forcer un regroupement en struct hors perimetre de cette tranche.
+#[allow(clippy::too_many_arguments)]
 async fn do_proxy(
     state: &AppState,
     service: &Service,
@@ -94,6 +112,7 @@ async fn do_proxy(
     group_code: Option<&str>,
     req: Request<Body>,
     captured: Option<CapturedRequest>,
+    observe: bool,
 ) -> Response {
     // Service "purement mocke" (real_target_url vide) : ne jamais tenter de
     // proxifier vers une URL vide. `validate_service` bloque deja cette
@@ -139,6 +158,13 @@ async fn do_proxy(
         target = %target,
         "proxy forwarding"
     );
+    if observe {
+        return do_proxy_observed(
+            state, service, path, method_str, group_code, proxy_path, &target, req, captured,
+        )
+        .await;
+    }
+
     match state
         .proxy
         .forward(&service.real_target_url, proxy_path, req)
@@ -165,6 +191,73 @@ async fn do_proxy(
     }
 }
 
+/// Meme relais que la branche par defaut de `do_proxy`, en tentant EN PLUS de
+/// capturer requete+reponse pour l'observation de trafic (cf
+/// `server::observation`) — jamais appelee sauf si l'utilisateur a active
+/// explicitement l'observation de CE service (`ObservationToggle`, cf
+/// `handle_service`). `ProxyClient::forward_with_capture` degrade
+/// automatiquement en streaming pur (comme `forward()`) des qu'une capture
+/// n'est pas sure (taille inconnue/trop grande) : aucune perte fonctionnelle
+/// pour le trafic relaye, seulement une capture en moins pour l'echange
+/// concerne.
+#[allow(clippy::too_many_arguments)]
+async fn do_proxy_observed(
+    state: &AppState,
+    service: &Service,
+    path: &str,
+    method_str: &str,
+    group_code: Option<&str>,
+    proxy_path: &str,
+    target: &str,
+    req: Request<Body>,
+    captured: Option<CapturedRequest>,
+) -> Response {
+    let max_buffer = crate::server::observation::max_buffer_size();
+    match state
+        .proxy
+        .forward_with_capture(&service.real_target_url, proxy_path, req, max_buffer)
+        .await
+    {
+        Ok((resp, capture)) => {
+            let status = resp.status().as_u16();
+            state
+                .request_log
+                .log_proxy(&service.name, method_str, path, target, status, captured);
+            if let Some(raw) = capture {
+                let key = crate::server::observation::ObservationKey {
+                    group_name: group_code.map(|s| s.to_string()),
+                    service_name: service.name.clone(),
+                    method: method_str.to_string(),
+                    sub_path: proxy_path.to_string(),
+                };
+                let exchange = crate::server::observation::ObservedExchange::new(
+                    raw.request_query_params,
+                    raw.request_headers,
+                    &raw.request_body,
+                    raw.request_content_type,
+                    raw.response_status,
+                    raw.response_headers,
+                    &raw.response_body,
+                    raw.response_content_type,
+                );
+                state.observation.store.record(key, exchange);
+            }
+            resp
+        }
+        Err(status) => {
+            state.request_log.log_proxy(
+                &service.name,
+                method_str,
+                path,
+                target,
+                status.as_u16(),
+                captured,
+            );
+            status.into_response()
+        }
+    }
+}
+
 async fn handle_service(
     state: &AppState,
     service: &Service,
@@ -181,8 +274,24 @@ async fn handle_service(
     if !service.is_mocked {
         // Proxy niveau service : chemin streame sans buffering (aucun
         // RequestData construit ici), donc aucun detail capturable pour le
-        // testeur de regle sur ce chemin ("Proxy streaming").
-        return do_proxy(state, service, path, &method_str, "service-level", gc, req, None).await;
+        // testeur de regle sur ce chemin ("Proxy streaming"). Exception
+        // deliberee et OPT-IN uniquement : si l'utilisateur a explicitement
+        // active l'observation de ce service (ObservationToggle, jamais
+        // automatique), `do_proxy` tente une capture bornee pour armer une
+        // future suggestion de regle de mock — cf `server::observation`.
+        let observe = state.observation.toggle.is_enabled(gc, &service.name);
+        return do_proxy(
+            state,
+            service,
+            path,
+            &method_str,
+            "service-level",
+            gc,
+            req,
+            None,
+            observe,
+        )
+        .await;
     }
 
     if is_wsdl_request(req.uri().query()) {
@@ -199,8 +308,18 @@ async fn handle_service(
                     mode = "proxy", context = "wsdl-bypass",
                     "WSDL request, bypassing mock rules"
                 );
-                return do_proxy(state, service, path, &method_str, "wsdl-bypass", gc, req, None)
-                    .await;
+                return do_proxy(
+                    state,
+                    service,
+                    path,
+                    &method_str,
+                    "wsdl-bypass",
+                    gc,
+                    req,
+                    None,
+                    false,
+                )
+                .await;
             }
         }
     }
@@ -271,6 +390,7 @@ async fn handle_service(
             gc,
             proxy_req,
             captured,
+            false,
         )
         .await;
     }
@@ -291,9 +411,27 @@ async fn handle_service(
         query_params: request_data.query_params.clone(),
         path_params: merged_params.clone(),
     };
-    let pre_script_result = run_rule_script(&state.script_engine, &rule.name, "pre_script", &rule.pre_script, &script_ctx);
-    let script_result = run_rule_script(&state.script_engine, &rule.name, "script", &rule.script, &script_ctx);
-    let post_script_result = run_rule_script(&state.script_engine, &rule.name, "post_script", &rule.post_script, &script_ctx);
+    let pre_script_result = run_rule_script(
+        &state.script_engine,
+        &rule.name,
+        "pre_script",
+        &rule.pre_script,
+        &script_ctx,
+    );
+    let script_result = run_rule_script(
+        &state.script_engine,
+        &rule.name,
+        "script",
+        &rule.script,
+        &script_ctx,
+    );
+    let post_script_result = run_rule_script(
+        &state.script_engine,
+        &rule.name,
+        "post_script",
+        &rule.post_script,
+        &script_ctx,
+    );
 
     let ctx = TemplateContext {
         path_params: &merged_params,
@@ -649,7 +787,13 @@ mod tests {
     fn run_rule_script_soft_fails_on_invalid_script() {
         let engine = ScriptEngine::new();
         let script = Some("this is not valid rhai (((".to_string());
-        let result = run_rule_script(&engine, "my-rule", "post_script", &script, &empty_script_ctx());
+        let result = run_rule_script(
+            &engine,
+            "my-rule",
+            "post_script",
+            &script,
+            &empty_script_ctx(),
+        );
         // Soft-fail : jamais None ni panique, un ScriptResult vide en repli.
         assert_eq!(result.unwrap().value, "");
     }
@@ -680,14 +824,13 @@ mod tests {
     // do_proxy / handle_service.
 
     fn temp_dir_for_intercept_test() -> std::path::PathBuf {
-        let dir = std::env::temp_dir().join(format!("lightmock-intercept-test-{}", fastrand::u64(..)));
+        let dir =
+            std::env::temp_dir().join(format!("lightmock-intercept-test-{}", fastrand::u64(..)));
         std::fs::create_dir_all(&dir).unwrap();
         dir
     }
 
-    async fn capture_one_raw_request(
-        ready_tx: tokio::sync::oneshot::Sender<u16>,
-    ) -> String {
+    async fn capture_one_raw_request(ready_tx: tokio::sync::oneshot::Sender<u16>) -> String {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
         ready_tx.send(addr.port()).unwrap();
@@ -789,6 +932,7 @@ mod tests {
             keycloak: None,
             script_engine: ScriptEngine::new(),
             ping_cache: crate::server::ping::PingCache::new(),
+            observation: crate::server::observation::ObservationState::new(),
             #[cfg(feature = "messaging-kafka")]
             messaging,
             #[cfg(feature = "tcp-mock")]
@@ -909,6 +1053,7 @@ mod tests {
             keycloak: None,
             script_engine: ScriptEngine::new(),
             ping_cache: crate::server::ping::PingCache::new(),
+            observation: crate::server::observation::ObservationState::new(),
             #[cfg(feature = "messaging-kafka")]
             messaging,
             #[cfg(feature = "tcp-mock")]
@@ -958,9 +1103,15 @@ mod tests {
         // contrairement au proxy niveau service ci-dessus.
         let logged = request_log_handle.recent(1);
         assert_eq!(logged.len(), 1);
-        let captured = logged[0].captured.as_ref().expect("rule-level proxy doit capturer le detail de la requete");
+        let captured = logged[0]
+            .captured
+            .as_ref()
+            .expect("rule-level proxy doit capturer le detail de la requete");
         assert_eq!(captured.query_params.get("a").unwrap(), "1");
-        assert_eq!(captured.headers.get("x-custom-header").unwrap(), "custom-value");
+        assert_eq!(
+            captured.headers.get("x-custom-header").unwrap(),
+            "custom-value"
+        );
         assert_eq!(captured.body, "payload-body");
 
         std::fs::remove_dir_all(&data_dir).ok();
@@ -1023,6 +1174,7 @@ mod tests {
             keycloak: None,
             script_engine: ScriptEngine::new(),
             ping_cache: crate::server::ping::PingCache::new(),
+            observation: crate::server::observation::ObservationState::new(),
             #[cfg(feature = "messaging-kafka")]
             messaging,
             #[cfg(feature = "tcp-mock")]
@@ -1038,7 +1190,9 @@ mod tests {
 
         let client = reqwest::Client::new();
         let resp = client
-            .get(format!("http://127.0.0.1:{server_port}/mocksvc/42/rest?foo=bar"))
+            .get(format!(
+                "http://127.0.0.1:{server_port}/mocksvc/42/rest?foo=bar"
+            ))
             .send()
             .await
             .unwrap();
@@ -1047,7 +1201,10 @@ mod tests {
         let logged = request_log_handle.recent(1);
         assert_eq!(logged.len(), 1);
         assert_eq!(logged[0].mode, "mock");
-        let captured = logged[0].captured.as_ref().expect("le mock doit capturer le detail de la requete");
+        let captured = logged[0]
+            .captured
+            .as_ref()
+            .expect("le mock doit capturer le detail de la requete");
         assert_eq!(captured.path_params.get("id").unwrap(), "42");
         assert_eq!(captured.query_params.get("foo").unwrap(), "bar");
         assert!(!captured.body_truncated);
@@ -1059,7 +1216,13 @@ mod tests {
     // Helper partage par les 3 tests ci-dessous : construit un vrai serveur
     // Axum (meme routeur qu'en production) pour une config donnee — factorise
     // ici car les 3 scenarios suivants ne different que par la config initiale.
-    async fn spawn_test_server(config: MockConfig) -> (u16, crate::server::request_log::RequestLog, std::path::PathBuf) {
+    async fn spawn_test_server(
+        config: MockConfig,
+    ) -> (
+        u16,
+        crate::server::request_log::RequestLog,
+        std::path::PathBuf,
+    ) {
         let data_dir = temp_dir_for_intercept_test();
         let store = MockStore::new(data_dir.join("mock-config.yaml"));
         store.replace(config).await.unwrap();
@@ -1082,6 +1245,7 @@ mod tests {
             keycloak: None,
             script_engine: ScriptEngine::new(),
             ping_cache: crate::server::ping::PingCache::new(),
+            observation: crate::server::observation::ObservationState::new(),
             #[cfg(feature = "messaging-kafka")]
             messaging,
             #[cfg(feature = "tcp-mock")]
@@ -1124,7 +1288,12 @@ mod tests {
             post_script: None,
             response_mode: None,
             conditions: ConditionGroup::default(),
-            response: MockResponse { status: 200, headers: vec![], body: vec![], chaos: None },
+            response: MockResponse {
+                status: 200,
+                headers: vec![],
+                body: vec![],
+                chaos: None,
+            },
         };
         let (port, request_log_handle, data_dir) = spawn_test_server(MockConfig {
             services: vec![purely_mocked_service(vec![rule])],
@@ -1162,7 +1331,12 @@ mod tests {
             post_script: None,
             response_mode: None,
             conditions: ConditionGroup::default(),
-            response: MockResponse { status: 200, headers: vec![], body: vec![], chaos: None },
+            response: MockResponse {
+                status: 200,
+                headers: vec![],
+                body: vec![],
+                chaos: None,
+            },
         };
         let mut service = purely_mocked_service(vec![rule]);
         service.name = "avecible".into();
@@ -1236,7 +1410,12 @@ mod tests {
             post_script: None,
             response_mode: None,
             conditions: ConditionGroup::default(),
-            response: MockResponse { status: 200, headers: vec![], body: vec![], chaos: None },
+            response: MockResponse {
+                status: 200,
+                headers: vec![],
+                body: vec![],
+                chaos: None,
+            },
         };
         let (port, _log, data_dir) = spawn_test_server(MockConfig {
             services: vec![purely_mocked_service(vec![rule])],
@@ -1294,7 +1473,10 @@ mod tests {
             conditions: ConditionGroup::default(),
             response: MockResponse {
                 status: 200,
-                headers: vec![HeaderEntry { name: "Content-Type".into(), value: "application/json".into() }],
+                headers: vec![HeaderEntry {
+                    name: "Content-Type".into(),
+                    value: "application/json".into(),
+                }],
                 body: vec![BodyFragment::Template {
                     template: r#"{"count":{{script.count}},"lines":{{script.lines_json}}}"#.into(),
                 }],
@@ -1557,7 +1739,9 @@ mod tests {
         // en echec (fonction inexistante) du bug d'origine ne parvenait
         // jamais a atteindre.
         let resp = client
-            .get(format!("http://127.0.0.1:{port}/annuaire/lookup/nonexistent"))
+            .get(format!(
+                "http://127.0.0.1:{port}/annuaire/lookup/nonexistent"
+            ))
             .send()
             .await
             .unwrap();

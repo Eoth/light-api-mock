@@ -7,8 +7,6 @@ use crate::engine::matcher::{
 use crate::engine::script::ScriptContext;
 use crate::models::{ConditionGroup, Group, MockConfig, RuleAction, Service};
 use crate::server::AppState;
-use std::collections::HashMap;
-use std::sync::Arc;
 use crate::server::request_log::LogEntry;
 use crate::server::validation::{validate_backup_filename, validate_service};
 use axum::Extension;
@@ -17,6 +15,8 @@ use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::routing::{delete as delete_route, get, post, put};
 use axum::{Json, Router};
+use std::collections::HashMap;
+use std::sync::Arc;
 
 pub fn routes() -> Router<AppState> {
     let router = Router::new()
@@ -39,15 +39,35 @@ pub fn routes() -> Router<AppState> {
         .route("/services/:name/rules/reorder", put(reorder_rules))
         .route(
             "/groups/:group/services/:name",
-            get(get_service_grouped).put(update_service_grouped).delete(delete_service_grouped),
+            get(get_service_grouped)
+                .put(update_service_grouped)
+                .delete(delete_service_grouped),
         )
-        .route("/groups/:group/services/:name/toggle", put(toggle_service_grouped))
-        .route("/groups/:group/services/:name/ping", post(ping_service_grouped))
-        .route("/groups/:group/services/:name/rules/reorder", put(reorder_rules_grouped))
+        .route(
+            "/groups/:group/services/:name/toggle",
+            put(toggle_service_grouped),
+        )
+        .route(
+            "/groups/:group/services/:name/ping",
+            post(ping_service_grouped),
+        )
+        .route(
+            "/groups/:group/services/:name/rules/reorder",
+            put(reorder_rules_grouped),
+        )
         .route("/script/validate", post(validate_script))
         .route("/rule-test", post(test_rule))
         .route("/rule-conflicts", post(check_rule_conflicts))
         .route("/logs", get(get_logs))
+        .route("/observation/status", get(get_observation_status))
+        .route(
+            "/services/:name/observe",
+            post(observe_service).delete(unobserve_service),
+        )
+        .route(
+            "/groups/:group/services/:name/observe",
+            post(observe_service_grouped).delete(unobserve_service_grouped),
+        )
         .route("/groups", get(list_groups).post(create_group))
         .route(
             "/groups/:name",
@@ -64,7 +84,10 @@ pub fn routes() -> Router<AppState> {
     #[cfg(feature = "tcp-mock")]
     let router = router
         .route("/tcp/status", get(get_tcp_status))
-        .route("/tcp/services", get(list_tcp_services).post(create_tcp_service))
+        .route(
+            "/tcp/services",
+            get(list_tcp_services).post(create_tcp_service),
+        )
         .route(
             "/tcp/services/:name",
             put(update_tcp_service).delete(delete_tcp_service),
@@ -264,7 +287,11 @@ async fn reset_config(
 ) -> Result<StatusCode, AppError> {
     require_super_admin(&user)?;
 
-    state.store.backup_before_reset().await.map_err(AppError::Store)?;
+    state
+        .store
+        .backup_before_reset()
+        .await
+        .map_err(AppError::Store)?;
 
     tracing::info!(user = %user.username, "config reset: all services removed");
     state
@@ -325,6 +352,116 @@ async fn get_logs(
     Query(q): Query<LogsQuery>,
 ) -> Json<Vec<LogEntry>> {
     Json(state.request_log.recent(q.limit))
+}
+
+// --------------- Observation de trafic (proxy niveau service) ---------------
+// Active/desactive EXPLICITEMENT par l'utilisateur (jamais automatique, cf
+// `server::observation`) : n'a d'effet que sur un service purement proxifie
+// (is_mocked=false) — c'est le seul chemin ou le proxy est aujourd'hui
+// streame sans aucune capture par defaut. Meme garde d'auth que
+// toggle/ping/reorder (can_access_service, pas de restriction super-admin :
+// action reversible, pas une mutation de la configuration persistee).
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct ObservationStatusEntry {
+    group_name: Option<String>,
+    service_name: String,
+}
+
+async fn get_observation_status(
+    State(state): State<AppState>,
+    Extension(user): Extension<AuthUser>,
+) -> Json<Vec<ObservationStatusEntry>> {
+    let config = state.store.snapshot().await;
+    let entries = state
+        .observation
+        .toggle
+        .active_services()
+        .into_iter()
+        .filter_map(|(group, name)| {
+            let svc = config
+                .services
+                .iter()
+                .find(|s| service_matches(s, group.as_deref(), &name))?;
+            if state.auth_config.enabled
+                && !can_access_service(&user.username, user.is_super_admin, svc, &config.groups)
+            {
+                return None;
+            }
+            Some(ObservationStatusEntry {
+                group_name: group,
+                service_name: name,
+            })
+        })
+        .collect();
+    Json(entries)
+}
+
+async fn observe_service_impl(
+    state: AppState,
+    user: AuthUser,
+    group: Option<String>,
+    name: String,
+    enable: bool,
+) -> Result<StatusCode, AppError> {
+    let config = state.store.snapshot().await;
+    let svc = config
+        .services
+        .iter()
+        .find(|s| service_matches(s, group.as_deref(), &name))
+        .ok_or(AppError::NotFound)?;
+
+    if state.auth_config.enabled
+        && !can_access_service(&user.username, user.is_super_admin, svc, &config.groups)
+    {
+        return Err(AppError::Forbidden);
+    }
+
+    if enable && svc.is_mocked {
+        return Err(AppError::Validation(
+            "L'observation de trafic n'a d'effet que sur un service purement proxifie (is_mocked=false)."
+                .into(),
+        ));
+    }
+
+    if enable {
+        state.observation.toggle.enable(group.as_deref(), &name);
+    } else {
+        state.observation.toggle.disable(group.as_deref(), &name);
+    }
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn observe_service(
+    State(state): State<AppState>,
+    Extension(user): Extension<AuthUser>,
+    Path(name): Path<String>,
+) -> Result<StatusCode, AppError> {
+    observe_service_impl(state, user, None, name, true).await
+}
+
+async fn observe_service_grouped(
+    State(state): State<AppState>,
+    Extension(user): Extension<AuthUser>,
+    Path((group, name)): Path<(String, String)>,
+) -> Result<StatusCode, AppError> {
+    observe_service_impl(state, user, Some(group), name, true).await
+}
+
+async fn unobserve_service(
+    State(state): State<AppState>,
+    Extension(user): Extension<AuthUser>,
+    Path(name): Path<String>,
+) -> Result<StatusCode, AppError> {
+    observe_service_impl(state, user, None, name, false).await
+}
+
+async fn unobserve_service_grouped(
+    State(state): State<AppState>,
+    Extension(user): Extension<AuthUser>,
+    Path((group, name)): Path<(String, String)>,
+) -> Result<StatusCode, AppError> {
+    observe_service_impl(state, user, Some(group), name, false).await
 }
 
 // --------------- Messaging (Kafka) ---------------
@@ -406,9 +543,7 @@ async fn simulate_message(
 // necessaire (contrairement a un edit manuel du YAML).
 
 #[cfg(feature = "tcp-mock")]
-async fn get_tcp_status(
-    State(state): State<AppState>,
-) -> Json<Vec<crate::tcp::TcpServiceStatus>> {
+async fn get_tcp_status(State(state): State<AppState>) -> Json<Vec<crate::tcp::TcpServiceStatus>> {
     Json(state.tcp_runtime.statuses().await)
 }
 
@@ -521,7 +656,11 @@ async fn list_services(
     Extension(user): Extension<AuthUser>,
 ) -> Json<Vec<Service>> {
     let config = state.store.snapshot().await;
-    Json(visible_services(&user.username, user.is_super_admin, &config))
+    Json(visible_services(
+        &user.username,
+        user.is_super_admin,
+        &config,
+    ))
 }
 
 // Un service est identifie de facon non ambigue par (group_name, name) : le
@@ -603,9 +742,10 @@ async fn create_service(
 
     {
         let config = state.store.snapshot().await;
-        let same_group = config.services.iter().any(|s| {
-            s.name == service.name && s.group_name == service.group_name
-        });
+        let same_group = config
+            .services
+            .iter()
+            .any(|s| s.name == service.name && s.group_name == service.group_name);
         if same_group {
             tracing::warn!(service = %service.name, "service creation refused: name already exists in group");
             return Err(AppError::Conflict(format!(
@@ -851,7 +991,10 @@ async fn ping_service_impl(
     // cache pour le mauvais service pendant la TTL de 2 min), non corrigee
     // ici car hors perimetre de ce correctif (ambiguite d'IDENTIFICATION du
     // service cible, pas de son statut de ping affiche).
-    if let Some(cached) = state.ping_cache.get_fresh(&name, crate::server::ping::PING_TTL_MS) {
+    if let Some(cached) = state
+        .ping_cache
+        .get_fresh(&name, crate::server::ping::PING_TTL_MS)
+    {
         return Ok(Json(cached));
     }
 
@@ -964,9 +1107,7 @@ async fn list_groups(
     let visible: Vec<Group> = config
         .groups
         .iter()
-        .filter(|g| {
-            g.admins.contains(&user.username) || g.members.contains(&user.username)
-        })
+        .filter(|g| g.admins.contains(&user.username) || g.members.contains(&user.username))
         .cloned()
         .collect();
     Json(visible)
@@ -1002,9 +1143,7 @@ async fn create_group(
 ) -> Result<(StatusCode, Json<Group>), AppError> {
     let name = group.name.trim().to_string();
     if name.is_empty() {
-        return Err(AppError::Validation(
-            "Le nom du groupe est requis.".into(),
-        ));
+        return Err(AppError::Validation("Le nom du groupe est requis.".into()));
     }
     group.name = name;
 
@@ -1031,7 +1170,11 @@ async fn create_group(
                     "Le code groupe doit faire exactement 5 caracteres alphanumeriques.".into(),
                 ));
             }
-            if config.groups.iter().any(|g| g.code.eq_ignore_ascii_case(&c)) {
+            if config
+                .groups
+                .iter()
+                .any(|g| g.code.eq_ignore_ascii_case(&c))
+            {
                 return Err(AppError::Conflict(format!(
                     "Le code \"{c}\" est deja utilise par un autre groupe."
                 )));
@@ -1070,8 +1213,14 @@ async fn update_group(
 ) -> Result<Json<Group>, AppError> {
     {
         let config = state.store.snapshot().await;
-        let existing = config.groups.iter().find(|g| g.name == name).ok_or(AppError::NotFound)?;
-        if state.auth_config.enabled && !can_manage_group(&user.username, user.is_super_admin, existing) {
+        let existing = config
+            .groups
+            .iter()
+            .find(|g| g.name == name)
+            .ok_or(AppError::NotFound)?;
+        if state.auth_config.enabled
+            && !can_manage_group(&user.username, user.is_super_admin, existing)
+        {
             return Err(AppError::Forbidden);
         }
     }
@@ -1102,8 +1251,14 @@ async fn delete_group(
 ) -> Result<StatusCode, AppError> {
     {
         let config = state.store.snapshot().await;
-        let existing = config.groups.iter().find(|g| g.name == name).ok_or(AppError::NotFound)?;
-        if state.auth_config.enabled && !can_manage_group(&user.username, user.is_super_admin, existing) {
+        let existing = config
+            .groups
+            .iter()
+            .find(|g| g.name == name)
+            .ok_or(AppError::NotFound)?;
+        if state.auth_config.enabled
+            && !can_manage_group(&user.username, user.is_super_admin, existing)
+        {
             return Err(AppError::Forbidden);
         }
     }
@@ -1175,7 +1330,6 @@ async fn update_group_members(
 
 // --------------- Helpers & Errors ---------------
 
-
 // --------------- Script validation ---------------
 
 #[derive(serde::Deserialize)]
@@ -1194,8 +1348,14 @@ async fn validate_script(
     Json(req): Json<ValidateScriptRequest>,
 ) -> Json<ValidateScriptResponse> {
     match state.script_engine.validate(&req.script) {
-        Ok(()) => Json(ValidateScriptResponse { valid: true, error: None }),
-        Err(e) => Json(ValidateScriptResponse { valid: false, error: Some(e) }),
+        Ok(()) => Json(ValidateScriptResponse {
+            valid: true,
+            error: None,
+        }),
+        Err(e) => Json(ValidateScriptResponse {
+            valid: false,
+            error: Some(e),
+        }),
     }
 }
 
@@ -1538,13 +1698,22 @@ mod tests {
     // fichier a ce jour).
     #[test]
     fn require_super_admin_rejects_non_admin() {
-        let user = AuthUser { username: "bob".into(), is_super_admin: false };
-        assert!(matches!(require_super_admin(&user), Err(AppError::Forbidden)));
+        let user = AuthUser {
+            username: "bob".into(),
+            is_super_admin: false,
+        };
+        assert!(matches!(
+            require_super_admin(&user),
+            Err(AppError::Forbidden)
+        ));
     }
 
     #[test]
     fn require_super_admin_accepts_admin() {
-        let user = AuthUser { username: "alice".into(), is_super_admin: true };
+        let user = AuthUser {
+            username: "alice".into(),
+            is_super_admin: true,
+        };
         assert!(require_super_admin(&user).is_ok());
     }
 
@@ -1599,10 +1768,8 @@ mod tests {
     // croisee entre groupes) : une regression doit etre detectee par
     // `cargo test` seul, sans dependre de la suite Playwright.
     async fn spawn_test_app(config: MockConfig) -> String {
-        let data_dir = std::env::temp_dir().join(format!(
-            "lightmock-api-test-{}",
-            fastrand::u64(..)
-        ));
+        let data_dir =
+            std::env::temp_dir().join(format!("lightmock-api-test-{}", fastrand::u64(..)));
         std::fs::create_dir_all(&data_dir).unwrap();
         let store = crate::store::MockStore::new(data_dir.join("mock-config.yaml"));
         store.replace(config).await.unwrap();
@@ -1632,6 +1799,7 @@ mod tests {
             keycloak: None,
             script_engine: crate::engine::script::ScriptEngine::new(),
             ping_cache: crate::server::ping::PingCache::new(),
+            observation: crate::server::observation::ObservationState::new(),
             #[cfg(feature = "messaging-kafka")]
             messaging,
             #[cfg(feature = "tcp-mock")]
@@ -1656,7 +1824,11 @@ mod tests {
 
     #[tokio::test]
     async fn get_service_grouped_route_returns_only_the_matching_group() {
-        let base = spawn_test_app(MockConfig { services: ambiguous_services(), groups: vec![] }).await;
+        let base = spawn_test_app(MockConfig {
+            services: ambiguous_services(),
+            groups: vec![],
+        })
+        .await;
         let client = reqwest::Client::new();
 
         let via_group_a = client
@@ -1675,12 +1847,19 @@ mod tests {
             .unwrap();
         assert_eq!(via_flat.status(), 200);
         let svc: Service = via_flat.json().await.unwrap();
-        assert_eq!(svc.group_name, None, "la route non scopee doit resoudre au service SANS groupe, pas au premier trouve");
+        assert_eq!(
+            svc.group_name, None,
+            "la route non scopee doit resoudre au service SANS groupe, pas au premier trouve"
+        );
     }
 
     #[tokio::test]
     async fn delete_ambiguous_service_only_removes_the_targeted_group() {
-        let base = spawn_test_app(MockConfig { services: ambiguous_services(), groups: vec![] }).await;
+        let base = spawn_test_app(MockConfig {
+            services: ambiguous_services(),
+            groups: vec![],
+        })
+        .await;
         let client = reqwest::Client::new();
 
         let del = client
@@ -1695,14 +1874,22 @@ mod tests {
             .send()
             .await
             .unwrap();
-        assert_eq!(still_team_b.status(), 200, "le service de team-b ne doit pas avoir ete supprime");
+        assert_eq!(
+            still_team_b.status(),
+            200,
+            "le service de team-b ne doit pas avoir ete supprime"
+        );
 
         let still_ungrouped = client
             .get(format!("{base}/services/shared-name"))
             .send()
             .await
             .unwrap();
-        assert_eq!(still_ungrouped.status(), 200, "le service sans groupe ne doit pas avoir ete supprime");
+        assert_eq!(
+            still_ungrouped.status(),
+            200,
+            "le service sans groupe ne doit pas avoir ete supprime"
+        );
 
         let gone_team_a = client
             .get(format!("{base}/groups/team-a/services/shared-name"))
@@ -1714,7 +1901,11 @@ mod tests {
 
     #[tokio::test]
     async fn update_via_flat_route_does_not_touch_grouped_namesakes() {
-        let base = spawn_test_app(MockConfig { services: ambiguous_services(), groups: vec![] }).await;
+        let base = spawn_test_app(MockConfig {
+            services: ambiguous_services(),
+            groups: vec![],
+        })
+        .await;
         let client = reqwest::Client::new();
 
         let mut updated = svc_named("shared-name", None);
@@ -1735,7 +1926,10 @@ mod tests {
             .json::<Service>()
             .await
             .unwrap();
-        assert_eq!(team_a.real_target_url, "http://example.com", "team-a ne doit pas avoir ete modifie par un PUT scope sans groupe");
+        assert_eq!(
+            team_a.real_target_url, "http://example.com",
+            "team-a ne doit pas avoir ete modifie par un PUT scope sans groupe"
+        );
     }
 
     // --- test_rule() : testeur de regle, endpoint stateless ---
@@ -1749,13 +1943,17 @@ mod tests {
     // complet) : seul script_engine est reellement exerce par ces tests,
     // le reste est un etat vide/desactive standard.
     async fn test_state() -> AppState {
-        let data_dir = std::env::temp_dir().join(format!(
-            "lightmock-scripttest-{}",
-            fastrand::u64(..)
-        ));
+        let data_dir =
+            std::env::temp_dir().join(format!("lightmock-scripttest-{}", fastrand::u64(..)));
         std::fs::create_dir_all(&data_dir).unwrap();
         let store = crate::store::MockStore::new(data_dir.join("mock-config.yaml"));
-        store.replace(MockConfig { services: vec![], groups: vec![] }).await.unwrap();
+        store
+            .replace(MockConfig {
+                services: vec![],
+                groups: vec![],
+            })
+            .await
+            .unwrap();
 
         #[cfg(feature = "messaging-kafka")]
         let messaging = crate::messaging::MessagingState {
@@ -1781,6 +1979,7 @@ mod tests {
             keycloak: None,
             script_engine: crate::engine::script::ScriptEngine::new(),
             ping_cache: crate::server::ping::PingCache::new(),
+            observation: crate::server::observation::ObservationState::new(),
             #[cfg(feature = "messaging-kafka")]
             messaging,
             #[cfg(feature = "tcp-mock")]
@@ -1818,7 +2017,12 @@ mod tests {
             request: captured,
             ..Default::default()
         };
-        let Json(result) = test_rule(State(test_state().await), Extension(anon_user()), Json(payload)).await;
+        let Json(result) = test_rule(
+            State(test_state().await),
+            Extension(anon_user()),
+            Json(payload),
+        )
+        .await;
         assert!(result.method_matches);
         assert!(result.sub_path_matches);
         assert!(result.overall_matched);
@@ -1844,7 +2048,12 @@ mod tests {
             request: captured,
             ..Default::default()
         };
-        let Json(result) = test_rule(State(test_state().await), Extension(anon_user()), Json(payload)).await;
+        let Json(result) = test_rule(
+            State(test_state().await),
+            Extension(anon_user()),
+            Json(payload),
+        )
+        .await;
         assert!(!result.overall_matched);
         assert!(!result.all_of[0].matched);
         let hint = result.all_of[0].hint.as_deref().unwrap();
@@ -1860,7 +2069,12 @@ mod tests {
             request: empty_captured("POST", "/anything"),
             ..Default::default()
         };
-        let Json(result) = test_rule(State(test_state().await), Extension(anon_user()), Json(payload)).await;
+        let Json(result) = test_rule(
+            State(test_state().await),
+            Extension(anon_user()),
+            Json(payload),
+        )
+        .await;
         assert!(!result.method_matches);
         assert!(!result.overall_matched);
     }
@@ -1876,7 +2090,12 @@ mod tests {
             request: captured,
             ..Default::default()
         };
-        let Json(result) = test_rule(State(test_state().await), Extension(anon_user()), Json(payload)).await;
+        let Json(result) = test_rule(
+            State(test_state().await),
+            Extension(anon_user()),
+            Json(payload),
+        )
+        .await;
         assert!(result.body_truncated);
     }
 
@@ -1901,11 +2120,20 @@ mod tests {
             request: empty_captured("GET", "/x"),
             ..Default::default()
         };
-        let Json(result) = test_rule(State(test_state().await), Extension(anon_user()), Json(payload)).await;
+        let Json(result) = test_rule(
+            State(test_state().await),
+            Extension(anon_user()),
+            Json(payload),
+        )
+        .await;
         assert!(result.overall_matched);
         assert_eq!(result.script_errors.len(), 1);
         assert_eq!(result.script_errors[0].slot, "script");
-        assert!(result.script_errors[0].message.contains("totally_undefined_fn"));
+        assert!(
+            result.script_errors[0]
+                .message
+                .contains("totally_undefined_fn")
+        );
     }
 
     #[tokio::test]
@@ -1920,7 +2148,12 @@ mod tests {
             request: empty_captured("GET", "/x"),
             ..Default::default()
         };
-        let Json(result) = test_rule(State(test_state().await), Extension(anon_user()), Json(payload)).await;
+        let Json(result) = test_rule(
+            State(test_state().await),
+            Extension(anon_user()),
+            Json(payload),
+        )
+        .await;
         assert!(result.overall_matched);
         let slots: Vec<&str> = result.script_errors.iter().map(|e| e.slot).collect();
         assert_eq!(slots, vec!["pre_script", "post_script"]);
@@ -1936,8 +2169,16 @@ mod tests {
             request: empty_captured("GET", "/x"),
             ..Default::default()
         };
-        let Json(result) = test_rule(State(test_state().await), Extension(anon_user()), Json(payload)).await;
-        assert!(!result.overall_matched, "GET != POST : la regle ne doit pas matcher");
+        let Json(result) = test_rule(
+            State(test_state().await),
+            Extension(anon_user()),
+            Json(payload),
+        )
+        .await;
+        assert!(
+            !result.overall_matched,
+            "GET != POST : la regle ne doit pas matcher"
+        );
         assert!(
             result.script_errors.is_empty(),
             "un script n'est jamais execute pour une regle qui ne matche pas, meme conditions qu'en production"
@@ -1955,7 +2196,12 @@ mod tests {
             request: empty_captured("GET", "/x"),
             ..Default::default()
         };
-        let Json(result) = test_rule(State(test_state().await), Extension(anon_user()), Json(payload)).await;
+        let Json(result) = test_rule(
+            State(test_state().await),
+            Extension(anon_user()),
+            Json(payload),
+        )
+        .await;
         assert!(result.overall_matched);
         assert!(
             result.script_errors.is_empty(),
@@ -1973,7 +2219,12 @@ mod tests {
             request: empty_captured("GET", "/x"),
             ..Default::default()
         };
-        let Json(result) = test_rule(State(test_state().await), Extension(anon_user()), Json(payload)).await;
+        let Json(result) = test_rule(
+            State(test_state().await),
+            Extension(anon_user()),
+            Json(payload),
+        )
+        .await;
         assert!(result.overall_matched);
         assert!(result.script_errors.is_empty());
     }
@@ -1995,7 +2246,9 @@ mod tests {
         // le testeur doit desormais montrer les champs produits, pas
         // seulement l'absence d'erreur.
         let mut captured = empty_captured("GET", "/quote/44306184100047");
-        captured.path_params.insert("siret".into(), "44306184100047".into());
+        captured
+            .path_params
+            .insert("siret".into(), "44306184100047".into());
         let payload = RuleTestRequest {
             method: "GET".into(),
             sub_path: Some("/quote/{siret}".into()),
@@ -2013,13 +2266,21 @@ mod tests {
             request: captured,
             ..Default::default()
         };
-        let Json(result) = test_rule(State(test_state().await), Extension(anon_user()), Json(payload)).await;
+        let Json(result) = test_rule(
+            State(test_state().await),
+            Extension(anon_user()),
+            Json(payload),
+        )
+        .await;
         assert!(result.overall_matched);
         assert!(result.script_errors.is_empty());
         assert_eq!(result.script_results.len(), 1);
         let script_result = &result.script_results[0];
         assert_eq!(script_result.slot, "script");
-        assert!(!script_result.fields.is_empty(), "les champs de la ville piochee doivent etre exposes");
+        assert!(
+            !script_result.fields.is_empty(),
+            "les champs de la ville piochee doivent etre exposes"
+        );
         assert!(script_result.fields.contains_key("name"));
         assert!(script_result.fields.contains_key("cp"));
         assert!(script_result.fields.contains_key("insee"));
@@ -2049,11 +2310,17 @@ mod tests {
             request: empty_captured("GET", "/x"),
             ..Default::default()
         };
-        let Json(result) = test_rule(State(test_state().await), Extension(anon_user()), Json(payload)).await;
+        let Json(result) = test_rule(
+            State(test_state().await),
+            Extension(anon_user()),
+            Json(payload),
+        )
+        .await;
         assert_eq!(result.script_results.len(), 1);
         let fields = &result.script_results[0].fields;
         assert_eq!(fields.get("id").unwrap(), "fixed-id");
-        let ville_json: serde_json::Value = serde_json::from_str(fields.get("ville").unwrap()).unwrap();
+        let ville_json: serde_json::Value =
+            serde_json::from_str(fields.get("ville").unwrap()).unwrap();
         assert_eq!(ville_json["name"], "Lyon");
     }
 
@@ -2067,7 +2334,12 @@ mod tests {
             request: empty_captured("GET", "/x"),
             ..Default::default()
         };
-        let Json(result) = test_rule(State(test_state().await), Extension(anon_user()), Json(payload)).await;
+        let Json(result) = test_rule(
+            State(test_state().await),
+            Extension(anon_user()),
+            Json(payload),
+        )
+        .await;
         assert!(!result.overall_matched);
         assert!(result.script_results.is_empty());
     }
@@ -2083,7 +2355,12 @@ mod tests {
             request: empty_captured("GET", "/x"),
             ..Default::default()
         };
-        let Json(result) = test_rule(State(test_state().await), Extension(anon_user()), Json(payload)).await;
+        let Json(result) = test_rule(
+            State(test_state().await),
+            Extension(anon_user()),
+            Json(payload),
+        )
+        .await;
         assert_eq!(result.script_errors.len(), 1);
         assert_eq!(result.script_errors[0].slot, "pre_script");
         assert_eq!(result.script_results.len(), 1);
@@ -2180,6 +2457,145 @@ mod tests {
         assert_eq!(result.conflicts[0].winner, ConflictWinner::Draft);
     }
 
+    // --- Observation de trafic (proxy niveau service) : meme infra
+    // spawn_test_app que le reste de ce fichier, auth desactivee.
+
+    #[tokio::test]
+    async fn observe_service_enables_toggle_for_proxy_service() {
+        let svc = Service {
+            is_mocked: false,
+            ..svc_named("proxy-svc", None)
+        };
+        let base = spawn_test_app(MockConfig {
+            services: vec![svc],
+            groups: vec![],
+        })
+        .await;
+        let client = reqwest::Client::new();
+
+        let resp = client
+            .post(format!("{base}/services/proxy-svc/observe"))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::NO_CONTENT);
+
+        let status = client
+            .get(format!("{base}/observation/status"))
+            .send()
+            .await
+            .unwrap()
+            .json::<Vec<ObservationStatusEntry>>()
+            .await
+            .unwrap();
+        assert_eq!(status.len(), 1);
+        assert_eq!(status[0].service_name, "proxy-svc");
+        assert_eq!(status[0].group_name, None);
+    }
+
+    #[tokio::test]
+    async fn observe_service_rejects_mocked_service() {
+        let svc = svc_named("mocked-svc", None); // is_mocked: true par defaut
+        let base = spawn_test_app(MockConfig {
+            services: vec![svc],
+            groups: vec![],
+        })
+        .await;
+        let client = reqwest::Client::new();
+
+        let resp = client
+            .post(format!("{base}/services/mocked-svc/observe"))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn unobserve_service_disables_toggle() {
+        let svc = Service {
+            is_mocked: false,
+            ..svc_named("proxy-svc", None)
+        };
+        let base = spawn_test_app(MockConfig {
+            services: vec![svc],
+            groups: vec![],
+        })
+        .await;
+        let client = reqwest::Client::new();
+
+        client
+            .post(format!("{base}/services/proxy-svc/observe"))
+            .send()
+            .await
+            .unwrap();
+        let resp = client
+            .delete(format!("{base}/services/proxy-svc/observe"))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::NO_CONTENT);
+
+        let status = client
+            .get(format!("{base}/observation/status"))
+            .send()
+            .await
+            .unwrap()
+            .json::<Vec<ObservationStatusEntry>>()
+            .await
+            .unwrap();
+        assert!(status.is_empty());
+    }
+
+    #[tokio::test]
+    async fn observe_service_grouped_scopes_by_group() {
+        let svc = Service {
+            is_mocked: false,
+            ..svc_named("shared-name", Some("team-a"))
+        };
+        let base = spawn_test_app(MockConfig {
+            services: vec![svc],
+            groups: vec![],
+        })
+        .await;
+        let client = reqwest::Client::new();
+
+        let resp = client
+            .post(format!("{base}/groups/team-a/services/shared-name/observe"))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::NO_CONTENT);
+
+        let status = client
+            .get(format!("{base}/observation/status"))
+            .send()
+            .await
+            .unwrap()
+            .json::<Vec<ObservationStatusEntry>>()
+            .await
+            .unwrap();
+        assert_eq!(status.len(), 1);
+        assert_eq!(status[0].group_name.as_deref(), Some("team-a"));
+    }
+
+    #[tokio::test]
+    async fn observe_service_unknown_name_returns_not_found() {
+        let base = spawn_test_app(MockConfig {
+            services: vec![],
+            groups: vec![],
+        })
+        .await;
+        let client = reqwest::Client::new();
+
+        let resp = client
+            .post(format!("{base}/services/does-not-exist/observe"))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    }
+
     // --- CRUD TCP (feature "tcp-mock") : meme infra spawn_test_app que le
     // reste de ce fichier (vrai routeur, vrai port TCP), auth desactivee
     // (spawn_test_app force auth_config.enabled: false) donc les gardes
@@ -2192,7 +2608,11 @@ mod tests {
     async fn tcp_services_crud_roundtrip() {
         use crate::tcp::config::{TcpMatcher, TcpRule, TcpService};
 
-        let base = spawn_test_app(MockConfig { services: vec![], groups: vec![] }).await;
+        let base = spawn_test_app(MockConfig {
+            services: vec![],
+            groups: vec![],
+        })
+        .await;
         let client = reqwest::Client::new();
 
         let created = client
@@ -2263,7 +2683,11 @@ mod tests {
     async fn tcp_service_create_rejects_duplicate_port() {
         use crate::tcp::config::{TcpMatcher, TcpRule, TcpService};
 
-        let base = spawn_test_app(MockConfig { services: vec![], groups: vec![] }).await;
+        let base = spawn_test_app(MockConfig {
+            services: vec![],
+            groups: vec![],
+        })
+        .await;
         let client = reqwest::Client::new();
 
         let service = |name: &str| TcpService {
@@ -2298,7 +2722,11 @@ mod tests {
     async fn tcp_service_update_missing_returns_404() {
         use crate::tcp::config::TcpService;
 
-        let base = spawn_test_app(MockConfig { services: vec![], groups: vec![] }).await;
+        let base = spawn_test_app(MockConfig {
+            services: vec![],
+            groups: vec![],
+        })
+        .await;
         let client = reqwest::Client::new();
 
         let resp = client
@@ -2317,7 +2745,11 @@ mod tests {
     #[cfg(feature = "tcp-mock")]
     #[tokio::test]
     async fn tcp_service_delete_missing_returns_404() {
-        let base = spawn_test_app(MockConfig { services: vec![], groups: vec![] }).await;
+        let base = spawn_test_app(MockConfig {
+            services: vec![],
+            groups: vec![],
+        })
+        .await;
         let client = reqwest::Client::new();
 
         let resp = client
@@ -2338,7 +2770,11 @@ mod tests {
         use crate::tcp::config::{TcpMatcher, TcpRule, TcpService};
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-        let base = spawn_test_app(MockConfig { services: vec![], groups: vec![] }).await;
+        let base = spawn_test_app(MockConfig {
+            services: vec![],
+            groups: vec![],
+        })
+        .await;
         let client = reqwest::Client::new();
 
         // Port 0 refuse cote validation (aucune contrainte dessus), mais on a

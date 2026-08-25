@@ -6,6 +6,7 @@
 mod api;
 pub(crate) mod codegen;
 mod intercept;
+pub mod observation;
 pub mod ping;
 pub mod request_log;
 pub mod validation;
@@ -35,6 +36,7 @@ pub struct AppState {
     pub keycloak: Option<KeycloakClient>,
     pub script_engine: ScriptEngine,
     pub ping_cache: PingCache,
+    pub observation: observation::ObservationState,
     #[cfg(feature = "messaging-kafka")]
     pub messaging: crate::messaging::MessagingState,
     #[cfg(feature = "tcp-mock")]
@@ -202,6 +204,7 @@ mod tests {
             keycloak: None,
             script_engine: crate::engine::script::ScriptEngine::new(),
             ping_cache: PingCache::new(),
+            observation: observation::ObservationState::new(),
             #[cfg(feature = "messaging-kafka")]
             messaging,
             #[cfg(feature = "tcp-mock")]

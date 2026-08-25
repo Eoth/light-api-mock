@@ -113,6 +113,7 @@ async fn main() {
         keycloak,
         script_engine: ScriptEngine::new(),
         ping_cache: PingCache::new(),
+        observation: crate::server::observation::ObservationState::new(),
         #[cfg(feature = "messaging-kafka")]
         messaging,
         #[cfg(feature = "tcp-mock")]
