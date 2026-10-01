@@ -69,7 +69,7 @@ Size M
 
 Size L, to split by module
 
-**Why.** Reviewers read the code, and most comments are still in French, often long session narratives rather than the reason the code is the way it is.
+**Why.** Reviewers read the code. The server's comments were French session narratives rather than the reason the code is the way it is; the UI's still are.
 
 **What.** Module by module, in reading order of the [reviewer guide](REVIEWING.md), rewrite comments in English and keep only what explains *why* (an invariant, a pitfall, a specification reference); history stays in Git. Translate test names and test messages at the same time.
 
