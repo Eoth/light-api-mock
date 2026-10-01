@@ -1,5 +1,6 @@
 <script>
   import { untrack } from 'svelte';
+  import { t, tCount } from '../i18n.svelte.js';
 
   let {
     condition = null,
@@ -9,21 +10,22 @@
     onCancel = () => {},
   } = $props();
 
+  // Labels are getters, read when rendered, so that they follow a change of language.
   const allSourceTypes = [
-    { value: 'QueryParam', label: 'Parametre de requete (?cle=valeur)' },
-    { value: 'Header', label: 'En-tete HTTP' },
-    { value: 'PathParam', label: 'Parametre de chemin ({param} dans l\'URL)' },
-    { value: 'JsonPointer', label: 'JSON Pointer' },
-    { value: 'XPath', label: 'XPath (XML/SOAP)' },
-    { value: 'FormField', label: 'Champ formulaire' },
-    { value: 'BodyRaw', label: 'Corps brut (texte entier)' },
+    { value: 'QueryParam', get label() { return t("Query parameter (?key=value)"); } },
+    { value: 'Header', get label() { return t("HTTP header"); } },
+    { value: 'PathParam', get label() { return t("Path parameter ({param} in the URL)"); } },
+    { value: 'JsonPointer', get label() { return t("JSON Pointer"); } },
+    { value: 'XPath', get label() { return t("XPath (XML/SOAP)"); } },
+    { value: 'FormField', get label() { return t("Form field"); } },
+    { value: 'BodyRaw', get label() { return t("Raw body (whole text)"); } },
   ];
 
   const operatorTypes = [
-    { value: 'Eq', label: 'Égal à' },
-    { value: 'Contains', label: 'Contient' },
-    { value: 'Regex', label: 'Expression régulière' },
-    { value: 'Exists', label: 'Existe (peu importe la valeur)' },
+    { value: 'Eq', get label() { return t("Equals"); } },
+    { value: 'Contains', get label() { return t("Contains"); } },
+    { value: 'Regex', get label() { return t("Regular expression"); } },
+    { value: 'Exists', get label() { return t("Exists (any value)"); } },
   ];
 
   // `condition` non-null = edition en place d'une condition existante
@@ -70,13 +72,13 @@
   }
 </script>
 
-<form class="condition-form" onsubmit={handleSubmit} aria-label={isEditing ? 'Modifier la condition' : 'Ajouter une condition'}>
+<form class="condition-form" onsubmit={handleSubmit} aria-label={isEditing ? t("Edit the condition") : t("Add a condition")}>
   <div class="form-row">
     <div class="form-field">
-      <label for="cond-source">Source</label>
+      <label for="cond-source">{t("Source")}</label>
       {#if availablePathParams.length > 0}
         <span class="field-hint path-param-badge">
-          {availablePathParams.length} paramètre{availablePathParams.length > 1 ? 's' : ''} de chemin disponible{availablePathParams.length > 1 ? 's' : ''} : {availablePathParams.join(', ')}
+          {tCount(availablePathParams.length, "{0} path parameter available: {1}", "{0} path parameters available: {1}", availablePathParams.join(', '))}
         </span>
       {/if}
       <select id="cond-source" bind:value={sourceType} data-testid="condition-form-source-select">
@@ -89,23 +91,23 @@
     {#if needsKey}
       <div class="form-field">
         {#if sourceType === 'PathParam'}
-          <label for="cond-key">Paramètre de chemin</label>
+          <label for="cond-key">{t("Path parameter")}</label>
           <select id="cond-key" bind:value={sourceKey} required aria-describedby="cond-key-hint" data-testid="condition-form-key-select">
-            <option value="" disabled>Choisir un paramètre</option>
+            <option value="" disabled>{t("Choose a parameter")}</option>
             {#each pathParamOptions as name}
               <option value={name}>{name}</option>
             {/each}
           </select>
-          <span class="field-hint" id="cond-key-hint">Sélection stricte parmi les paramètres réels de l'URL</span>
+          <span class="field-hint" id="cond-key-hint">{t("Strict choice among the actual parameters of the URL")}</span>
         {:else if sourceType === 'QueryParam'}
-          <label for="cond-key">Clé / Chemin</label>
+          <label for="cond-key">{t("Key / path")}</label>
           <input
             id="cond-key"
             type="text"
             list="cond-query-param-suggestions"
             bind:value={sourceKey}
             required
-            placeholder="nom"
+            placeholder={t("name")}
             aria-describedby="cond-key-hint"
             data-testid="condition-form-key-input"
           />
@@ -115,23 +117,23 @@
             {/each}
           </datalist>
           <span class="field-hint" id="cond-key-hint">
-            Nom du paramètre de requête — suggestions basées sur le trafic réel du service, saisie libre possible
+            {t("Name of the query parameter: suggestions come from the real traffic of the service, any name can be typed")}
           </span>
         {:else}
-          <label for="cond-key">Clé / Chemin</label>
+          <label for="cond-key">{t("Key / path")}</label>
           <input
             id="cond-key"
             type="text"
             bind:value={sourceKey}
             required
-            placeholder={sourceType === 'JsonPointer' ? '/user/role' : sourceType === 'XPath' ? 'Envelope/Body/id' : 'nom'}
+            placeholder={sourceType === 'JsonPointer' ? '/user/role' : sourceType === 'XPath' ? 'Envelope/Body/id' : t("name")}
             aria-describedby="cond-key-hint"
             data-testid="condition-form-key-input"
           />
           <span class="field-hint" id="cond-key-hint">
-            {#if sourceType === 'JsonPointer'}Chemin JSON Pointer (ex: /user/role)
-            {:else if sourceType === 'XPath'}Chemin XPath simplifié (ex: Envelope/Body/id)
-            {:else}Nom du paramètre, en-tête ou champ
+            {#if sourceType === 'JsonPointer'}{t("JSON Pointer path (e.g. /user/role)")}
+            {:else if sourceType === 'XPath'}{t("Simplified XPath path (e.g. Envelope/Body/id)")}
+            {:else}{t("Name of the parameter, header or field")}
             {/if}
           </span>
         {/if}
@@ -141,7 +143,7 @@
 
   <div class="form-row">
     <div class="form-field">
-      <label for="cond-op">Opérateur</label>
+      <label for="cond-op">{t("Operator")}</label>
       <select id="cond-op" bind:value={operatorType} data-testid="condition-form-operator-select">
         {#each operatorTypes as op}
           <option value={op.value}>{op.label}</option>
@@ -151,13 +153,13 @@
 
     {#if needsValue}
       <div class="form-field">
-        <label for="cond-val">Valeur attendue</label>
+        <label for="cond-val">{t("Expected value")}</label>
         <input
           id="cond-val"
           type="text"
           bind:value={operatorValue}
           required
-          placeholder={operatorType === 'Regex' ? '^\\d{3}$' : 'valeur'}
+          placeholder={operatorType === 'Regex' ? '^\\d{3}$' : t("value")}
           data-testid="condition-form-value-input"
         />
       </div>
@@ -165,8 +167,8 @@
   </div>
 
   <div class="form-actions">
-    <button type="submit" class="btn btn-sm btn-primary" data-testid="condition-form-submit-button">{isEditing ? 'Enregistrer' : 'Valider'}</button>
-    <button type="button" class="btn btn-sm btn-secondary" onclick={onCancel} data-testid="condition-form-cancel-button">Annuler</button>
+    <button type="submit" class="btn btn-sm btn-primary" data-testid="condition-form-submit-button">{isEditing ? t("Save") : t("OK")}</button>
+    <button type="button" class="btn btn-sm btn-secondary" onclick={onCancel} data-testid="condition-form-cancel-button">{t("Cancel")}</button>
   </div>
 </form>
 

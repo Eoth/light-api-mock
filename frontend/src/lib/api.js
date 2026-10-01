@@ -10,6 +10,7 @@
 // exposee sur une origine distincte de celle qui sert la SPA.
 import { auth, logout } from './auth.svelte.js';
 import { getApiBaseUrl } from './runtime-config.js';
+import { t } from './i18n.svelte.js';
 
 const BASE = '/api';
 
@@ -27,7 +28,7 @@ async function request(method, path, body) {
   const res = await fetch(`${getApiBaseUrl()}${BASE}${path}`, opts);
   if (res.status === 401 && auth.enabled) {
     logout();
-    throw new Error('Session expiree, veuillez vous reconnecter');
+    throw new Error(t("Session expired, please sign in again"));
   }
   if (!res.ok) {
     let msg = `${res.status} ${res.statusText}`;

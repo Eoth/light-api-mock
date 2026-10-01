@@ -8,6 +8,7 @@
   // (meme garde que le bouton Reset).
   import { getBackups, restoreBackup } from '../api.js';
   import { formatDateTime } from '../format-date.js';
+  import { t, intlLocale } from '../i18n.svelte.js';
   import ConfirmDialog from './ConfirmDialog.svelte';
 
   let { onNotify = () => {}, onBack = () => {} } = $props();
@@ -22,7 +23,7 @@
     try {
       backups = await getBackups();
     } catch (e) {
-      onNotify(`Erreur chargement des sauvegardes : ${e.message}`, 'error');
+      onNotify(t("Error while loading the backups: {0}", e.message), 'error');
     } finally {
       loading = false;
     }
@@ -34,22 +35,22 @@
     restoring = true;
     try {
       await restoreBackup(filename);
-      onNotify(`Configuration restauree depuis "${filename}"`, 'success');
+      onNotify(t("Configuration restored from \"{0}\"", filename), 'success');
       await loadBackups();
     } catch (e) {
-      onNotify(`Erreur restauration : ${e.message}`, 'error');
+      onNotify(t("Restore error: {0}", e.message), 'error');
     } finally {
       restoring = false;
     }
   }
 
   function formatDate(ms) {
-    return formatDateTime(ms, undefined, 'fr-FR');
+    return formatDateTime(ms, undefined, intlLocale());
   }
 
   function formatSize(bytes) {
-    if (bytes < 1024) return `${bytes} o`;
-    return `${(bytes / 1024).toFixed(1)} Ko`;
+    if (bytes < 1024) return t("{0} B", bytes);
+    return t("{0} KB", (bytes / 1024).toFixed(1));
   }
 
   $effect(() => { loadBackups(); });
@@ -57,24 +58,24 @@
 
 <div class="backup-manager">
   <div class="list-header">
-    <h2>Sauvegardes de configuration</h2>
-    <button type="button" class="btn btn-outline btn-sm" onclick={onBack} data-testid="backup-manager-back-button">Retour</button>
+    <h2>{t("Configuration backups")}</h2>
+    <button type="button" class="btn btn-outline btn-sm" onclick={onBack} data-testid="backup-manager-back-button">{t("Back")}</button>
   </div>
 
   {#if loading}
-    <p class="loading-text">Chargement des sauvegardes...</p>
+    <p class="loading-text">{t("Loading the backups...")}</p>
   {:else if backups.length === 0}
-    <p class="empty-text" data-testid="backup-manager-empty-message">Aucune sauvegarde disponible pour le moment.</p>
+    <p class="empty-text" data-testid="backup-manager-empty-message">{t("No backup available yet.")}</p>
   {:else}
     <ul class="backup-list">
       {#each backups as backup (backup.filename)}
         <li class="backup-card" data-testid="backup-manager-item-{backup.filename}">
           <div class="backup-info">
-            <span class="backup-name">{backup.filename}</span>
+            <span class="backup-name" translate="no">{backup.filename}</span>
             <span class="backup-meta">
               {formatDate(backup.created_at_ms)} · {formatSize(backup.size_bytes)}
               {#if backup.protected}
-                <span class="badge badge-testing">Protegee (pre-reset)</span>
+                <span class="badge badge-testing">{t("Protected (before a reset)")}</span>
               {/if}
             </span>
           </div>
@@ -85,7 +86,7 @@
             onclick={() => restorePending = backup.filename}
             data-testid="backup-manager-restore-button-{backup.filename}"
           >
-            Restaurer
+            {t("Restore")}
           </button>
         </li>
       {/each}
@@ -94,10 +95,10 @@
 
   <ConfirmDialog
     open={restorePending !== null}
-    title="Restaurer une sauvegarde"
-    message={restorePending ? `Restaurer la configuration depuis "${restorePending}" ? La configuration actuelle sera d'abord sauvegardee automatiquement (rollback possible), puis remplacee par le contenu de ce fichier.` : ''}
-    confirmLabel="Restaurer"
-    confirmKeyword="RESTAURER"
+    title={t("Restore a backup")}
+    message={restorePending ? t("Restore the configuration from \"{0}\"? The current configuration is first backed up automatically (so this can be rolled back), then replaced by the content of this file.", restorePending) : ''}
+    confirmLabel={t("Restore")}
+    confirmKeyword={t("RESTORE")}
     onConfirm={handleRestore}
     onCancel={() => restorePending = null}
   />

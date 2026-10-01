@@ -1,8 +1,9 @@
 <script>
   import ServiceCard from './ServiceCard.svelte';
+  import { t, tCount } from '../i18n.svelte.js';
 
   let {
-    groupName = 'Sans groupe',
+    groupName = null,
     groupId = 'ungrouped',
     groupCode = '',
     services = [],
@@ -25,8 +26,8 @@
     data-testid="service-group-header-{groupId}"
   >
     <span class="group-chevron" class:expanded aria-hidden="true">&#9654;</span>
-    <h3 class="group-name">{groupName}</h3>
-    <span class="group-count">{services.length} service{services.length !== 1 ? 's' : ''}</span>
+    <h3 class="group-name">{groupName ?? t("No group")}</h3>
+    <span class="group-count">{tCount(services.length, "{0} service", "{0} services")}</span>
   </button>
 
   {#if expanded}

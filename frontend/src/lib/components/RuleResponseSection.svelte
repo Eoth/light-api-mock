@@ -28,6 +28,8 @@
   import { templateToFields, templateToXmlFields, validateTemplateAsJson, validateTemplateAsXml } from '../tpl-utils.js';
   import { validateScript as apiValidateScript } from '../api.js';
   import { RHAI_FUNCTIONS } from '../rhai-functions.js';
+  import Sentence from './Sentence.svelte';
+  import { t } from '../i18n.svelte.js';
 
   let { visible = true, initRule = null } = $props();
 
@@ -160,12 +162,12 @@
 
   async function validateScriptCode(code) {
     if (!code.trim()) {
-      return { status: 'error', message: 'Le script est vide.' };
+      return { status: 'error', message: t("The script is empty.") };
     }
     try {
       const result = await apiValidateScript(code);
       return result.valid
-        ? { status: 'ok', message: 'Script valide.' }
+        ? { status: 'ok', message: t("Valid script.") }
         : { status: 'error', message: result.error };
     } catch (e) {
       return { status: 'error', message: e.message };
@@ -173,17 +175,17 @@
   }
 
   async function handleValidateScript() {
-    scriptValidation = { status: 'pending', message: 'Validation...' };
+    scriptValidation = { status: 'pending', message: t("Validating...") };
     scriptValidation = await validateScriptCode(scriptCode);
   }
 
   async function handleValidatePreScript() {
-    preScriptValidation = { status: 'pending', message: 'Validation...' };
+    preScriptValidation = { status: 'pending', message: t("Validating...") };
     preScriptValidation = await validateScriptCode(preScriptCode);
   }
 
   async function handleValidatePostScript() {
-    postScriptValidation = { status: 'pending', message: 'Validation...' };
+    postScriptValidation = { status: 'pending', message: t("Validating...") };
     postScriptValidation = await validateScriptCode(postScriptCode);
   }
 
@@ -207,35 +209,36 @@
     return fragments;
   }
 
+  // Labels are getters, read when rendered, so that they follow a change of language.
   const fragmentTypes = [
-    { value: 'Template', label: 'Template (expressions)' },
-    { value: 'Literal', label: 'Texte fixe' },
-    { value: 'Uuid', label: 'UUID v4' },
-    { value: 'PickFrom', label: 'Choix aleatoire' },
-    { value: 'FakeData', label: 'Donnee fictive' },
-    { value: 'PathSegment', label: 'Segment URL (index)' },
+    { value: 'Template', get label() { return t("Template (expressions)"); } },
+    { value: 'Literal', get label() { return t("Fixed text"); } },
+    { value: 'Uuid', get label() { return t("UUID v4"); } },
+    { value: 'PickFrom', get label() { return t("Random choice"); } },
+    { value: 'FakeData', get label() { return t("Fake data"); } },
+    { value: 'PathSegment', get label() { return t("URL segment (index)"); } },
   ];
 
   const fakeKinds = [
-    { value: 'FirstName', label: 'Prenom' },
-    { value: 'LastName', label: 'Nom de famille' },
-    { value: 'Email', label: 'Adresse email' },
-    { value: 'PhoneNumberFR', label: 'Telephone FR' },
-    { value: 'Integer', label: 'Nombre entier' },
-    { value: 'CompanyName', label: 'Nom d\'entreprise' },
-    { value: 'StreetName', label: 'Nom de rue' },
-    { value: 'CityFR', label: 'Ville (FR)' },
-    { value: 'PostcodeFR', label: 'Code postal (FR)' },
-    { value: 'Siren', label: 'SIREN (9 chiffres)' },
-    { value: 'Siret', label: 'SIRET (14 chiffres)' },
-    { value: 'FullAddressFR', label: 'Adresse complete (FR)' },
-    { value: 'DatePast', label: 'Date passee' },
-    { value: 'DateFuture', label: 'Date future' },
-    { value: 'TimestampMs', label: 'Timestamp (ms)' },
-    { value: 'BoolRandom', label: 'Booleen aleatoire' },
-    { value: 'LoremSentence', label: 'Phrase Lorem Ipsum' },
-    { value: 'CountryFR', label: 'Pays francophone' },
-    { value: 'IbanFR', label: 'IBAN francais' },
+    { value: 'FirstName', get label() { return t("First name"); } },
+    { value: 'LastName', get label() { return t("Last name"); } },
+    { value: 'Email', get label() { return t("Email address"); } },
+    { value: 'PhoneNumberFR', get label() { return t("Phone number (France)"); } },
+    { value: 'Integer', get label() { return t("Integer"); } },
+    { value: 'CompanyName', get label() { return t("Company name"); } },
+    { value: 'StreetName', get label() { return t("Street name"); } },
+    { value: 'CityFR', get label() { return t("City (France)"); } },
+    { value: 'PostcodeFR', get label() { return t("Postcode (France)"); } },
+    { value: 'Siren', get label() { return t("SIREN (French company number, 9 digits)"); } },
+    { value: 'Siret', get label() { return t("SIRET (French establishment number, 14 digits)"); } },
+    { value: 'FullAddressFR', get label() { return t("Full address (France)"); } },
+    { value: 'DatePast', get label() { return t("Past date"); } },
+    { value: 'DateFuture', get label() { return t("Future date"); } },
+    { value: 'TimestampMs', get label() { return t("Timestamp (ms)"); } },
+    { value: 'BoolRandom', get label() { return t("Random boolean"); } },
+    { value: 'LoremSentence', get label() { return t("Lorem ipsum sentence"); } },
+    { value: 'CountryFR', get label() { return t("French-speaking country"); } },
+    { value: 'IbanFR', get label() { return t("IBAN (France)"); } },
   ];
 
   let pendingMode = $state(null);
@@ -418,10 +421,10 @@
       return r.ok ? { ok: true, xmlPasteFields: r.xmlFields ?? [] } : r;
     }
     if (from === 'xml-guided' && to === 'json-guided') {
-      return { ok: false, reason: 'La conversion XML vers JSON guide n\'est pas supportee. Passez par le mode template avance comme intermediaire.' };
+      return { ok: false, reason: t("Converting XML to guided JSON is not supported. Go through the advanced template mode.") };
     }
     if ((from === 'xml-guided' || from === 'xml-paste') && to === 'json-paste') {
-      return { ok: false, reason: 'La conversion XML vers JSON n\'est pas supportee. Passez par le mode template avance comme intermediaire.' };
+      return { ok: false, reason: t("Converting XML to JSON is not supported. Go through the advanced template mode.") };
     }
     return { ok: false };
   }
@@ -431,13 +434,13 @@
     if (!tpl.trim()) return { ok: true, jsonFields: [] };
     const jsonErr = validateTemplateAsJson(tpl);
     if (jsonErr) {
-      return { ok: false, reason: `Conversion impossible : ${jsonErr}. Verifiez les accolades ({{ pour JSON literal, { pour variable).` };
+      return { ok: false, reason: t("Cannot convert: {0}. Check the braces: { and } are literal, {{ and }} enclose a variable.", jsonErr) };
     }
     try {
       const fields = templateToFields(tpl);
       return { ok: true, jsonFields: fields };
     } catch (e) {
-      return { ok: false, reason: `Conversion impossible : ${e.message}` };
+      return { ok: false, reason: t("Cannot convert: {0}", e.message) };
     }
   }
 
@@ -452,13 +455,13 @@
     if (!tpl.trim()) return { ok: true, xmlFields: [] };
     const xmlErr = validateTemplateAsXml(tpl);
     if (xmlErr) {
-      return { ok: false, reason: `Conversion impossible : ${xmlErr}` };
+      return { ok: false, reason: t("Cannot convert: {0}", xmlErr) };
     }
     try {
       const parsed = templateToXmlFields(tpl);
       return { ok: true, xmlFields: parsed.fields, xmlRootTag: parsed.rootTag, xmlRootAttributes: parsed.rootAttributes };
     } catch (e) {
-      return { ok: false, reason: `Conversion impossible : ${e.message}` };
+      return { ok: false, reason: t("Cannot convert: {0}", e.message) };
     }
   }
 
@@ -471,7 +474,7 @@
       const xmlF = sourceFields.filter(f => f.key?.trim()).map(f => jsonFieldToXmlNode(f));
       return { ok: true, xmlFields: xmlF };
     } catch {
-      return { ok: false, reason: 'La structure JSON contient des elements incompatibles avec XML (tableaux de valeurs scalaires).' };
+      return { ok: false, reason: t("The JSON structure holds elements XML cannot express (arrays of scalar values).") };
     }
   }
 
@@ -538,11 +541,11 @@
   export function validate() {
     if (responseMode === 'json-paste' && jsonPasteRef) {
       const err = validateTemplateAsJson(jsonPasteRef.toTemplate());
-      if (err) return `JSON par exemple invalide : ${err}`;
+      if (err) return t("Invalid example JSON: {0}", err);
     }
     if (responseMode === 'json-guided' && jsonBuilderRef) {
       const err = validateTemplateAsJson(jsonBuilderRef.toTemplate());
-      if (err) return `JSON guide invalide : ${err}`;
+      if (err) return t("Invalid guided JSON: {0}", err);
     }
     if (responseMode === 'xml-guided' && xmlBuilderRef) {
       const err = validateTemplateAsXml(xmlBuilderRef.toTemplate());
@@ -557,11 +560,11 @@
       const ct = respHeaders.find(h => h.name?.toLowerCase() === 'content-type')?.value?.toLowerCase() || '';
       if (ct.includes('json') && tpl.trim()) {
         const err = validateTemplateAsJson(tpl);
-        if (err) return `Content-Type JSON mais template invalide : ${err}`;
+        if (err) return t("JSON Content-Type but invalid template: {0}", err);
       }
       if (ct.includes('xml') && tpl.trim()) {
         const xmlErr = validateTemplateAsXml(tpl);
-        if (xmlErr) return `Content-Type XML mais template invalide : ${xmlErr}`;
+        if (xmlErr) return t("XML Content-Type but invalid template: {0}", xmlErr);
       }
     }
     return null;
@@ -599,31 +602,31 @@
 
 {#snippet basicScriptHelp(varName)}
   <p class="field-hint">
-    Execute independamment des autres blocs de script (meme contexte requete, pas de chainage).
-    Resultat accessible via <code>{`{{${varName}}}`}</code> ou <code>{`{{${varName}.champ}}`}</code>.
-    Meme syntaxe Rhai que le "Script personnalise" ci-dessous (voir ses exemples).
+    {t("Runs independently of the other script blocks (same request context, no chaining).")}
+    <Sentence text={t("Result available as {0} or {1}.")} codes={[`{{${varName}}}`, `{{${varName}.field}}`]} />
+    {t("Same Rhai syntax as the custom script below (see its examples).")}
   </p>
 {/snippet}
 
 {#snippet mainScriptHelp()}
-  <p class="field-hint"><strong>Contexte disponible :</strong> <code>request.body</code> (texte), <code>request.headers</code>, <code>request.query</code>, <code>request.path</code> (maps cle/valeur)</p>
-  <p class="field-hint"><strong>Resultat :</strong> La derniere expression est le retour. String → <code>{"{{script}}"}</code>. Objet <code>#{"{cle: val}"}</code> → <code>{"{{script.cle}}"}</code></p>
+  <p class="field-hint"><strong>{t("Available context:")}</strong> <Sentence text={t("{0} (text), {1}, {2}, {3} (key/value maps)")} codes={['request.body', 'request.headers', 'request.query', 'request.path']} /></p>
+  <p class="field-hint"><strong>{t("Result:")}</strong> <Sentence text={t("The last expression is returned. A string → {0}. An object {1} → {2}")} codes={['{{script}}', '#{key: val}', '{{script.key}}']} /></p>
   <details class="script-examples">
-    <summary class="field-hint">Exemples et syntaxe Rhai</summary>
+    <summary class="field-hint">{t("Rhai examples and syntax")}</summary>
     <div class="script-examples-content">
-      <p><strong>Variables :</strong> <code>let x = 42;</code> <code>let s = "hello";</code></p>
-      <p><strong>Conditions :</strong> <code>if x &gt; 10 {"{"} "grand" {"}"} else {"{"} "petit" {"}"}</code></p>
-      <p><strong>Strings :</strong> <code>s.to_upper()</code> <code>s.len()</code> <code>s.contains("el")</code> <code>s.replace("a", "b")</code></p>
-      <p><strong>Fonctions et donnees de contexte disponibles</strong> (autocompletion dans l'editeur : tapez le debut d'un nom, ou <kbd>Ctrl</kbd>+<kbd>Espace</kbd>) :</p>
+      <p><strong>{t("Variables:")}</strong> <code>let x = 42;</code> <code>let s = "hello";</code></p>
+      <p><strong>{t("Conditions:")}</strong> <code>if x &gt; 10 {"{"} "big" {"}"} else {"{"} "small" {"}"}</code></p>
+      <p><strong>{t("Strings:")}</strong> <code>s.to_upper()</code> <code>s.len()</code> <code>s.contains("el")</code> <code>s.replace("a", "b")</code></p>
+      <p><strong>{t("Available functions and context data")}</strong> {t("(autocompletion in the editor: type the start of a name, or Ctrl+Space):")}</p>
       <ul class="script-fn-list">
         {#each RHAI_FUNCTIONS as fn}
           <li><code>{fn.signature}</code> — {fn.description}</li>
         {/each}
       </ul>
-      <p><strong>Objet retour :</strong> <code>#{"{"} cle: "val", n: random_int(1,100) {"}"}</code> → accessible via <code>{"{{script.cle}}"}</code></p>
-      <p><strong>Ratio 4/5 :</strong> <code>if random_int(1,5) &lt;= 4 {"{"} #{"{"} status: "ok" {"}"} {"}"} else {"{"} #{"{"} status: "ko" {"}"} {"}"}</code></p>
-      <p><strong>Nom fixe par SIRET :</strong> <code>seeded_pick(request.path.siret, ["Dupont SARL", "Martin SAS"])</code></p>
-      <p class="field-hint">Sandbox : pas d'acces fichier/reseau, 10K ops max. <a href="https://rhai.rs/book/" target="_blank" rel="noopener">Doc Rhai</a></p>
+      <p><strong>{t("Returned object:")}</strong> <code>#{"{"} key: "val", n: random_int(1,100) {"}"}</code> <Sentence text={t("available as {0}")} codes={['{{script.key}}']} /></p>
+      <p><strong>{t("4 in 5 ratio:")}</strong> <code>if random_int(1,5) &lt;= 4 {"{"} #{"{"} status: "ok" {"}"} {"}"} else {"{"} #{"{"} status: "ko" {"}"} {"}"}</code></p>
+      <p><strong>{t("Same value for the same id:")}</strong> <code>seeded_pick(request.path.id, ["Acme Ltd", "Globex Corp"])</code></p>
+      <p class="field-hint">{t("Sandbox: no file or network access, 10,000 operations at most.")} <a href="https://rhai.rs/book/" target="_blank" rel="noopener">{t("Rhai documentation")}</a></p>
     </div>
   </details>
 {/snippet}
@@ -632,7 +635,7 @@
 <fieldset class="section section-response">
   <legend>
     <button type="button" class="legend-toggle" onclick={() => responseOpen = !responseOpen} aria-expanded={responseOpen} data-testid="rule-form-response-toggle-button">
-      {responseOpen ? '▼' : '▶'} Reponse mockee
+      {responseOpen ? '▼' : '▶'} {t("Mocked response")}
     </button>
   </legend>
 
@@ -648,8 +651,8 @@
       VALEURS acceptees changent (json/xml/text/advanced/empty au lieu des
       7 anciennes).
     -->
-    <div class="mode-selector" role="radiogroup" aria-label="Format de la reponse">
-      {#each [['json','JSON'],['xml','XML'],['text','Texte'],['advanced','Template avance'],['empty','Vide (204)']] as [val, label]}
+    <div class="mode-selector" role="radiogroup" aria-label={t("Response format")}>
+      {#each [['json', t("JSON")], ['xml', t("XML")], ['text', t("Text")], ['advanced', t("Advanced template")], ['empty', t("Empty (204)")]] as [val, label]}
         <button type="button" class="mode-btn" class:mode-active={formatOfMode(responseMode) === val} onclick={() => selectFormat(val)} role="radio" aria-checked={formatOfMode(responseMode) === val} data-testid="rule-form-mode-button-{val}">{label}</button>
       {/each}
     </div>
@@ -657,10 +660,10 @@
 
     {#if pendingMode}
       <div class="mode-warning" role="alert">
-        <p>{pendingConvMessage || `Changer vers le mode "${pendingMode}" pourrait entrainer une perte de donnees.`}</p>
+        <p>{pendingConvMessage || t("Switching to the \"{0}\" mode may lose data.", pendingMode)}</p>
         <div class="mode-warning-actions">
-          <button type="button" class="btn btn-sm btn-primary" onclick={confirmModeSwitch} data-testid="rule-form-mode-switch-confirm-button">Changer quand meme</button>
-          <button type="button" class="btn btn-sm btn-secondary" onclick={cancelModeSwitch} data-testid="rule-form-mode-switch-cancel-button">Annuler</button>
+          <button type="button" class="btn btn-sm btn-primary" onclick={confirmModeSwitch} data-testid="rule-form-mode-switch-confirm-button">{t("Switch anyway")}</button>
+          <button type="button" class="btn btn-sm btn-secondary" onclick={cancelModeSwitch} data-testid="rule-form-mode-switch-cancel-button">{t("Cancel")}</button>
         </div>
       </div>
     {/if}
@@ -668,18 +671,18 @@
     {#if responseMode !== 'empty'}
       <div class="form-row">
         <div class="form-field" style="max-width:8rem">
-          <label for="resp-status">Code HTTP</label>
+          <label for="resp-status">{t("HTTP status")}</label>
           <input id="resp-status" type="number" bind:value={status} min="100" max="599" data-testid="rule-form-status-input" />
         </div>
       </div>
 
       <div class="sub-section">
-        <strong>En-tetes</strong>
+        <strong>{t("Headers")}</strong>
         {#each respHeaders as hdr, idx}
           <div class="header-row">
-            <input type="text" bind:value={hdr.name} placeholder="Content-Type" aria-label="Nom de l'en-tete {idx + 1}" list="dl-header-names" autocomplete="off" data-testid="rule-form-header-name-input-{idx}" />
-            <input type="text" bind:value={hdr.value} placeholder="application/json" aria-label="Valeur de l'en-tete {idx + 1}" list={hdr.name?.toLowerCase() === 'content-type' ? 'dl-content-types' : undefined} autocomplete="off" data-testid="rule-form-header-value-input-{idx}" />
-            <button type="button" class="btn-icon btn-delete" onclick={() => removeHeader(idx)} aria-label="Supprimer l'en-tete" data-testid="rule-form-remove-header-button-{idx}">&#10005;</button>
+            <input type="text" bind:value={hdr.name} placeholder="Content-Type" aria-label={t("Name of the header {0}", idx + 1)} list="dl-header-names" autocomplete="off" data-testid="rule-form-header-name-input-{idx}" />
+            <input type="text" bind:value={hdr.value} placeholder="application/json" aria-label={t("Value of the header {0}", idx + 1)} list={hdr.name?.toLowerCase() === 'content-type' ? 'dl-content-types' : undefined} autocomplete="off" data-testid="rule-form-header-value-input-{idx}" />
+            <button type="button" class="btn-icon btn-delete" onclick={() => removeHeader(idx)} aria-label={t("Delete the header")} data-testid="rule-form-remove-header-button-{idx}">&#10005;</button>
           </div>
         {/each}
         <datalist id="dl-header-names">
@@ -688,9 +691,9 @@
         <datalist id="dl-content-types">
           {#each commonContentTypes as ct}<option value={ct}></option>{/each}
         </datalist>
-        <button type="button" class="btn btn-sm btn-outline" onclick={addHeader} data-testid="rule-form-add-header-button">+ En-tete</button>
+        <button type="button" class="btn btn-sm btn-outline" onclick={addHeader} data-testid="rule-form-add-header-button">{t("+ Header")}</button>
         {#if responseMode === 'json-guided' || responseMode === 'json-paste'}
-          <span class="field-hint">Content-Type: application/json sera ajoute automatiquement.</span>
+          <span class="field-hint">{t("Content-Type: application/json is added automatically.")}</span>
         {/if}
       </div>
     {/if}
@@ -699,7 +702,7 @@
       <div class="sub-section">
         <JsonPasteBuilder bind:this={jsonPasteRef} fields={jsonPasteFields} startParsed={jsonPasteFields.length > 0} onUpdate={(f) => jsonPasteFields = f} />
         <button type="button" class="btn btn-sm btn-outline open-detail-button" onclick={revealDetailMode} data-testid="rule-form-open-detail-button">
-          Modifier en détail (structure complète) →
+          {t("Edit in detail (full structure) →")}
         </button>
       </div>
 
@@ -707,7 +710,7 @@
       <div class="sub-section">
         <JsonResponseBuilder bind:this={jsonBuilderRef} fields={jsonFields} onUpdate={(f) => jsonFields = f} />
         <button type="button" class="btn btn-sm btn-outline back-to-paste-button" onclick={backToPasteMode} data-testid="rule-form-back-to-paste-button">
-          ← Revenir à la vue « par exemple »
+          {t("← Back to the “by example” view")}
         </button>
       </div>
 
@@ -715,7 +718,7 @@
       <div class="sub-section">
         <XmlPasteBuilder bind:this={xmlPasteRef} fields={xmlPasteFields} rootTag={xmlRootTag} rootAttributes={xmlRootAttributes} startParsed={xmlPasteFields.length > 0} onUpdate={(f) => xmlPasteFields = f} />
         <button type="button" class="btn btn-sm btn-outline open-detail-button" onclick={revealDetailMode} data-testid="rule-form-open-detail-button">
-          Modifier en détail (structure complète) →
+          {t("Edit in detail (full structure) →")}
         </button>
       </div>
 
@@ -723,81 +726,81 @@
       <div class="sub-section">
         <XmlResponseBuilder bind:this={xmlBuilderRef} fields={xmlFields} rootTag={xmlRootTag} onUpdate={(f) => xmlFields = f} />
         <button type="button" class="btn btn-sm btn-outline back-to-paste-button" onclick={backToPasteMode} data-testid="rule-form-back-to-paste-button">
-          ← Revenir à la vue « par exemple »
+          {t("← Back to the “by example” view")}
         </button>
       </div>
 
     {:else if responseMode === 'text'}
       <div class="sub-section">
-        <strong>Contenu texte</strong>
-        <textarea bind:value={textContent} rows="5" placeholder="Contenu de la reponse en texte brut" aria-label="Contenu texte de la reponse" class="text-area" data-testid="rule-form-text-content-textarea"></textarea>
+        <strong>{t("Text content")}</strong>
+        <textarea bind:value={textContent} rows="5" placeholder={t("Response content as plain text")} aria-label={t("Text content of the response")} class="text-area" data-testid="rule-form-text-content-textarea"></textarea>
       </div>
 
     {:else if responseMode === 'advanced'}
       <div class="sub-section">
-        <strong>Corps de la reponse (fragments)</strong>
-        <p class="section-help">Composez la reponse en ajoutant des blocs concatenes dans l'ordre.</p>
+        <strong>{t("Response body (fragments)")}</strong>
+        <p class="section-help">{t("Build the response from blocks joined in order.")}</p>
 
         {#each fragments as frag, idx}
           <div class="fragment-card" data-testid="rule-form-fragment-card-{idx}">
             <div class="fragment-header">
               <span class="frag-index">{idx + 1}</span>
-              <select value={frag.type} onchange={(e) => updateFragmentType(idx, e.target.value)} aria-label="Type du fragment {idx + 1}" data-testid="rule-form-fragment-type-select-{idx}">
+              <select value={frag.type} onchange={(e) => updateFragmentType(idx, e.target.value)} aria-label={t("Type of the fragment {0}", idx + 1)} data-testid="rule-form-fragment-type-select-{idx}">
                 {#each fragmentTypes as ft}
                   <option value={ft.value}>{ft.label}</option>
                 {/each}
               </select>
               <div class="fragment-actions">
-                <button type="button" class="btn-icon" onclick={() => moveFragment(idx, -1)} disabled={idx === 0} aria-label="Monter" title="Monter" data-testid="rule-form-fragment-moveup-button-{idx}">&#9650;</button>
-                <button type="button" class="btn-icon" onclick={() => moveFragment(idx, 1)} disabled={idx === fragments.length - 1} aria-label="Descendre" title="Descendre" data-testid="rule-form-fragment-movedown-button-{idx}">&#9660;</button>
-                <button type="button" class="btn-icon btn-delete" onclick={() => removeFragment(idx)} aria-label="Supprimer" title="Supprimer" data-testid="rule-form-fragment-delete-button-{idx}">&#10005;</button>
+                <button type="button" class="btn-icon" onclick={() => moveFragment(idx, -1)} disabled={idx === 0} aria-label={t("Move up")} title={t("Move up")} data-testid="rule-form-fragment-moveup-button-{idx}">&#9650;</button>
+                <button type="button" class="btn-icon" onclick={() => moveFragment(idx, 1)} disabled={idx === fragments.length - 1} aria-label={t("Move down")} title={t("Move down")} data-testid="rule-form-fragment-movedown-button-{idx}">&#9660;</button>
+                <button type="button" class="btn-icon btn-delete" onclick={() => removeFragment(idx)} aria-label={t("Delete")} title={t("Delete")} data-testid="rule-form-fragment-delete-button-{idx}">&#10005;</button>
               </div>
             </div>
             <div class="fragment-body">
               {#if frag.type === 'Literal'}
-                <textarea bind:value={frag.value} rows="2" placeholder='ex: {`{"siret":"`}' aria-label="Contenu texte" data-testid="rule-form-fragment-literal-textarea-{idx}"></textarea>
+                <textarea bind:value={frag.value} rows="2" placeholder={t("e.g. {0}", '{"id":"')} aria-label={t("Text content")} data-testid="rule-form-fragment-literal-textarea-{idx}"></textarea>
               {:else if frag.type === 'Uuid'}
-                <p class="frag-info">UUID v4 genere a chaque requete.</p>
+                <p class="frag-info">{t("A UUID v4 generated for each request.")}</p>
               {:else if frag.type === 'PickFrom'}
                 {#each frag.values as val, vi}
                   <div class="pick-row">
-                    <input type="text" bind:value={frag.values[vi]} placeholder="Valeur {vi + 1}" aria-label="Valeur {vi + 1}" data-testid="rule-form-fragment-pick-input-{idx}-{vi}" />
-                    <button type="button" class="btn-icon btn-delete" onclick={() => removePickValue(idx, vi)} aria-label="Supprimer" data-testid="rule-form-fragment-pick-remove-button-{idx}-{vi}">&#10005;</button>
+                    <input type="text" bind:value={frag.values[vi]} placeholder={t("Value {0}", vi + 1)} aria-label={t("Value {0}", vi + 1)} data-testid="rule-form-fragment-pick-input-{idx}-{vi}" />
+                    <button type="button" class="btn-icon btn-delete" onclick={() => removePickValue(idx, vi)} aria-label={t("Delete")} data-testid="rule-form-fragment-pick-remove-button-{idx}-{vi}">&#10005;</button>
                   </div>
                 {/each}
-                <button type="button" class="btn btn-sm btn-outline" onclick={() => addPickValue(idx)} data-testid="rule-form-fragment-pick-add-button-{idx}">+ Valeur</button>
+                <button type="button" class="btn btn-sm btn-outline" onclick={() => addPickValue(idx)} data-testid="rule-form-fragment-pick-add-button-{idx}">{t("+ Value")}</button>
               {:else if frag.type === 'FakeData'}
-                <select value={frag.kind?.type ?? 'FirstName'} onchange={(e) => updateFakeKind(idx, e.target.value)} aria-label="Type fictif" data-testid="rule-form-fragment-fake-select-{idx}">
+                <select value={frag.kind?.type ?? 'FirstName'} onchange={(e) => updateFakeKind(idx, e.target.value)} aria-label={t("Kind of fake data")} data-testid="rule-form-fragment-fake-select-{idx}">
                   {#each fakeKinds as fk}<option value={fk.value}>{fk.label}</option>{/each}
                 </select>
               {:else if frag.type === 'PathSegment'}
-                <label class="inline-label">Position <input type="number" bind:value={frag.index} min="0" style="width:5rem" data-testid="rule-form-fragment-pathsegment-input-{idx}" /></label>
+                <label class="inline-label">{t("Position")} <input type="number" bind:value={frag.index} min="0" style="width:5rem" data-testid="rule-form-fragment-pathsegment-input-{idx}" /></label>
               {:else if frag.type === 'Template'}
                 <textarea bind:value={frag.template} rows="5" class="template-textarea"
-                  placeholder={`Ex: {{"siret":"{path.siret}","siren":"{path.siret | first(9)}"}}`}
-                  aria-label="Template" data-testid="rule-form-fragment-template-textarea-{idx}"></textarea>
+                  placeholder={t("e.g. {0}", '{"id":"{{path.id}}","code":"{{path.id | first(3)}}"}')}
+                  aria-label={t("Template")} data-testid="rule-form-fragment-template-textarea-{idx}"></textarea>
                 <div class="template-help">
-                  <span class="field-hint"><strong>Variables :</strong> <code>{`{path.nom}`}</code>, <code>{`{query.id}`}</code>, <code>{`{uuid}`}</code>, <code>{`{now_ms}`}</code>, <code>{`{fake.CompanyName}`}</code>, <code>{`{seq}`}</code></span>
-                  <span class="field-hint"><strong>Pipes :</strong> <code>| lower</code>, <code>| upper</code>, <code>| capitalize</code>, <code>| first(N)</code>, <code>| last(N)</code>, <code>| substr(start,len)</code>, <code>| replace("a","b")</code>, <code>| prepend("x")</code>, <code>| append("x")</code>, <code>| default("val")</code>, <code>| length</code>, <code>| trim</code>. JSON : <code>{`{{`}</code> / <code>{`}}`}</code></span>
+                  <span class="field-hint"><strong>{t("Variables:")}</strong> <code>{`{{path.name}}`}</code>, <code>{`{{query.id}}`}</code>, <code>{`{{uuid}}`}</code>, <code>{`{{now_ms}}`}</code>, <code>{`{{fake.CompanyName}}`}</code>, <code>{`{{seq}}`}</code></span>
+                  <span class="field-hint"><strong>{t("Pipes:")}</strong> <code>| lower</code>, <code>| upper</code>, <code>| capitalize</code>, <code>| first(N)</code>, <code>| last(N)</code>, <code>| substr(start,len)</code>, <code>| replace("a","b")</code>, <code>| prepend("x")</code>, <code>| append("x")</code>, <code>| default("val")</code>, <code>| length</code>, <code>| trim</code>. {t("Single braces { } are literal text.")}</span>
                 </div>
               {/if}
             </div>
           </div>
         {/each}
-        <button type="button" class="btn btn-sm btn-outline" onclick={addFragment} data-testid="rule-form-fragment-add-button">+ Ajouter un fragment</button>
+        <button type="button" class="btn btn-sm btn-outline" onclick={addFragment} data-testid="rule-form-fragment-add-button">{t("+ Add a fragment")}</button>
       </div>
 
     {:else if responseMode === 'empty'}
-      <p class="section-help" style="margin-top:0.5rem">La reponse sera 204 No Content, sans body.</p>
+      <p class="section-help" style="margin-top:0.5rem">{t("The response will be 204 No Content, without a body.")}</p>
     {/if}
 
     <RuleScriptSlot
-      id="rule-script" toggleLabel="Script personnalise"
+      id="rule-script" toggleLabel={t("Custom script")}
       enabled={scriptEnabled} code={scriptCode}
       onToggle={(v) => scriptEnabled = v} onCodeInput={(v) => scriptCode = v}
       validation={scriptValidation} onValidate={handleValidateScript}
       rows={8}
-      placeholder={'// Exemples Rhai :\n// Retourner une valeur simple :\nlet id = request.path.id;\n`user_${id}`\n\n// Retourner un objet (accessible via {{script.champ}}) :\n#{ nom: "Alice", age: "30" }'}
+      placeholder={t("// Rhai examples:\n// Return a simple value:\nlet id = request.path.id;\n`user_${id}`\n\n// Return an object (available as {{script.field}}):\n#{ name: \"Alice\", age: \"30\" }")}
     >
       {#snippet help()}{@render mainScriptHelp()}{/snippet}
     </RuleScriptSlot>
@@ -811,11 +814,11 @@
         aria-controls="rule-form-advanced-options-panel"
         data-testid="rule-form-advanced-options-toggle-button"
       >
-        {advancedOpen ? '▼' : '▶'} Options avancées (pré-script / post-script)
+        {advancedOpen ? '▼' : '▶'} {t("Advanced options (pre-script / post-script)")}
       </button>
       <div id="rule-form-advanced-options-panel" class="advanced-options-panel" hidden={!advancedOpen} data-testid="rule-form-advanced-options-panel">
         <RuleScriptSlot
-          id="rule-pre-script" toggleLabel="Pré-script (préparation)"
+          id="rule-pre-script" toggleLabel={t("Pre-script (preparation)")}
           enabled={preScriptEnabled} code={preScriptCode}
           onToggle={(v) => preScriptEnabled = v} onCodeInput={(v) => preScriptCode = v}
           validation={preScriptValidation} onValidate={handleValidatePreScript}
@@ -825,7 +828,7 @@
         </RuleScriptSlot>
 
         <RuleScriptSlot
-          id="rule-post-script" toggleLabel="Post-script (finalisation)"
+          id="rule-post-script" toggleLabel={t("Post-script (finalization)")}
           enabled={postScriptEnabled} code={postScriptCode}
           onToggle={(v) => postScriptEnabled = v} onCodeInput={(v) => postScriptCode = v}
           validation={postScriptValidation} onValidate={handleValidatePostScript}
@@ -837,16 +840,16 @@
     </div>
 
     <div class="sub-section chaos-section">
-      <ToggleSwitch label="Mode Chaos" checked={chaosEnabled} onchange={(v) => chaosEnabled = v} />
+      <ToggleSwitch label={t("Chaos mode")} name="chaos" checked={chaosEnabled} onchange={(v) => chaosEnabled = v} />
       {#if chaosEnabled}
         <div class="chaos-fields">
-          <label>Latence fixe (ms) <input type="number" bind:value={chaos.delay_ms} min="0" max="30000" data-testid="rule-form-chaos-delay-input" /></label>
-          <label>Latence min (ms) <input type="number" bind:value={chaos.delay_min_ms} min="0" max="30000" data-testid="rule-form-chaos-delay-min-input" /></label>
-          <label>Latence max (ms) <input type="number" bind:value={chaos.delay_max_ms} min="0" max="30000" data-testid="rule-form-chaos-delay-max-input" /></label>
-          <label>Taux d'erreur (0-1) <input type="number" bind:value={chaos.error_rate} min="0" max="1" step="0.05" data-testid="rule-form-chaos-error-rate-input" /></label>
-          <label>Code erreur <input type="number" bind:value={chaos.error_status} min="400" max="599" data-testid="rule-form-chaos-error-status-input" /></label>
+          <label>{t("Fixed latency (ms)")} <input type="number" bind:value={chaos.delay_ms} min="0" max="30000" data-testid="rule-form-chaos-delay-input" /></label>
+          <label>{t("Minimum latency (ms)")} <input type="number" bind:value={chaos.delay_min_ms} min="0" max="30000" data-testid="rule-form-chaos-delay-min-input" /></label>
+          <label>{t("Maximum latency (ms)")} <input type="number" bind:value={chaos.delay_max_ms} min="0" max="30000" data-testid="rule-form-chaos-delay-max-input" /></label>
+          <label>{t("Error rate (0-1)")} <input type="number" bind:value={chaos.error_rate} min="0" max="1" step="0.05" data-testid="rule-form-chaos-error-rate-input" /></label>
+          <label>{t("Error status")} <input type="number" bind:value={chaos.error_status} min="400" max="599" data-testid="rule-form-chaos-error-status-input" /></label>
         </div>
-        <span class="field-hint">Si min/max sont remplis, la latence est aleatoire dans la plage (ignore la latence fixe).</span>
+        <span class="field-hint">{t("When min and max are set, the latency is random in that range (the fixed latency is ignored).")}</span>
       {/if}
     </div>
   {/if}

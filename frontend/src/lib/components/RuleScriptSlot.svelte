@@ -9,6 +9,7 @@
   // duplique ici.
   import ToggleSwitch from './ToggleSwitch.svelte';
   import RhaiScriptEditor from './RhaiScriptEditor.svelte';
+  import { t } from '../i18n.svelte.js';
 
   let {
     id,
@@ -26,14 +27,14 @@
 </script>
 
 <div class="sub-section script-section">
-  <ToggleSwitch label={toggleLabel} checked={enabled} onchange={onToggle} />
+  <ToggleSwitch label={toggleLabel} name={id} checked={enabled} onchange={onToggle} />
   {#if enabled}
     <div class="script-editor">
-      <label for={id}>Code Rhai</label>
+      <label for={id}>{t("Rhai code")}</label>
       <RhaiScriptEditor {id} value={code} onInput={onCodeInput} {rows} {placeholder} ariaDescribedby="{id}-hint" />
       <div class="script-actions">
         <button type="button" class="btn btn-outline btn-sm" onclick={onValidate} disabled={validation.status === 'pending'} data-testid="rule-form-validate-script-button-{id}">
-          {validation.status === 'pending' ? 'Validation...' : 'Valider le script'}
+          {validation.status === 'pending' ? t("Validating...") : t("Validate the script")}
         </button>
         {#if validation.status === 'ok'}
           <span class="script-valid" role="status" data-testid="rule-form-script-valid-{id}">&#10003; {validation.message}</span>

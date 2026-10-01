@@ -1,3 +1,4 @@
+import { t } from './i18n.svelte.js';
 /**
  * Template utilities for lightMock's template format.
  *
@@ -109,7 +110,7 @@ export function validateTemplateAsJson(tpl) {
     JSON.parse(testStr);
     return null;
   } catch (e) {
-    return `JSON invalide : ${e.message}`;
+    return t("Invalid JSON: {0}", e.message);
   }
 }
 
@@ -120,11 +121,11 @@ export function validateTemplateAsXml(tpl) {
     const parser = new DOMParser();
     const doc = parser.parseFromString(testXml, 'application/xml');
     if (doc.querySelector('parsererror')) {
-      return 'XML invalide : verifiez les tags (noms vides, imbrication incorrecte).';
+      return t("Invalid XML: check the tags (empty names, wrong nesting).");
     }
     return null;
   } catch {
-    return 'XML malformed.';
+    return t("Malformed XML.");
   }
 }
 
@@ -168,7 +169,7 @@ export function templateToFields(tpl) {
   const testStr = templateToTestJson(trimmed);
   const parsed = JSON.parse(testStr);
   if (typeof parsed !== 'object' || Array.isArray(parsed)) {
-    throw new TypeError('Le JSON doit etre un objet pour etre converti en vue guidee.');
+    throw new TypeError(t("The JSON must be an object to be shown in the guided view."));
   }
   return parseTplObject(trimmed);
 }
@@ -268,7 +269,7 @@ export function varNameToSource(varName) {
 
 export function exampleJsonToFields(value) {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-    throw new TypeError('exampleJsonToFields attend un objet JSON en racine.');
+    throw new TypeError(t("The example must be a JSON object at its root."));
   }
   return objectToFields(value);
 }
@@ -463,20 +464,20 @@ function xmlNodeToTpl(field) {
 export function exampleXmlToFields(xmlString) {
   const text = xmlString.trim();
   if (!text) {
-    throw new TypeError('Collez un XML valide.');
+    throw new TypeError(t("Paste valid XML."));
   }
   const parser = new DOMParser();
   const doc = parser.parseFromString(text, 'application/xml');
   if (doc.querySelector('parsererror')) {
-    throw new TypeError('XML invalide : verifiez les tags (noms vides, imbrication incorrecte).');
+    throw new TypeError(t("Invalid XML: check the tags (empty names, wrong nesting)."));
   }
   const root = doc.documentElement;
   if (!root) {
-    throw new TypeError('XML invalide : aucun element racine trouve.');
+    throw new TypeError(t("Invalid XML: no root element found."));
   }
   const childElements = Array.from(root.children || []);
   if (childElements.length === 0) {
-    throw new TypeError('La racine XML ne contient aucun element imbrique. Collez un XML avec au moins un sous-element.');
+    throw new TypeError(t("The XML root holds no nested element. Paste XML with at least one child element."));
   }
   return {
     rootTag: root.tagName,
@@ -501,16 +502,16 @@ export function exampleXmlToFields(xmlString) {
 export function templateToXmlFields(tpl) {
   const text = tpl.trim();
   if (!text) {
-    throw new TypeError('Template XML vide.');
+    throw new TypeError(t("Empty XML template."));
   }
   const parser = new DOMParser();
   const doc = parser.parseFromString(text, 'application/xml');
   if (doc.querySelector('parsererror')) {
-    throw new TypeError('Template XML invalide : impossible de le reanalyser en vue structuree.');
+    throw new TypeError(t("Invalid XML template: it cannot be parsed back into the structured view."));
   }
   const root = doc.documentElement;
   if (!root) {
-    throw new TypeError('Template XML invalide : aucun element racine trouve.');
+    throw new TypeError(t("Invalid XML template: no root element found."));
   }
   return {
     rootTag: root.tagName,

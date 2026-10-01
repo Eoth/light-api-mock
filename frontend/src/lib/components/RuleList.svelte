@@ -1,4 +1,5 @@
 <script>
+  import { t, tCount } from '../i18n.svelte.js';
   let {
     rules = [],
     onReorder = () => {},
@@ -76,19 +77,19 @@
   }
 </script>
 
-<section class="rule-list-section" aria-label="Liste des regles">
+<section class="rule-list-section" aria-label={t("Rule list")}>
   <div class="rule-list-header">
-    <h3>Regles de matching</h3>
+    <h3>{t("Matching rules")}</h3>
     <button type="button" class="btn btn-sm btn-primary" onclick={clickAdd} data-testid="rule-list-add-button">
-      + Ajouter une regle
+      {t("+ Add a rule")}
     </button>
   </div>
 
   {#if rules.length === 0}
-    <p class="empty-rules" role="status" data-testid="rule-list-empty-message">Aucune regle definie. Les requetes retourneront 404.</p>
+    <p class="empty-rules" role="status" data-testid="rule-list-empty-message">{t("No rule defined. Requests will get 404.")}</p>
   {:else}
     <p class="rule-hint" id="rule-order-hint">
-      Premiere regle correspondante gagne. Reordonnez par glisser-deposer ou avec les boutons.
+      {t("The first matching rule wins. Reorder by drag and drop or with the buttons.")}
     </p>
     <ol class="rule-list" aria-describedby="rule-order-hint" role="list">
       {#each rules as rule, idx (rule.name)}
@@ -114,23 +115,23 @@
           <div class="rule-content">
             <span class="rule-index" aria-hidden="true">{idx + 1}</span>
             <span class="method-badge" data-method={rule.method}>{rule.method}</span>
-            <span class="rule-action-badge" class:proxy={rule.action === 'proxy'}>{(rule.action ?? 'mock').toUpperCase()}</span>
+            <span class="rule-action-badge" class:proxy={rule.action === 'proxy'}>{rule.action === 'proxy' ? t("PROXY") : t("MOCK")}</span>
             <span class="rule-name">{rule.name}</span>
             <span class="rule-meta">
               {#if rule.conditions?.all_of?.length || rule.conditions?.any_of?.length}
-                {(rule.conditions?.all_of?.length ?? 0) + (rule.conditions?.any_of?.length ?? 0)} condition{((rule.conditions?.all_of?.length ?? 0) + (rule.conditions?.any_of?.length ?? 0)) !== 1 ? 's' : ''}
+                {tCount((rule.conditions?.all_of?.length ?? 0) + (rule.conditions?.any_of?.length ?? 0), "{0} condition", "{0} conditions")}
               {:else}
-                Catch-all
+                {t("Catch-all")}
               {/if}
             </span>
           </div>
 
           <div class="rule-actions">
-            <button type="button" class="btn-icon" onclick={() => moveUp(idx)} disabled={idx === 0} aria-label="Monter la regle {rule.name}" title="Monter" data-testid="rule-list-moveup-button-{rule.name}">&#9650;</button>
-            <button type="button" class="btn-icon" onclick={() => moveDown(idx)} disabled={idx === rules.length - 1} aria-label="Descendre la regle {rule.name}" title="Descendre" data-testid="rule-list-movedown-button-{rule.name}">&#9660;</button>
-            <button type="button" class="btn-icon btn-edit" onclick={(e) => clickEdit(e, idx)} aria-label="Modifier la regle {rule.name}" title="Modifier" data-testid="rule-list-edit-button-{rule.name}">&#9998;</button>
-            <button type="button" class="btn-icon" onclick={(e) => { e.stopPropagation(); onCloneRule(idx); }} aria-label="Dupliquer la regle {rule.name}" title="Dupliquer" data-testid="rule-list-clone-button-{rule.name}">&#10697;</button>
-            <button type="button" class="btn-icon btn-delete" onclick={(e) => clickDelete(e, idx)} aria-label="Supprimer la regle {rule.name}" title="Supprimer" data-testid="rule-list-delete-button-{rule.name}">&#10005;</button>
+            <button type="button" class="btn-icon" onclick={() => moveUp(idx)} disabled={idx === 0} aria-label={t("Move the rule {0} up", rule.name)} title={t("Move up")} data-testid="rule-list-moveup-button-{rule.name}">&#9650;</button>
+            <button type="button" class="btn-icon" onclick={() => moveDown(idx)} disabled={idx === rules.length - 1} aria-label={t("Move the rule {0} down", rule.name)} title={t("Move down")} data-testid="rule-list-movedown-button-{rule.name}">&#9660;</button>
+            <button type="button" class="btn-icon btn-edit" onclick={(e) => clickEdit(e, idx)} aria-label={t("Edit the rule {0}", rule.name)} title={t("Edit")} data-testid="rule-list-edit-button-{rule.name}">&#9998;</button>
+            <button type="button" class="btn-icon" onclick={(e) => { e.stopPropagation(); onCloneRule(idx); }} aria-label={t("Duplicate the rule {0}", rule.name)} title={t("Duplicate")} data-testid="rule-list-clone-button-{rule.name}">&#10697;</button>
+            <button type="button" class="btn-icon btn-delete" onclick={(e) => clickDelete(e, idx)} aria-label={t("Delete the rule {0}", rule.name)} title={t("Delete")} data-testid="rule-list-delete-button-{rule.name}">&#10005;</button>
           </div>
         </li>
       {/each}

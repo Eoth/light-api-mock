@@ -1,6 +1,7 @@
 <script>
   import { getLogs } from '../api.js';
   import { formatDateTimePrecise } from '../format-date.js';
+  import { t, tCount } from '../i18n.svelte.js';
 
   let logs = $state([]);
   let loading = $state(true);
@@ -78,86 +79,86 @@
   function handleBackdrop(e) { if (e.target === e.currentTarget) closeDetail(); }
 </script>
 
-<section class="log-section" aria-label="Journal des requetes">
+<section class="log-section" aria-label={t("Request log")}>
   <div class="log-header">
-    <h2>Journal des requetes</h2>
+    <h2>{t("Request log")}</h2>
     <div class="log-controls">
-      <button type="button" class="btn btn-sm btn-outline" onclick={refresh} data-testid="request-log-refresh-button">Rafraichir</button>
+      <button type="button" class="btn btn-sm btn-outline" onclick={refresh} data-testid="request-log-refresh-button">{t("Refresh")}</button>
     </div>
   </div>
 
   <div class="filters-bar">
     {#if serviceNames.length > 1}
-      <select class="filter-select" bind:value={filterService} aria-label="Filtrer par service" data-testid="request-log-filter-service">
-        <option value="">Tous les services</option>
+      <select class="filter-select" bind:value={filterService} aria-label={t("Filter by service")} data-testid="request-log-filter-service">
+        <option value="">{t("All services")}</option>
         {#each serviceNames as sn}
           <option value={sn}>{sn}</option>
         {/each}
       </select>
     {/if}
 
-    <select class="filter-select" bind:value={filterMode} aria-label="Filtrer par mode" data-testid="request-log-filter-mode">
-      <option value="">Tous les modes</option>
-      <option value="mock">Mock</option>
-      <option value="proxy">Proxy</option>
-      <option value="no-rule">No-rule</option>
+    <select class="filter-select" bind:value={filterMode} aria-label={t("Filter by mode")} data-testid="request-log-filter-mode">
+      <option value="">{t("All modes")}</option>
+      <option value="mock">{t("Mock")}</option>
+      <option value="proxy">{t("Proxy")}</option>
+      <option value="no-rule">{t("No rule")}</option>
     </select>
 
-    <select class="filter-select" bind:value={filterStatus} aria-label="Filtrer par statut HTTP" data-testid="request-log-filter-status">
-      <option value="">Tous les status</option>
-      <option value="2xx">2xx (succes)</option>
-      <option value="3xx">3xx (redirection)</option>
-      <option value="4xx">4xx (erreur client)</option>
-      <option value="5xx">5xx (erreur serveur)</option>
+    <select class="filter-select" bind:value={filterStatus} aria-label={t("Filter by HTTP status")} data-testid="request-log-filter-status">
+      <option value="">{t("All statuses")}</option>
+      <option value="2xx">{t("2xx (success)")}</option>
+      <option value="3xx">{t("3xx (redirection)")}</option>
+      <option value="4xx">{t("4xx (client error)")}</option>
+      <option value="5xx">{t("5xx (server error)")}</option>
     </select>
 
-    <select class="filter-select" bind:value={filterTime} aria-label="Filtrer par periode" data-testid="request-log-filter-time">
-      <option value="">Toute la periode</option>
-      <option value="1m">Derniere minute</option>
-      <option value="5m">5 dernieres minutes</option>
-      <option value="1h">Derniere heure</option>
+    <select class="filter-select" bind:value={filterTime} aria-label={t("Filter by period")} data-testid="request-log-filter-time">
+      <option value="">{t("Any time")}</option>
+      <option value="1m">{t("Last minute")}</option>
+      <option value="5m">{t("Last 5 minutes")}</option>
+      <option value="1h">{t("Last hour")}</option>
     </select>
 
     <input
       type="text"
       class="filter-search"
       bind:value={filterText}
-      placeholder="Rechercher un path..."
-      aria-label="Recherche textuelle sur le path"
+      placeholder={t("Search a path...")}
+      aria-label={t("Text search in the path")}
       data-testid="request-log-filter-search"
     />
 
     {#if activeFilterCount > 0}
-      <button type="button" class="btn btn-sm btn-outline btn-clear" onclick={clearFilters} title="Effacer tous les filtres" data-testid="request-log-clear-filters-button">
-        Effacer ({activeFilterCount})
+      <button type="button" class="btn btn-sm btn-outline btn-clear" onclick={clearFilters} title={t("Clear every filter")} data-testid="request-log-clear-filters-button">
+        {t("Clear ({0})", activeFilterCount)}
       </button>
     {/if}
   </div>
 
   {#if loading}
-    <p class="loading">Chargement...</p>
+    <p class="loading">{t("Loading...")}</p>
   {:else if filteredLogs().length === 0}
     <p class="empty">
       {#if activeFilterCount > 0}
-        Aucune requete ne correspond aux filtres.
+        {t("No request matches the filters.")}
       {:else}
-        Aucune requete interceptee pour le moment.
+        {t("No request intercepted yet.")}
       {/if}
     </p>
   {:else}
-    <p class="result-count">{filteredLogs().length} requete{filteredLogs().length !== 1 ? 's' : ''}{activeFilterCount > 0 ? ' (filtrees)' : ''}</p>
+    <p class="result-count">{activeFilterCount > 0 ? tCount(filteredLogs().length, "{0} request (filtered)", "{0} requests (filtered)") : tCount(filteredLogs().length, "{0} request", "{0} requests")}</p>
     <div class="table-wrap">
-      <table class="log-table" aria-label="Dernieres requetes">
+      <table class="log-table" aria-label={t("Latest requests")}>
         <thead>
           <tr>
-            <th>Date/Heure</th>
-            <th>Service</th>
-            <th>Methode</th>
-            <th>Path</th>
-            <th>Mode</th>
-            <th>Regle / Cible</th>
-            <th>Status</th>
-            <th><span class="sr-only">Actions</span></th>
+            <th>{t("Date/time")}</th>
+            <th>{t("Service")}</th>
+            <th>{t("Method")}</th>
+            <th>{t("Path")}</th>
+            <th>{t("Mode")}</th>
+            <th>{t("Rule / target")}</th>
+            <th>{t("Status")}</th>
+            <th><span class="sr-only">{t("Actions")}</span></th>
           </tr>
         </thead>
         <tbody>
@@ -168,10 +169,10 @@
               <td><span class="method-badge" data-method={log.method}>{log.method}</span></td>
               <td class="col-path"><code>{log.path}</code></td>
               <td><span class="badge {modeBadge(log.mode)}">{log.mode}</span></td>
-              <td class="col-detail" title={log.rule_matched || log.target_url || '-'}>{log.rule_matched || log.target_url || '-'}</td>
+              <td class="col-detail" translate="no" title={log.rule_matched || log.target_url || '-'}>{log.rule_matched || log.target_url || '-'}</td>
               <td><span class="status" class:status-ok={log.status < 400} class:status-err={log.status >= 400}>{log.status}</span></td>
               <td>
-                <button type="button" class="btn-detail" onclick={() => openDetail(log)} aria-label="Voir le detail de la requete {log.path}" title="Detail" data-testid="request-log-detail-button-{idx}">&#8942;</button>
+                <button type="button" class="btn-detail" onclick={() => openDetail(log)} aria-label={t("Show the details of the request {0}", log.path)} title={t("Details")} data-testid="request-log-detail-button-{idx}">&#8942;</button>
               </td>
             </tr>
           {/each}
@@ -183,52 +184,52 @@
 
 {#if detailLog}
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-  <div class="modal-overlay" role="dialog" aria-modal="true" aria-label="Detail de la requete" tabindex="-1" onkeydown={handleKeydown} onclick={handleBackdrop} data-testid="request-log-detail-modal">
+  <div class="modal-overlay" role="dialog" aria-modal="true" aria-label={t("Request details")} tabindex="-1" onkeydown={handleKeydown} onclick={handleBackdrop} data-testid="request-log-detail-modal">
     <div class="modal-content" role="document">
       <div class="modal-header">
-        <h3>Detail de la requete</h3>
-        <button type="button" class="btn-close" onclick={closeDetail} aria-label="Fermer" data-testid="request-log-detail-modal-close-button">&#10005;</button>
+        <h3>{t("Request details")}</h3>
+        <button type="button" class="btn-close" onclick={closeDetail} aria-label={t("Close")} data-testid="request-log-detail-modal-close-button">&#10005;</button>
       </div>
       <dl class="detail-list">
         <div class="detail-row">
-          <dt>Date/Heure</dt>
+          <dt>{t("Date/time")}</dt>
           <dd>{formatDateTimePrecise(detailLog.timestamp)}</dd>
         </div>
         <div class="detail-row">
-          <dt>Service</dt>
+          <dt>{t("Service")}</dt>
           <dd>{detailLog.service_name}</dd>
         </div>
         <div class="detail-row">
-          <dt>Methode</dt>
+          <dt>{t("Method")}</dt>
           <dd><span class="method-badge" data-method={detailLog.method}>{detailLog.method}</span></dd>
         </div>
         <div class="detail-row">
-          <dt>Path</dt>
+          <dt>{t("Path")}</dt>
           <dd class="dd-mono">{detailLog.path}</dd>
         </div>
         <div class="detail-row">
-          <dt>Mode</dt>
+          <dt>{t("Mode")}</dt>
           <dd><span class="badge {modeBadge(detailLog.mode)}">{detailLog.mode}</span></dd>
         </div>
         {#if detailLog.rule_matched}
           <div class="detail-row">
-            <dt>Regle matchee</dt>
+            <dt>{t("Matched rule")}</dt>
             <dd class="dd-mono">{detailLog.rule_matched}</dd>
           </div>
         {/if}
         {#if detailLog.target_url}
           <div class="detail-row">
-            <dt>URL cible</dt>
+            <dt>{t("Target URL")}</dt>
             <dd class="dd-mono dd-break">{detailLog.target_url}</dd>
           </div>
         {/if}
         <div class="detail-row">
-          <dt>Status</dt>
+          <dt>{t("Status")}</dt>
           <dd><span class="status" class:status-ok={detailLog.status < 400} class:status-err={detailLog.status >= 400}>{detailLog.status}</span></dd>
         </div>
       </dl>
       <div class="modal-footer">
-        <button type="button" class="btn btn-sm btn-secondary" onclick={closeDetail}>Fermer</button>
+        <button type="button" class="btn btn-sm btn-secondary" onclick={closeDetail}>{t("Close")}</button>
       </div>
     </div>
   </div>

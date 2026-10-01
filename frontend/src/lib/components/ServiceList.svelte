@@ -1,5 +1,6 @@
 <script>
   import ServiceGroup from './ServiceGroup.svelte';
+  import { t, tCount } from '../i18n.svelte.js';
   import { getExpandedGroupKeys, setGroupExpanded, toggleGroupExpanded } from '../group-expansion-state.svelte.js';
 
   let { services = [], groups = [], onToggle = () => {}, onSelect = () => {}, onClone = () => {} } = $props();
@@ -60,7 +61,7 @@
   }
 
   function groupDisplayName(key) {
-    return key === '__ungrouped__' ? 'Sans groupe' : key;
+    return key === '__ungrouped__' ? t("No group") : key;
   }
 
   function groupId(key) {
@@ -74,33 +75,33 @@
   }
 </script>
 
-<section aria-label="Liste des services">
+<section aria-label={t("Service list")}>
   {#if services.length === 0}
     <div class="empty-state" role="status">
-      <p class="empty-title">Aucun service configure</p>
-      <p>Ajoutez un service pour commencer a mocker ou proxifier des routes.</p>
+      <p class="empty-title">{t("No service configured")}</p>
+      <p>{t("Add a service to start mocking or proxying routes.")}</p>
     </div>
   {:else}
     <div class="search-bar">
-      <label for="service-search" class="sr-only">Rechercher un service</label>
+      <label for="service-search" class="sr-only">{t("Search a service")}</label>
       <input
         id="service-search"
         type="search"
         bind:value={search}
-        placeholder="Rechercher par nom, chemin, URL ou groupe..."
-        aria-label="Rechercher un service"
+        placeholder={t("Search by name, path, URL or group...")}
+        aria-label={t("Search a service")}
         data-testid="service-list-search-input"
       />
       {#if search.trim()}
         <span class="search-count" role="status" aria-live="polite" data-testid="service-list-search-count">
-          {filtered.length} / {services.length} service{filtered.length !== 1 ? 's' : ''}
+          {tCount(filtered.length, "{0} / {1} service", "{0} / {1} services", services.length)}
         </span>
       {/if}
     </div>
 
     {#if filtered.length === 0}
       <div class="no-results" role="status" data-testid="service-list-no-results">
-        <p>Aucun service ne correspond a &laquo; {search} &raquo;</p>
+        <p>{t("No service matches “{0}”", search)}</p>
       </div>
     {:else}
       <div class="groups-container">

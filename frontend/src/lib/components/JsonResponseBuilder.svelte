@@ -1,27 +1,28 @@
 <script>
   import { fieldsToTemplate, buildExpr as sharedBuildExpr, templateToPreview } from '../tpl-utils.js';
+  import { t, tCount } from '../i18n.svelte.js';
 
   let { fields = [], onUpdate = () => {} } = $props();
 
   const fieldTypes = [
-    { value: 'value', label: 'Valeur' },
-    { value: 'object', label: 'Objet' },
-    { value: 'array-values', label: 'Tableau' },
-    { value: 'array-objects', label: 'Tableau d\'objets' },
+    { value: 'value', get label() { return t("Value"); } },
+    { value: 'object', get label() { return t("Object"); } },
+    { value: 'array-values', get label() { return t("Array"); } },
+    { value: 'array-objects', get label() { return t("Array of objects"); } },
   ];
 
   const valueSources = [
-    { value: 'fixed', label: 'Valeur fixe' },
-    { value: 'path', label: 'Parametre URL {param}' },
-    { value: 'query', label: 'Query param' },
-    { value: 'header', label: 'Header HTTP' },
-    { value: 'body', label: 'Echo body (JSON pointer)' },
-    { value: 'fake', label: 'Donnee fictive' },
-    { value: 'uuid', label: 'UUID' },
-    { value: 'now_ms', label: 'Timestamp (ms)' },
-    { value: 'now_iso', label: 'Date ISO' },
-    { value: 'seq', label: 'Compteur sequentiel' },
-    { value: 'script', label: 'Resultat du script' },
+    { value: 'fixed', get label() { return t("Fixed value"); } },
+    { value: 'path', get label() { return t("URL parameter {param}"); } },
+    { value: 'query', get label() { return t("Query param"); } },
+    { value: 'header', get label() { return t("HTTP header"); } },
+    { value: 'body', get label() { return t("Echo of the body (JSON pointer)"); } },
+    { value: 'fake', get label() { return t("Fake data"); } },
+    { value: 'uuid', get label() { return t("UUID"); } },
+    { value: 'now_ms', get label() { return t("Timestamp (ms)"); } },
+    { value: 'now_iso', get label() { return t("ISO date"); } },
+    { value: 'seq', get label() { return t("Sequence counter"); } },
+    { value: 'script', get label() { return t("Script result"); } },
   ];
 
   const fakeOptions = [
@@ -113,19 +114,19 @@
   }
 
   const pipeOptions = [
-    { value: '', label: '(aucun)' },
-    { value: 'lower', label: 'lower — minuscules' },
-    { value: 'upper', label: 'upper — majuscules' },
-    { value: 'trim', label: 'trim — suppr. espaces' },
-    { value: 'capitalize', label: 'capitalize — 1ere maj.' },
-    { value: 'first(N)', label: 'first(N) — N premiers car.' },
-    { value: 'last(N)', label: 'last(N) — N derniers car.' },
-    { value: 'substr(start,len)', label: 'substr(start,len)' },
-    { value: 'default("val")', label: 'default("val") — si vide' },
-    { value: 'replace("a","b")', label: 'replace("a","b")' },
-    { value: 'prepend("prefix")', label: 'prepend("prefix")' },
-    { value: 'append("suffix")', label: 'append("suffix")' },
-    { value: 'length', label: 'length — nb car.' },
+    { value: '', get label() { return t("(none)"); } },
+    { value: 'lower', get label() { return t("lower — lowercase"); } },
+    { value: 'upper', get label() { return t("upper — uppercase"); } },
+    { value: 'trim', get label() { return t("trim — strip spaces"); } },
+    { value: 'capitalize', get label() { return t("capitalize — first letter uppercase"); } },
+    { value: 'first(N)', get label() { return t("first(N) — first N characters"); } },
+    { value: 'last(N)', get label() { return t("last(N) — last N characters"); } },
+    { value: 'substr(start,len)', get label() { return t("substr(start,len)"); } },
+    { value: 'default("val")', get label() { return t("default(\"val\") — when empty"); } },
+    { value: 'replace("a","b")', get label() { return t("replace(\"a\",\"b\")"); } },
+    { value: 'prepend("prefix")', get label() { return t("prepend(\"prefix\")"); } },
+    { value: 'append("suffix")', get label() { return t("append(\"suffix\")"); } },
+    { value: 'length', get label() { return t("length — number of characters"); } },
   ];
 
   function newValueField() {
@@ -193,11 +194,11 @@
 
   function fieldPlaceholder(source) {
     switch (source) {
-      case 'fixed': return 'ex: actif';
-      case 'path': return 'ex: siret';
-      case 'query': return 'ex: page';
-      case 'header': return 'ex: x-request-id';
-      case 'body': return 'ex: /user/name';
+      case 'fixed': return t("e.g. active");
+      case 'path': return t("e.g. id");
+      case 'query': return t("e.g. page");
+      case 'header': return t("e.g. x-request-id");
+      case 'body': return t("e.g. /user/name");
       // Un seul niveau de cle plate est navigable ({{script.champ}}, jamais
       // {{script.objet.champ}}) : si le script retourne un objet imbrique
       // sous une cle (ex. `#{ ville: pick, id: uuid() }`), cette cle
@@ -206,7 +207,7 @@
       // le testeur de regle (bloc "Tester contre une requete reelle") pour
       // voir les cles reellement produites par le script avant de les
       // referencer ici.
-      case 'script': return 'ex: nom (vide = {{script}} entier ; 1 seul niveau — testez la regle pour voir les cles)';
+      case 'script': return t("e.g. name (empty = the whole {{script}}; one level only: test the rule to see the keys)");
       default: return '';
     }
   }
@@ -219,18 +220,18 @@
 
   function previewJson() {
     try { return templateToPreview(toTemplate()); }
-    catch { return '(erreur)'; }
+    catch { return t("(error)"); }
   }
 </script>
 
-<div class="json-builder" aria-label="Constructeur de reponse JSON">
+<div class="json-builder" aria-label={t("JSON response builder")}>
   <div class="builder-header">
-    <strong>Champs de la reponse JSON</strong>
-    <span class="field-hint">Construisez la structure JSON : valeurs, objets imbriques, tableaux.</span>
+    <strong>{t("Fields of the JSON response")}</strong>
+    <span class="field-hint">{t("Build the JSON structure: values, nested objects, arrays.")}</span>
   </div>
 
   {#if fields.length === 0}
-    <p class="empty-msg">Aucun champ. Cliquez "+ Ajouter un champ" pour commencer.</p>
+    <p class="empty-msg">{t("No field. Click “+ Add a field” to start.")}</p>
   {/if}
 
   {#snippet renderValueControls(field, path, idx)}
@@ -238,7 +239,7 @@
     <select
       value={field.source}
       onchange={(e) => updateProp(path, idx, 'source', e.target.value)}
-      aria-label="Source de la valeur"
+      aria-label={t("Source of the value")}
       data-testid="json-builder-source-select-{testPath}"
     >
       {#each valueSources as vs}
@@ -249,7 +250,7 @@
       <select
         value={field.value}
         onchange={(e) => updateProp(path, idx, 'value', e.target.value)}
-        aria-label="Type de donnee fictive"
+        aria-label={t("Fake data kind")}
         data-testid="json-builder-fake-select-{testPath}"
       >
         {#each fakeOptions as fo}
@@ -263,7 +264,7 @@
         value={field.value}
         oninput={(e) => updateProp(path, idx, 'value', e.target.value)}
         placeholder={fieldPlaceholder(field.source)}
-        aria-label="Valeur"
+        aria-label={t("Value")}
         data-testid="json-builder-value-input-{testPath}"
       />
     {/if}
@@ -273,14 +274,14 @@
         class="pipe-input"
         value={field.pipe || ''}
         oninput={(e) => updateProp(path, idx, 'pipe', e.target.value)}
-        placeholder="ex: first(9) | upper"
-        aria-label="Pipe de transformation"
+        placeholder={t("e.g. {0}", "first(9) | upper")}
+        aria-label={t("Transformation pipe")}
         list="dl-pipes"
         autocomplete="off"
         data-testid="json-builder-pipe-input-{testPath}"
       />
     {/if}
-    <label class="number-toggle" title="Rendre sans guillemets (nombre JSON)">
+    <label class="number-toggle" title={t("Render without quotes (JSON number)")}>
       <input type="checkbox" checked={field.asNumber} onchange={(e) => updateProp(path, idx, 'asNumber', e.target.checked)} data-testid="json-builder-asnumber-checkbox-{testPath}" />
       <span class="number-label">#</span>
     </label>
@@ -301,8 +302,8 @@
               onclick={() => toggleCollapse(testPath)}
               aria-expanded={!collapsed}
               aria-controls="json-builder-children-{testPath}"
-              aria-label={collapsed ? `Deplier ${field.key || 'ce champ'}` : `Replier ${field.key || 'ce champ'}`}
-              title={collapsed ? 'Deplier' : 'Replier'}
+              aria-label={collapsed ? t("Expand {0}", field.key || t("this field")) : t("Collapse {0}", field.key || t("this field"))}
+              title={collapsed ? t("Expand") : t("Collapse")}
               data-testid="json-builder-collapse-button-{testPath}"
             >{collapsed ? '▶' : '▼'}</button>
           {/if}
@@ -311,26 +312,26 @@
             class="key-input"
             value={field.key}
             oninput={(e) => updateProp(path, idx, 'key', e.target.value)}
-            placeholder="cle"
-            aria-label="Nom de la cle"
+            placeholder={t("key")}
+            aria-label={t("Key name")}
             data-testid="json-builder-key-input-{testPath}"
           />
           <select
             class="type-select"
             value={ft}
             onchange={(e) => changeFieldType(path, idx, e.target.value)}
-            aria-label="Type de champ"
+            aria-label={t("Field type")}
             data-testid="json-builder-type-select-{testPath}"
           >
-            {#each fieldTypes as t}
-              <option value={t.value}>{t.label}</option>
+            {#each fieldTypes as option}
+              <option value={option.value}>{option.label}</option>
             {/each}
           </select>
           {#if ft === 'value'}
             {@render renderValueControls(field, path, idx)}
           {/if}
           {#if collapsed}
-            <span class="collapsed-indicator" data-testid="json-builder-collapsed-indicator-{testPath}">({nestedCount(field, ft)} masque{nestedCount(field, ft) > 1 ? 's' : ''})</span>
+            <span class="collapsed-indicator" data-testid="json-builder-collapsed-indicator-{testPath}">{tCount(nestedCount(field, ft), "({0} hidden item)", "({0} hidden items)")}</span>
           {/if}
           <div class="field-actions">
             {#if ft === 'object' || ft === 'array-objects'}
@@ -338,21 +339,21 @@
                 type="button"
                 class="btn-icon"
                 onclick={() => focusPath = [...path, idx, ft === 'object' ? 'children' : 'template']}
-                aria-label="Naviguer dans {field.key || 'ce champ'}"
-                title="Naviguer dans ce champ"
+                aria-label={t("Go into {0}", field.key || t("this field"))}
+                title={t("Go into this field")}
                 data-testid="json-builder-navigate-button-{testPath}"
               >&#8594;</button>
             {/if}
-            <button type="button" class="btn-icon" onclick={() => moveAt(path, idx, -1)} disabled={idx === 0} aria-label="Monter" title="Monter" data-testid="json-builder-moveup-button-{testPath}">&#9650;</button>
-            <button type="button" class="btn-icon" onclick={() => moveAt(path, idx, 1)} disabled={idx === fieldList.length - 1} aria-label="Descendre" title="Descendre" data-testid="json-builder-movedown-button-{testPath}">&#9660;</button>
-            <button type="button" class="btn-icon btn-delete" onclick={() => removeAt(path, idx)} aria-label="Supprimer le champ {field.key || idx + 1}" data-testid="json-builder-delete-button-{testPath}">&#10005;</button>
+            <button type="button" class="btn-icon" onclick={() => moveAt(path, idx, -1)} disabled={idx === 0} aria-label={t("Move up")} title={t("Move up")} data-testid="json-builder-moveup-button-{testPath}">&#9650;</button>
+            <button type="button" class="btn-icon" onclick={() => moveAt(path, idx, 1)} disabled={idx === fieldList.length - 1} aria-label={t("Move down")} title={t("Move down")} data-testid="json-builder-movedown-button-{testPath}">&#9660;</button>
+            <button type="button" class="btn-icon btn-delete" onclick={() => removeAt(path, idx)} aria-label={t("Delete the field {0}", field.key || idx + 1)} data-testid="json-builder-delete-button-{testPath}">&#10005;</button>
           </div>
         </div>
 
         {#if ft === 'object'}
           <div class="nested-block" id="json-builder-children-{testPath}" hidden={collapsed}>
             {@render renderFields(field.children || [], [...path, idx, 'children'], depth + 1)}
-            <button type="button" class="btn btn-xs btn-outline" onclick={() => addFieldAt([...path, idx, 'children'])} data-testid="json-builder-add-subfield-button-{testPath}">+ Sous-champ</button>
+            <button type="button" class="btn btn-xs btn-outline" onclick={() => addFieldAt([...path, idx, 'children'])} data-testid="json-builder-add-subfield-button-{testPath}">{t("+ Sub-field")}</button>
           </div>
         {:else if ft === 'array-values'}
           <div class="nested-block" id="json-builder-children-{testPath}" hidden={collapsed}>
@@ -360,16 +361,16 @@
               <div class="array-item">
                 <span class="item-index">{iidx + 1}</span>
                 {@render renderValueControls(item, [...path, idx, 'items'], iidx)}
-                <button type="button" class="btn-icon btn-delete" onclick={() => removeAt([...path, idx, 'items'], iidx)} aria-label="Supprimer l'element {iidx + 1}" data-testid="json-builder-delete-item-button-{testPath}-{iidx}">&#10005;</button>
+                <button type="button" class="btn-icon btn-delete" onclick={() => removeAt([...path, idx, 'items'], iidx)} aria-label={t("Delete the item {0}", iidx + 1)} data-testid="json-builder-delete-item-button-{testPath}-{iidx}">&#10005;</button>
               </div>
             {/each}
-            <button type="button" class="btn btn-xs btn-outline" onclick={() => addArrayItem([...path, idx, 'items'])} data-testid="json-builder-add-item-button-{testPath}">+ Element</button>
+            <button type="button" class="btn btn-xs btn-outline" onclick={() => addArrayItem([...path, idx, 'items'])} data-testid="json-builder-add-item-button-{testPath}">{t("+ Item")}</button>
           </div>
         {:else if ft === 'array-objects'}
           <div class="nested-block" id="json-builder-children-{testPath}" hidden={collapsed}>
-            <span class="nested-hint">Schema d'un element du tableau :</span>
+            <span class="nested-hint">{t("Shape of an array item:")}</span>
             {@render renderFields(field.template || [], [...path, idx, 'template'], depth + 1)}
-            <button type="button" class="btn btn-xs btn-outline" onclick={() => addFieldAt([...path, idx, 'template'])} data-testid="json-builder-add-template-field-button-{testPath}">+ Champ</button>
+            <button type="button" class="btn btn-xs btn-outline" onclick={() => addFieldAt([...path, idx, 'template'])} data-testid="json-builder-add-template-field-button-{testPath}">{t("+ Field")}</button>
           </div>
         {/if}
       </div>
@@ -377,7 +378,7 @@
   {/snippet}
 
   {#if focusPath.length > 0}
-    <nav class="data-breadcrumb" aria-label="Chemin des donnees">
+    <nav class="data-breadcrumb" aria-label={t("Data path")}>
       <ol>
         {#each breadcrumb as segment, i}
           <li aria-current={i === breadcrumb.length - 1 ? 'page' : undefined}>
@@ -394,7 +395,7 @@
 
   {@render renderFields(focusedFields, focusPath, 0)}
 
-  <button type="button" class="btn btn-sm btn-outline" onclick={() => addFieldAt(focusPath)} data-testid="json-builder-add-field-button">+ Ajouter un champ</button>
+  <button type="button" class="btn btn-sm btn-outline" onclick={() => addFieldAt(focusPath)} data-testid="json-builder-add-field-button">{t("+ Add a field")}</button>
 
   <datalist id="dl-pipes">
     {#each pipeOptions.filter(p => p.value) as p}<option value={p.value}>{p.label}</option>{/each}
@@ -402,11 +403,11 @@
 
   {#if fields.length > 0}
     <details class="preview-section">
-      <summary>Apercu du template genere</summary>
+      <summary>{t("Preview of the generated template")}</summary>
       <code class="preview-code">{toTemplate()}</code>
     </details>
     <details class="preview-section">
-      <summary>Apercu JSON lisible</summary>
+      <summary>{t("Readable JSON preview")}</summary>
       <code class="preview-code preview-readable">{previewJson()}</code>
     </details>
   {/if}

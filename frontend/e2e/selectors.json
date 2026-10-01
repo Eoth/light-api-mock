@@ -316,7 +316,7 @@
   },
 
   "toggleSwitch": {
-    "switch": "[data-testid=\"toggle-switch-{label}\"]"
+    "switch": "[data-testid=\"toggle-switch-{name}\"]"
   },
 
   "urlHealthBadge": {

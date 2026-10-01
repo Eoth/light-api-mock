@@ -7,6 +7,7 @@
   // composant ne fait que proposer add/remove via callbacks, jamais de copie
   // locale des tableaux.
   import ConditionForm from './ConditionForm.svelte';
+  import { t } from '../i18n.svelte.js';
 
   let {
     allOf = [],
@@ -72,15 +73,15 @@
   }
 
   function conditionLabel(c) {
-    const src = c.source.type === 'BodyRaw' ? 'Corps brut' : `${c.source.type}(${c.source.key})`;
-    const op = c.operator.type === 'Exists' ? 'existe' : `${c.operator.type}(${c.operator.value})`;
+    const src = c.source.type === 'BodyRaw' ? t("Raw body") : `${c.source.type}(${c.source.key})`;
+    const op = c.operator.type === 'Exists' ? t("exists") : `${c.operator.type}(${c.operator.value})`;
     return `${src} ${op}`;
   }
 </script>
 
 <fieldset class="section">
-  <legend>Conditions ET (toutes doivent correspondre)</legend>
-  <p class="section-help">Sans condition, la regle matche toutes les requetes.</p>
+  <legend>{t("AND conditions (all must match)")}</legend>
+  <p class="section-help">{t("Without any condition, the rule matches every request.")}</p>
   {#if allOf.length > 0}
     <ul class="cond-list" role="list">
       {#each allOf as cond, idx}
@@ -100,12 +101,12 @@
               type="button"
               class="cond-label-button"
               onclick={() => startEdit('all_of', idx)}
-              aria-label="Modifier la condition : {conditionLabel(cond)}"
+              aria-label={t("Edit the condition: {0}", conditionLabel(cond))}
               data-testid="rule-form-edit-condition-allof-button-{idx}"
             >
-              {conditionLabel(cond)}
+              <span translate="no">{conditionLabel(cond)}</span>
             </button>
-            <button type="button" class="btn-icon btn-delete" onclick={() => removeCondition('all_of', idx)} aria-label="Supprimer" data-testid="rule-form-remove-condition-allof-button-{idx}">&#10005;</button>
+            <button type="button" class="btn-icon btn-delete" onclick={() => removeCondition('all_of', idx)} aria-label={t("Delete")} data-testid="rule-form-remove-condition-allof-button-{idx}">&#10005;</button>
           </li>
         {/if}
       {/each}
@@ -119,12 +120,12 @@
       onCancel={() => addingConditionTo = null}
     />
   {:else}
-    <button type="button" class="btn btn-sm btn-outline" onclick={() => startAdd('all_of')} data-testid="rule-form-add-condition-allof-button">+ Condition ET</button>
+    <button type="button" class="btn btn-sm btn-outline" onclick={() => startAdd('all_of')} data-testid="rule-form-add-condition-allof-button">{t("+ AND condition")}</button>
   {/if}
 </fieldset>
 
 <fieldset class="section">
-  <legend>Conditions OU (au moins une doit correspondre)</legend>
+  <legend>{t("OR conditions (at least one must match)")}</legend>
   {#if anyOf.length > 0}
     <ul class="cond-list" role="list">
       {#each anyOf as cond, idx}
@@ -144,12 +145,12 @@
               type="button"
               class="cond-label-button"
               onclick={() => startEdit('any_of', idx)}
-              aria-label="Modifier la condition : {conditionLabel(cond)}"
+              aria-label={t("Edit the condition: {0}", conditionLabel(cond))}
               data-testid="rule-form-edit-condition-anyof-button-{idx}"
             >
-              {conditionLabel(cond)}
+              <span translate="no">{conditionLabel(cond)}</span>
             </button>
-            <button type="button" class="btn-icon btn-delete" onclick={() => removeCondition('any_of', idx)} aria-label="Supprimer" data-testid="rule-form-remove-condition-anyof-button-{idx}">&#10005;</button>
+            <button type="button" class="btn-icon btn-delete" onclick={() => removeCondition('any_of', idx)} aria-label={t("Delete")} data-testid="rule-form-remove-condition-anyof-button-{idx}">&#10005;</button>
           </li>
         {/if}
       {/each}
@@ -163,7 +164,7 @@
       onCancel={() => addingConditionTo = null}
     />
   {:else}
-    <button type="button" class="btn btn-sm btn-outline" onclick={() => startAdd('any_of')} data-testid="rule-form-add-condition-anyof-button">+ Condition OU</button>
+    <button type="button" class="btn btn-sm btn-outline" onclick={() => startAdd('any_of')} data-testid="rule-form-add-condition-anyof-button">{t("+ OR condition")}</button>
   {/if}
 </fieldset>
 

@@ -9,6 +9,9 @@ entre versions mineures.
 
 ## [Unreleased]
 
+### Added
+- The interface is available in English and French: it follows the browser's language (English when no catalogue exists for it), and a language selector in the header remembers the choice. Each sentence is written once, in English, where it is used, and a language adds one catalogue (`frontend/src/locales/<language>.json`), loaded only by its users; a test fails on any message missing from a catalogue, any catalogue entry no longer used, any lost placeholder, and any visible word of the interface that escapes translation (rendered in a pseudo-locale).
+
 ### Security
 - With authentication enabled, the Kafka message log and `POST /api/messaging/simulate` are reserved to super-admins: Kafka is configured for the whole instance, its log spans every group's services, and a simulation publishes on the real reply topic.
 - Dependencies upgraded past known vulnerabilities: quick-xml 0.42 (RUSTSEC-2026-0194 and -0195: quadratic time and unbounded allocation on crafted XML, which lightMock parses from incoming requests), rustls 0.23.45 (RUSTSEC-2026-0285), and the yanked chacha20 0.10.0. XML text now resolves character references (`&#233;`) as well as the predefined entities.

@@ -17,6 +17,7 @@
   // correspondante dans la listbox, jamais par un deplacement de focus reel.
   import { tick, untrack } from 'svelte';
   import { filterRhaiFunctions, tokenAtCursor, computeInsertSelection } from '../rhai-functions.js';
+  import { t } from '../i18n.svelte.js';
 
   let {
     id,
@@ -123,7 +124,7 @@
     data-testid="rhai-script-editor-textarea-{id}"
   ></textarea>
   {#if showSuggestions}
-    <ul class="rhai-suggestions" id={listboxId} role="listbox" aria-label="Fonctions Rhai disponibles" data-testid="rhai-script-editor-suggestions-{id}">
+    <ul class="rhai-suggestions" id={listboxId} role="listbox" aria-label={t("Available Rhai functions")} data-testid="rhai-script-editor-suggestions-{id}">
       {#each suggestions as fn, i (fn.name)}
         <li
           id="{listboxId}-opt-{i}"

@@ -4,6 +4,9 @@
 // par l'autocompletion (RhaiScriptEditor.svelte) — meme principe que
 // tpl-utils.js pour le format template : une seule liste a mettre a jour
 // quand une fonction native est ajoutee/modifiee cote moteur.
+import { t } from './i18n.svelte.js';
+
+// Texts are getters, read when shown, so that they follow a change of language.
 export const RHAI_FUNCTIONS = [
   // --- Acces au contexte de la requete (variable `request`, pas des
   // fonctions a proprement parler, mais listees ici pour beneficier de la
@@ -21,123 +24,123 @@ export const RHAI_FUNCTIONS = [
   // verifier qu'une cle est bien trouvee avant de se fier au script.
   {
     name: 'request.path',
-    signature: 'request.path.nom_du_parametre',
-    description: 'Parametres de chemin extraits de l\'URL (ex. {id} dans /orders/{id} -> request.path.id). Cle absente = valeur vide, jamais d\'erreur.',
+    get signature() { return t("request.path.parameter_name"); },
+    get description() { return t("Path parameters taken from the URL (e.g. {id} in /orders/{id} -> request.path.id). A missing key gives an empty value, never an error."); },
     insertText: 'request.path',
   },
   {
     name: 'request.query',
-    signature: 'request.query.nom_du_parametre',
-    description: 'Parametres de la query string (ex. ?page=2 -> request.query.page). Cle absente = valeur vide, jamais d\'erreur.',
+    get signature() { return t("request.query.parameter_name"); },
+    get description() { return t("Parameters of the query string (e.g. ?page=2 -> request.query.page). A missing key gives an empty value, never an error."); },
     insertText: 'request.query',
   },
   {
     name: 'request.headers',
-    signature: 'request.headers.nom_entete',
-    description: 'En-tetes HTTP de la requete. ATTENTION : les noms sont toujours normalises en minuscules cote serveur (ex. "SOAPAction" devient request.headers.soapaction) — utiliser un nom en minuscules, sinon la cle est silencieusement introuvable.',
+    get signature() { return t("request.headers.header_name"); },
+    get description() { return t("HTTP headers of the request. WARNING: the server always lowercases their names (e.g. \"SOAPAction\" becomes request.headers.soapaction): use a lowercase name, or the key is silently not found."); },
     insertText: 'request.headers',
   },
   {
     name: 'request.body',
     signature: 'request.body',
-    description: 'Corps brut de la requete, en texte. A parser avec parse_json()/parse_xml_items() si le corps est structure.',
+    get description() { return t("Raw body of the request, as text. Parse it with parse_json() or parse_xml_items() when it is structured."); },
     insertText: 'request.body',
   },
   {
     name: 'random_int',
     signature: 'random_int(min, max)',
-    description: 'Entier aleatoire entre min et max (inclus).',
+    get description() { return t("Random integer between min and max (inclusive)."); },
     insertText: 'random_int(min, max)',
   },
   {
     name: 'now_ms',
     signature: 'now_ms()',
-    description: 'Timestamp Unix courant en millisecondes.',
+    get description() { return t("Current Unix timestamp in milliseconds."); },
     insertText: 'now_ms()',
   },
   {
     name: 'now_iso',
     signature: 'now_iso()',
-    description: "Date et heure courantes au format ISO 8601 complet (avec l'heure).",
+    get description() { return t("Current date and time in full ISO 8601 format (with the time)."); },
     insertText: 'now_iso()',
   },
   {
     name: 'year',
     signature: 'year()',
-    description: 'Annee courante sur 4 chiffres.',
+    get description() { return t("Current year, 4 digits."); },
     insertText: 'year()',
   },
   {
     name: 'date_now',
     signature: 'date_now(format)',
-    description: 'Date du jour. format optionnel : "iso" (defaut), "fr", "en".',
+    get description() { return t("Today's date. Optional format: \"iso\" (default), \"fr\", \"en\"."); },
     insertText: 'date_now("iso")',
   },
   {
     name: 'date_past',
-    signature: 'date_past(jours, format)',
-    description: "Date dans le passe, \"jours\" jours avant aujourd'hui (0 ou negatif = aujourd'hui).",
-    insertText: 'date_past(jours, "iso")',
+    get signature() { return t("date_past(days, format)"); },
+    get description() { return t("A date in the past, \"days\" days before today (0 or negative = today)."); },
+    get insertText() { return t("date_past(days, \"iso\")"); },
   },
   {
     name: 'date_future',
-    signature: 'date_future(jours, format)',
-    description: "Date dans le futur, \"jours\" jours apres aujourd'hui (0 ou negatif = aujourd'hui).",
-    insertText: 'date_future(jours, "iso")',
+    get signature() { return t("date_future(days, format)"); },
+    get description() { return t("A date in the future, \"days\" days after today (0 or negative = today)."); },
+    get insertText() { return t("date_future(days, \"iso\")"); },
   },
   {
     name: 'parse_date',
-    signature: 'parse_date(texte, "pattern")',
-    description: 'Sens inverse de date_now/date_past/date_future : parse une date SAISIE selon un pattern explicite (yyyy/MM/dd/HH/mm/ss, tout autre caractere est litteral) et retourne le nombre de millisecondes depuis epoch. Ex. parse_date("15/03/2026", "dd/MM/yyyy"). Heure optionnelle (defaut 00:00:00). Erreur d\'execution si le texte ne correspond pas au pattern ou si la date est invalide (ex. 31 fevrier).',
-    insertText: 'parse_date(texte, "dd/MM/yyyy")',
+    get signature() { return t("parse_date(text, \"pattern\")"); },
+    get description() { return t("The reverse of date_now/date_past/date_future: parses a date TYPED in an explicit pattern (yyyy/MM/dd/HH/mm/ss, any other character is literal) and returns milliseconds since the epoch. E.g. parse_date(\"15/03/2026\", \"dd/MM/yyyy\"). The time is optional (00:00:00 by default). A run error when the text does not follow the pattern or the date does not exist (e.g. February 31)."); },
+    get insertText() { return t("parse_date(text, \"dd/MM/yyyy\")"); },
   },
   {
     name: 'uuid',
     signature: 'uuid()',
-    description: 'Identifiant UUID v4 aleatoire.',
+    get description() { return t("Random UUID v4 identifier."); },
     insertText: 'uuid()',
   },
   {
     name: 'fake',
     signature: 'fake("Kind")',
-    description: 'Donnee fictive (ex. "FirstName", "Email", "CompanyName"...).',
+    get description() { return t("Fake data (e.g. \"FirstName\", \"Email\", \"CompanyName\"...)."); },
     insertText: 'fake("FirstName")',
   },
   {
     name: 'seeded_int',
     signature: 'seeded_int(seed, min, max)',
-    description: 'Entier deterministe dans [min, max] : meme resultat pour un meme seed.',
+    get description() { return t("Deterministic integer in [min, max]: the same seed always gives the same result."); },
     insertText: 'seeded_int(seed, min, max)',
   },
   {
     name: 'seeded_pick',
-    signature: 'seeded_pick(seed, [liste])',
-    description: 'Choisit un element de la liste de facon deterministe pour un meme seed.',
+    get signature() { return t("seeded_pick(seed, [list])"); },
+    get description() { return t("Picks an element of the list, always the same one for the same seed."); },
     insertText: 'seeded_pick(seed, ["a", "b"])',
   },
   {
     name: 'parse_json',
-    signature: 'parse_json(texte)',
-    description: 'Parse un texte JSON (ex. request.body) en liste/objet Rhai navigable.',
+    get signature() { return t("parse_json(text)"); },
+    get description() { return t("Parses JSON text (e.g. request.body) into a Rhai list or object you can navigate."); },
     insertText: 'parse_json(request.body)',
   },
   {
     name: 'to_json',
-    signature: 'to_json(valeur)',
-    description: 'Serialise une liste/objet Rhai en texte JSON, a inserer via {{script.champ}}.',
-    insertText: 'to_json(valeur)',
+    get signature() { return t("to_json(value)"); },
+    get description() { return t("Serializes a Rhai list or object to JSON text, to insert through {{script.field}}."); },
+    get insertText() { return t("to_json(value)"); },
   },
   {
     name: 'parse_xml_items',
-    signature: 'parse_xml_items(texte, "chemin/vers/item")',
-    description: 'Extrait tous les elements XML repetes a un chemin en liste d\'objets Rhai (un niveau de champs enfants).',
-    insertText: 'parse_xml_items(request.body, "chemin/vers/item")',
+    get signature() { return t("parse_xml_items(text, \"path/to/item\")"); },
+    get description() { return t("Extracts every XML element repeated at a path into a list of Rhai objects (one level of child fields)."); },
+    get insertText() { return t("parse_xml_items(request.body, \"path/to/item\")"); },
   },
   {
     name: 'xml_element',
-    signature: 'xml_element(tag, valeur)',
-    description: 'Construit un element XML <tag>...</tag> a partir d\'une liste/objet Rhai (recursif).',
-    insertText: 'xml_element("tag", valeur)',
+    get signature() { return t("xml_element(tag, value)"); },
+    get description() { return t("Builds an XML element <tag>...</tag> from a Rhai list or object (recursive)."); },
+    get insertText() { return t("xml_element(\"tag\", value)"); },
   },
 ];
 
