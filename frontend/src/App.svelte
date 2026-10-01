@@ -17,18 +17,15 @@
   let services = $state([]);
   let resetPending = $state(false);
   let groups = $state([]);
-  // Absent (binaire compile sans la feature "messaging-kafka") -> le bouton
-  // "Messages Kafka" reste cache plutot que de mener a une vue en echec (404).
+  // False on a binary built without the "messaging-kafka" feature: the Kafka messages button stays hidden rather than
+  // leading to a view that fails (404).
   let messagingAvailable = $state(false);
-  // Meme garde que messagingAvailable, pour la feature "tcp-mock".
+  // The same guard, for the "tcp-mock" feature.
   let tcpAvailable = $state(false);
   let notification = $state({ message: '', type: 'info', visible: false });
   let selectedService = $state(null);
-  // Le nom seul ne suffit pas a identifier un service (deux services
-  // peuvent partager un nom dans des groupes differents) : on garde le
-  // groupe d'origine a cote du nom selectionne pour que
-  // currentService/handleServiceUpdate/handleServiceDelete resolvent le bon
-  // service sans ambiguite.
+  // A name alone does not identify a service (two groups may each hold one of that name): the group is kept next to
+  // the selected name, so that currentService, handleServiceUpdate and handleServiceDelete find the right service.
   let selectedServiceGroup = $state(null);
   let view = $state('list');
   let loading = $state(true);
@@ -98,15 +95,12 @@
       const messagingStatus = await getMessagingStatus();
       messagingAvailable = !!messagingStatus?.available;
     } catch {
-      // 404 sur un binaire compile sans la feature "messaging-kafka" : c'est
-      // l'etat par defaut attendu, pas une erreur a notifier a l'utilisateur.
+      // 404 on a binary built without the "messaging-kafka" feature: the expected default, not an error to show.
       messagingAvailable = false;
     }
 
     try {
-      // getTcpStatus() renvoie toujours 200 (liste eventuellement vide) sur
-      // un binaire compile avec "tcp-mock" ; 404 sinon -- meme detection que
-      // messagingAvailable ci-dessus.
+      // 200, with a list that may be empty, on a binary built with "tcp-mock"; 404 otherwise, as for messaging above.
       await getTcpStatus();
       tcpAvailable = true;
     } catch {
@@ -171,10 +165,9 @@
     clonedService = { ...JSON.parse(JSON.stringify(svc)), name: t("{0}-copy", svc.name) };
     view = 'add';
   }
-  // `previousGroupName` est le groupe AVANT la mutation (capture par
-  // ServiceDetail/GroupManager avant l'appel API) : necessaire pour
-  // retrouver l'entree a remplacer meme si `updated.group_name` a change
-  // (deplacement vers un autre groupe) — `updated.name` seul ne suffit pas.
+  // `previousGroupName` is the group before the change (ServiceDetail and GroupManager read it before calling the
+  // API): it finds the entry to replace even when `updated.group_name` changed (a move to another group), which
+  // `updated.name` alone could not.
   function handleServiceUpdate(updated, previousGroupName = updated.group_name) {
     services = services.map(s => (s.name === updated.name && s.group_name === previousGroupName) ? updated : s);
     selectedService = updated.name;
@@ -279,9 +272,8 @@
       }
       let added = 0;
       for (const svc of config.services) {
-        // Scope par nom ET groupe : deux services du meme nom dans des
-        // groupes differents sont distincts, sinon la fusion ignorerait a
-        // tort un service reellement nouveau.
+        // Matched on name and group: two services of the same name in different groups are different, and a merge
+        // comparing names only would skip a service that is new.
         if (!services.some(s => s.name === svc.name && s.group_name === (svc.group_name ?? null))) {
           const result = await createService(svc);
           services = [...services, result];
