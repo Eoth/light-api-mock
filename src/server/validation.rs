@@ -1,3 +1,4 @@
+use crate::i18n::tr;
 use crate::models::Service;
 
 const RESERVED_NAMES: &[&str] = &[
@@ -62,10 +63,6 @@ pub fn has_dot_segment(path: &str) -> bool {
     })
 }
 
-fn is_dangerous_listen_path(_listen_path: &str) -> bool {
-    false
-}
-
 #[derive(Debug)]
 pub struct ValidationError {
     pub field: &'static str,
@@ -80,44 +77,37 @@ impl std::fmt::Display for ValidationError {
 
 pub fn validate_service(service: &Service) -> Result<(), ValidationError> {
     let name = service.name.trim();
+    let error = |field, message| Err(ValidationError { field, message });
 
     if name.is_empty() {
-        return Err(ValidationError {
-            field: "name",
-            message: "Le nom du service est requis.".into(),
-        });
+        return error("name", tr("The service name is required.", &[]));
     }
-
     if is_reserved_name(name) {
-        return Err(ValidationError {
-            field: "name",
-            message: format!(
-                "Le nom \"{name}\" est reserve par lightMock (noms interdits : {}).",
-                RESERVED_NAMES.join(", ")
+        return error(
+            "name",
+            tr(
+                "The name \"{0}\" is reserved by lightMock (forbidden names: {1}).",
+                &[&name, &RESERVED_NAMES.join(", ")],
             ),
-        });
+        );
     }
-
     if name.contains('/') || name.contains('\\') {
-        return Err(ValidationError {
-            field: "name",
-            message: "Le nom du service ne peut pas contenir de separateur de chemin (/ ou \\)."
-                .into(),
-        });
+        return error(
+            "name",
+            tr(
+                "A service name cannot contain a path separator (/ or \\).",
+                &[],
+            ),
+        );
     }
-
     if !NAME_CHARSET_RE.is_match(name) {
-        return Err(ValidationError {
-            field: "name",
-            message: "Le nom du service ne peut contenir que des lettres, chiffres, tirets (-) et underscores (_).".into(),
-        });
-    }
-
-    if is_dangerous_listen_path(&service.listen_path) {
-        return Err(ValidationError {
-            field: "listen_path",
-            message: "Le chemin d'ecoute est dangereux : un chemin vide, \"/\" ou \"/*\" au premier niveau capturerait la racine de lightMock et masquerait l'interface.".into(),
-        });
+        return error(
+            "name",
+            tr(
+                "A service name can only contain letters, digits, dashes (-) and underscores (_).",
+                &[],
+            ),
+        );
     }
 
     let effective = format!(
@@ -126,100 +116,94 @@ pub fn validate_service(service: &Service) -> Result<(), ValidationError> {
         service.listen_path.trim().trim_start_matches('/')
     );
     if is_internal_route(&effective) {
-        return Err(ValidationError {
-            field: "listen_path",
-            message: format!(
-                "Le pattern effectif \"{effective}\" entrerait en conflit avec une route interne de lightMock."
+        return error(
+            "listen_path",
+            tr(
+                "The resulting pattern \"{0}\" would conflict with an internal route of lightMock.",
+                &[&effective],
             ),
-        });
+        );
     }
 
-    // Service "purement mocke" : real_target_url vide est une valeur
-    // volontaire ("aucune cible configuree"), pas une omission a rejeter. En
-    // revanche is_mocked=false (proxy pur niveau service) sans cible n'a
-    // aucun sens : ce serait forcement un proxy vers une URL vide a chaque
-    // requete. Bloque a la source plutot que de laisser cette combinaison
-    // invalide atteindre le pipeline HTTP.
+    // An empty real_target_url is how a purely mocked service is written, not an omission. A direct proxy
+    // (is_mocked=false) without a target would forward every request to an empty URL: refused at the source.
     if !service.is_mocked && service.real_target_url.trim().is_empty() {
-        return Err(ValidationError {
-            field: "real_target_url",
-            message: "Un service sans cible ne peut pas etre en proxy direct (is_mocked=false) : activez le mode mock ou renseignez une cible.".into(),
-        });
+        return error(
+            "real_target_url",
+            tr(
+                "A service without a target cannot be a direct proxy (is_mocked=false): switch the mock mode on or set a target.",
+                &[],
+            ),
+        );
     }
 
     let mut seen_rules = std::collections::HashSet::new();
     for rule in &service.rules {
         let rn = rule.name.trim();
         if rn.is_empty() {
-            return Err(ValidationError {
-                field: "rules",
-                message: "Le nom de la regle est requis.".into(),
-            });
+            return error("rules", tr("The rule name is required.", &[]));
         }
         let method_upper = rule.method.trim().to_uppercase();
         if !VALID_METHODS.contains(&method_upper.as_str()) {
-            return Err(ValidationError {
-                field: "rules",
-                message: format!(
-                    "Methode HTTP invalide \"{}\" pour la regle \"{rn}\". Valeurs acceptees : {}.",
-                    rule.method,
-                    VALID_METHODS.join(", ")
+            return error(
+                "rules",
+                tr(
+                    "Invalid HTTP method \"{0}\" for the rule \"{1}\". Accepted values: {2}.",
+                    &[&rule.method, &rn, &VALID_METHODS.join(", ")],
                 ),
-            });
+            );
         }
         // A pattern that does not compile would never match, silently: refuse it when it is saved.
         for condition in rule.conditions.all_of.iter().chain(&rule.conditions.any_of) {
             if let crate::models::Operator::Regex(pattern) = &condition.operator
-                && let Err(error) = crate::engine::regex_cache::check_text(pattern)
+                && let Err(reason) = crate::engine::regex_cache::check_text(pattern)
             {
-                return Err(ValidationError {
-                    field: "rules",
-                    message: format!(
-                        "Rule \"{rn}\": invalid regular expression \"{pattern}\": {error}"
+                return error(
+                    "rules",
+                    tr(
+                        "Rule \"{0}\": invalid regular expression \"{1}\": {2}",
+                        &[&rn, pattern, &reason],
                     ),
-                });
+                );
             }
         }
         if !seen_rules.insert(rn.to_lowercase()) {
-            return Err(ValidationError {
-                field: "rules",
-                message: format!(
-                    "Le nom de regle \"{rn}\" est utilise plusieurs fois dans ce service. Chaque regle doit avoir un nom unique."
+            return error(
+                "rules",
+                tr(
+                    "The rule name \"{0}\" is used several times in this service. Each rule needs a unique name.",
+                    &[&rn],
                 ),
-            });
+            );
         }
     }
 
     Ok(())
 }
 
-/// Valide un nom de fichier de backup recu depuis un segment d'URL
-/// (`POST /api/config/restore/:filename`) avant toute operation disque.
-/// Rejette explicitement '..' et les separateurs de chemin AVANT le test de
-/// charset, pour renvoyer un message specifique sur la tentative de
-/// traversee plutot qu'un simple "format invalide".
+/// Validates a backup file name taken from a URL segment (`POST /api/config/restore/:filename`) before any disk
+/// access. `..` and path separators are refused before the character set is checked, so that a traversal attempt
+/// gets its own message rather than a mere "invalid format".
 pub fn validate_backup_filename(filename: &str) -> Result<(), ValidationError> {
     let name = filename.trim();
+    let error = |message| {
+        Err(ValidationError {
+            field: "filename",
+            message,
+        })
+    };
 
     if name.is_empty() {
-        return Err(ValidationError {
-            field: "filename",
-            message: "Le nom du fichier de sauvegarde est requis.".into(),
-        });
+        return error(tr("The backup file name is required.", &[]));
     }
-
     if name.contains("..") || name.contains('/') || name.contains('\\') {
-        return Err(ValidationError {
-            field: "filename",
-            message: "Le nom du fichier ne peut pas contenir de separateur de chemin (/ ou \\) ni de sequence \"..\".".into(),
-        });
+        return error(tr(
+            "A file name cannot contain a path separator (/ or \\) nor \"..\".",
+            &[],
+        ));
     }
-
     if !BACKUP_FILENAME_RE.is_match(name) {
-        return Err(ValidationError {
-            field: "filename",
-            message: "Nom de fichier de sauvegarde invalide.".into(),
-        });
+        return error(tr("Invalid backup file name.", &[]));
     }
 
     Ok(())

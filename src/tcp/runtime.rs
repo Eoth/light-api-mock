@@ -64,8 +64,7 @@ impl TcpRuntime {
     /// tache (et la `TcpListener` qu'elle possede) effectivement detruite,
     /// pas juste la demande de cancellation envoyee.
     pub async fn replace(&self, new_config: TcpConfig) -> std::io::Result<()> {
-        let yaml = serde_yaml::to_string(&new_config)
-            .expect("TcpConfig n'a aucun champ pouvant echouer a la serialisation YAML");
+        let yaml = serde_yaml::to_string(&new_config).map_err(std::io::Error::other)?;
         Self::write_to_disk(&TcpConfig::config_file(&self.data_dir), &yaml)?;
 
         let mut guard = self.inner.write().await;

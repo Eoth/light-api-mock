@@ -130,6 +130,6 @@ test.describe('Auth: assets statiques de la SPA accessibles sans token (AUTH_ENA
     const res = await request.get(`${baseUrl}/api/services`);
     expect(res.status()).toBe(401);
     const body = await res.json();
-    expect(body.error).toBe('Token manquant');
+    expect(body.error).toBe('Missing token.');
   });
 });

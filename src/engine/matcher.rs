@@ -208,33 +208,37 @@ impl MatchEngine {
     /// sont pas de simples cles nommees comparables entre elles (chemin
     /// structure ou corps entier, pas un nom de champ).
     fn cross_source_hint(source: &ConditionSource, req: &RequestData) -> Option<String> {
+        let query = || crate::i18n::tr("query parameter", &[]);
+        let header = || crate::i18n::tr("header", &[]);
+        let path = || crate::i18n::tr("path parameter", &[]);
+        let form = || crate::i18n::tr("form field", &[]);
         let (key, current_label) = match source {
-            ConditionSource::QueryParam(k) => (k, "parametre de requete"),
-            ConditionSource::Header(k) => (k, "en-tete"),
-            ConditionSource::PathParam(k) => (k, "parametre de chemin"),
-            ConditionSource::FormField(k) => (k, "champ de formulaire"),
+            ConditionSource::QueryParam(k) => (k, query()),
+            ConditionSource::Header(k) => (k, header()),
+            ConditionSource::PathParam(k) => (k, path()),
+            ConditionSource::FormField(k) => (k, form()),
             _ => return None,
         };
 
         let mut found_in = Vec::new();
         if !matches!(source, ConditionSource::PathParam(_)) && req.path_params.contains_key(key) {
-            found_in.push("parametre de chemin");
+            found_in.push(path());
         }
         if !matches!(source, ConditionSource::QueryParam(_)) && req.query_params.contains_key(key) {
-            found_in.push("parametre de requete");
+            found_in.push(query());
         }
         if !matches!(source, ConditionSource::Header(_))
             && req.headers.keys().any(|h| h.eq_ignore_ascii_case(key))
         {
-            found_in.push("en-tete");
+            found_in.push(header());
         }
 
         if found_in.is_empty() {
             None
         } else {
-            Some(format!(
-                "'{key}' n'a pas ete trouve comme {current_label}, mais est present comme {} dans cette requete",
-                found_in.join(" et ")
+            Some(crate::i18n::tr(
+                "'{0}' was not found as a {1}, but it is present as a {2} in this request",
+                &[key, &current_label, &found_in.join(", ")],
             ))
         }
     }
@@ -1185,7 +1189,7 @@ mod tests {
         assert!(result.all_of[0].found_value.is_none());
         let hint = result.all_of[0].hint.as_deref().unwrap();
         assert!(hint.contains("foo"));
-        assert!(hint.contains("parametre de chemin"));
+        assert!(hint.contains("path parameter"));
     }
 
     #[test]
@@ -1203,7 +1207,7 @@ mod tests {
         assert_eq!(
             result.all_of[0].hint.as_deref(),
             Some(
-                "'token' n'a pas ete trouve comme parametre de chemin, mais est present comme en-tete dans cette requete"
+                "'token' was not found as a path parameter, but it is present as a header in this request"
             )
         );
     }

@@ -151,6 +151,7 @@ pub fn build_router_with(
             guard,
             browser_guard::security_headers,
         ))
+        .layer(axum::middleware::from_fn(crate::i18n::language_scope))
         .with_state(state)
         .layer(cors)
 }

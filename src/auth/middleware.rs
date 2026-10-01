@@ -1,5 +1,6 @@
 use crate::auth::AuthConfig;
 use crate::auth::keycloak::KeycloakClient;
+use crate::i18n::tr;
 use axum::body::Body;
 use axum::extract::Request;
 use axum::http::StatusCode;
@@ -66,7 +67,7 @@ pub async fn auth_middleware(
     let Some(token) = token else {
         return (
             StatusCode::UNAUTHORIZED,
-            axum::Json(serde_json::json!({"error": "Token manquant"})),
+            axum::Json(serde_json::json!({"error": tr("Missing token.", &[])})),
         )
             .into_response();
     };
@@ -86,7 +87,9 @@ pub async fn auth_middleware(
             tracing::warn!(error = %detail, "token not checked: Keycloak unavailable");
             (
                 StatusCode::SERVICE_UNAVAILABLE,
-                axum::Json(serde_json::json!({"error": "Service d'authentification indisponible"})),
+                axum::Json(
+                    serde_json::json!({"error": tr("Authentication service unavailable.", &[])}),
+                ),
             )
                 .into_response()
         }
@@ -94,7 +97,7 @@ pub async fn auth_middleware(
             tracing::debug!(error = %e, "token validation failed");
             (
                 StatusCode::UNAUTHORIZED,
-                axum::Json(serde_json::json!({"error": "Token invalide ou expire"})),
+                axum::Json(serde_json::json!({"error": tr("Invalid or expired token.", &[])})),
             )
                 .into_response()
         }
@@ -215,7 +218,7 @@ mod tests {
         let resp = client.get(format!("{base}/services")).send().await.unwrap();
         assert_eq!(resp.status().as_u16(), 401);
         let body: serde_json::Value = resp.json().await.unwrap();
-        assert_eq!(body["error"], "Token manquant");
+        assert_eq!(body["error"], "Missing token.");
     }
 
     #[tokio::test]
@@ -237,7 +240,7 @@ mod tests {
             .unwrap();
         assert_eq!(resp.status().as_u16(), 401);
         let body: serde_json::Value = resp.json().await.unwrap();
-        assert_eq!(body["error"], "Token manquant");
+        assert_eq!(body["error"], "Missing token.");
     }
 
     #[tokio::test]
@@ -258,7 +261,7 @@ mod tests {
             .unwrap();
         assert_eq!(resp.status().as_u16(), 401);
         let body: serde_json::Value = resp.json().await.unwrap();
-        assert_eq!(body["error"], "Token invalide ou expire");
+        assert_eq!(body["error"], "Invalid or expired token.");
     }
 
     #[tokio::test]

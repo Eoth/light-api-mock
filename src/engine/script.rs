@@ -301,18 +301,17 @@ fn parse_date_impl(text: &str, pattern: &str) -> Result<i64, Box<rhai::EvalAltRe
             }
             let width = pi - start;
             if ti + width > text_chars.len() {
-                return Err(format!(
-                    "parse_date: '{text}' est trop court pour le pattern '{pattern}' (il manque {} chiffre(s) pour le champ '{}')",
-                    ti + width - text_chars.len(),
-                    token.to_string().repeat(width)
+                return Err(crate::i18n::tr(
+                    "parse_date: '{0}' is too short for the pattern '{1}' ({2} digit(s) missing for the field '{3}')",
+                    &[&text, &pattern, &(ti + width - text_chars.len()), &token.to_string().repeat(width)],
                 )
                 .into());
             }
             let slice: String = text_chars[ti..ti + width].iter().collect();
             if !slice.chars().all(|c| c.is_ascii_digit()) {
-                return Err(format!(
-                    "parse_date: '{slice}' n'est pas un nombre valide pour le champ '{}' du pattern '{pattern}' (dans '{text}')",
-                    token.to_string().repeat(width)
+                return Err(crate::i18n::tr(
+                    "parse_date: '{0}' is not a valid number for the field '{1}' of the pattern '{2}' (in '{3}')",
+                    &[&slice, &token.to_string().repeat(width), &pattern, &text],
                 )
                 .into());
             }
@@ -329,8 +328,9 @@ fn parse_date_impl(text: &str, pattern: &str) -> Result<i64, Box<rhai::EvalAltRe
             ti += width;
         } else {
             if ti >= text_chars.len() || text_chars[ti] != token {
-                return Err(format!(
-                    "parse_date: caractere '{token}' attendu a la position {ti} de '{text}' pour le pattern '{pattern}'"
+                return Err(crate::i18n::tr(
+                    "parse_date: character '{0}' expected at position {1} of '{2}' for the pattern '{3}'",
+                    &[&token, &ti, &text, &pattern],
                 )
                 .into());
             }
@@ -340,54 +340,68 @@ fn parse_date_impl(text: &str, pattern: &str) -> Result<i64, Box<rhai::EvalAltRe
     }
 
     if ti != text_chars.len() {
-        return Err(format!(
-            "parse_date: '{text}' contient des caracteres en trop apres application du pattern '{pattern}'"
+        return Err(crate::i18n::tr(
+            "parse_date: '{0}' has extra characters after the pattern '{1}'",
+            &[&text, &pattern],
         )
         .into());
     }
 
     let year = year.ok_or_else(|| {
-        format!("parse_date: le pattern '{pattern}' ne contient pas d'annee (yyyy)")
+        crate::i18n::tr(
+            "parse_date: the pattern '{0}' has no year (yyyy)",
+            &[&pattern],
+        )
     })?;
     if !(0..=9999).contains(&year) {
-        return Err(
-            format!("parse_date: year {year} in '{text}' is out of range (0000 to 9999)").into(),
-        );
+        return Err(crate::i18n::tr(
+            "parse_date: year {0} in '{1}' is out of range (0000 to 9999)",
+            &[&year, &text],
+        )
+        .into());
     }
     let month = month.ok_or_else(|| {
-        format!("parse_date: le pattern '{pattern}' ne contient pas de mois (MM)")
+        crate::i18n::tr(
+            "parse_date: the pattern '{0}' has no month (MM)",
+            &[&pattern],
+        )
     })?;
     let day = day.ok_or_else(|| {
-        format!("parse_date: le pattern '{pattern}' ne contient pas de jour (dd)")
+        crate::i18n::tr("parse_date: the pattern '{0}' has no day (dd)", &[&pattern])
     })?;
 
     if !(1..=12).contains(&month) {
-        return Err(format!(
-            "parse_date: mois invalide {month:02} dans '{text}' (doit etre entre 01 et 12)"
+        return Err(crate::i18n::tr(
+            "parse_date: invalid month {0} in '{1}' (must be between 01 and 12)",
+            &[&format!("{month:02}"), &text],
         )
         .into());
     }
     if !(1..=31).contains(&day) {
-        return Err(format!(
-            "parse_date: jour invalide {day:02} dans '{text}' (doit etre entre 01 et 31)"
+        return Err(crate::i18n::tr(
+            "parse_date: invalid day {0} in '{1}' (must be between 01 and 31)",
+            &[&format!("{day:02}"), &text],
         )
         .into());
     }
     if hour > 23 {
-        return Err(format!(
-            "parse_date: heure invalide {hour:02} dans '{text}' (doit etre entre 00 et 23)"
+        return Err(crate::i18n::tr(
+            "parse_date: invalid hour {0} in '{1}' (must be between 00 and 23)",
+            &[&format!("{hour:02}"), &text],
         )
         .into());
     }
     if minute > 59 {
-        return Err(format!(
-            "parse_date: minute invalide {minute:02} dans '{text}' (doit etre entre 00 et 59)"
+        return Err(crate::i18n::tr(
+            "parse_date: invalid minute {0} in '{1}' (must be between 00 and 59)",
+            &[&format!("{minute:02}"), &text],
         )
         .into());
     }
     if second > 59 {
-        return Err(format!(
-            "parse_date: seconde invalide {second:02} dans '{text}' (doit etre entre 00 et 59)"
+        return Err(crate::i18n::tr(
+            "parse_date: invalid second {0} in '{1}' (must be between 00 and 59)",
+            &[&format!("{second:02}"), &text],
         )
         .into());
     }
@@ -399,8 +413,9 @@ fn parse_date_impl(text: &str, pattern: &str) -> Result<i64, Box<rhai::EvalAltRe
     // jours ne re-convertit pas vers le meme triplet (cf commentaire de
     // days_from_civil, template.rs).
     if crate::engine::template::civil_from_days(days) != (year, month, day) {
-        return Err(format!(
-            "parse_date: '{day:02}/{month:02}/{year:04}' n'est pas une date valide (jour hors bornes pour ce mois/cette annee)"
+        return Err(crate::i18n::tr(
+            "parse_date: '{0}' is not a valid date (no such day in that month)",
+            &[&format!("{day:02}/{month:02}/{year:04}")],
         )
         .into());
     }
@@ -970,7 +985,7 @@ mod tests {
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(
-            err.contains("pas une date valide"),
+            err.contains("not a valid date"),
             "message d'erreur inattendu : {err}"
         );
     }
@@ -980,7 +995,7 @@ mod tests {
         let engine = ScriptEngine::new();
         let result = engine.execute(r#"parse_date("15/13/2026", "dd/MM/yyyy")"#, &empty_ctx());
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("mois invalide"));
+        assert!(result.unwrap_err().contains("invalid month"));
     }
 
     #[test]
@@ -991,7 +1006,7 @@ mod tests {
             &empty_ctx(),
         );
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("heure invalide"));
+        assert!(result.unwrap_err().contains("invalid hour"));
     }
 
     #[test]
@@ -999,7 +1014,7 @@ mod tests {
         let engine = ScriptEngine::new();
         let result = engine.execute(r#"parse_date("ab/03/2026", "dd/MM/yyyy")"#, &empty_ctx());
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("n'est pas un nombre valide"));
+        assert!(result.unwrap_err().contains("is not a valid number"));
     }
 
     #[test]
@@ -1015,7 +1030,7 @@ mod tests {
         let engine = ScriptEngine::new();
         let result = engine.execute(r#"parse_date("15/03/26", "dd/MM/yyyy")"#, &empty_ctx());
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("trop court"));
+        assert!(result.unwrap_err().contains("too short"));
     }
 
     #[test]
@@ -1026,7 +1041,7 @@ mod tests {
             &empty_ctx(),
         );
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("caracteres en trop"));
+        assert!(result.unwrap_err().contains("extra characters"));
     }
 
     #[test]

@@ -104,7 +104,10 @@ impl ProxyClient {
             Err(_elapsed) => PingStatus {
                 reachable: false,
                 checked_at: now_ms(),
-                error: Some(format!("timeout apres {}s", PING_TIMEOUT.as_secs())),
+                error: Some(crate::i18n::tr(
+                    "no answer after {0} s",
+                    &[&PING_TIMEOUT.as_secs()],
+                )),
             },
         }
     }
@@ -401,10 +404,10 @@ pub struct ProxyCaptureRaw {
 /// explicite dans l'URL en priorite, sinon 443 pour https, 80 pour tout le
 /// reste (http ou schema inconnu).
 fn parse_host_port(url: &str) -> Result<(String, u16), String> {
-    let parsed = url::Url::parse(url).map_err(|e| format!("URL invalide: {e}"))?;
+    let parsed = url::Url::parse(url).map_err(|e| crate::i18n::tr("invalid URL: {0}", &[&e]))?;
     let host = parsed
         .host_str()
-        .ok_or_else(|| "URL sans host".to_string())?
+        .ok_or_else(|| crate::i18n::tr("URL without a host", &[]))?
         .to_string();
     let port = parsed
         .port()
