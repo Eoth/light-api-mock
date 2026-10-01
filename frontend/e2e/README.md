@@ -105,4 +105,4 @@ The images of `docs/` are taken by this suite, so they follow the interface inst
 npm run docs:screenshots   # from frontend/, with Mimicway running on :7342
 ```
 
-Images are written to `docs/en/screenshots/` and `docs/fr/screenshots/` under the names the pages reference. `node scripts/check-doc-links.mjs` (run by CI) fails when a page references an image that does not exist. The three Kafka images need a binary built with `--features messaging-kafka`. States that no test reaches yet have no image; covering them is roadmap item R5.
+Images are written to `docs/en/screenshots/` and `docs/fr/screenshots/` under the names the pages reference. CI fails when a page references an image that does not exist (`node scripts/check-doc-links.mjs`), and when an image, a page, a heading or a language link exists in one language only (`node scripts/check-doc-translations.mjs`). The three Kafka images need a binary built with `--features messaging-kafka`. States that no test reaches yet have no image; covering them is roadmap item R5.
