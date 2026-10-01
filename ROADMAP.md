@@ -389,17 +389,17 @@ Size S per language
 
 ## 4. Engineering backlog
 
-### E1. One design system for the UI styles
+### E1. A design system of its own
 
 Size M
 
-**Why.** Button, form and layout styles are repeated in many components, so a visual change touches every file.
+**Why.** The UI borrowed the tokens of a design system that belongs to someone else; its colors are scattered through the components, seven of the variables they read are defined nowhere (so they keep their light value in the dark theme), and button, form and layout styles are repeated in many components, so a visual change touches every file.
 
-**What.** Move them into shared tokens and classes in `app.css`, components keep only what is specific to them; the look stays identical.
+**What.** Drop the borrowed tokens. Give the UI its own design system, Phasme: one tokens file, light and dark themes with measured contrasts; components read only its semantic tokens and share its classes, keeping only what is specific to them.
 
-**Measured (2026-10-01).** The tokens file defines 53 tokens of the former design system; `app.css` is the only file that reads them, 35 times, always with a fallback equal to the token's value, and 30 tokens are never read (nor is its `.custom-dt` selector): removing the file would change no rendered color or size. Whether the UI keeps that design system as its base, and so this file, is the maintainers' choice to make before the work starts. Components still define their own `.section`, `.btn-icon`, `.btn-xs` and warning boxes (`RuleResponseSection`, `RuleActionSelector`, `RuleConditionsEditor`, `RuleWarnings`, `ServiceForm`, the builders), and `ConditionForm` its own `.form-field`.
+**Progress.** The borrowed tokens file is gone and `app.css` holds the values it read, so nothing rendered changed; a CI check fails on any tracked file that names the former design system. Components still define their own `.section`, `.btn-icon`, `.btn-xs` and warning boxes (`RuleResponseSection`, `RuleActionSelector`, `RuleConditionsEditor`, `RuleWarnings`, `ServiceForm`, the builders), and `ConditionForm` its own `.form-field`.
 
-**Done when.** No component redefines `.btn` or `.form-field`, and screenshots are unchanged.
+**Done when.** Every color of the UI comes from a token, in both themes, with WCAG AA contrasts checked by a test; no variable is read without being defined; no component redefines `.btn`, `.form-field`, `.section`, `.btn-icon`, `.btn-xs` or a warning box.
 
 ### E2. Response builder leftovers
 
