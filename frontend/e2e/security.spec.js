@@ -169,3 +169,26 @@ test.describe('Rule name uniqueness', () => {
     expect(r2.status()).toBe(201);
   });
 });
+
+test.describe('Security: browser policy of the UI', () => {
+  test('the UI runs under its content security policy without any violation', async ({ page, request }) => {
+    await request.delete(`${API}/config/reset`);
+    const violations = [];
+    page.on('console', (msg) => {
+      if (/content security policy/i.test(msg.text())) violations.push(msg.text());
+    });
+    await page.addInitScript(() => {
+      document.addEventListener('securitypolicyviolation', (e) => {
+        console.error(`Content Security Policy violation: ${e.violatedDirective} ${e.blockedURI}`);
+      });
+    });
+    const response = await page.goto('/');
+    expect(response.headers()['content-security-policy']).toContain("frame-ancestors 'none'");
+    await page.locator('[data-testid="app-load-demo-button"]').click();
+    await page.locator('[data-testid="app-nav-logs-button"]').click();
+    await page.locator('[data-testid="app-theme-toggle-button"]').click();
+    await page.locator('[data-testid="app-title-button"]').click();
+    await page.waitForLoadState('networkidle');
+    expect(violations).toEqual([]);
+  });
+});

@@ -12,6 +12,9 @@
 //!   still reach it by making its own domain name resolve to 127.0.0.1; the browser then treats the calls as
 //!   same-origin. The management API therefore answers only requests addressed to a loopback name (`localhost`,
 //!   `127.0.0.1`, `[::1]`) in that case.
+//! - Response headers: lightMock's own pages and API answers carry a content security policy (no inline script,
+//!   no framing), `nosniff` and `no-referrer`. Responses of the mocked and proxied services are left exactly as
+//!   configured or as the backend sent them: they are what the applications under test expect.
 use crate::server::validation::is_management_api_route;
 use axum::body::Body;
 use axum::extract::{Request, State};
@@ -27,11 +30,23 @@ pub struct BrowserGuard {
     allowed_origins: Arc<Vec<HeaderValue>>,
     /// Set when the server only listens on a loopback address.
     loopback_hosts_only: bool,
+    /// Origin of `API_BASE_URL`, the only other place the UI may call.
+    api_origin: Option<String>,
 }
+
+/// Put by the proxy/mock pipeline on the responses of a service, which the headers below must not alter.
+#[derive(Clone, Copy)]
+pub struct ServiceResponse;
 
 impl BrowserGuard {
     pub fn from_env() -> Self {
-        Self::new(&std::env::var("CORS_ALLOWED_ORIGINS").unwrap_or_default())
+        let mut guard = Self::new(&std::env::var("CORS_ALLOWED_ORIGINS").unwrap_or_default());
+        guard.api_origin = std::env::var("API_BASE_URL")
+            .ok()
+            .and_then(|u| url::Url::parse(u.trim()).ok())
+            .map(|u| u.origin().ascii_serialization())
+            .filter(|o| o != "null");
+        guard
     }
 
     /// `raw` is a comma-separated list of origins (`https://ui.example.com,http://localhost:5173`); a trailing slash
@@ -55,6 +70,7 @@ impl BrowserGuard {
         Self {
             allowed_origins: Arc::new(origins),
             loopback_hosts_only: false,
+            api_origin: None,
         }
     }
 
@@ -124,6 +140,47 @@ fn is_loopback_host(host: &str) -> bool {
         || name
             .parse::<std::net::IpAddr>()
             .is_ok_and(|ip| ip.is_loopback())
+}
+
+impl BrowserGuard {
+    fn content_security_policy(&self) -> String {
+        let connect = match &self.api_origin {
+            Some(origin) => format!("'self' {origin}"),
+            None => "'self'".to_string(),
+        };
+        // Svelte sets inline style attributes, hence 'unsafe-inline' for styles only; scripts are files.
+        format!(
+            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; \
+             font-src 'self' data:; connect-src {connect}; object-src 'none'; base-uri 'self'; \
+             form-action 'self'; frame-ancestors 'none'"
+        )
+    }
+}
+
+pub async fn security_headers(
+    State(guard): State<BrowserGuard>,
+    req: Request<Body>,
+    next: Next,
+) -> Response {
+    let mut response = next.run(req).await;
+    if response.extensions().get::<ServiceResponse>().is_some() {
+        return response;
+    }
+    let headers = response.headers_mut();
+    let defaults = [
+        ("content-security-policy", guard.content_security_policy()),
+        ("x-content-type-options", "nosniff".to_string()),
+        ("x-frame-options", "DENY".to_string()),
+        ("referrer-policy", "no-referrer".to_string()),
+    ];
+    for (name, value) in defaults {
+        if !headers.contains_key(name)
+            && let Ok(value) = HeaderValue::from_str(&value)
+        {
+            headers.insert(name, value);
+        }
+    }
+    response
 }
 
 pub async fn management_api_guard(

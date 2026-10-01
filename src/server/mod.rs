@@ -144,8 +144,12 @@ pub fn build_router_with(
             )
         }))
         .layer(axum::middleware::from_fn_with_state(
-            guard,
+            guard.clone(),
             browser_guard::management_api_guard,
+        ))
+        .layer(axum::middleware::from_fn_with_state(
+            guard,
+            browser_guard::security_headers,
         ))
         .with_state(state)
         .layer(cors)
