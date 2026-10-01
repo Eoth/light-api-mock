@@ -79,11 +79,13 @@
     width: 20px;
     height: 20px;
     border-radius: var(--radius-round);
-    background: var(--color-surface);
+    /* Off, the knob takes the control color so that it stands out from the track in both themes (3:1). */
+    background: var(--color-control);
     transition: transform var(--duration-move);
   }
 
   .toggle-switch.active .toggle-knob {
+    background: var(--color-surface);
     transform: translateX(24px);
   }
 
