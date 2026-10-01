@@ -122,6 +122,8 @@ jobs:
         run: node scripts/check-doc-translations.mjs
       - name: Comments are in English (paths listed in the script)
         run: node scripts/check-french-comments.mjs
+      - name: No tracked file names the former design system
+        run: node scripts/check-former-design-system.mjs
 
   e2e:
     name: End-to-end (real binary, real browser)
