@@ -73,9 +73,9 @@ Size L, to split by module
 
 **What.** Module by module, in reading order of the [reviewer guide](REVIEWING.md), rewrite comments in English and keep only what explains *why* (an invariant, a pitfall, a specification reference); history stays in Git. Translate test names and test messages at the same time.
 
-**Progress.** Done: `main.rs`, `server/mod.rs`, `server/api.rs`, `server/browser_guard.rs`, `server/redaction.rs`, `server/validation.rs`, `server/ping.rs`, `server/codegen.rs`, `auth/`, `i18n.rs`, `tcp/hex.rs`. Also done: `engine/script.rs`, `engine/proxy.rs`, `server/intercept.rs`, `store/mod.rs`, `engine/matcher.rs`, `server/suggestion.rs`, `server/observation.rs`, `server/request_log.rs`, `engine/template.rs`, `models/`, and every server log message. Also done: `tcp/`. Left: `messaging/` (about 65 lines), then the UI (`frontend/src/`).
+**Progress.** The Rust code is done: every comment, test message and log line of `src/` is in English, and CI fails on a French comment there. Left: the UI, about 900 comment lines (largest: `e2e/scenario-runner.spec.js`, `RuleResponseSection.svelte`, `RuleForm.svelte`, `e2e/rule-tester.spec.js`, `tpl-utils.js`, `api.js`) and the French test titles; then extend the CI check to `frontend/`.
 
-**Done when.** No French comment left in `src/` and `frontend/src/`, checked by a script in CI that flags French stop words in comments.
+**Done when.** No French comment left in `frontend/`, and the CI check covers it.
 
 ### R11. Unit tests in English
 

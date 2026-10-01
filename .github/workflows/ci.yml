@@ -31,6 +31,12 @@ jobs:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
       - run: cargo fmt --check
+      - name: Rust comments are in English
+        run: |
+          if grep -rniE '^\s*//.*\b(les|pour|avec|une|sont|dans|qui|deja|regle|requete|meme|donc|sinon|aussi|mais|etre|cette|cela|lorsque|puis|chaque)\b' src --include=*.rs; then
+            echo "French words in Rust comments: comments are written in English."
+            exit 1
+          fi
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo clippy --features tcp-mock --all-targets -- -D warnings
       - run: cargo test
