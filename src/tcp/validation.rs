@@ -1,7 +1,5 @@
-// Validation d'un TcpService avant ecriture dans TcpRuntime, meme forme que
-// `server::validation::validate_service` cote HTTP (ValidationError { field,
-// message }) mais schema totalement different (pas de listen_path/method,
-// port + regles a octets bruts a la place).
+// Checks a TcpService before TcpRuntime stores it, with the same error shape as HTTP's `validate_service`
+// (ValidationError { field, message }) on another schema: a port and raw byte rules instead of paths and methods.
 use crate::i18n::tr;
 use crate::tcp::config::{TcpMatcher, TcpService};
 use crate::tcp::hex;
@@ -15,10 +13,8 @@ pub struct ValidationError {
     pub message: String,
 }
 
-/// `existing` : les autres services deja configures, DEJA EXCLUS de celui en
-/// cours de validation cote appelant (cf `server/api.rs` -- exclut le
-/// service qu'on est en train de mettre a jour de la verification d'unicite,
-/// sinon un PUT qui ne change rien se rejetterait lui-meme).
+/// `existing`: the other services, the one being validated already left out by the caller (server/api.rs), or a PUT
+/// that changes nothing would conflict with itself.
 pub fn validate_tcp_service(
     service: &TcpService,
     existing: &[TcpService],
@@ -185,8 +181,7 @@ mod tests {
 
     #[test]
     fn empty_response_hex_is_valid() {
-        // Une regle qui matche et repond "rien" (fermeture immediate) est un
-        // cas legitime, pas une erreur.
+        // A rule that matches and answers nothing (closing at once) is legitimate.
         let mut s = valid_service();
         s.rules[0].response_hex = String::new();
         assert!(validate_tcp_service(&s, &[]).is_ok());
