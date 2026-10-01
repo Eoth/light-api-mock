@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# Routing through Gloo Edge. The namespace below is also written inside the Gloo resources (upstream service
+# reference, route delegation), which kustomize does not rewrite: change all of them together.
+namespace: lightmock
+resources:
+  - ../base
+  - upstream.yaml
+  - routetable.yaml
+  - virtualservice.yaml

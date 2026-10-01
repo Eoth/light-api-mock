@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: lightmock
+  labels:
+    app.kubernetes.io/name: lightmock
+    app.kubernetes.io/component: routing
+spec:
+  # ingressClassName: nginx   # when your cluster has no default ingress class
+  # tls:
+  #   - hosts: [lightmock.example.com]
+  #     secretName: lightmock-tls
+  rules:
+    # lightMock is served from the root of its host: its UI calls /api, /assets and /runtime-config.json.
+    - host: lightmock.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: lightmock
+                port:
+                  name: http

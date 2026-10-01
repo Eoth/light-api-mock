@@ -19,7 +19,7 @@ Each item has an identifier that never changes, a size (S: a day or less, M: a f
 ## Order of work
 
 1. [Ready for an international launch](#1-ready-for-an-international-launch): R1 to R9.
-2. [Trust and operations](#2-trust-and-operations): T1 to T10.
+2. [Trust and operations](#2-trust-and-operations): T1 to T11.
 3. [Make it indispensable](#3-make-it-indispensable): U1 to U16, in the listed order.
 4. [Engineering backlog](#4-engineering-backlog): taken alongside, when they unblock an item above.
 
@@ -89,9 +89,9 @@ Size L, to split by module
 
 Size S
 
-**Why.** Small leftovers make a project look unfinished: `k8s/README.md`, `frontend/README.md`, `frontend/e2e/README.md`, the bootstrap scripts' messages, `Cargo.toml` and `package.json` descriptions, the oldest changelog entries.
+**Why.** Small leftovers make a project look unfinished: `frontend/README.md`, `frontend/e2e/README.md`, the bootstrap scripts' messages, `Cargo.toml` and `package.json` descriptions, the oldest changelog entries.
 
-**What.** Translate them to English, once, without keeping a French copy. Make `k8s/` vendor-neutral: a plain `Ingress` as the default, the Gloo Edge routing as an optional overlay, and a neutral namespace.
+**What.** Translate them to English, once, without keeping a French copy.
 
 **Done when.** A search for French stop words outside the French catalogues finds nothing.
 
@@ -193,7 +193,7 @@ Size M
 
 **Why.** Kubernetes users expect a Helm chart, and compose users a ready file.
 
-**What.** A Helm chart (published as an OCI artifact with the image), a `compose.yaml` at the root, and a plain `Ingress` example; security contexts stay as strict as the current manifests.
+**What.** A Helm chart (published as an OCI artifact with the image) built from the same settings as `k8s/base`, and a `compose.yaml` at the root; security contexts stay as strict as the current manifests.
 
 **Done when.** `helm install` and `docker compose up` both give a working instance, tested in CI with kind.
 
@@ -216,6 +216,16 @@ Size S
 **What.** Move to a maintained YAML implementation, keeping the file format byte-compatible; follow Rhai's releases and drop the `smartstring` exception as soon as a release no longer depends on it.
 
 **Done when.** `cargo deny check` passes with an empty `ignore` list.
+
+### T11. Serve under a path prefix
+
+Size M
+
+**Why.** The UI loads `/assets`, `/runtime-config.json` and `/api` from the root of its host, so lightMock cannot live under a path such as `https://tools.example.com/lightmock/`, which many platforms impose (one host, one prefix per tool).
+
+**What.** A `BASE_PATH` setting: the server mounts the UI, the API and the mocked services under it, the UI is built with relative asset paths and reads the prefix from `runtime-config.json`, and service URLs shown in the UI include it.
+
+**Done when.** An end-to-end run with `BASE_PATH=/lightmock` behind a prefix-stripping proxy passes, and a Kubernetes overlay shows it.
 
 ## 3. Make it indispensable
 

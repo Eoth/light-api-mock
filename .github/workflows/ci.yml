@@ -126,6 +126,23 @@ jobs:
           ignore-unfixed: true
           exit-code: "1"
 
+  kubernetes:
+    name: Kubernetes manifests (render, schema check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install kubeconform
+        run: |
+          curl -sSLo kubeconform.tgz https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz
+          echo "95f14e87aa28c09d5941f11bd024c1d02fdc0303ccaa23f61cef67bc92619d73  kubeconform.tgz" | sha256sum -c -
+          tar xzf kubeconform.tgz kubeconform
+      - name: Render and validate every overlay
+        # Custom resources (Gloo Edge) have no published schema: they are rendered, not validated.
+        run: |
+          for overlay in k8s/ingress k8s/gloo-edge; do
+            kubectl kustomize "$overlay" | ./kubeconform -strict -summary -ignore-missing-schemas -
+          done
+
   secrets:
     name: Secret scan
     runs-on: ubuntu-latest

@@ -144,7 +144,7 @@ Everything is set through environment variables; none is required.
 | `REDACT_HEADERS` | *(empty)* | Extra header names (comma-separated) whose values are hidden in logs, observation and suggestions, on top of `Authorization`, `Proxy-Authorization`, `Cookie`, `Set-Cookie`, `X-Api-Key`, `X-Auth-Token`, `X-Amz-Security-Token`. |
 | `REQUEST_LOG_MAX_BODY_SIZE` | `16384` | Bytes of each body kept in the request log. |
 | `TRAFFIC_OBSERVATION_MAX_BODY_SIZE` | `16384` | Bytes of each body kept by traffic observation. |
-| `TRAFFIC_OBSERVATION_MAX_BUFFER_SIZE` | `10485760` | Memory budget of traffic observation, in bytes. |
+| `TRAFFIC_OBSERVATION_MAX_BUFFER_SIZE` | `10485760` | Largest request or response body (by its `Content-Length`) that traffic observation buffers to capture an exchange; larger or unsized bodies are streamed and not observed. |
 | `TRAFFIC_OBSERVATION_MAX_KEYS` | `200` | Distinct request shapes observed per service. |
 | `TRAFFIC_OBSERVATION_SAMPLES_PER_KEY` | `8` | Exchanges kept per request shape. |
 | `TRAFFIC_OBSERVATION_MIN_SAMPLES` | `3` | Exchanges needed before a rule is suggested. |
@@ -238,14 +238,16 @@ volumes:
 
 ### Kubernetes
 
-[k8s/](k8s/) holds a Kustomize base: Deployment with a read-only root file system, no privilege escalation and every capability dropped, a PersistentVolumeClaim, a Service and Gloo Edge routing as an example of ingress. See [k8s/README.md](k8s/README.md).
+[k8s/](k8s/) holds a Kustomize base (a single-replica Deployment with a read-only root file system, no privilege escalation and every capability dropped, a PersistentVolumeClaim, a Service) and two overlays to route traffic to it: a standard `Ingress`, or Gloo Edge. See [k8s/README.md](k8s/README.md).
 
 ```bash
-docker build -t <registry>/lightmock:<version> .
-kubectl apply -k k8s/
+cd k8s/ingress
+kustomize edit set image lightmock=<registry>/lightmock:<version>
+kubectl create namespace lightmock
+kubectl apply -k .
 ```
 
-Run a single replica: the configuration lives in one file on one volume.
+lightMock must be served from the root of a host, and by a single replica: the configuration lives in one file on one volume.
 
 ### Split UI and API
 

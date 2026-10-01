@@ -2,10 +2,9 @@ apiVersion: gateway.solo.io/v1
 kind: VirtualService
 metadata:
   name: lightmock
-  namespace: entreprise-tools
   labels:
     app.kubernetes.io/name: lightmock
-    app.kubernetes.io/component: gloo
+    app.kubernetes.io/component: routing
 spec:
   virtualHost:
     domains:
@@ -16,4 +15,4 @@ spec:
         delegateAction:
           ref:
             name: lightmock
-            namespace: entreprise-tools
+            namespace: lightmock
