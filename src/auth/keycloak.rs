@@ -134,7 +134,7 @@ impl KeycloakClient {
         format!("{}/protocol/openid-connect/certs", self.realm_url())
     }
 
-    /// `KEYCLOAK_ISSUER` when Keycloak issues tokens under another URL than the one lightMock reaches it through
+    /// `KEYCLOAK_ISSUER` when Keycloak issues tokens under another URL than the one Mimicway reaches it through
     /// (a public hostname in front of an in-cluster service, for instance); the realm URL otherwise.
     fn issuer(&self) -> String {
         if self.config.issuer.is_empty() {

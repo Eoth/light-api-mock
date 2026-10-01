@@ -47,7 +47,7 @@ pub async fn spawn_tcp_services(
 
     for service in &config.services {
         // The interface of the HTTP server (`BIND_ADDRESS`, loopback by default): a mock created on a workstation
-        // must not be reachable from the network when the rest of lightMock is not.
+        // must not be reachable from the network when the rest of Mimicway is not.
         let addr = std::net::SocketAddr::new(bind_ip, service.listen_port);
         let listener = match TcpListener::bind(addr).await {
             Ok(l) => l,
@@ -259,7 +259,7 @@ mod tests {
         let (_handles, statuses) = spawn_tcp_services(&config, LOOPBACK).await;
         assert!(
             statuses[0].address.starts_with("127.0.0.1:"),
-            "a loopback-only lightMock must not expose its TCP mocks: {:?}",
+            "a loopback-only Mimicway must not expose its TCP mocks: {:?}",
             statuses[0]
         );
     }

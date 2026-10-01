@@ -1,6 +1,6 @@
 //! Browser-facing protections of the management API (`/api/...`).
 //!
-//! Any website open in a browser can send requests to a lightMock reachable from that machine (often `localhost`,
+//! Any website open in a browser can send requests to a Mimicway reachable from that machine (often `localhost`,
 //! often without authentication during development). These rules keep such a page from reading or changing the
 //! configuration, while the mocked and proxied services stay callable from any origin, which is their purpose:
 //! - CORS: the management API answers cross-origin calls only for the origins listed in `CORS_ALLOWED_ORIGINS`
@@ -8,11 +8,11 @@
 //! - Cross-site writes: a state-changing API request that the browser itself marks as coming from another site
 //!   (`Sec-Fetch-Site`) is refused unless its `Origin` is listed. This also covers the requests that a browser
 //!   sends without a CORS preflight (a form `POST`, for instance).
-//! - DNS rebinding: when lightMock only listens on the loopback interface (the default of the binary), a page can
+//! - DNS rebinding: when Mimicway only listens on the loopback interface (the default of the binary), a page can
 //!   still reach it by making its own domain name resolve to 127.0.0.1; the browser then treats the calls as
 //!   same-origin. The management API therefore answers only requests addressed to a loopback name (`localhost`,
 //!   `127.0.0.1`, `[::1]`) in that case.
-//! - Response headers: lightMock's own pages and API answers carry a content security policy (no inline script,
+//! - Response headers: Mimicway's own pages and API answers carry a content security policy (no inline script,
 //!   no framing), `nosniff` and `no-referrer`. Responses of the mocked and proxied services are left exactly as
 //!   configured or as the backend sent them: they are what the applications under test expect.
 use crate::i18n::tr;
@@ -106,7 +106,7 @@ impl BrowserGuard {
                 .is_some_and(|h| !is_loopback_host(h))
         {
             return Some(tr(
-                "Request refused: this lightMock only listens on the local machine; call it through localhost.",
+                "Request refused: this Mimicway only listens on the local machine; call it through localhost.",
                 &[],
             ));
         }

@@ -10,11 +10,11 @@ import { fileURLToPath } from 'node:url';
 // Cas particulier de la suite E2E : contrairement a tous les autres fichiers
 // *.spec.js/*.spec.mjs (qui ciblent le backend PARTAGE deja demarre sur
 // http://localhost:7342 avec AUTH_ENABLED=false, cf frontend/e2e/README.md),
-// ce spec demarre SA PROPRE instance de lightMock, sur un port dedie, avec
+// ce spec demarre SA PROPRE instance de Mimicway, sur un port dedie, avec
 // AUTH_ENABLED=true. Impossible de reutiliser l'instance partagee pour ce
 // besoin : activer l'auth dessus casserait tous les 80+ autres tests de la
 // suite, qui supposent tous AUTH_ENABLED=false. Necessite le binaire deja
-// compile (`cargo build`, target/debug/light-mock(.exe)) et frontend/dist deja
+// compile (`cargo build`, target/debug/mimicway(.exe)) et frontend/dist deja
 // buildee (memes prerequis que `npm run build`/`cargo build`) -- pas de build
 // automatique dans ce spec, comme le reste de la suite E2E qui suppose deja
 // un environnement pret.
@@ -33,7 +33,7 @@ const binaryPath = path.join(
   repoRoot,
   'target',
   'debug',
-  process.platform === 'win32' ? 'light-mock.exe' : 'light-mock',
+  process.platform === 'win32' ? 'mimicway.exe' : 'mimicway',
 );
 const staticDir = path.join(repoRoot, 'frontend', 'dist');
 
@@ -61,7 +61,7 @@ async function waitForHealth(baseUrl, timeoutMs = 15000) {
     await new Promise((r) => setTimeout(r, 150));
   }
   throw new Error(
-    `lightMock (instance auth-enabled dediee a ce spec) n'a pas demarre a temps sur ${baseUrl}: ${lastError}`,
+    `Mimicway (instance auth-enabled dediee a ce spec) n'a pas demarre a temps sur ${baseUrl}: ${lastError}`,
   );
 }
 
@@ -73,7 +73,7 @@ test.describe('Auth: assets statiques de la SPA accessibles sans token (AUTH_ENA
   test.beforeAll(async () => {
     const port = await getFreePort();
     baseUrl = `http://127.0.0.1:${port}`;
-    dataDir = mkdtempSync(path.join(tmpdir(), 'lightmock-auth-e2e-'));
+    dataDir = mkdtempSync(path.join(tmpdir(), 'mimicway-auth-e2e-'));
 
     child = spawn(binaryPath, [], {
       cwd: repoRoot,
@@ -88,7 +88,7 @@ test.describe('Auth: assets statiques de la SPA accessibles sans token (AUTH_ENA
         // demarrage AuthConfig::from_env() (panique si vide quand enabled).
         KEYCLOAK_URL: 'http://127.0.0.1:1',
         KEYCLOAK_REALM: 'test-realm',
-        KEYCLOAK_CLIENT_ID: 'lightmock',
+        KEYCLOAK_CLIENT_ID: 'mimicway',
         SUPER_ADMINS: '',
       },
       stdio: 'pipe',

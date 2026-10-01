@@ -48,9 +48,9 @@ impl ScriptEngine {
         engine.set_max_expr_depths(64, 32);
         engine.set_module_resolver(rhai::module_resolvers::DummyModuleResolver::new());
         engine.disable_symbol("eval");
-        engine.on_print(|text| tracing::debug!(target: "light_mock::script", "print: {text}"));
+        engine.on_print(|text| tracing::debug!(target: "mimicway::script", "print: {text}"));
         engine.on_debug(
-            |text, _source, _pos| tracing::debug!(target: "light_mock::script", "debug: {text}"),
+            |text, _source, _pos| tracing::debug!(target: "mimicway::script", "debug: {text}"),
         );
 
         engine.register_fn("random_int", |min: i64, max: i64| -> i64 {

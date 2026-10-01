@@ -1,8 +1,8 @@
 # Roadmap
 
-What is planned for lightMock, in the order it will be done, and why. Finished work moves to [CHANGELOG.md](CHANGELOG.md); this file only holds what is still ahead.
+What is planned for Mimicway, in the order it will be done, and why. Finished work moves to [CHANGELOG.md](CHANGELOG.md); this file only holds what is still ahead.
 
-## What lightMock stays
+## What Mimicway stays
 
 Every item below is weighed against these promises; an idea that breaks one of them is reshaped or dropped.
 
@@ -24,16 +24,6 @@ Each item has an identifier that never changes, a size (S: a day or less, M: a f
 4. [Engineering backlog](#4-engineering-backlog): taken alongside, when they unblock an item above.
 
 ## 1. Ready for an international launch
-
-### R1. Decide the name
-
-**Decision needed** · Size S
-
-**Why.** The product is "lightMock", the crate and binary "light-mock", the repository "light-api-mock". Three spellings cost trust and searchability before anyone runs the tool.
-
-**What.** Pick one public name, check it against existing trademarks and package registries (crates.io, npm, Docker Hub, GHCR), then align the repository, binary, image, Helm chart and documentation.
-
-**Done when.** One name everywhere a user can see it; old names redirect (repository rename keeps redirects).
 
 ### R2. Publish signed releases
 
@@ -153,7 +143,7 @@ Size S
 
 Size S
 
-**Why.** The DNS-rebinding guard only applies when lightMock listens on loopback. Listening on `0.0.0.0` without authentication leaves that door open.
+**Why.** The DNS-rebinding guard only applies when Mimicway listens on loopback. Listening on `0.0.0.0` without authentication leaves that door open.
 
 **What.** `ALLOWED_HOSTS`: the host names the management API answers to, required (or derived from `API_BASE_URL`) when listening beyond loopback without authentication.
 
@@ -195,7 +185,7 @@ Size M
 
 **Why.** Teams want mocks reviewed and versioned with the application, and the same mocks in every environment.
 
-**What.** A read-only mode that loads services from files in a directory (one file per service or group, YAML or JSON), reloads on change, and refuses changes through the API; a `light-mock validate <dir>` command that checks files in CI; a JSON Schema of the configuration for editor completion.
+**What.** A read-only mode that loads services from files in a directory (one file per service or group, YAML or JSON), reloads on change, and refuses changes through the API; a `mimicway validate <dir>` command that checks files in CI; a JSON Schema of the configuration for editor completion.
 
 **Done when.** A mock committed in a repository reaches a running instance without the UI, and an invalid file fails the CI command with the same message the UI would show.
 
@@ -213,11 +203,11 @@ Size S
 
 Size M
 
-**Why.** The UI loads `/assets`, `/runtime-config.json` and `/api` from the root of its host, so lightMock cannot live under a path such as `https://tools.example.com/lightmock/`, which many platforms impose (one host, one prefix per tool).
+**Why.** The UI loads `/assets`, `/runtime-config.json` and `/api` from the root of its host, so Mimicway cannot live under a path such as `https://tools.example.com/mimicway/`, which many platforms impose (one host, one prefix per tool).
 
 **What.** A `BASE_PATH` setting: the server mounts the UI, the API and the mocked services under it, the UI is built with relative asset paths and reads the prefix from `runtime-config.json`, and service URLs shown in the UI include it.
 
-**Done when.** An end-to-end run with `BASE_PATH=/lightmock` behind a prefix-stripping proxy passes, and a Kubernetes overlay shows it.
+**Done when.** An end-to-end run with `BASE_PATH=/mimicway` behind a prefix-stripping proxy passes, and a Kubernetes overlay shows it.
 
 ## 3. Make it indispensable
 
@@ -257,7 +247,7 @@ Size M
 
 **Why.** Testing an error case means editing the mock and editing it back, which breaks parallel tests sharing an instance.
 
-**What.** Named variants of a rule's response, picked by a request header (`X-LightMock-Scenario: timeout`), a cookie or a query parameter, with a default; the UI shows the variants side by side.
+**What.** Named variants of a rule's response, picked by a request header (`X-Mimicway-Scenario: timeout`), a cookie or a query parameter, with a default; the UI shows the variants side by side.
 
 **Done when.** Two test runs against the same instance get different scenarios at the same time.
 
@@ -267,7 +257,7 @@ Size L, to split
 
 **Why.** Many APIs are "create, then read what was created". Static rules cannot follow, and scripts have no memory.
 
-**What.** First, a per-service state machine: a rule can require a state and move to another one (like an order going from `created` to `paid`). Then a "resource" service type: from a path such as `/orders/{id}`, lightMock answers POST, GET (one and list), PUT, PATCH and DELETE on an in-memory collection, seeded from examples, reset by API.
+**What.** First, a per-service state machine: a rule can require a state and move to another one (like an order going from `created` to `paid`). Then a "resource" service type: from a path such as `/orders/{id}`, Mimicway answers POST, GET (one and list), PUT, PATCH and DELETE on an in-memory collection, seeded from examples, reset by API.
 
 **Done when.** A create-then-read test passes against a resource service with no rule written.
 
@@ -277,7 +267,7 @@ Size S
 
 **Why.** Responses with dates (`now_iso`, `date_future`…) make snapshots and assertions flaky.
 
-**What.** A clock per service or per request (`X-LightMock-Time`): fixed at an instant, or shifted by a duration; templates and scripts read it instead of the system clock.
+**What.** A clock per service or per request (`X-Mimicway-Time`): fixed at an instant, or shifted by a duration; templates and scripts read it instead of the system clock.
 
 **Done when.** The same request with the same frozen time returns byte-identical responses.
 
@@ -299,7 +289,7 @@ Size S
 
 **What.** Count hits per rule (shown in the rule list, reset with the log), and an "unmatched requests" view where "Create a rule" fills the rule form from the request.
 
-**Done when.** A 404 from lightMock can become a working rule in two clicks.
+**Done when.** A 404 from Mimicway can become a working rule in two clicks.
 
 ### U9. Built-in identity provider mock
 
@@ -309,7 +299,7 @@ Size M
 
 **What.** A service type that behaves as an OpenID Connect provider: discovery document, key set, token endpoint (client credentials, password, authorization code with PKCE), with configurable claims and lifetimes, signing keys generated per instance.
 
-**Done when.** A sample application configured with lightMock as its issuer logs in and validates tokens.
+**Done when.** A sample application configured with Mimicway as its issuer logs in and validates tokens.
 
 ### U10. More protocols
 
@@ -375,7 +365,7 @@ Size M
 
 Size S per language
 
-**Why.** English and French cover a small part of the people who could use lightMock.
+**Why.** English and French cover a small part of the people who could use Mimicway.
 
 **What.** Spanish, German, Portuguese, Italian and Japanese catalogues for the UI and the server messages, contributed and reviewed by native speakers; the existing tests already check each catalogue.
 

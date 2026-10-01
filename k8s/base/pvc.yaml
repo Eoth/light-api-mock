@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: lightmock-data
+  name: mimicway-data
   labels:
-    app.kubernetes.io/name: lightmock
+    app.kubernetes.io/name: mimicway
     app.kubernetes.io/component: storage
 spec:
   accessModes:

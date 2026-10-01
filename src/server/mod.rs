@@ -229,7 +229,7 @@ mod tests {
             enabled: true,
             keycloak_url: "http://127.0.0.1:1".into(),
             realm: "test-realm".into(),
-            client_id: "lightmock".into(),
+            client_id: "mimicway".into(),
             super_admins: vec![],
             issuer: String::new(),
             show_reset_button: false,

@@ -1,10 +1,10 @@
 {
-  "name": "lightmock-frontend",
+  "name": "mimicway-frontend",
   "version": "0.1.0",
-  "description": "Web interface of lightMock, served as static files by its binary",
+  "description": "Web interface of Mimicway, served as static files by its binary",
   "private": true,
   "license": "MIT",
-  "repository": "https://github.com/eoth/light-api-mock",
+  "repository": "https://github.com/Eoth/mimicway",
   "type": "module",
   "scripts": {
     "dev": "vite",

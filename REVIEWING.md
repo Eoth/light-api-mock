@@ -1,6 +1,6 @@
-# Reviewing lightMock
+# Reviewing Mimicway
 
-This guide is for the engineer asked to approve lightMock before it runs in their company. It gives a reading order that follows the trust boundaries, the authorization matrix of the API, and commands that check each claim instead of taking it on trust. The security model itself (what is exposed, outbound flows, defaults) is described in [docs/security.md](docs/security.md).
+This guide is for the engineer asked to approve Mimicway before it runs in their company. It gives a reading order that follows the trust boundaries, the authorization matrix of the API, and commands that check each claim instead of taking it on trust. The security model itself (what is exposed, outbound flows, defaults) is described in [docs/security.md](docs/security.md).
 
 ## Facts that bound the review
 

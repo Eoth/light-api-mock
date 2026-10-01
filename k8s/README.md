@@ -1,37 +1,37 @@
 # Kubernetes manifests
 
-A [Kustomize](https://kustomize.io) base with everything lightMock needs, and two ways to route traffic to it. lightMock does not depend on any routing technology: use the overlay that matches your cluster, or keep the base and add your own routing.
+A [Kustomize](https://kustomize.io) base with everything Mimicway needs, and two ways to route traffic to it. Mimicway does not depend on any routing technology: use the overlay that matches your cluster, or keep the base and add your own routing.
 
 | Directory | Content |
 |---|---|
 | `base/` | ConfigMap (environment), PersistentVolumeClaim (64 MiB for the configuration and its backups), Deployment (one pod, probes, strict security context), Service (port 80 to 7342). No namespace, no routing. |
-| `ingress/` | The base in the `lightmock` namespace, exposed by a standard `Ingress` on `lightmock.example.com`. |
-| `gloo-edge/` | The base in the `lightmock` namespace, exposed through Gloo Edge (`Upstream`, `RouteTable`, `VirtualService`). |
+| `ingress/` | The base in the `mimicway` namespace, exposed by a standard `Ingress` on `mimicway.example.com`. |
+| `gloo-edge/` | The base in the `mimicway` namespace, exposed through Gloo Edge (`Upstream`, `RouteTable`, `VirtualService`). |
 
 ## Deploy
 
 ```bash
 # Build and push the image, or use a published one.
-docker build -t <registry>/lightmock:<version> .
-docker push <registry>/lightmock:<version>
+docker build -t <registry>/mimicway:<version> .
+docker push <registry>/mimicway:<version>
 
 # Point the overlay at it, then apply.
 cd k8s/ingress
-kustomize edit set image lightmock=<registry>/lightmock:<version>
-kubectl create namespace lightmock
+kustomize edit set image mimicway=<registry>/mimicway:<version>
+kubectl create namespace mimicway
 kubectl apply -k .
 
-kubectl -n lightmock get pods -l app.kubernetes.io/name=lightmock
-kubectl -n lightmock logs -l app.kubernetes.io/name=lightmock
+kubectl -n mimicway get pods -l app.kubernetes.io/name=mimicway
+kubectl -n mimicway logs -l app.kubernetes.io/name=mimicway
 ```
 
 Edit the host name in `ingress/ingress.yaml` (or `gloo-edge/virtualservice.yaml`), and the settings in `base/configmap.yaml` (see the configuration table of the [README](../README.md#configuration)). To use another namespace, change it in the overlay's `kustomization.yaml`; for Gloo Edge, also in the three Gloo resources, which refer to it in their specification.
 
 ## What any routing must provide
 
-Whatever exposes lightMock (these overlays, a Helm chart of your own, a platform that generates routes from labels…) only has to meet three conditions:
+Whatever exposes Mimicway (these overlays, a Helm chart of your own, a platform that generates routes from labels…) only has to meet three conditions:
 
-1. **lightMock is served from the root of a host.** Its UI loads `/assets/…`, `/runtime-config.json` and `/api/…` from the root, so it cannot be moved under a path prefix such as `/lightmock` (planned, see the [roadmap](../ROADMAP.md)).
+1. **Mimicway is served from the root of a host.** Its UI loads `/assets/…`, `/runtime-config.json` and `/api/…` from the root, so it cannot be moved under a path prefix such as `/mimicway` (planned, see the [roadmap](../ROADMAP.md)).
 2. **The pod's port (`PORT`, 7342) is reachable** from the routing layer, through the Service.
 3. **`/api/health` answers the probes**; it never requires authentication.
 
@@ -45,8 +45,8 @@ The configuration is one file on one volume, written by one process. A second re
 
 - `runAsNonRoot`, user 1000, no privilege escalation, every Linux capability dropped.
 - Read-only root file system: only `/data` (the volume) is writable.
-- Memory limit 256 MiB: idle, lightMock uses a few MiB, but request bodies up to 10 MiB are buffered to evaluate rules.
-- lightMock serves plain HTTP: terminate TLS in your ingress (commented example in `ingress/ingress.yaml`).
+- Memory limit 256 MiB: idle, Mimicway uses a few MiB, but request bodies up to 10 MiB are buffered to evaluate rules.
+- Mimicway serves plain HTTP: terminate TLS in your ingress (commented example in `ingress/ingress.yaml`).
 - To restrict where proxied services may connect, add a `NetworkPolicy` for the pod's egress (see the hardening checklist of the [security model](../docs/security.md#hardening-checklist)).
 
 ## Persistence

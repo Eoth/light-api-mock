@@ -1,12 +1,12 @@
-# lightMock UI
+# Mimicway UI
 
-A Svelte 5 single-page application (no SvelteKit), built to static files that the lightMock binary serves. It has no runtime dependency: `package.json` only lists build and test tools.
+A Svelte 5 single-page application (no SvelteKit), built to static files that the Mimicway binary serves. It has no runtime dependency: `package.json` only lists build and test tools.
 
 ## Develop
 
 ```bash
 npm ci
-npm run dev           # http://localhost:5173, proxies /api and /runtime-config.json to a lightMock on :7342
+npm run dev           # http://localhost:5173, proxies /api and /runtime-config.json to a Mimicway on :7342
 ```
 
 ## Build and test
@@ -14,7 +14,7 @@ npm run dev           # http://localhost:5173, proxies /api and /runtime-config.
 ```bash
 npm run build         # dist/, served by the binary (STATIC_DIR)
 npm test              # Vitest unit tests, including the translation checks
-npm run test:e2e      # Playwright, against a lightMock running on :7342 (see e2e/README.md)
+npm run test:e2e      # Playwright, against a Mimicway running on :7342 (see e2e/README.md)
 npm run docs:screenshots   # regenerates the images of docs/ from the end-to-end suite
 ```
 

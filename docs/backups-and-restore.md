@@ -1,6 +1,6 @@
 # Backups and restore
 
-lightMock protects your configuration against mistakes: before each change, the previous state is saved, so you can always go back.
+Mimicway protects your configuration against mistakes: before each change, the previous state is saved, so you can always go back.
 
 ## Automatic backups
 

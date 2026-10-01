@@ -1,6 +1,6 @@
 import { t } from './i18n.svelte.js';
 /**
- * Template utilities for lightMock's template format.
+ * Template utilities for Mimicway's template format.
  *
  * Template format (consumed by Rust backend):
  *   { and } = literal braces (normal JSON/XML)

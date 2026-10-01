@@ -51,7 +51,7 @@
     const trimmed = n.trim();
     if (!trimmed) return t("The service name is required.");
     if (RESERVED_NAMES.includes(trimmed.toLowerCase())) {
-      return t("The name \"{0}\" is reserved by lightMock (forbidden names: {1}).", trimmed, RESERVED_NAMES.join(', '));
+      return t("The name \"{0}\" is reserved by Mimicway (forbidden names: {1}).", trimmed, RESERVED_NAMES.join(', '));
     }
     if (trimmed.includes('/') || trimmed.includes('\\')) {
       return t("A service name cannot contain a path separator (/ or \\).");

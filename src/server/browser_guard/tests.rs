@@ -208,7 +208,7 @@ fn a_loopback_only_server_answers_the_api_through_loopback_names_only() {
 }
 
 #[tokio::test]
-async fn lightmock_pages_carry_security_headers_but_mock_responses_stay_untouched() {
+async fn mimicway_pages_carry_security_headers_but_mock_responses_stay_untouched() {
     let root = spawn_app().await;
     let client = reqwest::Client::new();
     for path in ["/api/health", "/runtime-config.json", "/index.html"] {

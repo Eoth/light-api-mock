@@ -683,36 +683,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "light-mock"
-version = "0.1.0"
-dependencies = [
- "axum",
- "base64",
- "fastrand",
- "futures-util",
- "http",
- "http-body-util",
- "jsonwebtoken",
- "proptest",
- "quick-xml",
- "rdkafka",
- "regex",
- "reqwest",
- "rhai",
- "ring",
- "serde",
- "serde_json",
- "serde_yaml",
- "tokio",
- "tower 0.4.13",
- "tower-http 0.5.2",
- "tracing",
- "tracing-subscriber",
- "url",
- "uuid",
-]
-
-[[package]]
 name = "linux-raw-sys"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -771,6 +741,36 @@ checksum = "f7c44f8e672c00fe5308fa235f821cb4198414e1c77935c1ab6948d3fd78550e"
 dependencies = [
  "mime",
  "unicase",
+]
+
+[[package]]
+name = "mimicway"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "base64",
+ "fastrand",
+ "futures-util",
+ "http",
+ "http-body-util",
+ "jsonwebtoken",
+ "proptest",
+ "quick-xml",
+ "rdkafka",
+ "regex",
+ "reqwest",
+ "rhai",
+ "ring",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "tokio",
+ "tower 0.4.13",
+ "tower-http 0.5.2",
+ "tracing",
+ "tracing-subscriber",
+ "url",
+ "uuid",
 ]
 
 [[package]]

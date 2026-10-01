@@ -1,5 +1,5 @@
 name: Feature request
-description: A problem lightMock could solve, or solve better.
+description: A problem Mimicway could solve, or solve better.
 labels: [enhancement]
 body:
   - type: markdown

@@ -40,7 +40,7 @@ impl KafkaConfig {
             .collect();
 
         let consumer_group =
-            std::env::var("KAFKA_CONSUMER_GROUP").unwrap_or_else(|_| "lightmock".into());
+            std::env::var("KAFKA_CONSUMER_GROUP").unwrap_or_else(|_| "mimicway".into());
         let listen_topic = std::env::var("KAFKA_LISTEN_TOPIC").unwrap_or_default();
         let reply_topic = std::env::var("KAFKA_REPLY_TOPIC")
             .ok()
@@ -81,7 +81,7 @@ mod tests {
         let cfg = KafkaConfig::from_env();
         assert!(!cfg.enabled);
         assert!(cfg.brokers.is_empty());
-        assert_eq!(cfg.consumer_group, "lightmock");
+        assert_eq!(cfg.consumer_group, "mimicway");
         assert_eq!(cfg.listen_topic, "");
         assert!(cfg.reply_topic.is_none());
     }
@@ -110,9 +110,9 @@ mod tests {
     fn reply_topic_from_env() {
         let _guard = ENV_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
         clear_env();
-        unsafe { std::env::set_var("KAFKA_REPLY_TOPIC", "lightmock.replies") };
+        unsafe { std::env::set_var("KAFKA_REPLY_TOPIC", "mimicway.replies") };
         let cfg = KafkaConfig::from_env();
-        assert_eq!(cfg.reply_topic, Some("lightmock.replies".to_string()));
+        assert_eq!(cfg.reply_topic, Some("mimicway.replies".to_string()));
         clear_env();
     }
 

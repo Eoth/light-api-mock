@@ -1,10 +1,10 @@
 [package]
-name = "light-mock"
+name = "mimicway"
 version = "0.1.0"
 edition = "2024"
 description = "Mock or proxy any HTTP API, rule by rule, from a web UI: one self-contained binary, no telemetry"
 license = "MIT"
-repository = "https://github.com/eoth/light-api-mock"
+repository = "https://github.com/Eoth/mimicway"
 
 [dependencies]
 # Web framework async

@@ -1,18 +1,18 @@
 apiVersion: gateway.solo.io/v1
 kind: VirtualService
 metadata:
-  name: lightmock
+  name: mimicway
   labels:
-    app.kubernetes.io/name: lightmock
+    app.kubernetes.io/name: mimicway
     app.kubernetes.io/component: routing
 spec:
   virtualHost:
     domains:
-      - lightmock.example.com
+      - mimicway.example.com
     routes:
       - matchers:
           - prefix: /
         delegateAction:
           ref:
-            name: lightmock
-            namespace: lightmock
+            name: mimicway
+            namespace: mimicway

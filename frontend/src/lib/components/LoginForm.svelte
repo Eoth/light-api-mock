@@ -32,7 +32,7 @@
 
 <div class="login-container">
   <div class="login-card">
-    <h1 class="login-title">lightMock</h1>
+    <h1 class="login-title">Mimicway</h1>
     <p class="login-subtitle">{t("Sign-in required")}</p>
 
     <form class="login-form" onsubmit={handleSubmit}>

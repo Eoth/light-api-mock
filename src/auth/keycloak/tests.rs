@@ -7,7 +7,7 @@ fn test_config() -> AuthConfig {
         enabled: true,
         keycloak_url: "https://keycloak.example.com".into(),
         realm: "entreprise".into(),
-        client_id: "lightmock".into(),
+        client_id: "mimicway".into(),
         issuer: String::new(),
         super_admins: vec!["admin".into()],
         show_reset_button: false,
@@ -93,7 +93,7 @@ async fn accepts_a_token_of_the_realm_issued_to_this_client() {
     // A token whose audience names the client is accepted too.
     let mut claims = realm.claims("bob");
     claims["azp"] = "other".into();
-    claims["aud"] = serde_json::json!(["account", "lightmock"]);
+    claims["aud"] = serde_json::json!(["account", "mimicway"]);
     assert_eq!(
         client
             .validate_token(&realm.key.sign(&claims))

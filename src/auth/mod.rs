@@ -22,7 +22,7 @@ pub struct AuthConfig {
 
 impl AuthConfig {
     /// The authentication settings, or a message naming what is missing when authentication is enabled without
-    /// the Keycloak settings it needs (lightMock then refuses to start rather than run half-protected).
+    /// the Keycloak settings it needs (Mimicway then refuses to start rather than run half-protected).
     pub fn from_env() -> Result<Self, String> {
         let enabled = std::env::var("AUTH_ENABLED")
             .unwrap_or_else(|_| "false".into())
@@ -124,7 +124,7 @@ mod tests {
             enabled: true,
             keycloak_url: "https://kc.example.com".into(),
             realm: "test".into(),
-            client_id: "lightmock".into(),
+            client_id: "mimicway".into(),
             super_admins: vec!["admin1".into()],
             issuer: String::new(),
             show_reset_button: false,

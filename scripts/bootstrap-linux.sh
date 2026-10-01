@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# lightMock - build from source on Debian/Ubuntu.
+# Mimicway - build from source on Debian/Ubuntu.
 # Usage: ./scripts/bootstrap-linux.sh
 # Safe to run several times: installed tools are kept.
 set -euo pipefail
@@ -71,7 +71,7 @@ ok "Server built in target/release/"
 
 echo ""
 echo "================================================================"
-echo "  lightMock is ready. Start it with:"
-echo "  ./target/release/light-mock"
+echo "  Mimicway is ready. Start it with:"
+echo "  ./target/release/mimicway"
 echo "  then open http://localhost:7342"
 echo "================================================================"

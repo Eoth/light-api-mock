@@ -172,15 +172,15 @@ async fn api_errors_follow_the_language_the_request_asks_for() {
             body["error"].as_str().unwrap().to_string()
         }
     };
-    assert!(error(None).await.contains("is reserved by lightMock"));
+    assert!(error(None).await.contains("is reserved by Mimicway"));
     assert!(
         error(Some("fr-FR,fr;q=0.9"))
             .await
-            .contains("est reserve par lightMock")
+            .contains("est reserve par Mimicway")
     );
     assert!(
         error(Some("de-DE"))
             .await
-            .contains("is reserved by lightMock")
+            .contains("is reserved by Mimicway")
     );
 }

@@ -1,14 +1,14 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: lightmock
+  name: mimicway
   labels:
-    app.kubernetes.io/name: lightmock
+    app.kubernetes.io/name: mimicway
     app.kubernetes.io/component: server
 spec:
   type: ClusterIP
   selector:
-    app.kubernetes.io/name: lightmock
+    app.kubernetes.io/name: mimicway
   ports:
     - port: 80
       targetPort: http

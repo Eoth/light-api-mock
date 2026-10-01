@@ -1,5 +1,5 @@
 // Source unique de verite pour les fonctions natives Rhai exposees par
-// lightMock (miroir de src/engine/script.rs::ScriptEngine::new). Reutilisee a
+// Mimicway (miroir de src/engine/script.rs::ScriptEngine::new). Reutilisee a
 // la fois par la doc contextuelle de l'editeur de script (RuleForm.svelte) ET
 // par l'autocompletion (RhaiScriptEditor.svelte) — meme principe que
 // tpl-utils.js pour le format template : une seule liste a mettre a jour

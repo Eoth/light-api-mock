@@ -1,6 +1,6 @@
 # Responses and templates
 
-Once a [rule](matching-rules.md) matches, lightMock produces a response: an HTTP status, headers and a body (JSON, XML or text) that can be **static** or **dynamic** (holding values computed for each request).
+Once a [rule](matching-rules.md) matches, Mimicway produces a response: an HTTP status, headers and a body (JSON, XML or text) that can be **static** or **dynamic** (holding values computed for each request).
 
 ## Pick a format, then a level of detail
 
@@ -10,7 +10,7 @@ The body is built in two steps: first a **format** (JSON, XML, Text, Advanced te
 
 ### 1. By example: paste an existing response
 
-For bodies that are already complex, it is often faster to **paste a real response** (one you got from the real backend, for instance): lightMock detects every field, and you can then replace some values with variables or fake data, field by field. Each variable value can also get a **transformation** (see "Transformations" below), exactly as in the detailed level.
+For bodies that are already complex, it is often faster to **paste a real response** (one you got from the real backend, for instance): Mimicway detects every field, and you can then replace some values with variables or fake data, field by field. Each variable value can also get a **transformation** (see "Transformations" below), exactly as in the detailed level.
 
 For JSON, the detected fields are listed **flat**, with indentation for nested levels: enough for REST payloads, which are usually shallow. A nested **object** field still shows a **chevron** (▼/▶) on its left to fold it for a while (a "(N hidden items)" note reminds you that content is hidden): handy when a pasted sample holds several nested objects and you want to focus on one. Folding never deletes anything: it only changes the view, and everything is unfolded by default.
 
@@ -22,7 +22,7 @@ For XML, often nested more deeply (a SOAP envelope, for instance), this level al
 
 ![XML by example: breadcrumb after entering a node, attributes shown above](screenshots/response-xml-by-example-navigation.png)
 
-Namespace prefixes (`soap:Envelope`) and `xmlns`/`xmlns:*` declarations are kept as they are, as text; lightMock does not resolve them. Pasting XML with namespaces works without errors, but no semantic validation is done.
+Namespace prefixes (`soap:Envelope`) and `xmlns`/`xmlns:*` declarations are kept as they are, as text; Mimicway does not resolve them. Pasting XML with namespaces works without errors, but no semantic validation is done.
 
 > The by-example level does not rename, add or remove a detected field or node: for that, click **"Edit in detail (full structure) →"** (see below).
 
@@ -40,7 +40,7 @@ To move around a deeply nested structure, a breadcrumb above the editor (a click
 
 ### Changing format on the way
 
-You can change format (from "Advanced template" to "XML", for instance) after you started writing a response. lightMock then tries to **convert** what you already typed instead of starting over:
+You can change format (from "Advanced template" to "XML", for instance) after you started writing a response. Mimicway then tries to **convert** what you already typed instead of starting over:
 
 - **Advanced template → JSON** or **Advanced template → XML**: when the text is valid JSON or XML (with its `{{...}}` variables already in place), it is taken as it is into the by-example view of the new format: fields, values, pipes, and for XML the root tag and its attributes.
 - When the content is **not** valid in the target format, a warning explains why it cannot be converted, and offers "Switch anyway" (start empty in the new format) or cancelling to fix the content first.
@@ -48,9 +48,9 @@ You can change format (from "Advanced template" to "XML", for instance) after yo
 
 ### Reopening a rule restores its view
 
-When you reopen a saved rule, lightMock remembers **which view** built it (by example or in detail, JSON or XML) and opens that one. A rule built by example reopens by example (with "Edit in detail" still at hand), a rule built in detail reopens in detail. "Text" and "Advanced template" are restored too.
+When you reopen a saved rule, Mimicway remembers **which view** built it (by example or in detail, JSON or XML) and opens that one. A rule built by example reopens by example (with "Edit in detail" still at hand), a rule built in detail reopens in detail. "Text" and "Advanced template" are restored too.
 
-**Limit**: if the response was changed outside the interface (configuration file edited by hand, old backup restored) and no longer fits the shape the remembered view expects, lightMock falls back to "Advanced template" instead of showing an error: your content stays visible and editable, only the structured view is not restored. Likewise, a JSON body whose root is an **array** (only possible by example) cannot be restored in a structured view when reopened: "Advanced template" takes over.
+**Limit**: if the response was changed outside the interface (configuration file edited by hand, old backup restored) and no longer fits the shape the remembered view expects, Mimicway falls back to "Advanced template" instead of showing an error: your content stays visible and editable, only the structured view is not restored. Likewise, a JSON body whose root is an **array** (only possible by example) cannot be restored in a structured view when reopened: "Advanced template" takes over.
 
 ## Template syntax: `{{ }}`
 

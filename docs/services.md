@@ -1,6 +1,6 @@
 # Services and routing
 
-A **service** is the basic unit of lightMock: it stands for one API you want to mock or relay. Each service you create is reachable at once on its own URL, without restarting anything.
+A **service** is the basic unit of Mimicway: it stands for one API you want to mock or relay. Each service you create is reachable at once on its own URL, without restarting anything.
 
 ## Creating a service
 
@@ -30,7 +30,7 @@ Some services are never meant to relay a real request: they only produce mocked 
 
 **A rule with the "Proxy" action makes no sense on a purely mocked service**, so the rule form only offers "Mock" for such services.
 
-**Making an existing service purely mocked while some of its rules use "Proxy"**: lightMock warns instead of blocking. The message lists the rules concerned (they will stop relaying and answer with a clear error) and offers "Save anyway" or going back to fix them first.
+**Making an existing service purely mocked while some of its rules use "Proxy"**: Mimicway warns instead of blocking. The message lists the rules concerned (they will stop relaying and answer with a clear error) and offers "Save anyway" or going back to fix them first.
 
 ## How the URL is built
 
@@ -58,7 +58,7 @@ The exact URL to call is always shown on the service's page: no need to work it 
 
 ## Mock or proxy: two modes, two levels
 
-lightMock can either **answer a request itself** (*mock* mode, with the response you configured) or **pass it to the real backend** and return its answer unchanged (*proxy* mode). The choice exists at two levels:
+Mimicway can either **answer a request itself** (*mock* mode, with the response you configured) or **pass it to the real backend** and return its answer unchanged (*proxy* mode). The choice exists at two levels:
 
 - **Service level**: the mock switch turns the WHOLE service into a pure proxy (no rule is evaluated, every request goes straight to `real_target_url`) or into mock mode (the service's rules are evaluated, see [Matching rules](matching-rules.md)).
 - **Rule level**: while the service is in mock mode, each rule can itself be set to "mock" (answer with the configured content) or "proxy" (relay the requests it matches to the real backend). This gives a **partial mock**: for instance, mock only the error cases and let everything else reach the real service.
@@ -90,4 +90,4 @@ The service list has a search field that filters by name, path, URL or group, an
 
 - No requirement: available in every installation.
 - A service name must be unique **within its scope** (no group, or one group). Two services with the same name in two groups are allowed and told apart everywhere in the interface.
-- Some names are reserved by lightMock itself (`api`, `auth`, `assets`, `index.html`, `favicon.ico`, `runtime-config.json`) and cannot name a service, so that they never hide the interface.
+- Some names are reserved by Mimicway itself (`api`, `auth`, `assets`, `index.html`, `favicon.ico`, `runtime-config.json`) and cannot name a service, so that they never hide the interface.

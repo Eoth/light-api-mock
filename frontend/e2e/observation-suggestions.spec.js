@@ -8,7 +8,7 @@ const API = 'http://localhost:7342/api';
 // central du chantier (deux appels au meme endpoint, reponses legitimement
 // differentes) plutot qu'un cas trivial ou tout endpoint repond pareil.
 // Content-Length explicite : Node envoie "chunked" par defaut sans ca, ce qui
-// desactiverait silencieusement la capture cote lightMock (voir
+// desactiverait silencieusement la capture cote Mimicway (voir
 // ProxyClient::forward_with_capture, src/engine/proxy.rs).
 function startFakeTarget() {
   return new Promise((resolve) => {

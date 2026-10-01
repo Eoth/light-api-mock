@@ -18,12 +18,12 @@ pub(crate) fn assert_consistent(config: &MockConfig) {
     );
 }
 
-/// Directory of the current test run: `<temp>/lightmock-tests/<pid>-<start time>`. A test cannot know when the
+/// Directory of the current test run: `<temp>/mimicway-tests/<pid>-<start time>`. A test cannot know when the
 /// servers it started stop writing, so its directory is not removed by the test itself; instead the first test of
 /// each run removes the runs older than an hour. Tests used to leave one directory per test in the temporary
 /// folder, thousands after a few days.
 static RUN_DIR: std::sync::LazyLock<PathBuf> = std::sync::LazyLock::new(|| {
-    let root = std::env::temp_dir().join("lightmock-tests");
+    let root = std::env::temp_dir().join("mimicway-tests");
     if let Ok(runs) = std::fs::read_dir(&root) {
         let hour_ago = std::time::SystemTime::now() - std::time::Duration::from_secs(3600);
         for run in runs.flatten() {

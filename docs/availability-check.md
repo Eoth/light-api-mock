@@ -29,4 +29,4 @@ Clicking again within 2 minutes of a check reuses its result without opening a n
 
 - No requirement: available in every installation.
 - Only offered when the service has a `real_target_url`.
-- The result is **not saved** with the service: it is a temporary status, cleared when lightMock restarts.
+- The result is **not saved** with the service: it is a temporary status, cleared when Mimicway restarts.
