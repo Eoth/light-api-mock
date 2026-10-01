@@ -73,7 +73,7 @@ Size L, to split by module
 
 **What.** Module by module, in reading order of the [reviewer guide](REVIEWING.md), rewrite comments in English and keep only what explains *why* (an invariant, a pitfall, a specification reference); history stays in Git. Translate test names and test messages at the same time.
 
-**Progress.** Done: `main.rs`, `server/mod.rs`, `server/api.rs`, `server/browser_guard.rs`, `server/redaction.rs`, `server/validation.rs`, `server/ping.rs`, `server/codegen.rs`, `auth/`, `i18n.rs`, `tcp/hex.rs`. Also done: `engine/script.rs`, `engine/proxy.rs`, `server/intercept.rs`. Next, by number of French comment lines: `store/mod.rs` (about 120), `engine/matcher.rs` (110), `server/suggestion.rs` (70), `server/observation.rs`, `tcp/`, `messaging/`, `models/`, `server/request_log.rs`, `engine/template.rs`, then the UI.
+**Progress.** Done: `main.rs`, `server/mod.rs`, `server/api.rs`, `server/browser_guard.rs`, `server/redaction.rs`, `server/validation.rs`, `server/ping.rs`, `server/codegen.rs`, `auth/`, `i18n.rs`, `tcp/hex.rs`. Also done: `engine/script.rs`, `engine/proxy.rs`, `server/intercept.rs`, `store/mod.rs`, and every server log message. Next, by number of French comment lines: `engine/matcher.rs` (about 110), `server/suggestion.rs` (70), `server/observation.rs`, `tcp/`, `messaging/`, `models/`, `server/request_log.rs`, `engine/template.rs`, then the UI.
 
 **Done when.** No French comment left in `src/` and `frontend/src/`, checked by a script in CI that flags French stop words in comments.
 

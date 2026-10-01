@@ -1065,7 +1065,7 @@ mod tests {
         );
         assert!(
             raw.to_lowercase().contains("x-custom-header: custom-value"),
-            "header custom manquant (rule-level proxy):\n{raw}"
+            "custom header missing (rule-level proxy):\n{raw}"
         );
         assert!(
             raw.contains("payload-body"),

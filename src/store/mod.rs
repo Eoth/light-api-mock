@@ -1,36 +1,19 @@
-// Persistance de la config (services + groupes) en YAML sur disque.
-// Architecture : Arc<RwLock<Arc<MockConfig>>> pour lectures O(1) sans clone.
-// snapshot() retourne un Arc (clone du pointeur, pas des donnees).
-// Les mutations (update/replace) clonent les donnees, les modifient, mettent
-// a jour l'Arc en memoire INSTANTANEMENT, puis delegent l'ecriture disque
-// effective (tmp write + rename) a une tache de fond via un channel
-// (write-behind, cf WriterHandle plus bas) — le thread de requete HTTP n'est
-// donc plus jamais bloque par l'I/O disque elle-meme.
+// The configuration (services and groups), kept in memory and in one YAML file.
 //
-// Backup/rollback : avant chaque ecrasement du fichier de config, l'ancien
-// contenu est copie dans {data_dir}/backups/. C'est event-driven (declenche
-// par la mutation elle-meme), PAS une tache de fond/cron — coherent avec le
-// choix fait pour le ping (src/server/ping.rs). Rotation immediate apres
-// coup pour ne garder que BACKUP_MAX_COUNT fichiers (defaut 5), necessaire
-// vu la contrainte PVC 64Mi en K8s.
+// Reads take a snapshot: an Arc of the current configuration, so a reader never copies it nor waits for a writer.
+// A change copies the configuration, modifies the copy and swaps it in at once; writing it to disk (temporary file,
+// then rename) is left to a background task (write-behind, see WriterHandle), so a request never waits on disk I/O.
 //
-// IMPORTANT (write-behind) : le backup reste SYNCHRONE et s'execute AVANT la
-// mise en queue de l'ecriture asynchrone (voir prepare_and_backup(), appelee
-// sous le verrou d'ecriture avant tout appel a WriterHandle::send_write()).
-// Une mutation ne passe donc jamais sans sauvegarde prealable — casser cet
-// ordre viderait le mecanisme de rollback de son utilite.
+// Backups: before the file is overwritten, the previous content is copied to {data_dir}/backups/ and only the
+// newest BACKUP_MAX_COUNT copies are kept (5 by default; the reference Kubernetes volume is small). It happens as
+// part of the change itself, with no timer. The copy is made synchronously, under the write lock and BEFORE the new
+// content is queued for writing (prepare_and_backup): a change is never accepted without its backup, which is the
+// whole point of the rollback.
 //
-// Backup pre-reset protege : avant un reset complet (DELETE /api/config/reset),
-// backup_before_reset() copie la config courante dans backups/protected/. Ce
-// sous-repertoire est EXEMPT de rotate_backups() (qui ne liste que les
-// fichiers directement dans backups/, pas ses sous-dossiers) — un reset ne
-// peut donc jamais se faire "avaler" par le quota BACKUP_MAX_COUNT classique
-// a cause d'ecritures ulterieures. Il n'est purge que par expiration
-// (PROTECTED_BACKUP_MAX_AGE_MS, 30 jours), verifiee de facon opportuniste a
-// chaque ecriture normale (toujours event-driven, jamais de timer/cron) :
-// l'interpretation retenue est qu'une ecriture survenant >=30 jours apres le
-// reset est le signal que plus personne ne depend de cet ancien etat — pas de
-// comptage d'activite plus fin que ca.
+// A full reset first copies the configuration to backups/protected/ (backup_before_reset). Rotation only looks at
+// files directly in backups/, so later changes can never push that copy out. It expires after 30 days
+// (PROTECTED_BACKUP_MAX_AGE_MS), checked at each ordinary write: a write 30 days after the reset is taken as the
+// sign that nobody depends on the old state any more.
 use crate::models::MockConfig;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -41,26 +24,16 @@ static BACKUP_SEQ: AtomicU64 = AtomicU64::new(0);
 
 const PROTECTED_BACKUP_MAX_AGE_MS: u128 = 30 * 24 * 60 * 60 * 1000;
 
-// Capacite du channel d'ecriture asynchrone (write-behind). Bornee
-// volontairement : le but de cette evolution est de ne plus bloquer le
-// thread de requete sur l'I/O disque, PAS d'autoriser une file d'attente
-// illimitee qui grossirait sans controle en cas de pic d'ecritures (sobriete
-// ressources). Chaque mutation flush individuellement (pas de
-// vrai batching, voir WriteJob et le commentaire sur run()) : avec ce
-// pattern, une capacite de 64 absorbe largement les pics realistes. Au-dela,
-// send_write().await applique un backpressure naturel (le call site attend
-// qu'une place se libere) plutot que de perdre des ecritures ou de laisser
-// la memoire grossir indefiniment — c'est un choix delibere, pas une limite
-// subie. Constante fixe (pas de variable d'env comme BACKUP_MAX_COUNT) : il
-// s'agit d'une soupape de securite interne, pas d'un reglage utilisateur.
+// The write queue is bounded on purpose: write-behind exists so that requests stop waiting on disk I/O, not to let
+// a queue grow without limit during a burst. Each change is one job (no batching), and 64 jobs absorb realistic
+// bursts; beyond that, the change waits for a free slot (backpressure) rather than losing writes or growing memory.
+// A fixed safety valve, not a setting.
 const WRITE_QUEUE_CAPACITY: usize = 64;
 
-/// Un job pousse dans le channel du writer asynchrone.
-/// - `Write` : contenu YAML deja serialise a persister sur `path`.
-/// - `Barrier` : ne fait aucune ecriture, signale juste au demandeur (via le
-///   oneshot) que tous les jobs pousses AVANT lui ont ete traites. Utilise par
-///   `flush()` (tests deterministes sans sleep, et drain a l'arret gracieux
-///   du serveur) — jamais par le chemin de mutation normal.
+/// A job for the background writer.
+/// - `Write`: serialized YAML to write to `path`.
+/// - `Barrier`: writes nothing; answers through its oneshot once every job queued before it is done. Used by
+///   `flush()` (deterministic tests, draining on shutdown), never by the normal change path.
 enum WriteJob {
     Write { path: PathBuf, yaml: String },
     Barrier(oneshot::Sender<()>),
@@ -72,16 +45,15 @@ struct WriterStats {
     last_error: std::sync::RwLock<Option<WriterError>>,
 }
 
-/// Derniere erreur d'ecriture disque rencontree par la tache de fond.
-/// Expose via GET /api/health pour la detection d'un backlog/probleme
-/// disque en observabilite K8s.
+/// The last write error of the background task, reported by GET /api/health so that a disk problem shows up in
+/// monitoring.
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct WriterError {
     pub message: String,
     pub at_ms: u64,
 }
 
-/// Etat observable du write-behind, expose via GET /api/health.
+/// State of the background writer, reported by GET /api/health.
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct WriteQueueStatus {
     pub pending: usize,
@@ -90,9 +62,8 @@ pub struct WriteQueueStatus {
     pub last_error: Option<WriterError>,
 }
 
-/// Handle cote "producteur" du write-behind : chaque `MockStore` en detient
-/// un clone (Sender + stats partages), la tache de fond en detient le
-/// `Receiver` correspondant (voir `WriterHandle::spawn`).
+/// The sending side of the background writer: each `MockStore` holds a clone (sender and shared stats), the task
+/// holds the receiver (see `WriterHandle::spawn`).
 #[derive(Clone)]
 struct WriterHandle {
     tx: mpsc::Sender<WriteJob>,
@@ -107,21 +78,12 @@ impl WriterHandle {
         Self { tx, stats }
     }
 
-    /// Boucle de la tache de fond : consomme le channel jusqu'a sa
-    /// fermeture. PAS de polling/timer — purement event-driven (un `recv()`
-    /// qui attend le prochain message), coherent avec le reste du projet
-    /// (ping, backups). Choix assume : flush par mutation individuelle
-    /// plutot qu'un vrai batching (regrouper plusieurs jobs avant d'ecrire)
-    /// — un batching reduirait le nombre d'ecritures mais elargirait la
-    /// fenetre de risque en cas de crash (plus de mutations en memoire sans
-    /// contrepartie sur disque). Le gain recherche ici est de ne plus
-    /// bloquer le thread de requete, pas de reduire le nombre d'IO.
+    /// The background task: takes jobs until the channel closes, waiting on `recv()` with no polling. One write per
+    /// change rather than batching: batching would write less often but leave more changes only in memory in case of a
+    /// crash, and the goal is to keep requests off the disk, not to save writes.
     ///
-    /// Une erreur d'ecriture est loguee (niveau error) et enregistree dans
-    /// `stats.last_error`, MAIS ne fait pas paniquer la tache : le call site
-    /// HTTP a deja repondu succes a ce stade (la mutation est appliquee en
-    /// memoire), donc la tache continue de traiter les jobs suivants plutot
-    /// que d'abandonner tout write-behind futur pour une erreur transitoire.
+    /// A failed write is logged and kept in `stats.last_error`, and the task goes on: the request already succeeded
+    /// (the change is in memory), and one transient error must not stop every later write.
     async fn run(mut rx: mpsc::Receiver<WriteJob>, stats: Arc<WriterStats>) {
         while let Some(job) = rx.recv().await {
             match job {
@@ -135,7 +97,7 @@ impl WriterHandle {
                         tracing::error!(
                             path = %path.display(),
                             error = %e,
-                            "write-behind: echec de la persistance disque — l'etat en memoire est en avance sur le disque, perte possible si le processus s'arrete avant la prochaine ecriture reussie"
+                            "write-behind: writing the configuration to disk failed; memory is ahead of the disk, and changes may be lost if the process stops before the next successful write"
                         );
                         *stats.last_error.write().unwrap() = Some(WriterError {
                             message: e.to_string(),
@@ -148,28 +110,22 @@ impl WriterHandle {
                 }
             }
         }
-        tracing::warn!("write-behind: tache d'ecriture arretee (channel ferme)");
+        tracing::warn!("write-behind: the writer task stopped (channel closed)");
     }
 
-    /// Pousse une ecriture dans la file. `send().await` applique un
-    /// backpressure naturel si la file est pleine (voir WRITE_QUEUE_CAPACITY)
-    /// — c'est le seul cas ou une mutation peut de nouveau attendre sur le
-    /// write-behind, et c'est volontaire (soupape de securite plutot qu'une
-    /// file illimitee). Si le Receiver a ete abandonne (tache de fond morte,
-    /// ne devrait pas arriver en fonctionnement normal), on logue au lieu de
-    /// paniquer : la mutation reste appliquee en memoire.
+    /// Queues a write. When the queue is full, `send().await` waits for a free slot: the only case where a change waits
+    /// on the writer, by design. If the task is gone (which should not happen), the error is logged rather than turned
+    /// into a panic: the change stays applied in memory.
     async fn send_write(&self, path: PathBuf, yaml: String) {
         if self.tx.send(WriteJob::Write { path, yaml }).await.is_err() {
             tracing::error!(
-                "write-behind: tache d'ecriture indisponible, mutation appliquee en memoire uniquement (pas persistee)"
+                "write-behind: the writer task is gone; the change is applied in memory only, not written to disk"
             );
         }
     }
 
-    /// Attend que tous les jobs pousses AVANT cet appel aient ete traites
-    /// (succes ou echec). Utilise par les tests (assertions deterministes
-    /// sans sleep) et par l'arret gracieux du serveur (drainer la file avant
-    /// de quitter, cf main.rs).
+    /// Waits until every job queued before this call is done, successful or not: for deterministic tests and for
+    /// draining the queue on shutdown (main.rs).
     async fn flush(&self) {
         let (tx, rx) = oneshot::channel();
         if self.tx.send(WriteJob::Barrier(tx)).await.is_ok() {
@@ -230,11 +186,8 @@ impl MockStore {
         let file = Self::config_file(data_dir);
         std::fs::create_dir_all(data_dir).map_err(|e| StoreError::Io(e.to_string()))?;
 
-        // Bootstrap : ecriture synchrone (pas de write-behind ici). C'est le
-        // seul chemin d'ecriture qui reste bloquant intentionnellement — il
-        // s'execute avant que le serveur ne commence a accepter du trafic,
-        // donc aucune requete HTTP n'attend dessus, et le contrat "le fichier
-        // existe des le retour de load_or_init" doit rester vrai sans flush().
+        // The first write is synchronous on purpose: it happens before the server takes any traffic, so no request waits
+        // on it, and the file must exist as soon as load_or_init returns, without a flush().
         let config = if file.exists() {
             let content =
                 std::fs::read_to_string(&file).map_err(|e| StoreError::Io(e.to_string()))?;
@@ -260,13 +213,9 @@ impl MockStore {
         self.config.read().await.clone()
     }
 
-    /// Applique la mutation instantanement en memoire, puis delegue
-    /// l'ecriture disque a la tache de fond (write-behind). Le verrou
-    /// d'ecriture est tenu du debut (backup synchrone) jusqu'a la mise en
-    /// queue incluse : ca serialise les mutations concurrentes dans le meme
-    /// ordre que les jobs arrivent dans le channel (FIFO, un seul
-    /// consommateur), donc l'ordre des ecritures sur disque respecte
-    /// toujours l'ordre des mutations.
+    /// Applies the change in memory at once and leaves the disk write to the background task. The write lock is held
+    /// from the synchronous backup until the job is queued, so concurrent changes reach the single-consumer queue in
+    /// the order they were applied, and the disk sees them in that order.
     pub async fn replace(&self, config: MockConfig) -> Result<(), StoreError> {
         let mut guard = self.config.write().await;
         let yaml = Self::prepare_and_backup(&self.path, &config)?;
@@ -306,25 +255,19 @@ impl MockStore {
         Ok(Ok(guard.clone()))
     }
 
-    /// Attend que toutes les mutations deja soumises aient ete persistees
-    /// sur disque (succes ou echec). A utiliser pour des assertions de test
-    /// deterministes, ou a l'arret gracieux du serveur pour drainer la file
-    /// avant de quitter (cf main.rs). Ne fait PAS partie du chemin de
-    /// mutation normal — les handlers HTTP ne l'appellent jamais.
+    /// Waits until every change submitted so far is written (or failed). For deterministic tests and for draining on
+    /// shutdown (main.rs); request handlers never call it.
     pub async fn flush(&self) {
         self.writer.flush().await;
     }
 
-    /// Etat observable du write-behind (taille de file, derniere ecriture
-    /// reussie, derniere erreur), expose par GET /api/health.
+    /// State of the background writer (queue length, last successful write, last error), for GET /api/health.
     pub fn writer_status(&self) -> WriteQueueStatus {
         self.writer.status()
     }
 
-    /// Liste les backups disponibles (backups/ + backups/protected/), triees
-    /// des plus recents aux plus anciens. Lecture de metadonnees fichier
-    /// uniquement (nom, taille, mtime via DirEntry::metadata()) — le contenu
-    /// YAML n'est jamais charge pour construire cette liste.
+    /// The available backups (backups/ and backups/protected/), newest first. Only file metadata is read (name, size,
+    /// modification time), never the YAML content.
     pub async fn list_backups(&self) -> Result<Vec<BackupInfo>, StoreError> {
         let parent = self
             .path
@@ -393,14 +336,9 @@ impl MockStore {
         }
     }
 
-    /// Restaure la config depuis un fichier de backup (backups/ ou
-    /// backups/protected/). `filename` doit deja avoir ete valide par
-    /// l'appelant (`validate_backup_filename`, anti-traversal) — cette
-    /// methode ne refait pas cette verification, elle se contente de
-    /// chercher le nom tel quel dans les deux repertoires de backups.
-    /// Reutilise `replace()` pour la reecriture : `atomic_write()` cree donc
-    /// automatiquement un backup de l'etat courant AVANT d'ecraser avec le
-    /// contenu restaure, sans logique dupliquee.
+    /// Restores the configuration from a backup in backups/ or backups/protected/. The caller has already validated
+    /// `filename` (`validate_backup_filename`, no path traversal); this only looks the name up in the two directories.
+    /// The restore goes through `replace()`, so the state it overwrites is backed up first, like any other change.
     pub async fn restore_from_backup(&self, filename: &str) -> Result<(), StoreError> {
         let parent = self
             .path
@@ -430,10 +368,8 @@ impl MockStore {
         self.replace(config).await
     }
 
-    /// Sauvegarde protegee avant un reset complet. A appeler explicitement
-    /// AVANT `replace(MockConfig::empty())` dans le handler de reset — ne
-    /// fait pas partie du chemin d'ecriture normal (atomic_write), donc les
-    /// ecritures ordinaires ne creent jamais de backup "protected".
+    /// The protected backup taken before a full reset. Called explicitly before `replace(MockConfig::empty())` by the
+    /// reset handler; ordinary writes never create a protected backup.
     pub async fn backup_before_reset(&self) -> Result<(), StoreError> {
         if !self.path.exists() {
             return Ok(());
@@ -452,11 +388,9 @@ impl MockStore {
         Ok(())
     }
 
-    /// Partie SYNCHRONE de l'ecriture : serialise en YAML, purge les backups
-    /// proteges expires, puis sauvegarde le fichier existant AVANT tout
-    /// remplacement. Appelee sous le verrou d'ecriture, avant la mise en
-    /// queue de l'ecriture asynchrone — voir le commentaire en tete de
-    /// fichier sur la contrainte "backup avant write-behind".
+    /// The synchronous part of a write: serializes to YAML, purges expired protected backups, then backs up the current
+    /// file before anything replaces it. Runs under the write lock, before the asynchronous write is queued (see the
+    /// top of this file: the backup always comes first).
     fn prepare_and_backup(path: &Path, config: &MockConfig) -> Result<String, StoreError> {
         let yaml = serde_yaml::to_string(config).map_err(|e| StoreError::Yaml(e.to_string()))?;
 
@@ -470,11 +404,8 @@ impl MockStore {
         Ok(yaml)
     }
 
-    /// Partie ASYNCHRONE (write-behind) : ecrit le YAML deja serialise sur
-    /// disque via tmp write + rename. Appelee uniquement par la tache de
-    /// fond du writer (WriterHandle::run) — sauf pour l'ecriture de bootstrap
-    /// dans load_or_init(), qui reste volontairement synchrone (cf commentaire
-    /// sur load_or_init).
+    /// The asynchronous part: writes the serialized YAML through a temporary file and a rename. Only the background
+    /// task calls it, except for the first write in load_or_init(), which is synchronous on purpose.
     fn write_to_disk(path: &Path, yaml: &str) -> Result<(), StoreError> {
         let parent = path
             .parent()
@@ -487,27 +418,13 @@ impl MockStore {
         Ok(())
     }
 
-    /// Purge les backups pre-reset (backups/protected/) plus vieux que
-    /// PROTECTED_BACKUP_MAX_AGE_MS. Opportuniste : declenche par l'ecriture
-    /// en cours, pas de timer. Age lu depuis le timestamp encode dans le nom
-    /// de fichier (`pre-reset-{ts}.yaml`), pas depuis les metadonnees disque.
+    /// Deletes the pre-reset backups (backups/protected/) older than PROTECTED_BACKUP_MAX_AGE_MS, at each write rather
+    /// than on a timer. The age comes from the timestamp in the file name (`pre-reset-{ts}.yaml`), not from file
+    /// metadata.
     ///
-    /// Appelee sous le verrou d'ecriture, sur CHAQUE mutation (§3/§5 point 22,
-    /// "opportuniste a chaque ecriture normale") : `backups/protected/` n'est
-    /// borne QUE par cette purge (pas de rotation par quantite comme
-    /// `backups/`), donc en usage reel (E2E ou dev quotidien qui reset
-    /// souvent, jamais 30 jours sans mutation) ce dossier peut compter des
-    /// centaines/milliers de fichiers avant sa premiere expiration. `entry
-    /// .file_type()` (plutot que `entry.path().is_file()`, qui refait un
-    /// `stat()` par fichier) reutilise le type deja renvoye par l'enumeration
-    /// du repertoire (gratuit sur Windows via WIN32_FIND_DATAW, pas d'appel
-    /// systeme supplementaire) : evite N stats couteux inutiles a CHAQUE
-    /// mutation de l'appli des que ce dossier grossit. Diagnostique via un
-    /// dossier `backups/protected/` de dev local a >1300 entrees (accumule
-    /// par des mois de sessions E2E, chaque `beforeEach` faisant un
-    /// `DELETE /api/config/reset`) : cf le commentaire du test
-    /// `purge_expired_protected_backups_correct_with_many_entries` plus bas
-    /// pour la mesure avant/apres.
+    /// It runs under the write lock on every change, and this directory has no count-based rotation: it can hold
+    /// thousands of files (test suites reset before every test). `entry.file_type()` reuses what the directory listing
+    /// already returned, whereas `entry.path().is_file()` would make one more system call per file on every change.
     fn purge_expired_protected_backups(parent: &Path) -> Result<(), StoreError> {
         let protected_dir = parent.join("backups").join("protected");
         if !protected_dir.exists() {
@@ -540,10 +457,8 @@ impl MockStore {
             .ok()
     }
 
-    /// Copie le fichier de config existant (avant ecrasement) dans un
-    /// repertoire de backups, puis purge les plus anciens au-dela de
-    /// `backup_max_count()`. Ne fait rien si `path` n'existe pas encore
-    /// (premier ecrit, rien a sauvegarder).
+    /// Copies the current configuration file into a backup directory before it is overwritten, then deletes the oldest
+    /// copies beyond `backup_max_count()`. Does nothing when the file does not exist yet.
     fn backup_before_overwrite(path: &Path, parent: &Path) -> Result<(), StoreError> {
         if !path.exists() {
             return Ok(());
@@ -569,8 +484,7 @@ impl MockStore {
             .filter(|p| p.is_file())
             .collect();
 
-        // Le nom encode timestamp+seq avec largeur fixe : le tri lexicographique
-        // correspond a l'ordre chronologique (plus recent = plus grand).
+        // Names hold a fixed-width timestamp and sequence: sorting them as text sorts them by date (newest last).
         files.sort();
 
         let max = Self::backup_max_count();
@@ -590,8 +504,7 @@ impl MockStore {
     }
 }
 
-/// Metadonnees d'un fichier de backup (jamais le contenu YAML), exposees par
-/// `GET /api/config/backups`.
+/// A backup file as `GET /api/config/backups` lists it: metadata only, never the YAML content.
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct BackupInfo {
     pub filename: String,
@@ -910,17 +823,10 @@ mod tests {
         std::fs::remove_dir_all(&dir).ok();
     }
 
-    /// `backups/protected/` n'a AUCUNE rotation par quantite (contrairement a
-    /// `backups/`, cape a BACKUP_MAX_COUNT) — seule
-    /// `purge_expired_protected_backups` (appelee sous verrou, sur CHAQUE
-    /// mutation) le borne, par age. Ce dossier peut grossir a plusieurs
-    /// milliers d'entrees en usage prolonge : `entry.file_type()` (deja connu
-    /// de l'enumeration du repertoire) est utilise plutot que `path.is_file()`
-    /// (un `stat()` par fichier) pour que le cout de ce scan, appele SOUS LE
-    /// VERROU D'ECRITURE a chaque mutation, reste negligeable meme a grande
-    /// echelle. Ce test ne mesure pas le temps (fragile en CI) mais verifie la
-    /// CORRECTION a l'echelle : seule l'entree expiree est purgee parmi 1501,
-    /// aucune des fraiches n'est touchee.
+    /// backups/protected/ has no count-based rotation: only the age-based purge, run under the write lock on every
+    /// change, bounds it, and it can grow to thousands of files. The purge reads the file type from the directory
+    /// listing so that this stays cheap. The test checks correctness at that scale rather than timing (unreliable in
+    /// CI): among 1,501 entries, only the expired one is deleted.
     #[tokio::test]
     async fn purge_expired_protected_backups_correct_with_many_entries() {
         let dir = temp_dir();
@@ -930,11 +836,8 @@ mod tests {
         let protected_dir = dir.join("backups").join("protected");
         std::fs::create_dir_all(&protected_dir).unwrap();
 
-        // now_ms() lue UNE SEULE FOIS avant la boucle : appelee a chaque
-        // iteration, l'horloge reelle peut avancer pendant les 1500 ecritures
-        // et faire coincider deux (i, now_ms()) differents sur le meme
-        // fresh_ts (collision de nom de fichier -> moins de 1500 fichiers
-        // reellement crees). Purement arithmetique ici, aucune ambiguite.
+        // now_ms() is read once before the loop: read at each iteration, the clock could move during the 1,500 writes and
+        // two iterations could produce the same file name, leaving fewer than 1,500 files.
         let base_now = MockStore::now_ms();
         for i in 0..1500 {
             let fresh_ts = base_now - 1_000 - i;
@@ -1114,14 +1017,8 @@ mod tests {
 
     #[tokio::test]
     async fn restore_from_backup_creates_safety_backup_of_current_state_first() {
-        // Ce test compte les backups non-proteges dans backups/ (soumis a
-        // rotation par BACKUP_MAX_COUNT) : sans tenir ENV_MUTEX, une mutation
-        // concurrente de cette variable par un autre test (ex.
-        // backup_rotation_keeps_max_n, protected_backup_exempt_from_normal_rotation,
-        // backup_max_count_from_env) peut plafonner le nombre de backups a une
-        // valeur trop basse pendant la fenetre du test, rendant la comparaison
-        // avant/apres fausse de facon intermittente (meme pitfall que tout
-        // test Rust qui mute un env var process-wide sans serialisation).
+        // This test counts the rotated backups of backups/: it holds ENV_MUTEX, or another test setting BACKUP_MAX_COUNT
+        // at the same time could cap the count and make the before/after comparison fail now and then.
         let _guard = ENV_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
         unsafe { std::env::remove_var("BACKUP_MAX_COUNT") };
         let dir = temp_dir();
@@ -1203,20 +1100,16 @@ mod tests {
         std::fs::remove_dir_all(&dir).ok();
     }
 
-    /// Le backup de l'etat ecrase doit exister sur disque immediatement apres
-    /// replace(), MEME SANS flush() — il est cree de facon synchrone par
-    /// prepare_and_backup() avant que l'ecriture ne soit seulement mise en
-    /// queue. Ne pas confondre avec la persistance du NOUVEAU contenu
-    /// (mock-config.yaml lui-meme), qui elle est asynchrone.
+    /// The backup of the overwritten state is on disk right after replace(), without flush(): prepare_and_backup()
+    /// writes it synchronously before the new content is even queued. Only the new content itself (mock-config.yaml)
+    /// is written in the background.
     #[tokio::test]
     async fn backup_is_synchronous_before_write_is_queued() {
         let dir = temp_dir();
         let store = MockStore::load_or_init(&dir).await.unwrap();
 
         store.replace(sample_config()).await.unwrap();
-        // Deliberement PAS de flush() ici : on verifie que le backup de
-        // l'etat precedent est deja sur disque independamment de l'etat
-        // d'avancement de la tache de fond.
+        // No flush() on purpose: the previous state's backup must already be on disk whatever the background task is doing.
         let backups = store.list_backups().await.unwrap();
         assert_eq!(
             backups.iter().filter(|b| !b.protected).count(),
@@ -1288,10 +1181,8 @@ mod tests {
         std::fs::remove_dir_all(&dir).ok();
     }
 
-    /// Une erreur d'ecriture disque (chemin invalide) est loguee et exposee
-    /// via writer_status(), mais ne fait PAS mourir la tache de fond : une
-    /// mutation ulterieure vers un chemin redevenu valide doit toujours
-    /// aboutir.
+    /// A failed disk write (invalid path) is logged and reported by writer_status(), and the background task keeps
+    /// running: a later change to a valid path still gets written.
     #[tokio::test]
     async fn write_error_is_reported_and_task_keeps_running() {
         let dir = temp_dir();
