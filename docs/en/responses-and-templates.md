@@ -47,6 +47,7 @@ To move around a deeply nested structure, the **→** button of an object field 
 You can change format (from "Advanced template" to "XML", for instance) after you started writing a response. Mimicway then tries to **convert** what you already typed instead of starting over:
 
 - **Advanced template → JSON** or **Advanced template → XML**: when the text is valid JSON or XML (with its `{{...}}` variables already in place), it is taken as it is into the by-example view of the new format: fields, values, pipes, and for XML the root tag and its attributes.
+- **JSON → Advanced template** or **XML → Advanced template**, by example or in detail: the response becomes its template, variables and pipes included, so nothing is lost.
 - When the content is **not** valid in the target format, a warning explains why it cannot be converted, and offers "Switch anyway" (start empty in the new format) or cancelling to fix the content first.
 - Some conversions are deliberately left manual (XML → JSON, for instance): the warning says so and suggests going through "Advanced template" as an intermediate step.
 

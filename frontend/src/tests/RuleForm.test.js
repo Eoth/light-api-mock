@@ -888,3 +888,31 @@ describe('RuleForm: the traffic of its own service', () => {
     expect(options.map((o) => o.textContent)).toEqual([expect.stringContaining('/a/users/1')]);
   });
 });
+
+describe('RuleForm: converting a by-example response to the advanced template', () => {
+  const byId = (container, id) => container.querySelector(`[data-testid="${id}"]`);
+
+  async function paste(container, format, sample) {
+    await fireEvent.click(byId(container, `rule-form-mode-button-${format}`));
+    await setInput(byId(container, `${format}-paste-builder-textarea`), sample);
+    await fireEvent.click(byId(container, `${format}-paste-builder-analyze-button`));
+  }
+
+  it('turns a JSON pasted by example into its template, without a warning', async () => {
+    const { container } = render(RuleForm);
+    await paste(container, 'json', '{"id":"42"}');
+    await fireEvent.click(byId(container, 'rule-form-mode-button-advanced'));
+
+    expect(byId(container, 'rule-form-mode-switch-confirm-button')).toBeNull();
+    expect(byId(container, 'rule-form-fragment-template-textarea-0').value).toBe('{"id":"42"}');
+  });
+
+  it('turns an XML pasted by example into its template, without a warning', async () => {
+    const { container } = render(RuleForm);
+    await paste(container, 'xml', '<order id="7"><a>x</a></order>');
+    await fireEvent.click(byId(container, 'rule-form-mode-button-advanced'));
+
+    expect(byId(container, 'rule-form-mode-switch-confirm-button')).toBeNull();
+    expect(byId(container, 'rule-form-fragment-template-textarea-0').value).toBe('<order id="7"><a>x</a></order>');
+  });
+});

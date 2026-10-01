@@ -366,7 +366,8 @@
         ? { ok: true, xmlPasteFields: r.xmlFields ?? [], xmlRootTag: r.xmlRootTag, xmlRootAttributes: r.xmlRootAttributes }
         : r;
     }
-    if ((from === 'json-guided' || from === 'xml-guided') && to === 'advanced') {
+    // Every structured view, by example or in detail, turns into its own template: nothing is lost.
+    if (STRUCTURED_MODES.includes(from) && to === 'advanced') {
       return { ok: true, fragments: [{ type: 'Template', template: structuredTemplate(from) }] };
     }
     if (from === 'json-guided' && to === 'xml-guided') {

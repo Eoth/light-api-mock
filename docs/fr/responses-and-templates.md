@@ -47,6 +47,7 @@ Pour circuler dans une structure profondément imbriquée, le bouton **→** d'u
 Vous pouvez changer de format (de « Template avancé » à « XML », par exemple) après avoir commencé à écrire une réponse. Mimicway tente alors de **convertir** ce que vous avez déjà saisi au lieu de repartir de zéro :
 
 - **Template avancé → JSON** ou **Template avancé → XML** : quand le texte est du JSON ou du XML valide (avec ses variables `{{...}}` déjà en place), il est repris tel quel dans la vue par l'exemple du nouveau format : champs, valeurs, pipes, et pour XML la balise racine et ses attributs.
+- **JSON → Template avancé** ou **XML → Template avancé**, par l'exemple ou en détail : la réponse devient son template, variables et pipes compris, donc rien n'est perdu.
 - Quand le contenu n'est **pas** valide dans le format cible, un avertissement explique pourquoi il ne peut pas être converti, et propose « Changer quand même » (partir à vide dans le nouveau format) ou d'annuler pour corriger le contenu d'abord.
 - Certaines conversions restent volontairement manuelles (XML → JSON, par exemple) : l'avertissement le dit et suggère de passer par « Template avancé » comme étape intermédiaire.
 
