@@ -78,8 +78,8 @@ struct RuntimeConfig {
 // back).
 //
 // Servi EN DEHORS de `/api` (route enregistree directement sur le Router
-// racine, pas nestee sous `api::routes()`) et ajoute a `is_internal_route`/
-// `is_static_asset_route` (src/server/validation.rs) : ce fichier doit
+// racine, pas nestee sous `api::routes()`) et ajoute a `is_internal_route`
+// (src/server/validation.rs), hors de l'API de gestion : ce fichier doit
 // rester joignable meme quand `/api` est route vers une origine differente
 // par l'infrastructure — il doit arriver au frontend par le MEME chemin que
 // index.html/le bundle JS (c'est ce qui lui permet, une fois charge,

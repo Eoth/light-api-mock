@@ -35,15 +35,12 @@ pub async fn auth_middleware(
         "/api/auth/login",
         "/api/auth/validate",
     ];
-    // Assets statiques de la SPA (index.html, bundle JS/CSS, favicon) : voir
-    // `is_static_asset_route` (src/server/validation.rs) pour la justification
-    // complete. Sans ce bypass, un navigateur sans token ne peut meme pas
-    // charger le JS qui affiche l'ecran de connexion (LoginForm.svelte) quand
-    // AUTH_ENABLED=true. Volontairement distinct de `no_auth_paths` ci-dessus
-    // (egalite stricte) : ce bypass ne doit JAMAIS etre etendu a un prefixe
-    // "/api" — voir les tests de non-regression dans validation.rs.
-    if no_auth_paths.iter().any(|p| path == *p)
-        || crate::server::validation::is_static_asset_route(&path)
+    // Only the management API is protected. Every other path is either the SPA shell, which must load without a
+    // token to show the login screen, or traffic of the mocked/proxied services: that traffic comes from the
+    // applications under test, which hold no lightMock token, and a token required here would then be forwarded
+    // to the real backend by the proxy.
+    if !crate::server::validation::is_management_api_route(&path)
+        || no_auth_paths.iter().any(|p| path == *p)
     {
         req.extensions_mut().insert(AuthUser::anonymous());
         return next.run(req).await;
@@ -150,17 +147,19 @@ mod tests {
     // auth_middleware exactement comme il tourne en production (layer Axum
     // reel), pas une version isolee reimplementee pour le test.
     async fn spawn_test_app(auth_config: AuthConfig, keycloak: Option<KeycloakClient>) -> String {
+        spawn_test_app_with_config(auth_config, keycloak, crate::models::MockConfig::empty()).await
+    }
+
+    async fn spawn_test_app_with_config(
+        auth_config: AuthConfig,
+        keycloak: Option<KeycloakClient>,
+        config: crate::models::MockConfig,
+    ) -> String {
         let data_dir =
             std::env::temp_dir().join(format!("lightmock-auth-mw-test-{}", fastrand::u64(..)));
         std::fs::create_dir_all(&data_dir).unwrap();
         let store = crate::store::MockStore::new(data_dir.join("mock-config.yaml"));
-        store
-            .replace(crate::models::MockConfig {
-                services: vec![],
-                groups: vec![],
-            })
-            .await
-            .unwrap();
+        store.replace(config).await.unwrap();
         store.flush().await;
 
         #[cfg(feature = "messaging-kafka")]
@@ -416,7 +415,7 @@ mod tests {
         // Regression cible : le bypass des assets statiques ne doit jamais
         // affaiblir la protection d'une route /api/* arbitraire (hors les 4
         // routes deja exemptees). Prouve au niveau du vrai routeur Axum, pas
-        // seulement au niveau unitaire de is_static_asset_route
+        // seulement au niveau unitaire de is_management_api_route
         // (validation.rs), que le comportement bout-en-bout reste correct.
         let kc_url = spawn_fake_keycloak("good-token", "alice").await;
         let auth_config = enabled_auth_config(kc_url, vec![]);
@@ -459,5 +458,46 @@ mod tests {
         let client = reqwest::Client::new();
         let resp = client.get(format!("{base}/services")).send().await.unwrap();
         assert_eq!(resp.status().as_u16(), 500);
+    }
+
+    #[tokio::test]
+    async fn mocked_service_traffic_needs_no_token_while_the_api_still_does() {
+        // The applications under test call the mocks with their own credentials (or none): requiring a lightMock
+        // token there broke every mock as soon as authentication was enabled, and would have forwarded that token
+        // to the real backend on proxied rules.
+        let service: crate::models::Service = serde_json::from_value(serde_json::json!({
+            "name": "orders", "listen_path": "", "real_target_url": "", "is_mocked": true,
+            "rewrite_directory_urls": false, "group_name": null, "wsdl_mode": "auto",
+            "rules": [{
+                "name": "list", "method": "GET", "sub_path": null, "action": "mock",
+                "pre_script": null, "script": null, "post_script": null,
+                "conditions": {"all_of": [], "any_of": []},
+                "response": {"status": 200, "headers": [], "body": [{"type": "Literal", "value": "mocked"}]}
+            }]
+        }))
+        .unwrap();
+        let kc_url = spawn_fake_keycloak("good-token", "alice").await;
+        let auth_config = enabled_auth_config(kc_url, vec![]);
+        let keycloak = Some(KeycloakClient::new(auth_config.clone()));
+        let config = crate::models::MockConfig {
+            services: vec![service],
+            groups: vec![],
+        };
+        let base = spawn_test_app_with_config(auth_config, keycloak, config).await;
+        let root = base.trim_end_matches("/api");
+        let client = reqwest::Client::new();
+
+        let mocked = client
+            .get(format!("{root}/orders/list"))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(mocked.status().as_u16(), 200);
+        assert_eq!(mocked.text().await.unwrap(), "mocked");
+
+        for api in ["/api/services", "/API/services"] {
+            let resp = client.get(format!("{root}{api}")).send().await.unwrap();
+            assert_ne!(resp.status().as_u16(), 200, "{api} must stay protected");
+        }
     }
 }
