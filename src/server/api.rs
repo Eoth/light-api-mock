@@ -1695,7 +1695,7 @@ async fn check_rule_conflicts(
     })
 }
 
-fn ensure_group_codes(groups: &mut Vec<Group>) {
+fn ensure_group_codes(groups: &mut [Group]) {
     let mut existing_codes: Vec<String> = groups
         .iter()
         .filter(|g| !g.code.trim().is_empty())

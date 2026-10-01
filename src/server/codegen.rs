@@ -68,7 +68,7 @@ mod tests {
     #[test]
     fn avoids_collision_with_existing() {
         let first = generate_code("mygroup", &[]);
-        let second = generate_code("mygroup", &[first.clone()]);
+        let second = generate_code("mygroup", std::slice::from_ref(&first));
         assert_ne!(first, second);
         assert_eq!(second.len(), 5);
     }

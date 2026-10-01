@@ -30,6 +30,12 @@ pub struct ScriptContext {
     pub path_params: HashMap<String, String>,
 }
 
+impl Default for ScriptEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ScriptEngine {
     pub fn new() -> Self {
         let mut engine = rhai::Engine::new();
@@ -39,7 +45,9 @@ impl ScriptEngine {
         engine.set_max_map_size(500);
 
         engine.register_fn("random_int", |min: i64, max: i64| -> i64 {
-            if min >= max { return min; }
+            if min >= max {
+                return min;
+            }
             min + (fastrand::i64(..) % (max - min + 1)).abs()
         });
 
@@ -107,9 +115,7 @@ impl ScriptEngine {
             },
         );
 
-        engine.register_fn("uuid", || -> String {
-            uuid::Uuid::new_v4().to_string()
-        });
+        engine.register_fn("uuid", || -> String { uuid::Uuid::new_v4().to_string() });
 
         engine.register_fn("fake", |kind: &str| -> String {
             crate::engine::template::resolve_fake_public(kind)
@@ -120,9 +126,12 @@ impl ScriptEngine {
         // le hash FNV-1a deja en place pour Group.code (src/server/codegen.rs) au
         // lieu d'ajouter une dependance de hashing dediee. `seed` accepte n'importe
         // quel type Rhai (string, int, bool...) via Dynamic::to_string().
-        engine.register_fn("seeded_int", |seed: rhai::Dynamic, min: i64, max: i64| -> i64 {
-            seeded_int_impl(&seed.to_string(), min, max)
-        });
+        engine.register_fn(
+            "seeded_int",
+            |seed: rhai::Dynamic, min: i64, max: i64| -> i64 {
+                seeded_int_impl(&seed.to_string(), min, max)
+            },
+        );
         engine.register_fn(
             "seeded_pick",
             |seed: rhai::Dynamic, list: rhai::Array| -> rhai::Dynamic {
@@ -534,10 +543,10 @@ fn parse_xml_items_impl(xml: &str, path: &str) -> rhai::Array {
                 }
             }
             Ok(Event::Text(e)) => {
-                if item_depth == 2 {
-                    if let Ok(t) = e.unescape() {
-                        current_text.push_str(&t);
-                    }
+                if item_depth == 2
+                    && let Ok(t) = e.unescape()
+                {
+                    current_text.push_str(&t);
                 }
             }
             Ok(Event::End(_)) => {
@@ -586,18 +595,16 @@ fn xml_element_impl(tag: &str, value: &rhai::Dynamic) -> String {
             if v.is_array() {
                 let arr = v.clone().into_array().unwrap_or_default();
                 for item in &arr {
-                    inner.push_str(&xml_element_impl(&k.to_string(), item));
+                    inner.push_str(&xml_element_impl(k.as_ref(), item));
                 }
             } else {
-                inner.push_str(&xml_element_impl(&k.to_string(), v));
+                inner.push_str(&xml_element_impl(k.as_ref(), v));
             }
         }
         format!("<{tag}>{inner}</{tag}>")
     } else if value.is_array() {
         let arr = value.clone().into_array().unwrap_or_default();
-        arr.iter()
-            .map(|item| xml_element_impl(tag, item))
-            .collect()
+        arr.iter().map(|item| xml_element_impl(tag, item)).collect()
     } else if value.is_unit() {
         format!("<{tag}/>")
     } else {
@@ -725,7 +732,7 @@ mod tests {
         let engine = ScriptEngine::new();
         let result = engine.execute("year()", &empty_ctx()).unwrap();
         let y: i64 = result.value.parse().unwrap();
-        assert!(y >= 2025 && y <= 2100);
+        assert!((2025..=2100).contains(&y));
     }
 
     #[test]
@@ -919,7 +926,10 @@ mod tests {
     fn parse_date_leap_year_feb_29_is_valid() {
         let engine = ScriptEngine::new();
         let result = engine.execute(r#"parse_date("29/02/2028", "dd/MM/yyyy")"#, &empty_ctx());
-        assert!(result.is_ok(), "29/02/2028 devrait etre valide (2028 est bissextile)");
+        assert!(
+            result.is_ok(),
+            "29/02/2028 devrait etre valide (2028 est bissextile)"
+        );
     }
 
     #[test]
@@ -1083,9 +1093,8 @@ mod tests {
                 .unwrap()
                 .value
         };
-        let picks: std::collections::HashSet<String> = (0..10)
-            .map(|i| script(&format!("siret-{i}")))
-            .collect();
+        let picks: std::collections::HashSet<String> =
+            (0..10).map(|i| script(&format!("siret-{i}"))).collect();
         assert!(
             picks.len() > 1,
             "expected different SIRET values to yield at least some different picks"
@@ -1103,14 +1112,18 @@ mod tests {
     #[test]
     fn fake_returns_data() {
         let engine = ScriptEngine::new();
-        let result = engine.execute(r#"fake("FirstName")"#, &empty_ctx()).unwrap();
+        let result = engine
+            .execute(r#"fake("FirstName")"#, &empty_ctx())
+            .unwrap();
         assert!(!result.value.is_empty());
     }
 
     #[test]
     fn compose_date_with_string() {
         let engine = ScriptEngine::new();
-        let result = engine.execute(r#"`${year()}-05-10`"#, &empty_ctx()).unwrap();
+        let result = engine
+            .execute(r#"`${year()}-05-10`"#, &empty_ctx())
+            .unwrap();
         assert!(result.value.ends_with("-05-10"));
         assert_eq!(result.value.len(), 10);
     }
@@ -1141,9 +1154,13 @@ mod tests {
             body: r#"{"name":"Alice","age":30}"#.into(),
             ..empty_ctx()
         };
-        let result = engine.execute("parse_json(request.body).name", &ctx).unwrap();
+        let result = engine
+            .execute("parse_json(request.body).name", &ctx)
+            .unwrap();
         assert_eq!(result.value, "Alice");
-        let result = engine.execute("parse_json(request.body).age", &ctx).unwrap();
+        let result = engine
+            .execute("parse_json(request.body).age", &ctx)
+            .unwrap();
         assert_eq!(result.value, "30");
     }
 
@@ -1380,7 +1397,10 @@ mod tests {
         "#;
         let mut path = HashMap::new();
         path.insert("name".into(), "svc-b".into());
-        let ctx = ScriptContext { path_params: path, ..empty_ctx() };
+        let ctx = ScriptContext {
+            path_params: path,
+            ..empty_ctx()
+        };
         let result = engine.execute(script, &ctx).unwrap();
         assert_eq!(result.value, "id-2");
     }
@@ -1395,7 +1415,10 @@ mod tests {
         "#;
         let mut path = HashMap::new();
         path.insert("name".into(), "svc-zzz".into());
-        let ctx = ScriptContext { path_params: path, ..empty_ctx() };
+        let ctx = ScriptContext {
+            path_params: path,
+            ..empty_ctx()
+        };
         let result = engine.execute(script, &ctx).unwrap();
         assert_eq!(result.value, "unknown");
     }
@@ -1416,7 +1439,10 @@ mod tests {
         "#;
         let mut path = HashMap::new();
         path.insert("name".into(), "svc-a".into());
-        let ctx = ScriptContext { path_params: path, ..empty_ctx() };
+        let ctx = ScriptContext {
+            path_params: path,
+            ..empty_ctx()
+        };
         let result = engine.execute(script, &ctx).unwrap();
         assert_eq!(result.value, "id-1");
     }
@@ -1444,7 +1470,8 @@ mod tests {
         "#;
         let result = engine.execute(script, &ctx).unwrap();
         assert_eq!(result.fields.get("big_count").unwrap(), "2");
-        let skus: serde_json::Value = serde_json::from_str(result.fields.get("big_skus").unwrap()).unwrap();
+        let skus: serde_json::Value =
+            serde_json::from_str(result.fields.get("big_skus").unwrap()).unwrap();
         assert_eq!(skus, serde_json::json!(["B", "C"]));
     }
 
@@ -1495,7 +1522,8 @@ mod tests {
     fn calling_undefined_function_is_a_real_execution_error() {
         let engine = ScriptEngine::new();
         let result = engine.execute("totally_undefined_fn(1, 2)", &empty_ctx());
-        let err = result.expect_err("un appel de fonction inexistante doit etre une erreur d'execution");
+        let err =
+            result.expect_err("un appel de fonction inexistante doit etre une erreur d'execution");
         assert!(err.contains("totally_undefined_fn"));
     }
 
@@ -1529,7 +1557,10 @@ mod tests {
         "#;
         let mut path = HashMap::new();
         path.insert("siret".into(), "44306184100047".into());
-        let ctx = ScriptContext { path_params: path, ..empty_ctx() };
+        let ctx = ScriptContext {
+            path_params: path,
+            ..empty_ctx()
+        };
         let result = engine.execute(script, &ctx).unwrap();
         assert_eq!(result.fields.get("name").unwrap(), "Lyon");
         assert_eq!(result.fields.get("cp").unwrap(), "69000");
@@ -1555,7 +1586,10 @@ mod tests {
         "#;
         let mut path = HashMap::new();
         path.insert("siret".into(), "44306184100047".into());
-        let ctx = ScriptContext { path_params: path, ..empty_ctx() };
+        let ctx = ScriptContext {
+            path_params: path,
+            ..empty_ctx()
+        };
         let result = engine.execute(script, &ctx).unwrap();
         assert_eq!(result.fields.get("other").unwrap(), "x");
         let raw = result.fields.get("ville").unwrap();
@@ -1563,8 +1597,9 @@ mod tests {
             !raw.starts_with('#'),
             "le champ imbrique ne doit plus utiliser la syntaxe Rhai #{{...}}: {raw}"
         );
-        let parsed: serde_json::Value = serde_json::from_str(raw)
-            .unwrap_or_else(|e| panic!("le champ imbrique doit etre du JSON valide, obtenu {raw:?}: {e}"));
+        let parsed: serde_json::Value = serde_json::from_str(raw).unwrap_or_else(|e| {
+            panic!("le champ imbrique doit etre du JSON valide, obtenu {raw:?}: {e}")
+        });
         assert_eq!(parsed["name"], "Lyon");
         assert_eq!(parsed["cp"], "69000");
         assert_eq!(parsed["insee"], "69123");
@@ -1596,7 +1631,10 @@ mod tests {
         // des scripts existants (scalaires).
         let engine = ScriptEngine::new();
         let result = engine
-            .execute(r#"#{ greeting: "hi", count: 42, active: true }"#, &empty_ctx())
+            .execute(
+                r#"#{ greeting: "hi", count: 42, active: true }"#,
+                &empty_ctx(),
+            )
             .unwrap();
         assert_eq!(result.fields.get("greeting").unwrap(), "hi");
         assert_eq!(result.fields.get("count").unwrap(), "42");
@@ -1620,9 +1658,15 @@ mod tests {
         "#;
         let mut path = HashMap::new();
         path.insert("siret".into(), "44306184100047".into());
-        let ctx = ScriptContext { path_params: path, ..empty_ctx() };
+        let ctx = ScriptContext {
+            path_params: path,
+            ..empty_ctx()
+        };
         let result = engine.execute(script, &ctx);
-        assert!(result.is_ok(), "un champ absent sur une map utilisateur ne doit jamais lever d'erreur");
+        assert!(
+            result.is_ok(),
+            "un champ absent sur une map utilisateur ne doit jamais lever d'erreur"
+        );
         assert_eq!(result.unwrap().value, "");
     }
 
@@ -1637,7 +1681,10 @@ mod tests {
         // outil pour ce cas — cf commentaire sur /api/rule-test.
         let engine = ScriptEngine::new();
         let result = engine.execute("request.path.this_key_does_not_exist", &empty_ctx());
-        assert!(result.is_ok(), "une cle absente ne doit jamais lever d'erreur");
+        assert!(
+            result.is_ok(),
+            "une cle absente ne doit jamais lever d'erreur"
+        );
         assert_eq!(result.unwrap().value, "");
     }
 }

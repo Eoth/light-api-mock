@@ -31,13 +31,15 @@ pub fn render_template(template: &str, ctx: &TemplateContext) -> String {
     let mut i = 0;
 
     while i < len {
-        if chars[i] == '{' && i + 1 < len && chars[i + 1] == '{' {
-            if let Some(end) = find_closing_double_brace(&chars, i + 2) {
-                let expr: String = chars[i + 2..end].iter().collect();
-                out.push_str(&eval_expression(expr.trim(), ctx));
-                i = end + 2;
-                continue;
-            }
+        if chars[i] == '{'
+            && i + 1 < len
+            && chars[i + 1] == '{'
+            && let Some(end) = find_closing_double_brace(&chars, i + 2)
+        {
+            let expr: String = chars[i + 2..end].iter().collect();
+            out.push_str(&eval_expression(expr.trim(), ctx));
+            i = end + 2;
+            continue;
         }
         out.push(chars[i]);
         i += 1;
@@ -242,7 +244,11 @@ fn apply_single_pipe(value: &str, pipe: &str, _ctx: &TemplateContext) -> String 
             let mut chars = value.chars();
             match chars.next() {
                 None => String::new(),
-                Some(c) => format!("{}{}", c.to_uppercase(), chars.as_str().to_ascii_lowercase()),
+                Some(c) => format!(
+                    "{}{}",
+                    c.to_uppercase(),
+                    chars.as_str().to_ascii_lowercase()
+                ),
             }
         }
         "length" => value.chars().count().to_string(),
@@ -257,11 +263,18 @@ fn apply_single_pipe(value: &str, pipe: &str, _ctx: &TemplateContext) -> String 
                 chars.into_iter().skip(skip).collect()
             } else if let Some(arg) = extract_fn_arg(pipe, "default") {
                 let fallback = arg.trim_matches('"').trim_matches('\'');
-                if value.is_empty() { fallback.to_string() } else { value.to_string() }
+                if value.is_empty() {
+                    fallback.to_string()
+                } else {
+                    value.to_string()
+                }
             } else if let Some(arg) = extract_fn_arg(pipe, "substr") {
                 let parts: Vec<&str> = arg.split(',').map(|s| s.trim()).collect();
                 let start: usize = parts.first().and_then(|s| s.parse().ok()).unwrap_or(0);
-                let len: usize = parts.get(1).and_then(|s| s.parse().ok()).unwrap_or(usize::MAX);
+                let len: usize = parts
+                    .get(1)
+                    .and_then(|s| s.parse().ok())
+                    .unwrap_or(usize::MAX);
                 value.chars().skip(start).take(len).collect()
             } else if let Some(arg) = extract_fn_arg(pipe, "replace") {
                 let (from, to) = parse_two_string_args(arg);
@@ -286,10 +299,24 @@ fn parse_two_string_args(arg: &str) -> (String, String) {
     let mut quote_char = '"';
     let mut escaped = false;
     for ch in arg.chars() {
-        if escaped { current.push(ch); escaped = false; continue; }
-        if ch == '\\' { escaped = true; continue; }
-        if !in_quotes && (ch == '"' || ch == '\'') { in_quotes = true; quote_char = ch; continue; }
-        if in_quotes && ch == quote_char { in_quotes = false; continue; }
+        if escaped {
+            current.push(ch);
+            escaped = false;
+            continue;
+        }
+        if ch == '\\' {
+            escaped = true;
+            continue;
+        }
+        if !in_quotes && (ch == '"' || ch == '\'') {
+            in_quotes = true;
+            quote_char = ch;
+            continue;
+        }
+        if in_quotes && ch == quote_char {
+            in_quotes = false;
+            continue;
+        }
         if !in_quotes && ch == ',' {
             parts.push(std::mem::take(&mut current));
             continue;
@@ -298,7 +325,10 @@ fn parse_two_string_args(arg: &str) -> (String, String) {
     }
     parts.push(current);
     let a = parts.first().map(|s| s.to_string()).unwrap_or_default();
-    let b = parts.get(1).map(|s| s.trim().to_string()).unwrap_or_default();
+    let b = parts
+        .get(1)
+        .map(|s| s.trim().to_string())
+        .unwrap_or_default();
     (a, b)
 }
 
@@ -400,7 +430,11 @@ mod tests {
         }
     }
 
-    fn empty_ctx() -> (HashMap<String, String>, HashMap<String, String>, HashMap<String, String>) {
+    fn empty_ctx() -> (
+        HashMap<String, String>,
+        HashMap<String, String>,
+        HashMap<String, String>,
+    ) {
         (HashMap::new(), HashMap::new(), HashMap::new())
     }
 
@@ -430,7 +464,10 @@ mod tests {
     #[test]
     fn script_variable_resolves_from_populated_result() {
         let (p, q, h) = empty_ctx();
-        let sr = ScriptResult { value: "hello".into(), fields: HashMap::new() };
+        let sr = ScriptResult {
+            value: "hello".into(),
+            fields: HashMap::new(),
+        };
         let ctx = make_ctx_full(&p, &q, &h, b"", 0, Some(&sr), None, None);
         assert_eq!(render_template("{{script}}", &ctx), "hello");
     }
@@ -440,7 +477,10 @@ mod tests {
         let (p, q, h) = empty_ctx();
         let mut fields = HashMap::new();
         fields.insert("role".to_string(), "admin".to_string());
-        let sr = ScriptResult { value: String::new(), fields };
+        let sr = ScriptResult {
+            value: String::new(),
+            fields,
+        };
         let ctx = make_ctx_full(&p, &q, &h, b"", 0, Some(&sr), None, None);
         assert_eq!(render_template("{{script.role}}", &ctx), "admin");
     }
@@ -448,7 +488,10 @@ mod tests {
     #[test]
     fn pre_script_variable_resolves_independently() {
         let (p, q, h) = empty_ctx();
-        let sr = ScriptResult { value: "pre-val".into(), fields: HashMap::new() };
+        let sr = ScriptResult {
+            value: "pre-val".into(),
+            fields: HashMap::new(),
+        };
         let ctx = make_ctx_full(&p, &q, &h, b"", 0, None, Some(&sr), None);
         assert_eq!(render_template("{{pre_script}}", &ctx), "pre-val");
     }
@@ -458,7 +501,10 @@ mod tests {
         let (p, q, h) = empty_ctx();
         let mut fields = HashMap::new();
         fields.insert("total".to_string(), "42".to_string());
-        let sr = ScriptResult { value: String::new(), fields };
+        let sr = ScriptResult {
+            value: String::new(),
+            fields,
+        };
         let ctx = make_ctx_full(&p, &q, &h, b"", 0, None, None, Some(&sr));
         assert_eq!(render_template("{{post_script.total}}", &ctx), "42");
     }
@@ -466,10 +512,19 @@ mod tests {
     #[test]
     fn pre_script_and_post_script_do_not_leak_into_each_other() {
         let (p, q, h) = empty_ctx();
-        let pre = ScriptResult { value: "PRE".into(), fields: HashMap::new() };
-        let post = ScriptResult { value: "POST".into(), fields: HashMap::new() };
+        let pre = ScriptResult {
+            value: "PRE".into(),
+            fields: HashMap::new(),
+        };
+        let post = ScriptResult {
+            value: "POST".into(),
+            fields: HashMap::new(),
+        };
         let ctx = make_ctx_full(&p, &q, &h, b"", 0, None, Some(&pre), Some(&post));
-        assert_eq!(render_template("{{pre_script}}-{{post_script}}", &ctx), "PRE-POST");
+        assert_eq!(
+            render_template("{{pre_script}}-{{post_script}}", &ctx),
+            "PRE-POST"
+        );
         assert_eq!(render_template("{{script}}", &ctx), "");
     }
 
@@ -613,7 +668,10 @@ mod tests {
         let body = br#"<Envelope><Body><recherche><Siret>12345678901234</Siret></recherche></Body></Envelope>"#;
         let ctx = make_ctx(&p, &q, &h, body, 0);
         assert_eq!(
-            render_template("{{xpath.Envelope/Body/recherche/Siret | substr(0,9)}}", &ctx),
+            render_template(
+                "{{xpath.Envelope/Body/recherche/Siret | substr(0,9)}}",
+                &ctx
+            ),
             "123456789"
         );
     }
@@ -623,7 +681,10 @@ mod tests {
         let (p, q, h) = empty_ctx();
         let body = br#"<Envelope><Body><mode>x</mode></Body></Envelope>"#;
         let ctx = make_ctx(&p, &q, &h, body, 0);
-        assert_eq!(render_template("{{xpath.Envelope/Body/recherche}}", &ctx), "");
+        assert_eq!(
+            render_template("{{xpath.Envelope/Body/recherche}}", &ctx),
+            ""
+        );
     }
 
     #[test]
@@ -659,7 +720,10 @@ mod tests {
         p.insert("siret".into(), "44306184100047".into());
         let (q, h) = (HashMap::new(), HashMap::new());
         let ctx = make_ctx(&p, &q, &h, b"", 0);
-        assert_eq!(render_template("{{path.siret | first(9)}}", &ctx), "443061841");
+        assert_eq!(
+            render_template("{{path.siret | first(9)}}", &ctx),
+            "443061841"
+        );
     }
 
     #[test]
@@ -716,7 +780,8 @@ mod tests {
         p.insert("siret".into(), "44306184100047".into());
         let (q, h) = (HashMap::new(), HashMap::new());
         let ctx = make_ctx(&p, &q, &h, b"", 5);
-        let tpl = r#"{"siret":"{{path.siret}}","siren":"{{path.siret | first(9)}}","seq":"{{seq}}"}"#;
+        let tpl =
+            r#"{"siret":"{{path.siret}}","siren":"{{path.siret | first(9)}}","seq":"{{seq}}"}"#;
         let out = render_template(tpl, &ctx);
         let parsed: serde_json::Value = serde_json::from_str(&out).unwrap();
         assert_eq!(parsed["siret"], "44306184100047");
@@ -786,7 +851,10 @@ mod tests {
         p.insert("v".into(), "hello world".into());
         let (q, h) = (HashMap::new(), HashMap::new());
         let ctx = make_ctx(&p, &q, &h, b"", 0);
-        assert_eq!(render_template(r#"{{path.v | replace("world", "rust")}}"#, &ctx), "hello rust");
+        assert_eq!(
+            render_template(r#"{{path.v | replace("world", "rust")}}"#, &ctx),
+            "hello rust"
+        );
     }
 
     #[test]
@@ -795,7 +863,10 @@ mod tests {
         p.insert("v".into(), "world".into());
         let (q, h) = (HashMap::new(), HashMap::new());
         let ctx = make_ctx(&p, &q, &h, b"", 0);
-        assert_eq!(render_template(r#"{{path.v | prepend("hello ")}}"#, &ctx), "hello world");
+        assert_eq!(
+            render_template(r#"{{path.v | prepend("hello ")}}"#, &ctx),
+            "hello world"
+        );
     }
 
     #[test]
@@ -804,7 +875,10 @@ mod tests {
         p.insert("v".into(), "hello".into());
         let (q, h) = (HashMap::new(), HashMap::new());
         let ctx = make_ctx(&p, &q, &h, b"", 0);
-        assert_eq!(render_template(r#"{{path.v | append(" world")}}"#, &ctx), "hello world");
+        assert_eq!(
+            render_template(r#"{{path.v | append(" world")}}"#, &ctx),
+            "hello world"
+        );
     }
 
     #[test]
@@ -884,13 +958,25 @@ mod tests {
         let ctx = make_ctx(&p, &q, &h, b"", 0);
         assert_eq!(render_template("{{path.v | lower}}", &ctx), "hello world");
         assert_eq!(render_template("{{path.v | upper}}", &ctx), "HELLO WORLD");
-        assert_eq!(render_template("{{path.v | capitalize}}", &ctx), "Hello world");
+        assert_eq!(
+            render_template("{{path.v | capitalize}}", &ctx),
+            "Hello world"
+        );
         assert_eq!(render_template("{{path.v | first(5)}}", &ctx), "Hello");
         assert_eq!(render_template("{{path.v | last(5)}}", &ctx), "World");
         assert_eq!(render_template("{{path.v | length}}", &ctx), "11");
         assert_eq!(render_template("{{path.v | substr(6, 5)}}", &ctx), "World");
-        assert_eq!(render_template(r#"{{path.v | replace("World", "Rust")}}"#, &ctx), "Hello Rust");
-        assert_eq!(render_template(r#"{{path.v | prepend(">> ")}}"#, &ctx), ">> Hello World");
-        assert_eq!(render_template(r#"{{path.v | append(" <<")}}"#, &ctx), "Hello World <<");
+        assert_eq!(
+            render_template(r#"{{path.v | replace("World", "Rust")}}"#, &ctx),
+            "Hello Rust"
+        );
+        assert_eq!(
+            render_template(r#"{{path.v | prepend(">> ")}}"#, &ctx),
+            ">> Hello World"
+        );
+        assert_eq!(
+            render_template(r#"{{path.v | append(" <<")}}"#, &ctx),
+            "Hello World <<"
+        );
     }
 }

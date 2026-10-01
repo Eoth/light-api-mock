@@ -117,7 +117,10 @@ pub fn build_router(state: AppState, static_dir: &Path) -> Router {
     let keycloak = state.keycloak.clone();
 
     Router::new()
-        .route("/runtime-config.json", axum::routing::get(runtime_config_handler))
+        .route(
+            "/runtime-config.json",
+            axum::routing::get(runtime_config_handler),
+        )
         .nest("/api", api_routes)
         .fallback_service(ServeDir::new(static_dir).append_index_html_on_directories(true))
         .layer(axum::middleware::from_fn_with_state(
@@ -136,7 +139,10 @@ pub fn build_router(state: AppState, static_dir: &Path) -> Router {
         .layer(cors)
 }
 
+// ENV_MUTEX guards are held across awaits on purpose: they serialize the tests that mutate process-wide
+// environment variables, and each #[tokio::test] owns its runtime, so holding one cannot deadlock.
 #[cfg(test)]
+#[allow(clippy::await_holding_lock)]
 mod tests {
     use super::*;
 
@@ -176,14 +182,15 @@ mod tests {
     // (lit l'env directement) : un nouveau champ obligatoire sur AppState
     // ajouterait un site de construction de plus a maintenir dans les tests.
     async fn spawn_test_app(auth_config: crate::auth::AuthConfig) -> String {
-        let data_dir = std::env::temp_dir().join(format!(
-            "lightmock-servermod-test-{}",
-            fastrand::u64(..)
-        ));
+        let data_dir =
+            std::env::temp_dir().join(format!("lightmock-servermod-test-{}", fastrand::u64(..)));
         std::fs::create_dir_all(&data_dir).unwrap();
         let store = crate::store::MockStore::new(data_dir.join("mock-config.yaml"));
         store
-            .replace(crate::models::MockConfig { services: vec![], groups: vec![] })
+            .replace(crate::models::MockConfig {
+                services: vec![],
+                groups: vec![],
+            })
             .await
             .unwrap();
         store.flush().await;

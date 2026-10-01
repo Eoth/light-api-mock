@@ -165,10 +165,16 @@ impl MatchEngine {
     /// voir tests) garantit que les deux ne divergent jamais, plutot que de
     /// s'appuyer sur une delegation qui masquerait ce cout de perf.
     pub fn evaluate_group(group: &ConditionGroup, req: &RequestData) -> GroupEvaluation {
-        let all_of: Vec<ConditionEvaluation> =
-            group.all_of.iter().map(|c| Self::eval_detailed(c, req)).collect();
-        let any_of: Vec<ConditionEvaluation> =
-            group.any_of.iter().map(|c| Self::eval_detailed(c, req)).collect();
+        let all_of: Vec<ConditionEvaluation> = group
+            .all_of
+            .iter()
+            .map(|c| Self::eval_detailed(c, req))
+            .collect();
+        let any_of: Vec<ConditionEvaluation> = group
+            .any_of
+            .iter()
+            .map(|c| Self::eval_detailed(c, req))
+            .collect();
         let all_ok = all_of.is_empty() || all_of.iter().all(|e| e.matched);
         let any_ok = any_of.is_empty() || any_of.iter().any(|e| e.matched);
         GroupEvaluation {
@@ -214,8 +220,7 @@ impl MatchEngine {
         if !matches!(source, ConditionSource::PathParam(_)) && req.path_params.contains_key(key) {
             found_in.push("parametre de chemin");
         }
-        if !matches!(source, ConditionSource::QueryParam(_)) && req.query_params.contains_key(key)
-        {
+        if !matches!(source, ConditionSource::QueryParam(_)) && req.query_params.contains_key(key) {
             found_in.push("parametre de requete");
         }
         if !matches!(source, ConditionSource::Header(_))
@@ -351,7 +356,9 @@ impl MatchEngine {
     fn sub_paths_could_overlap(a: &Option<String>, b: &Option<String>) -> bool {
         match (a, b) {
             (None, _) | (_, None) => true,
-            (Some(pa), Some(pb)) => Self::canonicalize_sub_path(pa) == Self::canonicalize_sub_path(pb),
+            (Some(pa), Some(pb)) => {
+                Self::canonicalize_sub_path(pa) == Self::canonicalize_sub_path(pb)
+            }
         }
     }
 
@@ -441,7 +448,11 @@ impl MatchEngine {
         let mut result = String::new();
 
         let path_matches = |stack: &[String]| {
-            stack.len() == segments.len() && stack.iter().map(String::as_str).eq(segments.iter().copied())
+            stack.len() == segments.len()
+                && stack
+                    .iter()
+                    .map(String::as_str)
+                    .eq(segments.iter().copied())
         };
 
         loop {
@@ -461,10 +472,8 @@ impl MatchEngine {
                     stack.pop();
                 }
                 Ok(Event::Text(e)) => {
-                    if capture {
-                        if let Ok(t) = e.unescape() {
-                            result.push_str(&t);
-                        }
+                    if capture && let Ok(t) = e.unescape() {
+                        result.push_str(&t);
                     }
                 }
                 Ok(Event::End(_)) => {
@@ -486,7 +495,7 @@ impl MatchEngine {
     // de prefixe de namespace XML (`soap:Body` -> `Body`).
     pub(crate) fn local_name(e: &quick_xml::events::BytesStart<'_>) -> String {
         let full = String::from_utf8_lossy(e.name().as_ref()).to_string();
-        full.split(':').last().unwrap_or(&full).to_string()
+        full.split(':').next_back().unwrap_or(&full).to_string()
     }
 
     fn extract_form_field(body: &[u8], field: &str) -> Option<String> {
@@ -514,15 +523,14 @@ fn url_decode(s: &str) -> String {
     let bytes = s.as_bytes();
     let mut i = 0;
     while i < bytes.len() {
-        if bytes[i] == b'%' && i + 2 < bytes.len() {
-            if let Ok(byte) = u8::from_str_radix(
-                std::str::from_utf8(&bytes[i + 1..i + 3]).unwrap_or(""),
-                16,
-            ) {
-                result.push(byte as char);
-                i += 3;
-                continue;
-            }
+        if bytes[i] == b'%'
+            && i + 2 < bytes.len()
+            && let Ok(byte) =
+                u8::from_str_radix(std::str::from_utf8(&bytes[i + 1..i + 3]).unwrap_or(""), 16)
+        {
+            result.push(byte as char);
+            i += 3;
+            continue;
         }
         result.push(bytes[i] as char);
         i += 1;
@@ -536,9 +544,17 @@ pub(crate) fn match_path(
 ) -> Option<(HashMap<String, String>, String)> {
     let pattern_str = normalize_colon_syntax(listen_path);
 
-    let decoded_pat: Vec<String> = pattern_str.split('/').filter(|s| !s.is_empty()).map(|s| url_decode(s)).collect();
+    let decoded_pat: Vec<String> = pattern_str
+        .split('/')
+        .filter(|s| !s.is_empty())
+        .map(url_decode)
+        .collect();
     let pattern_segs: Vec<&str> = decoded_pat.iter().map(|s| s.as_str()).collect();
-    let decoded_req: Vec<String> = request_path.split('/').filter(|s| !s.is_empty()).map(|s| url_decode(s)).collect();
+    let decoded_req: Vec<String> = request_path
+        .split('/')
+        .filter(|s| !s.is_empty())
+        .map(url_decode)
+        .collect();
     let request_segs: Vec<&str> = decoded_req.iter().map(|s| s.as_str()).collect();
 
     if pattern_segs.is_empty() {
@@ -635,9 +651,7 @@ mod tests {
             response: MockResponse {
                 status: 200,
                 headers: vec![],
-                body: vec![BodyFragment::Literal {
-                    value: name.into(),
-                }],
+                body: vec![BodyFragment::Literal { value: name.into() }],
                 chaos: None,
             },
         }

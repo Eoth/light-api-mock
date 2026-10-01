@@ -255,7 +255,14 @@ mod tests {
     fn log_proxy_service_level_has_no_captured_detail() {
         let _guard = ENV_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
         let log = RequestLog::new();
-        log.log_proxy("svc", "GET", "/svc/orders/1", "http://backend/orders/1", 200, None);
+        log.log_proxy(
+            "svc",
+            "GET",
+            "/svc/orders/1",
+            "http://backend/orders/1",
+            200,
+            None,
+        );
         let entries = log.recent(1);
         assert!(entries[0].captured.is_none());
     }

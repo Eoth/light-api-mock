@@ -1,11 +1,22 @@
 use crate::models::Service;
 
-const RESERVED_NAMES: &[&str] =
-    &["api", "auth", "index.html", "assets", "favicon.ico", "runtime-config.json"];
+const RESERVED_NAMES: &[&str] = &[
+    "api",
+    "auth",
+    "index.html",
+    "assets",
+    "favicon.ico",
+    "runtime-config.json",
+];
 const VALID_METHODS: &[&str] = &["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"];
 
 const RESERVED_PATH_PREFIXES: &[&str] = &[
-    "/api/", "/api", "/index.html", "/assets/", "/favicon.ico", "/runtime-config.json",
+    "/api/",
+    "/api",
+    "/index.html",
+    "/assets/",
+    "/favicon.ico",
+    "/runtime-config.json",
 ];
 
 static NAME_CHARSET_RE: std::sync::LazyLock<regex::Regex> =
@@ -46,8 +57,12 @@ pub fn is_internal_route(path: &str) -> bool {
 // prefixe). `/runtime-config.json` est inclus ici pour la meme raison que
 // les assets statiques : le frontend doit pouvoir le lire AVANT de savoir
 // s'il est authentifie (c'est ce fichier qui lui indique ou se trouve l'API).
-const STATIC_ASSET_PATH_PREFIXES: &[&str] =
-    &["/index.html", "/assets/", "/favicon.ico", "/runtime-config.json"];
+const STATIC_ASSET_PATH_PREFIXES: &[&str] = &[
+    "/index.html",
+    "/assets/",
+    "/favicon.ico",
+    "/runtime-config.json",
+];
 
 pub fn is_static_asset_route(path: &str) -> bool {
     if path == "/" || path.is_empty() {
@@ -214,7 +229,7 @@ mod tests {
     use super::*;
     use crate::models::Service;
 
-    use crate::models::{Rule, RuleAction, MockResponse, BodyFragment, WsdlMode};
+    use crate::models::{BodyFragment, MockResponse, Rule, RuleAction, WsdlMode};
 
     fn svc(name: &str, listen_path: &str) -> Service {
         Service {
@@ -231,23 +246,26 @@ mod tests {
 
     fn svc_with_rules(name: &str, rule_names: &[&str]) -> Service {
         let mut s = svc(name, "/v1/*");
-        s.rules = rule_names.iter().map(|rn| Rule {
-            name: rn.to_string(),
-            method: "GET".into(),
-            sub_path: None,
-            action: RuleAction::default(),
-            pre_script: None,
-            script: None,
-            post_script: None,
-            response_mode: None,
-            conditions: Default::default(),
-            response: MockResponse {
-                status: 200,
-                headers: vec![],
-                body: vec![BodyFragment::Literal { value: "ok".into() }],
-                chaos: None,
-            },
-        }).collect();
+        s.rules = rule_names
+            .iter()
+            .map(|rn| Rule {
+                name: rn.to_string(),
+                method: "GET".into(),
+                sub_path: None,
+                action: RuleAction::default(),
+                pre_script: None,
+                script: None,
+                post_script: None,
+                response_mode: None,
+                conditions: Default::default(),
+                response: MockResponse {
+                    status: 200,
+                    headers: vec![],
+                    body: vec![BodyFragment::Literal { value: "ok".into() }],
+                    chaos: None,
+                },
+            })
+            .collect();
         s
     }
 

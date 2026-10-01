@@ -6,5 +6,5 @@ pub mod template;
 
 pub use matcher::{MatchEngine, RequestData};
 pub use proxy::{PingStatus, ProxyClient};
-pub use renderer::{apply_chaos_and_render, ChaosMode, TemplateRenderer};
+pub use renderer::{ChaosMode, TemplateRenderer, apply_chaos_and_render};
 pub use template::TemplateContext;

@@ -1,11 +1,15 @@
-use crate::engine::template::{render_template, TemplateContext};
+use crate::engine::template::{TemplateContext, render_template};
 use crate::models::{BodyFragment, ChaosConfig, FakeKind, MockResponse};
 use axum::http::StatusCode;
 
 pub struct TemplateRenderer;
 
 impl TemplateRenderer {
-    pub fn render_body(fragments: &[BodyFragment], path_segments: &[&str], ctx: &TemplateContext) -> String {
+    pub fn render_body(
+        fragments: &[BodyFragment],
+        path_segments: &[&str],
+        ctx: &TemplateContext,
+    ) -> String {
         let mut out = String::new();
         for frag in fragments {
             match frag {
@@ -36,11 +40,22 @@ impl TemplateRenderer {
 
         format!(
             "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
-            bytes[0], bytes[1], bytes[2], bytes[3],
-            bytes[4], bytes[5],
-            bytes[6], bytes[7],
-            bytes[8], bytes[9],
-            bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15],
+            bytes[0],
+            bytes[1],
+            bytes[2],
+            bytes[3],
+            bytes[4],
+            bytes[5],
+            bytes[6],
+            bytes[7],
+            bytes[8],
+            bytes[9],
+            bytes[10],
+            bytes[11],
+            bytes[12],
+            bytes[13],
+            bytes[14],
+            bytes[15],
         )
     }
 
@@ -78,20 +93,39 @@ impl TemplateRenderer {
 
     fn pick_first_name() -> String {
         const NAMES: &[&str] = &[
-            "Alice", "Bob", "Claire", "David", "Emma", "François",
-            "Gabrielle", "Hugo", "Isabelle", "Julien", "Karine", "Lucas",
-            "Marie", "Nicolas", "Olivia", "Pierre", "Quentin", "Rose",
-            "Sophie", "Thomas", "Ursule", "Victor", "Wendy", "Xavier",
+            "Alice",
+            "Bob",
+            "Claire",
+            "David",
+            "Emma",
+            "François",
+            "Gabrielle",
+            "Hugo",
+            "Isabelle",
+            "Julien",
+            "Karine",
+            "Lucas",
+            "Marie",
+            "Nicolas",
+            "Olivia",
+            "Pierre",
+            "Quentin",
+            "Rose",
+            "Sophie",
+            "Thomas",
+            "Ursule",
+            "Victor",
+            "Wendy",
+            "Xavier",
         ];
         NAMES[fastrand::usize(..NAMES.len())].to_string()
     }
 
     fn pick_last_name() -> String {
         const NAMES: &[&str] = &[
-            "Martin", "Bernard", "Dubois", "Thomas", "Robert", "Richard",
-            "Petit", "Durand", "Leroy", "Moreau", "Simon", "Laurent",
-            "Lefebvre", "Michel", "Garcia", "David", "Bertrand", "Roux",
-            "Vincent", "Fournier", "Morel", "Girard", "Andre", "Mercier",
+            "Martin", "Bernard", "Dubois", "Thomas", "Robert", "Richard", "Petit", "Durand",
+            "Leroy", "Moreau", "Simon", "Laurent", "Lefebvre", "Michel", "Garcia", "David",
+            "Bertrand", "Roux", "Vincent", "Fournier", "Morel", "Girard", "Andre", "Mercier",
         ];
         NAMES[fastrand::usize(..NAMES.len())].to_string()
     }
@@ -124,12 +158,26 @@ impl TemplateRenderer {
 
     fn pick_company_name() -> String {
         const NAMES: &[&str] = &[
-            "Nexora", "Voltaire Industries", "Lumea Tech", "Groupe Ariane",
-            "Solaris SARL", "EcoVert Solutions", "DataPulse", "Meridian SAS",
-            "Altiore Conseil", "BioSphera", "CyberNova", "Hexagone Digital",
-            "Nova Logistique", "Prisme Analytics", "Quantum Services",
-            "Riviera Holding", "Sigma Ingenierie", "Triton Energies",
-            "Zenith Constructions", "Omega Pharma",
+            "Nexora",
+            "Voltaire Industries",
+            "Lumea Tech",
+            "Groupe Ariane",
+            "Solaris SARL",
+            "EcoVert Solutions",
+            "DataPulse",
+            "Meridian SAS",
+            "Altiore Conseil",
+            "BioSphera",
+            "CyberNova",
+            "Hexagone Digital",
+            "Nova Logistique",
+            "Prisme Analytics",
+            "Quantum Services",
+            "Riviera Holding",
+            "Sigma Ingenierie",
+            "Triton Energies",
+            "Zenith Constructions",
+            "Omega Pharma",
         ];
         NAMES[fastrand::usize(..NAMES.len())].to_string()
     }
@@ -137,11 +185,26 @@ impl TemplateRenderer {
     fn pick_street_name() -> String {
         const TYPES: &[&str] = &["Rue", "Avenue", "Boulevard", "Place", "Impasse", "Allee"];
         const NAMES: &[&str] = &[
-            "de la Republique", "Victor Hugo", "Jean Jaures", "du General de Gaulle",
-            "Pasteur", "des Lilas", "du Commerce", "Gambetta", "de la Liberte",
-            "Voltaire", "Emile Zola", "des Roses", "du Marechal Foch",
-            "de la Paix", "Saint-Michel", "des Champs", "Clemenceau",
-            "Pierre Curie", "de Verdun", "du Moulin",
+            "de la Republique",
+            "Victor Hugo",
+            "Jean Jaures",
+            "du General de Gaulle",
+            "Pasteur",
+            "des Lilas",
+            "du Commerce",
+            "Gambetta",
+            "de la Liberte",
+            "Voltaire",
+            "Emile Zola",
+            "des Roses",
+            "du Marechal Foch",
+            "de la Paix",
+            "Saint-Michel",
+            "des Champs",
+            "Clemenceau",
+            "Pierre Curie",
+            "de Verdun",
+            "du Moulin",
         ];
         let t = TYPES[fastrand::usize(..TYPES.len())];
         let n = NAMES[fastrand::usize(..NAMES.len())];
@@ -150,10 +213,26 @@ impl TemplateRenderer {
 
     fn pick_city_fr() -> String {
         const CITIES: &[&str] = &[
-            "Paris", "Marseille", "Lyon", "Toulouse", "Nice", "Nantes",
-            "Montpellier", "Strasbourg", "Bordeaux", "Lille", "Rennes",
-            "Reims", "Saint-Etienne", "Toulon", "Le Havre", "Grenoble",
-            "Dijon", "Angers", "Nimes", "Clermont-Ferrand",
+            "Paris",
+            "Marseille",
+            "Lyon",
+            "Toulouse",
+            "Nice",
+            "Nantes",
+            "Montpellier",
+            "Strasbourg",
+            "Bordeaux",
+            "Lille",
+            "Rennes",
+            "Reims",
+            "Saint-Etienne",
+            "Toulon",
+            "Le Havre",
+            "Grenoble",
+            "Dijon",
+            "Angers",
+            "Nimes",
+            "Clermont-Ferrand",
         ];
         CITIES[fastrand::usize(..CITIES.len())].to_string()
     }
@@ -211,8 +290,16 @@ impl TemplateRenderer {
 
     fn pick_country_fr() -> String {
         const COUNTRIES: &[&str] = &[
-            "France", "Belgique", "Suisse", "Canada", "Luxembourg",
-            "Monaco", "Allemagne", "Espagne", "Italie", "Portugal",
+            "France",
+            "Belgique",
+            "Suisse",
+            "Canada",
+            "Luxembourg",
+            "Monaco",
+            "Allemagne",
+            "Espagne",
+            "Italie",
+            "Portugal",
         ];
         COUNTRIES[fastrand::usize(..COUNTRIES.len())].to_string()
     }
@@ -250,10 +337,10 @@ impl ChaosMode {
         } else {
             config.delay_ms
         };
-        if let Some(ms) = delay {
-            if ms > 0 {
-                tokio::time::sleep(std::time::Duration::from_millis(ms)).await;
-            }
+        if let Some(ms) = delay
+            && ms > 0
+        {
+            tokio::time::sleep(std::time::Duration::from_millis(ms)).await;
         }
     }
 }
@@ -290,7 +377,8 @@ mod tests {
     use std::collections::HashMap;
 
     fn default_ctx() -> TemplateContext<'static> {
-        static EMPTY: std::sync::LazyLock<HashMap<String, String>> = std::sync::LazyLock::new(HashMap::new);
+        static EMPTY: std::sync::LazyLock<HashMap<String, String>> =
+            std::sync::LazyLock::new(HashMap::new);
         static EMPTY_BODY: &[u8] = b"";
         TemplateContext {
             path_params: &EMPTY,
@@ -309,7 +397,10 @@ mod tests {
         let frags = vec![BodyFragment::Literal {
             value: "hello world".into(),
         }];
-        assert_eq!(TemplateRenderer::render_body(&frags, &[], &default_ctx()), "hello world");
+        assert_eq!(
+            TemplateRenderer::render_body(&frags, &[], &default_ctx()),
+            "hello world"
+        );
     }
 
     #[test]
@@ -330,7 +421,9 @@ mod tests {
     #[test]
     fn render_pick_from() {
         let values = vec!["a".into(), "b".into(), "c".into()];
-        let frags = vec![BodyFragment::PickFrom { values: values.clone() }];
+        let frags = vec![BodyFragment::PickFrom {
+            values: values.clone(),
+        }];
         let out = TemplateRenderer::render_body(&frags, &[], &default_ctx());
         assert!(values.contains(&out));
     }
@@ -338,7 +431,10 @@ mod tests {
     #[test]
     fn render_pick_from_empty() {
         let frags = vec![BodyFragment::PickFrom { values: vec![] }];
-        assert_eq!(TemplateRenderer::render_body(&frags, &[], &default_ctx()), "");
+        assert_eq!(
+            TemplateRenderer::render_body(&frags, &[], &default_ctx()),
+            ""
+        );
     }
 
     #[test]
@@ -398,17 +494,28 @@ mod tests {
         let frags = vec![BodyFragment::FakeData {
             kind: FakeKind::Integer { min: 5, max: 5 },
         }];
-        assert_eq!(TemplateRenderer::render_body(&frags, &[], &default_ctx()), "5");
+        assert_eq!(
+            TemplateRenderer::render_body(&frags, &[], &default_ctx()),
+            "5"
+        );
     }
 
     #[test]
     fn render_composite_body() {
         let frags = vec![
-            BodyFragment::Literal { value: r#"{"id":""#.into() },
+            BodyFragment::Literal {
+                value: r#"{"id":""#.into(),
+            },
             BodyFragment::Uuid,
-            BodyFragment::Literal { value: r#"","name":""#.into() },
-            BodyFragment::FakeData { kind: FakeKind::FirstName },
-            BodyFragment::Literal { value: r#""}"#.into() },
+            BodyFragment::Literal {
+                value: r#"","name":""#.into(),
+            },
+            BodyFragment::FakeData {
+                kind: FakeKind::FirstName,
+            },
+            BodyFragment::Literal {
+                value: r#""}"#.into(),
+            },
         ];
         let out = TemplateRenderer::render_body(&frags, &[], &default_ctx());
         assert!(out.starts_with(r#"{"id":""#));
@@ -421,9 +528,13 @@ mod tests {
     #[test]
     fn render_path_segment() {
         let frags = vec![
-            BodyFragment::Literal { value: r#"{"siret":""#.into() },
+            BodyFragment::Literal {
+                value: r#"{"siret":""#.into(),
+            },
             BodyFragment::PathSegment { index: 2 },
-            BodyFragment::Literal { value: r#""}"#.into() },
+            BodyFragment::Literal {
+                value: r#""}"#.into(),
+            },
         ];
         let segments = vec!["v4", "api", "insee", "12345678901234"];
         let out = TemplateRenderer::render_body(&frags, &segments, &default_ctx());
@@ -448,7 +559,9 @@ mod tests {
     #[test]
     fn chaos_error_rate_zero_never_triggers() {
         let config = ChaosConfig {
-            delay_ms: None, delay_min_ms: None, delay_max_ms: None,
+            delay_ms: None,
+            delay_min_ms: None,
+            delay_max_ms: None,
             error_rate: Some(0.0),
             error_status: 500,
         };
@@ -460,7 +573,9 @@ mod tests {
     #[test]
     fn chaos_error_rate_one_always_triggers() {
         let config = ChaosConfig {
-            delay_ms: None, delay_min_ms: None, delay_max_ms: None,
+            delay_ms: None,
+            delay_min_ms: None,
+            delay_max_ms: None,
             error_rate: Some(1.0),
             error_status: 503,
         };
@@ -472,7 +587,9 @@ mod tests {
     #[test]
     fn chaos_no_error_rate() {
         let config = ChaosConfig {
-            delay_ms: Some(100), delay_min_ms: None, delay_max_ms: None,
+            delay_ms: Some(100),
+            delay_min_ms: None,
+            delay_max_ms: None,
             error_rate: None,
             error_status: 500,
         };
@@ -482,17 +599,24 @@ mod tests {
     #[test]
     fn chaos_error_status_custom() {
         let config = ChaosConfig {
-            delay_ms: None, delay_min_ms: None, delay_max_ms: None,
+            delay_ms: None,
+            delay_min_ms: None,
+            delay_max_ms: None,
             error_rate: Some(1.0),
             error_status: 429,
         };
-        assert_eq!(ChaosMode::error_status(&config), StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(
+            ChaosMode::error_status(&config),
+            StatusCode::TOO_MANY_REQUESTS
+        );
     }
 
     #[tokio::test]
     async fn chaos_delay_zero_is_instant() {
         let config = ChaosConfig {
-            delay_ms: Some(0), delay_min_ms: None, delay_max_ms: None,
+            delay_ms: Some(0),
+            delay_min_ms: None,
+            delay_max_ms: None,
             error_rate: None,
             error_status: 500,
         };
@@ -512,7 +636,9 @@ mod tests {
             body: vec![BodyFragment::Literal { value: "ok".into() }],
             chaos: None,
         };
-        let (status, headers, body) = apply_chaos_and_render(&response, &[], &default_ctx()).await.unwrap();
+        let (status, headers, body) = apply_chaos_and_render(&response, &[], &default_ctx())
+            .await
+            .unwrap();
         assert_eq!(status, StatusCode::CREATED);
         assert_eq!(headers.len(), 1);
         assert_eq!(headers[0].0, "X-Custom");
@@ -526,7 +652,9 @@ mod tests {
             headers: vec![],
             body: vec![BodyFragment::Literal { value: "ok".into() }],
             chaos: Some(ChaosConfig {
-                delay_ms: None, delay_min_ms: None, delay_max_ms: None,
+                delay_ms: None,
+                delay_min_ms: None,
+                delay_max_ms: None,
                 error_rate: Some(1.0),
                 error_status: 503,
             }),

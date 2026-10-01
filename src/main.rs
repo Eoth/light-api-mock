@@ -8,12 +8,12 @@
 //   messaging/ → cadrage MOM/Kafka (etude), feature "messaging-kafka" NON
 //                active par defaut — ce module ne compile meme pas sinon
 pub mod auth;
-pub mod models;
 pub mod engine;
-pub mod store;
-pub mod server;
 #[cfg(feature = "messaging-kafka")]
 pub mod messaging;
+pub mod models;
+pub mod server;
+pub mod store;
 #[cfg(feature = "tcp-mock")]
 pub mod tcp;
 
@@ -78,7 +78,11 @@ async fn main() {
                 brokers = ?kafka_config.brokers,
                 "messaging: Kafka enabled, starting consumer"
             );
-            crate::messaging::consumer::spawn(kafka_config.clone(), store.clone(), message_log.clone())
+            crate::messaging::consumer::spawn(
+                kafka_config.clone(),
+                store.clone(),
+                message_log.clone(),
+            )
         } else {
             tracing::info!("messaging: Kafka disabled (KAFKA_ENABLED=false)");
             crate::messaging::consumer::Publisher::None

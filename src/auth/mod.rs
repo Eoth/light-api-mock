@@ -153,27 +153,57 @@ mod tests {
     #[test]
     fn super_admin_can_access_any_service() {
         let groups = test_groups();
-        assert!(can_access_service("admin1", true, &test_service(Some("team-a")), &groups));
-        assert!(can_access_service("admin1", true, &test_service(None), &groups));
+        assert!(can_access_service(
+            "admin1",
+            true,
+            &test_service(Some("team-a")),
+            &groups
+        ));
+        assert!(can_access_service(
+            "admin1",
+            true,
+            &test_service(None),
+            &groups
+        ));
     }
 
     #[test]
     fn group_member_can_access_own_service() {
         let groups = test_groups();
-        assert!(can_access_service("dev-a1", false, &test_service(Some("team-a")), &groups));
-        assert!(can_access_service("lead-a", false, &test_service(Some("team-a")), &groups));
+        assert!(can_access_service(
+            "dev-a1",
+            false,
+            &test_service(Some("team-a")),
+            &groups
+        ));
+        assert!(can_access_service(
+            "lead-a",
+            false,
+            &test_service(Some("team-a")),
+            &groups
+        ));
     }
 
     #[test]
     fn outsider_cannot_access_service() {
         let groups = test_groups();
-        assert!(!can_access_service("outsider", false, &test_service(Some("team-a")), &groups));
+        assert!(!can_access_service(
+            "outsider",
+            false,
+            &test_service(Some("team-a")),
+            &groups
+        ));
     }
 
     #[test]
     fn no_group_service_only_super_admin() {
         let groups = test_groups();
-        assert!(!can_access_service("dev-a1", false, &test_service(None), &groups));
+        assert!(!can_access_service(
+            "dev-a1",
+            false,
+            &test_service(None),
+            &groups
+        ));
     }
 
     #[test]
@@ -224,9 +254,7 @@ mod tests {
     #[test]
     fn service_with_group_visible_to_members() {
         let config = MockConfig {
-            services: vec![
-                test_service(Some("team-a")),
-            ],
+            services: vec![test_service(Some("team-a"))],
             groups: test_groups(),
         };
         assert_eq!(visible_services("dev-a1", false, &config).len(), 1);
