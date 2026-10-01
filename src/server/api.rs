@@ -2791,6 +2791,39 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn every_shipped_example_imports_cleanly() {
+        // The files of examples/ are what a newcomer imports first: each one must pass the same checks as an
+        // import through the UI (PUT /api/config).
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("examples");
+        let mut checked = 0;
+        for entry in std::fs::read_dir(dir).unwrap().flatten() {
+            let path = entry.path();
+            if path.extension().is_none_or(|e| e != "json") {
+                continue;
+            }
+            let config: serde_json::Value =
+                serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+            let base = spawn_test_app(MockConfig::empty()).await;
+            let resp = reqwest::Client::new()
+                .put(format!("{base}/config"))
+                .json(&config)
+                .send()
+                .await
+                .unwrap();
+            let status = resp.status();
+            assert_eq!(
+                status,
+                StatusCode::OK,
+                "{}: {}",
+                path.display(),
+                resp.text().await.unwrap()
+            );
+            checked += 1;
+        }
+        assert!(checked > 0);
+    }
+
+    #[tokio::test]
     async fn put_config_refuses_a_service_in_an_undefined_group() {
         let base = spawn_test_app(MockConfig::empty()).await;
         let config = MockConfig {
