@@ -60,18 +60,18 @@ test.describe('Observation de trafic proxy et suggestions de regles', () => {
 
       await page.goto('/');
       await page.waitForLoadState('networkidle');
-      await page.getByText('Sans groupe').click();
+      await page.getByText('No group').click();
       await page.getByTestId('service-card-configure-button-orders-proxy').click();
 
       const panel = page.getByTestId('observation-panel-orders-proxy');
       await expect(panel).toBeVisible();
       const toggleBtn = page.getByTestId('observation-toggle-button-orders-proxy');
-      await expect(toggleBtn).toHaveText('Observer ce service');
-      await docsScreenshot(page, 'observation-panneau-inactif.png');
+      await expect(toggleBtn).toHaveText('Observe this service');
+      await docsScreenshot(page, 'observation-panel-off.png');
 
       await toggleBtn.click();
-      await expect(toggleBtn).toHaveText("Arrêter d'observer");
-      await docsScreenshot(page, 'observation-panneau-actif.png');
+      await expect(toggleBtn).toHaveText('Stop observing');
+      await docsScreenshot(page, 'observation-panel-on.png');
 
       // Vrai trafic proxifie, alterne id=1/id=2 -- 3 appels de chaque cote,
       // au-dela du seuil minimal avant qu'une suggestion soit calculee.
@@ -83,11 +83,11 @@ test.describe('Observation de trafic proxy et suggestions de regles', () => {
       }
 
       await page.getByTestId('observation-refresh-suggestions-button-orders-proxy').click();
-      const firstSuggestionCard = page.getByText('si Paramètre de requête "id" = "1"');
+      const firstSuggestionCard = page.getByText('if Query parameter "id" = "1"');
       await expect(firstSuggestionCard).toBeVisible();
-      await expect(page.getByText('si Paramètre de requête "id" = "2"')).toBeVisible();
+      await expect(page.getByText('if Query parameter "id" = "2"')).toBeVisible();
       await firstSuggestionCard.scrollIntoViewIfNeeded();
-      await docsScreenshot(page, 'observation-suggestions-liste.png');
+      await docsScreenshot(page, 'observation-suggestions.png');
 
       // "Utiliser cette suggestion" doit pre-remplir le formulaire de regle
       // existant (methode/sous-chemin/condition), pas creer la regle
@@ -95,7 +95,7 @@ test.describe('Observation de trafic proxy et suggestions de regles', () => {
       await page.getByTestId('observation-use-suggestion-orders-proxy-0-0').click();
       await expect(page.getByTestId('rule-form-method-select')).toHaveValue('GET');
       await expect(page.getByTestId('rule-form-subpath-input')).toHaveValue('/orders');
-      await docsScreenshot(page, 'observation-suggestion-formulaire-pre-rempli.png');
+      await docsScreenshot(page, 'observation-suggestion-prefilled-form.png');
 
       await page.getByTestId('rule-form-name-input').fill('id-1-found');
       await page.getByTestId('rule-form-submit-button').click();
@@ -142,11 +142,11 @@ test.describe('Observation de trafic proxy et suggestions de regles', () => {
 
       await page.goto('/');
       await page.waitForLoadState('networkidle');
-      await page.getByText('Sans groupe').click();
+      await page.getByText('No group').click();
       await page.getByTestId('service-card-configure-button-flaky-proxy').click();
       await page.getByTestId('observation-refresh-suggestions-button-flaky-proxy').click();
 
-      await expect(page.getByText(/Réponses variables observées/)).toBeVisible();
+      await expect(page.getByText(/Varying responses observed/)).toBeVisible();
       await expect(page.getByTestId('observation-suggestion-flaky-proxy-0-0')).toHaveCount(0);
     } finally {
       target.close();

@@ -2,17 +2,17 @@
 
 **"Logs"** in the navigation bar opens the history of the latest requests lightMock received, across all services. It shows what the application under test really sent, and helps diagnose a rule that does not trigger as expected.
 
-![The request log listing the latest calls received by a service](screenshots/journal-des-requetes-liste.png)
+![The request log listing the latest calls received by a service](screenshots/request-log-list.png)
 
 ## What an entry shows
 
-- The service and, when there is one, the rule that applied.
-- The date and time of the request.
-- Full details when available (see "Limits" below): headers, query and path parameters, body sent.
+- The date and time of the request, its method and path.
+- The service, and the mode it was handled in: mocked, proxied, or no matching rule.
+- The rule that answered, when one did, and the status sent back.
 
-These details are what the [rule tester](rule-tester-and-conflicts.md) uses to replay an earlier request against a draft rule.
+The details button opens the same information for one entry. Behind it, lightMock also keeps the request itself (headers, query and path parameters, body) when it is available (see "Limits" below): that capture is what the [rule tester](rule-tester-and-conflicts.md) replays against a draft rule.
 
-![Details of a log entry: method, path, mode and matching rule](screenshots/journal-des-requetes-detail.png)
+![Details of a log entry: method, path, mode and matching rule](screenshots/request-log-detail.png)
 
 ## Requirements and limits
 

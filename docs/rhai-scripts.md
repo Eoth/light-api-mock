@@ -17,7 +17,7 @@ The three blocks are **fully independent**: they all see the same request, and n
 
 > **Pre-script and post-script are folded by default** behind "Advanced options (pre-script / post-script)": most rules do not need them, and only the main script stays visible. Click that line to show them. When you edit a rule that already uses one of them, the section opens **by itself**: configured content is never hidden from you. Folding never deletes what you typed.
 
-![Advanced options folded on a new rule: only "▶ Advanced options" is visible](screenshots/regle-options-avancees-repliees.png)
+![Advanced options folded on a new rule: only "▶ Advanced options" is visible](screenshots/rule-advanced-options-folded.png)
 
 Each block can return:
 - a **simple value** (text, number), used as `{{script}}` / `{{pre_script}}` / `{{post_script}}`,
@@ -76,7 +76,7 @@ A script can fail while running, for instance when it calls a function that does
 1. **"Validate the script"**, under each script slot, checks the **syntax** (is it a valid Rhai program?). It does NOT detect a call to a missing function, nor an error that only happens at run time.
 2. The **[rule tester](rule-tester-and-conflicts.md)** ("Test against a real request", shown while editing a rule) really runs your scripts against a captured request, and shows an explicit error message when one fails. It is the reliable way to catch this kind of problem before saving, since syntax alone is not enough.
 
-![The rule tester showing a clear error after a call to a Rhai function that does not exist](screenshots/testeur-regle-erreur-script.png)
+![The rule tester showing a clear error after a call to a Rhai function that does not exist](screenshots/rule-tester-script-error.png)
 
 ## Use case: convert a date typed in a custom format into milliseconds
 
@@ -111,7 +111,7 @@ with the response body (Advanced template):
 
 `GET /my-service/convert?date=15/03/2026` returns `{"ms":1773532800000}`: the number of milliseconds since the epoch for March 15, 2026 at midnight UTC.
 
-![Rule form setting up a parse_date script, before saving](screenshots/regle-script-parse-date.png)
+![Rule form setting up a parse_date script, before saving](screenshots/rule-script-parse-date.png)
 
 **With a time**:
 
@@ -224,7 +224,7 @@ Response body:
 
 A frequent need: the request holds a **list of objects** (order lines, articles…) and the response must hold **as many items**, each built from the matching item of the request (same position). Neither a simple `{{...}}` variable nor rule conditions can do that: there is no loop outside a script. That is the job of `parse_json`/`to_json` (JSON, REST) and `parse_xml_items`/`xml_element` (XML, SOAP): parse the received list, loop over it in the script, then build JSON or XML text to insert directly in the response body.
 
-![Setting up a JSON repetition rule in the form (script and advanced template)](screenshots/regle-script-repetition-json.png)
+![Setting up a JSON repetition rule in the form (script and advanced template)](screenshots/rule-script-json-repetition.png)
 
 ### JSON (REST) example: a multi-line quote
 
@@ -347,9 +347,9 @@ let siret = if items.len() > 0 { items[0].Siret } else { "" };
 
 **Full example**: service `directory-soap`, path `/service`, a `POST` rule with an **XPath (XML/SOAP)** condition `Envelope/Body/recherche` = `Exists (any value)` (to match only the "recherche" operation, see [Matching rules](matching-rules.md#use-case-one-url-a-different-answer-per-soap-operation)) and the script above:
 
-![XPath condition on the SOAP body (Envelope/Body/recherche, Exists)](screenshots/regle-condition-xpath-soap-namespace.png)
+![XPath condition on the SOAP body (Envelope/Body/recherche, Exists)](screenshots/rule-condition-xpath-soap.png)
 
-![Extraction script (parse_xml_items) and response template copying the Siret](screenshots/regle-script-extraction-xpath-soap.png)
+![Extraction script (parse_xml_items) and response template copying the Siret](screenshots/rule-script-soap-extraction.png)
 
 **Response body** (Advanced template):
 ```xml

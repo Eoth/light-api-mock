@@ -16,6 +16,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - The messages of the server that people read (API validation errors, rule tester hints, script errors, availability-test errors) follow the `Accept-Language` of the request, which the UI sets to its own language; English by default. Same rule and same test as the UI, with `src/locales/fr.json`.
 
 ### Changed
+- The end-to-end suite reads the interface in English, its source language, and produces the guide's screenshots in English under English file names; new tests cover the request log view, the SOAP service form, the login screen and the signed-in header. CI fails on any Markdown link, image or anchor that does not resolve.
 - The README, the user guide (`docs/`, under English file names), the Kubernetes and UI READMEs and the build scripts are in English.
 - The Kubernetes manifests are a base plus two overlays, `k8s/ingress` (a standard `Ingress`, the new default) and `k8s/gloo-edge`, in a `lightmock` namespace; set the image with `kustomize edit set image`. **Breaking** for `kubectl apply -k k8s/`: apply an overlay instead.
 - The responses that lightMock itself sends to the applications under test (no matching rule, purely mocked service, refused path) are in English.

@@ -17,7 +17,7 @@ const SCREENSHOTS_DIR = path.join(__dirname, '..', '..', 'docs', 'screenshots');
 
 export const DOCS_SCREENSHOTS_ENABLED = !!process.env.DOCS_SCREENSHOTS;
 
-// Prend une capture nommee `filename` (ex. "accueil-liste-services.png") dans
+// Prend une capture nommee `filename` (ex. "home-service-list.png") dans
 // docs/screenshots/ si DOCS_SCREENSHOTS_ENABLED, sinon ne fait rien (simple
 // verification booleenne, cout negligeable sur la suite standard).
 export async function docsScreenshot(page, filename) {

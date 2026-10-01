@@ -8,10 +8,23 @@
         { "action": "click", "target": "app.addServiceButton" },
         { "action": "fill", "target": "serviceForm.nameInput", "value": "scenario-create-service" },
         { "action": "fill", "target": "serviceForm.targetInput", "value": "http://scenario-create-service:80" },
-        { "action": "screenshot", "file": "service-formulaire-creation.png" },
+        { "action": "screenshot", "file": "service-create-form.png" },
         { "action": "click", "target": "serviceForm.submitButton" },
         { "action": "assertVisible", "target": "serviceDetail.editButton" },
-        { "action": "screenshot", "file": "service-fiche-detail-url.png" }
+        { "action": "screenshot", "file": "service-detail-url.png" }
+      ]
+    },
+    {
+      "scenario": "The service form offers the SOAP type",
+      "steps": [
+        { "action": "goto", "page": "services" },
+        { "action": "click", "target": "app.addServiceButton" },
+        { "action": "fill", "target": "serviceForm.nameInput", "value": "customer-directory" },
+        { "action": "fill", "target": "serviceForm.targetInput", "value": "http://directory.internal:8080" },
+        { "action": "selectOption", "target": "serviceForm.typeSelect", "value": "soap" },
+        { "action": "screenshot", "file": "service-form-soap.png" },
+        { "action": "click", "target": "serviceForm.cancelButton" },
+        { "action": "assertVisible", "target": "app.addServiceButton" }
       ]
     },
     {
@@ -51,7 +64,7 @@
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ambig-grp-a" } },
-        { "action": "screenshot", "file": "groupes-liste-plies-deplies.png" },
+        { "action": "screenshot", "file": "groups-collapsed-expanded.png" },
         { "action": "click", "target": "serviceCard.configureButton", "params": { "name": "ambig-svc" } },
         { "action": "click", "target": "serviceDetail.deleteButton" },
         { "action": "click", "target": "confirmDialog.confirmButton" },
@@ -67,7 +80,7 @@
         { "action": "click", "target": "serviceCard.configureButton", "params": { "name": "no-crash-svc" } },
         { "action": "click", "target": "serviceDetail.deleteButton" },
         { "action": "click", "target": "confirmDialog.confirmButton" },
-        { "action": "assertText", "target": "notification.notification", "value": "supprimé" }
+        { "action": "assertText", "target": "notification.notification", "value": "deleted" }
       ]
     },
     {
@@ -86,7 +99,7 @@
         { "action": "fill", "target": "serviceForm.nameInput", "value": "purely-mocked-svc" },
         { "action": "click", "target": "toggleSwitch.switch", "params": { "name": "purely-mocked" } },
         { "action": "assertHidden", "target": "serviceForm.targetInput" },
-        { "action": "screenshot", "file": "service-purement-mocke-formulaire.png" },
+        { "action": "screenshot", "file": "service-purely-mocked-form.png" },
         { "action": "click", "target": "serviceForm.submitButton" },
         { "action": "assertVisible", "target": "serviceDetail.editButton" },
         { "action": "assertHidden", "target": "urlHealthBadge.status", "params": { "serviceName": "purely-mocked-svc" } }

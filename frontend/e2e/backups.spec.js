@@ -89,19 +89,19 @@ test.describe('Config backups & restore', () => {
 
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    await page.getByText('Sauvegardes', { exact: true }).click();
-    await expect(page.getByRole('heading', { name: 'Sauvegardes de configuration' })).toBeVisible();
+    await page.getByText('Backups', { exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Configuration backups' })).toBeVisible();
 
     const row = page.locator('.backup-card', { hasText: targetFilename });
     await expect(row).toBeVisible();
-    await docsScreenshot(page, 'sauvegardes-liste-restauration.png');
-    await row.getByText('Restaurer').click();
+    await docsScreenshot(page, 'backups-list.png');
+    await row.getByText('Restore').click();
 
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
-    await docsScreenshot(page, 'sauvegardes-confirmation-restauration.png');
-    await dialog.locator('#confirm-keyword-input').fill('RESTAURER');
-    await dialog.getByRole('button', { name: 'Restaurer' }).click();
+    await docsScreenshot(page, 'backups-restore-confirmation.png');
+    await dialog.locator('#confirm-keyword-input').fill('RESTORE');
+    await dialog.getByRole('button', { name: 'Restore' }).click();
 
     await expect(dialog).not.toBeVisible();
 
@@ -117,16 +117,16 @@ test.describe('Config backups & restore', () => {
 
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    await page.getByText('Sauvegardes', { exact: true }).click();
-    await expect(page.getByRole('heading', { name: 'Sauvegardes de configuration' })).toBeVisible();
+    await page.getByText('Backups', { exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Configuration backups' })).toBeVisible();
 
     const anyRow = page.locator('.backup-card').first();
     await expect(anyRow).toBeVisible();
-    await anyRow.getByText('Restaurer').click();
+    await anyRow.getByText('Restore').click();
 
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
-    await dialog.getByText('Annuler').click();
+    await dialog.getByText('Cancel').click();
     await expect(dialog).not.toBeVisible();
 
     const res = await request.get(`${API}/services`);

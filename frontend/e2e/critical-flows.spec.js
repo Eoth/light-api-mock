@@ -212,11 +212,11 @@ test.describe('Service identity across groups', () => {
     await expandGroup(page, 'url-parity-grp');
 
     const card = page.locator('.service-card', { hasText: 'url-parity-svc' });
-    const listUrl = await card.locator('.detail-row', { hasText: 'URL test' }).locator('code').textContent();
+    const listUrl = await card.locator('.detail-row', { hasText: 'Test URL' }).locator('code').textContent();
     expect(listUrl).toBe(`/${grp.code}/url-parity-svc/v1/*`);
 
-    await card.getByRole('button', { name: 'Configurer le service url-parity-svc' }).click();
-    await page.getByRole('button', { name: 'Modifier le service' }).click();
+    await card.getByRole('button', { name: 'Configure the service url-parity-svc' }).click();
+    await page.getByRole('button', { name: 'Edit the service' }).click();
 
     const editUrl = page.locator('.url-preview code');
     await expect(editUrl).toContainText(`/${grp.code}/url-parity-svc/v1/*`);

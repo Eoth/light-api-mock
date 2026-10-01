@@ -10,13 +10,13 @@ A group gathers several [services](services.md) under:
 - A **shared URL prefix**: the services of a group are reached under `/{group-code}/{service-name}/...` rather than `/{service-name}/...`.
 - **Their own access rights** (group admins and members) when [authentication](authentication.md) is on.
 
-![The service list with groups collapsed and expanded](screenshots/groupes-liste-plies-deplies.png)
+![The service list with groups collapsed and expanded](screenshots/groups-collapsed-expanded.png)
 
 ## Creating a group
 
 The "Groups" button of the navigation bar opens a short form that only asks for the group's **name**. A **5-character code** is derived from the name (the same name always gives the same code); that code prefixes the URLs of the group's services. There is nothing to type for it.
 
-![Form to create a group (name only)](screenshots/groupe-formulaire-creation.png)
+![Form to create a group (name only)](screenshots/group-create-form.png)
 
 **Who can create a group?** Any user. Whoever creates a group becomes its admin.
 

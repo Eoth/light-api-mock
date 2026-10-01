@@ -6,7 +6,7 @@ By default, lightMock is **open to everyone** who can reach it: anyone can see a
 
 With authentication on, lightMock relies on **Keycloak** (an identity server your organization may already run) to check identities: a login screen appears, and access then follows the logged-in user.
 
-![The login screen shown when authentication is on](screenshots/authentification-ecran-connexion.png)
+![The login screen shown when authentication is on](screenshots/authentication-login-screen.png)
 
 Access rights then depend on:
 
@@ -15,7 +15,7 @@ Access rights then depend on:
 
 The exact rights of each endpoint are listed in the [reviewer guide](../REVIEWING.md#authorization-matrix).
 
-![The navigation bar once logged in, with the user name badge](screenshots/authentification-badge-connecte.png)
+![The navigation bar once logged in, with the user name badge](screenshots/authentication-user-badge.png)
 
 Once logged in, the user name shows as a badge in the navigation bar; here the user is also a super-admin, hence the "Reset" button next to the badge.
 

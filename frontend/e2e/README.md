@@ -17,7 +17,7 @@ npx playwright install chromium   # once
 npm run test:e2e
 ```
 
-The suite runs in a French browser locale (`playwright.config.js`) because its text assertions are in French; `i18n.spec.js` checks the English interface and the language switch. Moving the suite to English is roadmap item R5. A few specs start their own lightMock (authentication, API base URL); they need `cargo build` first. The Kafka specs are skipped unless the binary was built with `--features messaging-kafka`.
+The suite reads the interface in English, its source language (`playwright.config.js`); `i18n.spec.js` checks the French interface and the language switch. A few specs start their own lightMock (authentication, API base URL); they need `cargo build` first. The Kafka specs are skipped unless the binary was built with `--features messaging-kafka`.
 
 ## Layout
 
@@ -103,4 +103,4 @@ The images of `docs/` are taken by this suite, so they follow the interface inst
 npm run docs:screenshots   # from frontend/, with lightMock running on :7342
 ```
 
-Images are written to `docs/screenshots/` under the names the pages reference. The three Kafka images need a binary built with `--features messaging-kafka`. States that no test reaches yet have no image; covering them is part of roadmap item R5.
+Images are written to `docs/screenshots/` under the names the pages reference; `node scripts/check-doc-links.mjs` (run by CI) fails when a page references an image that does not exist. The three Kafka images need a binary built with `--features messaging-kafka`. States that no test reaches yet have no image; covering them is roadmap item R5.

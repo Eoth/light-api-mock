@@ -10,7 +10,7 @@ A [service](services.md) in mock mode can hold **several rules**. Each rule says
 - **Conditions** (optional): extra criteria that narrow down when the rule applies (see below). Without conditions, the rule matches as soon as the method and sub-path do.
 - **Action**: `mock` (answer with the configured content, see [Responses and templates](responses-and-templates.md)) or `proxy` (relay the requests it matches to the real backend, for a partial mock; see [Services and routing](services.md)). On a [purely mocked service](services.md#purely-mocked-service-no-target) (no real target), `proxy` is not offered.
 
-![Form to create a rule (method, sub-path, action)](screenshots/regle-formulaire-creation.png)
+![Form to create a rule (method, sub-path, action)](screenshots/rule-create-form.png)
 
 **Opening a `proxy` rule on a service that has since become purely mocked**: the form shows it as `mock`, the only action left. Nothing changes until you save; if you do save the rule, even for another change such as a condition, lightMock first warns that saving will really turn the rule from `proxy` into `mock`, and lets you confirm ("Save anyway") or go back.
 
@@ -48,7 +48,7 @@ For a path parameter, the form offers a closed list of the parameter names that 
 
 A condition added to a rule **can be edited in place**: click it in the list (it is shown as a button) to reopen the form used to add it, filled with its current source, key, operator and value. Change what you need, including the source (from a query parameter to an HTTP header, for instance), then confirm to save it where it was: the other conditions of the rule keep their order and content. "Cancel" closes the form without changing anything.
 
-![Editing an existing condition in place](screenshots/regle-condition-edition-en-place.png)
+![Editing an existing condition in place](screenshots/rule-condition-edit-in-place.png)
 
 ## Use case: one URL, a different answer per SOAP operation
 
@@ -60,7 +60,7 @@ Create one rule per operation, each with an **HTTP header** condition on the `SO
 
 | Rule `get-client` | Rule `get-order` |
 |---|---|
-| ![Condition of the get-client rule: SOAPAction header equals GetClient](screenshots/regle-condition-soapaction-get-client.png) | ![Condition of the get-order rule: SOAPAction header equals GetOrder](screenshots/regle-condition-soapaction-get-order.png) |
+| ![Condition of the get-client rule: SOAPAction header equals GetClient](screenshots/rule-condition-soapaction-get-client.png) | ![Condition of the get-order rule: SOAPAction header equals GetOrder](screenshots/rule-condition-soapaction-get-order.png) |
 
 A `POST` to this service with `SOAPAction: GetClient` triggers `get-client` and its answer, while `SOAPAction: GetOrder` triggers `get-order`: **same URL**, no condition on the path. A request with another `SOAPAction` value, or without that header, matches neither rule and gets the "no rule matches" answer (see [Services and routing](services.md)).
 
@@ -82,7 +82,7 @@ Service `directory-soap`, path `/service`, two `POST` rules:
 | `search-operation` | `XPath (XML/SOAP)`, key `Envelope/Body/recherche`, operator `Exists (any value)` |
 | `mode-operation` | `XPath (XML/SOAP)`, key `Envelope/Body/mode`, operator `Exists (any value)` |
 
-![XPath condition on the SOAP body (Envelope/Body/recherche, Exists)](screenshots/regle-condition-xpath-soap-namespace.png)
+![XPath condition on the SOAP body (Envelope/Body/recherche, Exists)](screenshots/rule-condition-xpath-soap.png)
 
 A `POST` with this body (note the empty `<Header></Header>` before `<Body>`, written with an opening and a closing tag, a common envelope layout):
 

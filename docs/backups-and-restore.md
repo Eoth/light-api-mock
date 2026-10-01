@@ -12,11 +12,11 @@ Only the most recent backups are kept (`BACKUP_MAX_COUNT`, 5 by default): older 
 
 **"Backups"** in the navigation bar lists every available backup with its date and size, and restores one **in a click**.
 
-![The list of backups with a restore button](screenshots/sauvegardes-liste-restauration.png)
+![The list of backups with a restore button](screenshots/backups-list.png)
 
 A restore itself first backs up the state it overwrites: even a restore can be undone.
 
-![Confirmation before restoring a backup](screenshots/sauvegardes-confirmation-restauration.png)
+![Confirmation before restoring a backup](screenshots/backups-restore-confirmation.png)
 
 ## A special backup before a full reset
 
