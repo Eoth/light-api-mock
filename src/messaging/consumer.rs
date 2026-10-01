@@ -34,11 +34,15 @@ use std::time::Duration;
 /// pour verifier le comportement "publication sur reply_topic" sans broker
 /// reel — impossible a exercer autrement dans cet environnement de
 /// developpement (pas de Kafka/Docker disponible).
+/// (topic, payload) of each message a fake publisher received.
+#[cfg(test)]
+pub type PublishedMessages = Arc<Mutex<Vec<(String, Vec<u8>)>>>;
+
 #[derive(Clone)]
 pub enum Publisher {
     Kafka(Arc<FutureProducer>),
     #[cfg(test)]
-    Fake(Arc<Mutex<Vec<(String, Vec<u8>)>>>),
+    Fake(PublishedMessages),
     None,
 }
 
@@ -153,10 +157,10 @@ fn extract_headers(msg: &rdkafka::message::BorrowedMessage<'_>) -> HashMap<Strin
     let mut map = HashMap::new();
     if let Some(headers) = msg.headers() {
         for header in headers.iter() {
-            if let Some(value) = header.value {
-                if let Ok(s) = std::str::from_utf8(value) {
-                    map.insert(header.key.to_string(), s.to_string());
-                }
+            if let Some(value) = header.value
+                && let Ok(s) = std::str::from_utf8(value)
+            {
+                map.insert(header.key.to_string(), s.to_string());
             }
         }
     }
