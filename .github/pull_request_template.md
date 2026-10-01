@@ -1,0 +1,14 @@
+## Why
+
+<!-- The problem this solves, or the issue or roadmap item it closes. -->
+
+## What changes
+
+<!-- What a user or an operator will notice. Mark anything that breaks an existing setup as **Breaking**. -->
+
+## Checklist
+
+- [ ] Tests cover the change (a bug fix includes the test that failed before it)
+- [ ] Visible texts go through `t()` or `tr()`, with their French translation
+- [ ] README, `docs/` and `CHANGELOG.md` (Unreleased) are updated where they describe this
+- [ ] No new outbound connection, dependency or setting, or it is documented (`docs/security.md`, README) and justified

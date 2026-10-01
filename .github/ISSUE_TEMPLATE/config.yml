@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a vulnerability
+    url: https://github.com/eoth/light-api-mock/security/advisories/new
+    about: Privately, as described in SECURITY.md. Never in a public issue.
+  - name: Roadmap
+    url: https://github.com/eoth/light-api-mock/blob/main/ROADMAP.md
+    about: What is planned, and in which order.

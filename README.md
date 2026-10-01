@@ -338,4 +338,5 @@ English is the source language: every message is written once, in English, in th
 - [ROADMAP.md](ROADMAP.md): what is planned, and in which order.
 - [CHANGELOG.md](CHANGELOG.md): changes by release.
 - [SECURITY.md](SECURITY.md): supported versions and private vulnerability reporting.
+- [CONTRIBUTING.md](CONTRIBUTING.md): how to propose a change, run the checks and add a language; [code of conduct](CODE_OF_CONDUCT.md).
 - License: [MIT](LICENSE).
