@@ -1,5 +1,7 @@
 # Mimicway
 
+[![CI](https://github.com/Eoth/mimicway/actions/workflows/ci.yml/badge.svg)](https://github.com/Eoth/mimicway/actions/workflows/ci.yml) [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/Eoth/mimicway/badge)](https://scorecard.dev/viewer/?uri=github.com/Eoth/mimicway)
+
 Mock or proxy any HTTP API, one rule at a time, from a web UI. A single self-contained binary: no database, no agent, no cloud account.
 
 Mimicway sits between the application you test and the services it calls. Each service you declare gets its own URL namespace on Mimicway; every request that reaches it is either answered by a rule you wrote (fixed, templated or scripted response, optional latency and errors) or forwarded to the real backend. Everything is changed live from the UI or the REST API, without restarting anything.
