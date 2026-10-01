@@ -56,6 +56,35 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y cmake libcurl4-openssl-dev
       - run: cargo clippy --features messaging-kafka --all-targets -- -D warnings
       - run: cargo test --features messaging-kafka
+      # The Kafka specs of the end-to-end suite skip themselves against a binary without the feature, which is the one
+      # the e2e job builds: they run here, against this job's build, or they never run at all.
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - working-directory: frontend
+        run: npm ci --ignore-scripts && npm run build && npx playwright install --with-deps chromium
+      - run: cargo build --features messaging-kafka
+      - name: Start Mimicway with the Kafka feature
+        run: |
+          mkdir -p data
+          DATA_PATH=./data ./target/debug/mimicway > mimicway.log 2>&1 &
+          for _ in $(seq 1 50); do
+            if curl -sf http://localhost:7342/api/messaging/status | grep -q '"available":true'; then exit 0; fi
+            sleep 0.2
+          done
+          cat mimicway.log; exit 1
+      - name: End-to-end Kafka specs
+        working-directory: frontend
+        run: npx playwright test messaging.spec.js
+      - if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: e2e-kafka-report
+          path: |
+            frontend/test-results
+            mimicway.log
 
   supply-chain:
     name: Supply chain (advisories, licenses, sources)
