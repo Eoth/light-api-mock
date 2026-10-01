@@ -1,0 +1,18 @@
+apiVersion: gateway.solo.io/v1
+kind: RouteTable
+metadata:
+  name: lightmock
+  labels:
+    app.kubernetes.io/name: lightmock
+    app.kubernetes.io/component: routing
+spec:
+  routes:
+    # Everything under the host goes to lightMock, unchanged: its UI calls /api, /assets and /runtime-config.json from
+    # the root, so it cannot be moved under a path prefix.
+    - matchers:
+        - prefix: /
+      routeAction:
+        single:
+          upstream:
+            name: lightmock
+            namespace: lightmock

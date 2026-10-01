@@ -2,17 +2,16 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: lightmock
-  namespace: entreprise-tools
   labels:
     app.kubernetes.io/name: lightmock
     app.kubernetes.io/component: server
 spec:
+  # One writer of the configuration file: a second replica, or a rolling update that starts the new pod before the
+  # old one stops, would let two processes write the same volume and lose changes. Recreate stops the old pod first
+  # (it flushes pending writes on SIGTERM), then starts the new one.
   replicas: 1
   strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 0
-      maxSurge: 1
+    type: Recreate
   selector:
     matchLabels:
       app.kubernetes.io/name: lightmock
@@ -24,7 +23,8 @@ spec:
     spec:
       containers:
         - name: lightmock
-          image: lightmock:latest
+          # Set your registry and version: kustomize edit set image lightmock=<registry>/lightmock:<version>
+          image: lightmock
           ports:
             - containerPort: 7342
               name: http
@@ -35,13 +35,16 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /data
+          # Idle, lightMock uses a few MiB. A request body is buffered (up to 10 MiB) to evaluate rule conditions, and so
+          # is each side of an observed proxy exchange; observation then keeps at most 200 x 8 exchanges of 16 KiB per
+          # side. The limit leaves room for that and a few large bodies at once.
           resources:
             requests:
               cpu: 10m
-              memory: 16Mi
+              memory: 32Mi
             limits:
-              cpu: 200m
-              memory: 64Mi
+              cpu: 500m
+              memory: 256Mi
           readinessProbe:
             httpGet:
               path: /api/health

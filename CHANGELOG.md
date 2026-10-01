@@ -14,6 +14,7 @@ entre versions mineures.
 - The messages of the server that people read (API validation errors, rule tester hints, script errors, availability-test errors) follow the `Accept-Language` of the request, which the UI sets to its own language; English by default. Same rule and same test as the UI, with `src/locales/fr.json`.
 
 ### Changed
+- The Kubernetes manifests are a base plus two overlays, `k8s/ingress` (a standard `Ingress`, the new default) and `k8s/gloo-edge`, in a `lightmock` namespace; set the image with `kustomize edit set image`. **Breaking** for `kubectl apply -k k8s/`: apply an overlay instead.
 - The responses that lightMock itself sends to the applications under test (no matching rule, purely mocked service, refused path) are in English.
 
 ### Security
@@ -30,6 +31,7 @@ entre versions mineures.
 - With `AUTH_ENABLED=true`, only the management API (`/api/...`) requires a token, as documented. The mocked and proxied service routes required one too, which broke every mock for the applications under test and forwarded the lightMock token to the real backends on proxied rules.
 
 ### Fixed
+- The Gloo Edge example served lightMock under `/lightmock`, where its UI could not load its assets nor reach the API (they are requested from the root); it now routes the whole host. The Deployment used a rolling update, which ran the new pod next to the old one on the same volume, both writing the configuration: it now recreates the pod. The memory limit (64 MiB) left no room for the 10 MiB request bodies lightMock buffers; it is 256 MiB. The volume no longer names a storage class that most clusters lack.
 - A start that cannot succeed (authentication enabled without its Keycloak settings, unreadable configuration, port already in use, invalid `BIND_ADDRESS`) stops with one clear message and exit code 2 instead of a panic and its stack trace.
 - Regular expressions of rule conditions and raw TCP matchers are compiled once and cached instead of on every evaluated request, with a 1 MiB limit on their compiled size; a rule whose expression does not compile is refused when saved instead of silently never matching.
 - A service could be renamed onto another service of the same group, or created in a group that does not exist; an ungrouped service named like a group code (or the reverse) made `/{code}/...` route to two places. All are refused. Creating a service returns the one of the requested group when another group has a namesake. The ping cache no longer mixes up namesake services of different groups. Request log entries carry the service's `group_name`.
