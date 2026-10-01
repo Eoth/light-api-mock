@@ -20,6 +20,7 @@ export const COVERED = [
   'build.rs',
   'scripts/*.mjs',
   'frontend/src/main.js',
+  'frontend/src/*.css',
   'frontend/src/App.svelte',
   'frontend/src/lib/*.js',
   'frontend/src/lib/components/*.svelte',

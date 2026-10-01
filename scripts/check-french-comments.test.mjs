@@ -112,9 +112,10 @@ function sampleOf(pattern) {
   return pattern.replace('**/', '').replace('*', 'sample');
 }
 
-// A file of comment lines, written in the comment syntax of `file`: in Svelte markup, "//" is text.
+// A file of comment lines, written in the comment syntax of `file`: in Svelte markup and in CSS, "//" is not a comment.
 function commented(file, ...lines) {
-  const [open, close] = file.endsWith('.svelte') ? ['<!-- ', ' -->'] : ['// ', ''];
+  const extension = path.posix.extname(file);
+  const [open, close] = { '.svelte': ['<!-- ', ' -->'], '.css': ['/* ', ' */'] }[extension] ?? ['// ', ''];
   return lines.map((line) => `${open}${line}${close}\n`).join('');
 }
 

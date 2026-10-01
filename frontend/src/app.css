@@ -1,12 +1,11 @@
 /* ============================================================
- * Mimicway — CSS global
+ * Mimicway — global styles
  *
- * Variables mappees vers les tokens du theme.
- * Ce fichier centralise les classes dupliquees (.btn, .form-field, etc.)
- * pour que les composants Svelte n'aient plus a les redefinir.
+ * The theme variables, and the classes the components share: buttons, form fields, badges, dialogs. Some components
+ * still define their own variants of these classes.
  * ============================================================ */
 
-/* ── Design tokens ──────────────────── */
+/* ── Theme variables ── */
 
 :root,
 [data-theme="light"] {
@@ -62,14 +61,14 @@ button { cursor: pointer; font-family: inherit; font-size: inherit; }
 input, select, textarea { background: var(--color-surface); color: var(--color-text); border-color: var(--color-border); }
 :focus-visible { outline: 2px dashed var(--color-text); outline-offset: 2px; }
 
-/* ── Accessibilite ──────────────────────────────────────────── */
+/* ── Accessibility ──────────────────────────────────────────── */
 
 .sr-only {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
 }
 
-/* ── Boutons (centralises — ne plus redefinir dans les composants) ── */
+/* ── Buttons ────────────────────────────────────────────────── */
 
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
@@ -97,7 +96,7 @@ input, select, textarea { background: var(--color-surface); color: var(--color-t
 .btn-danger-outline { background: var(--color-surface); color: var(--color-danger); border-color: var(--color-danger); }
 .btn-danger-outline:hover { background: var(--color-danger); color: #fff; }
 
-/* ── Formulaires (centralises) ──────────────────────────────── */
+/* ── Forms ──────────────────────────────────────────────────── */
 
 .form-field {
   display: flex; flex-direction: column; gap: 0.25rem; margin-bottom: 1rem;
@@ -163,7 +162,7 @@ input, select, textarea { background: var(--color-surface); color: var(--color-t
 .badge-proxy { background: #e4e9fa; color: #0a1a88; }
 .badge-error { background: #f9e9e8; color: #901b14; }
 
-/* Badges "pilule" plus grands (etat, statut) — utilises par UrlHealthBadge/StatusBadge */
+/* Larger "pill" badges for a state (UrlHealthBadge, the listening status of TcpServiceManager) */
 .badge-pill {
   display: inline-flex; align-items: center; padding: 0.25rem 0.625rem;
   border-radius: var(--radius); font-size: 0.75rem; font-weight: 700;
@@ -188,7 +187,7 @@ input, select, textarea { background: var(--color-surface); color: var(--color-t
 .method-badge[data-method="OPTIONS"] { background: #e8e8e8; color: #424242; }
 .method-badge[data-method="HEAD"] { background: #e8e8e8; color: #424242; }
 
-/* ── Modale ─────────────────────────────────────────────────── */
+/* ── Dialogs ────────────────────────────────────────────────── */
 
 .modal-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,0.45);
