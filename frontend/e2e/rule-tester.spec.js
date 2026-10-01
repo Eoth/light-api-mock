@@ -39,13 +39,13 @@ async function openService(page, serviceName) {
     await group.click();
     await page.waitForTimeout(200);
   }
-  await page.getByRole('button', { name: new RegExp(`Configurer le service ${serviceName}`) }).click();
+  await page.getByRole('button', { name: new RegExp(`Configure the service ${serviceName}`) }).click();
   await page.waitForTimeout(200);
 }
 
 async function openAddRuleForm(page, serviceName) {
   await openService(page, serviceName);
-  await page.getByRole('button', { name: /Ajouter une regle/ }).click();
+  await page.getByRole('button', { name: /Add a rule/ }).click();
   await page.waitForTimeout(200);
 }
 
@@ -67,11 +67,11 @@ test.describe('Testeur de regle : condition mal choisie contre une vraie requete
     await openAddRuleForm(page, 'tester-svc');
     await page.locator('input#rule-name').fill('mauvais-choix');
 
-    await page.getByRole('button', { name: '+ Condition ET' }).click();
+    await page.getByRole('button', { name: '+ AND condition' }).click();
     await page.locator('#cond-source').selectOption('QueryParam');
     await page.locator('#cond-key').fill('id');
     await page.locator('#cond-val').fill('42');
-    await page.getByRole('button', { name: 'Valider' }).click();
+    await page.getByRole('button', { name: 'OK' }).click();
 
     // RequestLog n'est jamais purge par /config/reset (seule la config
     // services/regles l'est) : selectionner la premiere occurrence (la plus
@@ -85,12 +85,12 @@ test.describe('Testeur de regle : condition mal choisie contre une vraie requete
     const optionValue = await matchingOption.getAttribute('value');
     await logSelect.selectOption(optionValue);
 
-    await page.getByRole('button', { name: /Tester contre cette requête/ }).click();
+    await page.getByRole('button', { name: /Test against this request/ }).click();
 
-    await expect(page.getByText(/ne matcherait pas cette requête/)).toBeVisible();
-    await expect(page.getByText(/valeur trouvée : absente/)).toBeVisible();
-    await expect(page.getByText(/présent comme paramètre de chemin/)).toBeVisible();
-    await docsScreenshot(page, 'testeur-regle-hint.png');
+    await expect(page.getByText(/would not match this request/)).toBeVisible();
+    await expect(page.getByText(/value found: none/)).toBeVisible();
+    await expect(page.getByText(/present as a path parameter/)).toBeVisible();
+    await docsScreenshot(page, 'rule-tester-hint.png');
   });
 
   test('la selection du path param est stricte (select ferme, pas de saisie libre)', async ({ page, request }) => {
@@ -99,7 +99,7 @@ test.describe('Testeur de regle : condition mal choisie contre une vraie requete
     });
 
     await openAddRuleForm(page, 'strict-svc');
-    await page.getByRole('button', { name: '+ Condition ET' }).click();
+    await page.getByRole('button', { name: '+ AND condition' }).click();
     await page.locator('#cond-source').selectOption('PathParam');
 
     const keyField = page.locator('#cond-key');
@@ -114,7 +114,7 @@ test.describe('Testeur de regle : condition mal choisie contre une vraie requete
     });
 
     await openAddRuleForm(page, 'static-svc');
-    await page.getByRole('button', { name: '+ Condition ET' }).click();
+    await page.getByRole('button', { name: '+ AND condition' }).click();
 
     const sourceSelect = page.locator('#cond-source');
     const optionValues = await sourceSelect.locator('option').evaluateAll((opts) => opts.map((o) => o.value));
@@ -129,7 +129,7 @@ test.describe('Testeur de regle : condition mal choisie contre une vraie requete
     await request.get(`${BASE}/autocomplete-qp-svc/anything?customerRef=abc123`);
 
     await openAddRuleForm(page, 'autocomplete-qp-svc');
-    await page.getByRole('button', { name: '+ Condition ET' }).click();
+    await page.getByRole('button', { name: '+ AND condition' }).click();
     await page.locator('#cond-source').selectOption('QueryParam');
 
     const keyField = page.locator('#cond-key');
@@ -162,10 +162,10 @@ test.describe('Testeur de regle : condition mal choisie contre une vraie requete
     await page.locator('input#rule-name').fill('body-based-rule');
 
     // BodyRaw : source basee sur le corps entier, sensible a la troncature.
-    await page.getByRole('button', { name: '+ Condition ET' }).click();
+    await page.getByRole('button', { name: '+ AND condition' }).click();
     await page.locator('#cond-source').selectOption('BodyRaw');
     await page.locator('#cond-op').selectOption('Exists');
-    await page.getByRole('button', { name: 'Valider' }).click();
+    await page.getByRole('button', { name: 'OK' }).click();
 
     const logSelect = page.locator('#rule-tester-log');
     await expect(logSelect).toBeVisible();
@@ -174,9 +174,9 @@ test.describe('Testeur de regle : condition mal choisie contre une vraie requete
     const optionValue = await matchingOption.getAttribute('value');
     await logSelect.selectOption(optionValue);
 
-    await page.getByRole('button', { name: /Tester contre cette requête/ }).click();
+    await page.getByRole('button', { name: /Test against this request/ }).click();
 
-    await expect(page.getByText(/corps de cette requête a été tronqué/)).toBeVisible();
+    await expect(page.getByText(/body of this request was truncated/)).toBeVisible();
   });
 
   test('n\'avertit PAS de troncature quand aucune condition testee ne porte sur le corps', async ({ page, request }) => {
@@ -199,11 +199,11 @@ test.describe('Testeur de regle : condition mal choisie contre une vraie requete
 
     // QueryParam : ne depend jamais du corps, donc la troncature du corps
     // capture n'a aucune incidence sur ce test -- pas d'avertissement attendu.
-    await page.getByRole('button', { name: '+ Condition ET' }).click();
+    await page.getByRole('button', { name: '+ AND condition' }).click();
     await page.locator('#cond-source').selectOption('QueryParam');
     await page.locator('#cond-key').fill('foo');
     await page.locator('#cond-val').fill('bar');
-    await page.getByRole('button', { name: 'Valider' }).click();
+    await page.getByRole('button', { name: 'OK' }).click();
 
     const logSelect = page.locator('#rule-tester-log');
     await expect(logSelect).toBeVisible();
@@ -212,10 +212,10 @@ test.describe('Testeur de regle : condition mal choisie contre une vraie requete
     const optionValue = await matchingOption.getAttribute('value');
     await logSelect.selectOption(optionValue);
 
-    await page.getByRole('button', { name: /Tester contre cette requête/ }).click();
+    await page.getByRole('button', { name: /Test against this request/ }).click();
 
-    await expect(page.getByText(/matcherait cette requête/)).toBeVisible();
-    await expect(page.getByText(/corps de cette requête a été tronqué/)).not.toBeVisible();
+    await expect(page.getByText(/would match this request/)).toBeVisible();
+    await expect(page.getByText(/body of this request was truncated/)).not.toBeVisible();
   });
 });
 
@@ -243,7 +243,7 @@ test.describe('Testeur de regle : execution des scripts', () => {
     // Rhai INEXISTANTE — la classe d'erreur diagnostiquee comme cause
     // racine (validate() ne la detecte pas, seule une vraie execution le
     // peut).
-    await page.getByRole('switch', { name: /Script personnalis/ }).click();
+    await page.getByRole('switch', { name: /Custom script/ }).click();
     await page.locator('#rule-script').fill('totally_undefined_fn(1, 2)');
 
     const logSelect = page.locator('#rule-tester-log');
@@ -252,14 +252,14 @@ test.describe('Testeur de regle : execution des scripts', () => {
     await expect(matchingOption).toBeAttached();
     await logSelect.selectOption(await matchingOption.getAttribute('value'));
 
-    await page.getByRole('button', { name: /Tester contre cette requête/ }).click();
+    await page.getByRole('button', { name: /Test against this request/ }).click();
 
-    await expect(page.getByText(/matcherait cette requête/)).toBeVisible();
+    await expect(page.getByText(/would match this request/)).toBeVisible();
     const errorBanner = page.getByTestId('rule-tester-script-errors');
     await expect(errorBanner).toBeVisible();
     await expect(errorBanner).toContainText('totally_undefined_fn');
     await expect(page.getByTestId('rule-tester-script-error-script')).toBeVisible();
-    await docsScreenshot(page, 'testeur-regle-erreur-script.png');
+    await docsScreenshot(page, 'rule-tester-script-error.png');
   });
 
   test('un script de correspondance (map/lookup) correct ne produit aucune erreur', async ({ page, request }) => {
@@ -280,7 +280,7 @@ test.describe('Testeur de regle : execution des scripts', () => {
     // (map_lookup_by_path_param_returns_correct_target_and_falls_back_for_unknown_key,
     // src/server/intercept.rs) et que l'exemple documente dans
     // docs/rhai-scripts.md.
-    await page.getByRole('switch', { name: /Script personnalis/ }).click();
+    await page.getByRole('switch', { name: /Custom script/ }).click();
     await page.locator('#rule-script').fill(
       'let mapping = #{ "billing": "svc-billing-042", "orders": "svc-orders-017" };\n' +
       'let name = request.path.name;\n' +
@@ -293,9 +293,9 @@ test.describe('Testeur de regle : execution des scripts', () => {
     await expect(matchingOption).toBeAttached();
     await logSelect.selectOption(await matchingOption.getAttribute('value'));
 
-    await page.getByRole('button', { name: /Tester contre cette requête/ }).click();
+    await page.getByRole('button', { name: /Test against this request/ }).click();
 
-    await expect(page.getByText(/matcherait cette requête/)).toBeVisible();
+    await expect(page.getByText(/would match this request/)).toBeVisible();
     await expect(page.getByTestId('rule-tester-script-errors')).not.toBeVisible();
   });
 
@@ -316,7 +316,7 @@ test.describe('Testeur de regle : execution des scripts', () => {
     await openAddRuleForm(page, 'seeded-pick-object-svc');
     await page.locator('input#rule-name').fill('quote-rule');
 
-    await page.getByRole('switch', { name: /Script personnalis/ }).click();
+    await page.getByRole('switch', { name: /Custom script/ }).click();
     await page.locator('#rule-script').fill(
       'let villes = [\n' +
       '  #{ name: "Paris", cp: "75000", insee: "75056" },\n' +
@@ -332,9 +332,9 @@ test.describe('Testeur de regle : execution des scripts', () => {
     await expect(matchingOption).toBeAttached();
     await logSelect.selectOption(await matchingOption.getAttribute('value'));
 
-    await page.getByRole('button', { name: /Tester contre cette requête/ }).click();
+    await page.getByRole('button', { name: /Test against this request/ }).click();
 
-    await expect(page.getByText(/matcherait cette requête/)).toBeVisible();
+    await expect(page.getByText(/would match this request/)).toBeVisible();
     // Aucune erreur d'execution (c'est le point du diagnostic : le script
     // ne plante jamais dans ce scenario).
     await expect(page.getByTestId('rule-tester-script-errors')).not.toBeVisible();

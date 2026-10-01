@@ -6,7 +6,7 @@ A few features that apply to everything, from the navigation bar at the top of t
 
 **"Export"** downloads a file holding the whole current configuration (every service, group and rule): handy to share a configuration with a colleague, version it, or keep a copy before a risky change.
 
-![The Export button in the navigation bar](screenshots/administration-bouton-export.png)
+![The Export button in the navigation bar](screenshots/administration-export-button.png)
 
 ## Import: load a configuration from a file
 

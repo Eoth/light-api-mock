@@ -14,7 +14,7 @@ On the home screen, **"+ Add a service"** opens a form with:
 - **Service type**: REST (default) or SOAP; see the section further down.
 - **Group** (optional): attaches the service to a [group](groups.md).
 
-![Form to create a service](screenshots/service-formulaire-creation.png)
+![Form to create a service](screenshots/service-create-form.png)
 
 ## Purely mocked service (no target)
 
@@ -24,7 +24,7 @@ Some services are never meant to relay a real request: they only produce mocked 
 - The service stays in mock mode (the mock switch cannot be turned off for a service without a target: relaying to nowhere could only fail).
 - Unchecking the box at any time, including when editing, shows the target field again without losing anything: rules, group and service type stay as they were.
 
-![The form with "Purely mocked service" checked: the target field is gone](screenshots/service-purement-mocke-formulaire.png)
+![The form with "Purely mocked service" checked: the target field is gone](screenshots/service-purely-mocked-form.png)
 
 **A request that no rule matches**: on a purely mocked service, the answer is a `404` with an explicit message ("this service is purely mocked, no target configured") rather than a failed attempt to relay to an empty address.
 
@@ -54,7 +54,7 @@ or, when the service belongs to a group:
 
 The exact URL to call is always shown on the service's page: no need to work it out by hand.
 
-![A service's page showing its test URL](screenshots/service-fiche-detail-url.png)
+![A service's page showing its test URL](screenshots/service-detail-url.png)
 
 ## Mock or proxy: two modes, two levels
 
@@ -72,7 +72,7 @@ The "Service type" selector sets how technical SOAP requests are handled (WSDL, 
 - **REST** (default): standard behavior, no SOAP-specific handling.
 - **SOAP**: WSDL requests can either be **relayed as they are to the real backend** (`Proxy`/`Auto`, handy to let a SOAP client discover the real API contract) or **answered by your mocked rules** (`Mock`, to mock the service description too).
 
-![The service form with "SOAP / XML" selected](screenshots/service-formulaire-soap.png)
+![The service form with "SOAP / XML" selected](screenshots/service-form-soap.png)
 
 Turning a service into a SOAP one happens entirely in this form: nothing else needs configuring.
 

@@ -23,11 +23,15 @@ export default defineConfig({
     'config.spec.mjs',
     'rhai-autocomplete.spec.js',
     'observation-suggestions.spec.js',
+    'request-log.spec.js',
+    'auth-static-assets.spec.js',
   ],
   timeout: 15000,
   workers: 1,
   use: {
     baseURL: 'http://localhost:7342',
     headless: true,
+    // Screenshots show the interface in its source language, like the documentation.
+    locale: 'en-US',
   },
 });

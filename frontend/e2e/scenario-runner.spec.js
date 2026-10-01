@@ -81,6 +81,10 @@ test.describe('Runner data-driven (scenarios JSON)', () => {
     await runScenario(page, loadScenario('services.scenarios.json', 'Creer un service via le formulaire'));
   });
 
+  test('the service form offers the SOAP type (JSON scenario)', async ({ page }) => {
+    await runScenario(page, loadScenario('services.scenarios.json', 'The service form offers the SOAP type'));
+  });
+
   test('creer une regle simple (scenario JSON)', async ({ page, request }) => {
     // Prealable hors runner : le scenario ne couvre que le parcours UI de
     // creation de regle, pas la creation du service support -- reste

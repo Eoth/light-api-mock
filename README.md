@@ -12,7 +12,7 @@ lightMock sits between the application you test and the services it calls. Each 
 
 The interface is available in English and French; adding a language is one file (see [Translations](#translations)).
 
-![The list of services in the lightMock UI](docs/screenshots/accueil-liste-services.png)
+![The list of services in the lightMock UI](docs/screenshots/home-service-list.png)
 
 ## Trust at a glance
 

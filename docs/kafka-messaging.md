@@ -6,7 +6,7 @@ Beyond HTTP requests, lightMock can also answer **Kafka messages** (Kafka is a m
 
 **"Kafka messages"** only appears in the navigation bar when the running lightMock binary was built with Kafka support (`--features messaging-kafka`). When it is missing, the feature is simply not part of your installation: it is not an error.
 
-![The "Kafka messages" button in the navigation bar](screenshots/messaging-bouton-nav.png)
+![The "Kafka messages" button in the navigation bar](screenshots/kafka-nav-button.png)
 
 ## How it works
 
@@ -14,13 +14,13 @@ Once enabled and connected to Kafka, lightMock listens to a topic (a Kafka messa
 
 A **message log**, like the HTTP [request log](request-log.md), shows the messages received, whether they matched, and their answer.
 
-![The Kafka message log with matched and unmatched statuses](screenshots/messaging-journal-statuts.png)
+![The Kafka message log with matched and unmatched statuses](screenshots/kafka-message-log.png)
 
 ## Simulating a message without a Kafka server
 
 **"Simulate an incoming message"** tests how Kafka rules behave directly from the interface, with no Kafka server sending the message: handy to check a rule before plugging it into a real flow.
 
-![The form to simulate a Kafka message](screenshots/messaging-formulaire-simulation.png)
+![The form to simulate a Kafka message](screenshots/kafka-simulation-form.png)
 
 ## Requirements and limits
 

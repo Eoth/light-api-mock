@@ -6,7 +6,7 @@ Once a [rule](matching-rules.md) matches, lightMock produces a response: an HTTP
 
 The body is built in two steps: first a **format** (JSON, XML, Text, Advanced template, or Empty (204)), then, for JSON and XML only, an **editing level** (by example, or in detail). These levels are **not two modes to choose up front**: you always start by example (paste a sample), and **"Edit in detail (full structure) →"** reveals, on the *same* data, everything the detailed level offers, without losing anything you already entered.
 
-![Format selector (JSON/XML/Text/Advanced template/Empty) with the JSON by-example view below](screenshots/reponse-json-exemple-detection.png)
+![Format selector (JSON/XML/Text/Advanced template/Empty) with the JSON by-example view below](screenshots/response-json-by-example.png)
 
 ### 1. By example: paste an existing response
 
@@ -20,7 +20,7 @@ For XML, often nested more deeply (a SOAP envelope, for instance), this level al
 - **fold chevrons** (▼/▶), as for JSON,
 - editing of the **XML attributes** of each element, root included: a detected attribute (such as a namespace declaration `xmlns:soap="..."`) can be replaced with a variable or kept, like text content.
 
-![XML by example: breadcrumb after entering a node, attributes shown above](screenshots/reponse-xml-exemple-navigation.png)
+![XML by example: breadcrumb after entering a node, attributes shown above](screenshots/response-xml-by-example-navigation.png)
 
 Namespace prefixes (`soap:Envelope`) and `xmlns`/`xmlns:*` declarations are kept as they are, as text; lightMock does not resolve them. Pasting XML with namespaces works without errors, but no semantic validation is done.
 
@@ -34,7 +34,7 @@ Namespace prefixes (`soap:Envelope`) and `xmlns`/`xmlns:*` declarations are kept
 
 Each **object** or **array** field (JSON and XML) shows a **chevron** (▼/▶) on its left: click it to **fold** the field and hide its content for a while, handy once a branch is configured and you want to focus on the rest. A "(N hidden items)" note reminds you that content is hidden. Folding never deletes anything, and everything is unfolded when the form opens.
 
-![A folded JSON field: the chevron points right and a note says content is hidden](screenshots/regle-json-noeud-replie.png)
+![A folded JSON field: the chevron points right and a note says content is hidden](screenshots/rule-json-folded-node.png)
 
 To move around a deeply nested structure, a breadcrumb above the editor (a clickable path such as `root > address > city`) lets you enter a level and come back out in one click.
 
@@ -87,7 +87,7 @@ In the builder (both levels, JSON and XML), each variable is an option of the **
 
 **Checked example**: a `siret` field with the source **"XPath (XML/SOAP)"**, the value `Envelope/Body/recherche/Siret` and the transformation `substr(0,9)` (to keep the first 9 characters):
 
-![XML field with the XPath (XML/SOAP) source, a path and a substr pipe](screenshots/reponse-xml-source-xpath.png)
+![XML field with the XPath (XML/SOAP) source, a path and a substr pipe](screenshots/response-xml-xpath-source.png)
 
 Against a `POST` whose SOAP body holds `<ns3:Siret>98765432109876</ns3:Siret>` under `Envelope/Body/recherche` (even with a `<Header></Header>` written in full before `<Body>`), the response contains `<siret>987654321</siret>`.
 

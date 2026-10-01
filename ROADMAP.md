@@ -55,15 +55,15 @@ Size S
 
 **Done when.** Copying the release binary alone to an empty machine and running it serves the full UI; binary size growth is measured and stated in the changelog.
 
-### R5. English screenshots, English end-to-end tests
+### R5. Complete the documentation screenshots
 
 Size M
 
-**Why.** The guide is in English but its screenshots show the French interface, under French file names, and several states are not captured at all (group members, availability badge, combined conditions, rule reordering, JSON breadcrumb, chaos settings, fake data picker, import dialog, reset confirmation); one referenced image, `reponse-xml-exemple-navigation.png`, was never committed. The end-to-end suite asserts French texts, so it cannot produce English screenshots.
+**Why.** The end-to-end suite now runs in English and produces the guide's screenshots, but some states of the interface are not reached by any test, so the guide has no image for them: group members, combined conditions, rule reordering, the JSON breadcrumb, chaos settings, the fake data picker, the import dialog and the reset confirmation. The three Kafka images still show the former French interface, because they need a build with the `messaging-kafka` feature.
 
-**What.** Run the Playwright suite in English (the source language): replace the French text assertions with the English ones, keep French covered by `e2e/i18n.spec.js` and the pseudo-locale unit test. Rename the screenshots to English names, regenerate them with `npm run docs:screenshots`, and add the steps that reach the missing states.
+**What.** Add the end-to-end steps that reach these states, each with an assertion on what it shows and a screenshot, and reference the images from the guide. Regenerate the Kafka images from a build with the feature, ideally in the Kafka CI job, which already compiles it.
 
-**Done when.** Every image of `docs/` exists, shows the English interface and is produced by the suite; a check fails when a page references a missing image.
+**Done when.** Every feature page of `docs/` shows its main state, and no image shows French text.
 
 ### R6. English code comments
 

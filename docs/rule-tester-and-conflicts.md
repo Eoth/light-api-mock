@@ -8,7 +8,7 @@ While you create or edit a rule, **"Test against a real request"** checks the dr
 
 For each condition of the rule, the result says whether it matched and, above all, **why**. A typical case: you set a condition on a "query parameter" (`?key=value`) while the value was really in a "path parameter" of the URL (`{key}`). Without help, the rule just did not match, with no clue. The tester spots this kind of mix-up and says so ("`key` was not found as a query parameter, but it is present as a path parameter in this request").
 
-![The rule tester with its per-condition detail and a hint](screenshots/testeur-regle-hint.png)
+![The rule tester with its per-condition detail and a hint](screenshots/rule-tester-hint.png)
 
 ### Catch a broken script before saving
 
@@ -16,7 +16,7 @@ When your rule holds [Rhai scripts](rhai-scripts.md), the tester really runs the
 
 This matters because once the rule is saved, a script error **never blocks the response**: the request is still served, with an empty result for the failing script, and nothing visible for whoever receives the response. The tester is where such a problem becomes visible again, before saving; see [Rhai scripts: when a script fails](rhai-scripts.md#when-a-script-fails).
 
-![The rule tester showing a clear error after a call to a Rhai function that does not exist](screenshots/testeur-regle-erreur-script.png)
+![The rule tester showing a clear error after a call to a Rhai function that does not exist](screenshots/rule-tester-script-error.png)
 
 ### See what a script really produced, even without error
 
@@ -30,7 +30,7 @@ lightMock applies the **first rule that matches** a request (see [Matching rules
 
 Each time a rule is saved (created or edited), lightMock compares the draft with the service's other rules and shows a warning when a plausible overlap is found, saying **which of the two rules would really apply** in the current order.
 
-![Rule conflict warning shown when saving](screenshots/regle-avertissement-conflit.png)
+![Rule conflict warning shown when saving](screenshots/rule-conflict-warning.png)
 
 The warning **never blocks**: two choices are always offered,
 

@@ -7,7 +7,7 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:7342',
     headless: true,
-    // The scenarios assert French texts; the English interface is covered by its own spec.
-    locale: 'fr-FR',
+    // Tests read the interface in its source language; i18n.spec.js covers the French one.
+    locale: 'en-US',
   },
 });

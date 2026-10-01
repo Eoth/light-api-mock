@@ -6,7 +6,7 @@ This page is a **quick overview**: a line or two per feature, with a link to the
 
 > These pages are for the people who use and test with lightMock (QA, developers, business analysts). Installation, configuration and architecture are in the [README](../README.md); the security model is in [security.md](security.md).
 
-![The lightMock home screen with the list of services](screenshots/accueil-liste-services.png)
+![The lightMock home screen with the list of services](screenshots/home-service-list.png)
 
 ## Services and routing
 

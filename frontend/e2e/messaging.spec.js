@@ -69,20 +69,20 @@ test.describe('Messaging (Kafka) — journal des messages via simulation UI', ()
 
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    await docsScreenshot(page, 'messaging-bouton-nav.png');
+    await docsScreenshot(page, 'kafka-nav-button.png');
     await page.getByTitle('Journal des messages Kafka').click();
     await expect(page.getByRole('heading', { name: 'Messages Kafka' })).toBeVisible();
 
-    await page.getByLabel('Topic du message simule').fill('orders.in');
-    await page.getByLabel('Corps du message simule').fill('{"type":"order.created"}');
-    await docsScreenshot(page, 'messaging-formulaire-simulation.png');
-    await page.getByRole('button', { name: 'Simuler' }).click();
+    await page.getByLabel('Topic of the simulated message').fill('orders.in');
+    await page.getByLabel('Body of the simulated message').fill('{"type":"order.created"}');
+    await docsScreenshot(page, 'kafka-simulation-form.png');
+    await page.getByRole('button', { name: 'Simulate' }).click();
 
     const row = page.locator('tr', { hasText: 'orders.in' });
     await expect(row).toBeVisible();
     await expect(row).toContainText('kafka-svc / order-created');
     await expect(row).toContainText('Matche');
-    await docsScreenshot(page, 'messaging-journal-statuts.png');
+    await docsScreenshot(page, 'kafka-message-log.png');
   });
 
   test('un message sans regle correspondante est journalise comme non matche', async ({ page, request }) => {
@@ -93,13 +93,13 @@ test.describe('Messaging (Kafka) — journal des messages via simulation UI', ()
     await page.waitForLoadState('networkidle');
     await page.getByTitle('Journal des messages Kafka').click();
 
-    await page.getByLabel('Topic du message simule').fill('orders.unmatched');
-    await page.getByLabel('Corps du message simule').fill('{"type":"order.cancelled"}');
-    await page.getByRole('button', { name: 'Simuler' }).click();
+    await page.getByLabel('Topic of the simulated message').fill('orders.unmatched');
+    await page.getByLabel('Body of the simulated message').fill('{"type":"order.cancelled"}');
+    await page.getByRole('button', { name: 'Simulate' }).click();
 
     const row = page.locator('tr', { hasText: 'orders.unmatched' });
     await expect(row).toBeVisible();
-    await expect(row).toContainText('Non matche');
+    await expect(row).toContainText('Does not match');
   });
 
   test('un corps de message volumineux est journalise avec le badge "Tronque"', async ({ page, request }) => {
@@ -113,9 +113,9 @@ test.describe('Messaging (Kafka) — journal des messages via simulation UI', ()
     await page.waitForLoadState('networkidle');
     await page.getByTitle('Journal des messages Kafka').click();
 
-    await page.getByLabel('Topic du message simule').fill('orders.big');
-    await page.getByLabel('Corps du message simule').fill(bigPayload);
-    await page.getByRole('button', { name: 'Simuler' }).click();
+    await page.getByLabel('Topic of the simulated message').fill('orders.big');
+    await page.getByLabel('Body of the simulated message').fill(bigPayload);
+    await page.getByRole('button', { name: 'Simulate' }).click();
 
     const row = page.locator('tr', { hasText: 'orders.big' });
     await expect(row).toBeVisible();
@@ -123,7 +123,7 @@ test.describe('Messaging (Kafka) — journal des messages via simulation UI', ()
 
     // Le detail doit conserver la taille REELLE malgre la troncature de l'apercu.
     await row.locator('.btn-detail').click({ timeout: 20000 });
-    const dialog = page.getByRole('dialog', { name: 'Detail du message' });
+    const dialog = page.getByRole('dialog', { name: 'Message details' });
     await expect(dialog).toBeVisible();
     await expect(dialog).toContainText(`${bigPayload.length} octets`);
   });
@@ -133,7 +133,7 @@ test.describe('Messaging (Kafka) — journal des messages via simulation UI', ()
     await page.waitForLoadState('networkidle');
     await page.getByTitle('Journal des messages Kafka').click();
 
-    await page.getByRole('button', { name: 'Simuler' }).click();
-    await expect(page.getByText('Le topic est requis pour simuler un message.')).toBeVisible();
+    await page.getByRole('button', { name: 'Simulate' }).click();
+    await expect(page.getByText('A topic is required to simulate a message.')).toBeVisible();
   });
 });

@@ -28,7 +28,7 @@ test.beforeEach(async ({ request }) => {
 test('demo service repond avec les path params', async ({ page, request }) => {
   await page.goto('/');
   await page.waitForLoadState('networkidle');
-  await page.getByRole('button', { name: /Charger un exemple/ }).click();
+  await page.getByRole('button', { name: /Load an example/ }).click();
   await page.waitForTimeout(500);
 
   const resp = await request.get('http://localhost:7342/users-api/users/42');
@@ -44,7 +44,7 @@ test('export telecharge un fichier JSON valide', async ({ page, request }) => {
 
   await page.goto('/');
   await page.waitForLoadState('networkidle');
-  await docsScreenshot(page, 'administration-bouton-export.png');
+  await docsScreenshot(page, 'administration-export-button.png');
 
   const [download] = await Promise.all([
     page.waitForEvent('download'),

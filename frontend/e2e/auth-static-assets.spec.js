@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { docsScreenshot } from './docs-screenshot.js';
 import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -114,6 +115,35 @@ test.describe('Auth: assets statiques de la SPA accessibles sans token (AUTH_ENA
     // la liste des services.
     await expect(page.locator('[data-testid="login-form-username-input"]')).toBeVisible();
     await expect(page.locator('[data-testid="login-form-password-input"]')).toBeVisible();
+    await docsScreenshot(page, 'authentication-login-screen.png');
+  });
+
+  test('a signed-in super-admin sees their name and the reset button', async ({ page }) => {
+    // This instance reaches no Keycloak, so the login answer and the data are stubbed in the browser: the test checks
+    // how the interface presents a signed-in user. Token validation itself is covered by the server's tests.
+    await page.route('**/api/auth/login', (route) =>
+      route.fulfill({ json: { access_token: 'stub-token', refresh_token: null, username: 'alice', is_super_admin: true } }),
+    );
+    await page.route('**/api/services', (route) => route.fulfill({ json: [] }));
+    await page.route('**/api/groups', (route) => route.fulfill({ json: [] }));
+    // What a server built without the optional features answers to a valid token; the stub token would get 401,
+    // which signs the user out.
+    await page.route('**/api/messaging/status', (route) => route.fulfill({ status: 404, body: '' }));
+    await page.route('**/api/tcp/status', (route) => route.fulfill({ status: 404, body: '' }));
+
+    await page.goto(baseUrl + '/');
+    await page.locator('[data-testid="login-form-username-input"]').fill('alice');
+    await page.locator('[data-testid="login-form-password-input"]').fill('not-a-real-password');
+    const loginAnswered = page.waitForResponse('**/api/auth/login');
+    await page.locator('[data-testid="login-form-submit-button"]').click();
+    await loginAnswered;
+
+    await expect(page.locator('[data-testid="app-user-badge"]')).toContainText('alice');
+    await expect(page.locator('[data-testid="app-reset-button"]')).toBeVisible();
+    // Still signed in once the interface has settled.
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('[data-testid="app-user-badge"]')).toContainText('alice');
+    await docsScreenshot(page, 'authentication-user-badge.png');
   });
 
   test('un fichier du bundle assets/ reel se charge sans token', async ({ request }) => {
