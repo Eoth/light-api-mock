@@ -563,11 +563,11 @@ fn parse_xml_items_impl(xml: &str, path: &str) -> rhai::Array {
                     item_depth += 1;
                 }
             }
-            Ok(Event::Text(e)) => {
+            Ok(event @ (Event::Text(_) | Event::GeneralRef(_))) => {
                 if item_depth == 2
-                    && let Ok(t) = e.unescape()
+                    && let Some(text) = crate::engine::matcher::MatchEngine::xml_text(&event)
                 {
-                    current_text.push_str(&t);
+                    current_text.push_str(&text);
                 }
             }
             Ok(Event::End(_)) => {
