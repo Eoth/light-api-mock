@@ -48,6 +48,13 @@ pub async fn intercept_layer(
         tracing::trace!(path = %path, "internal route protected, skipping intercept");
         return next.run(req).await;
     }
+    if crate::server::validation::has_dot_segment(&path) {
+        return (
+            StatusCode::BAD_REQUEST,
+            "Paths with '.' or '..' segments are refused.",
+        )
+            .into_response();
+    }
 
     let config = state.store.snapshot().await;
 
@@ -1868,5 +1875,50 @@ mod tests {
         assert!(!text.contains("<siret>"));
 
         std::fs::remove_dir_all(&data_dir).ok();
+    }
+
+    #[tokio::test]
+    async fn dot_segments_never_reach_the_proxied_backend() {
+        use crate::server::test_support::{auth_disabled, serve, temp_data_dir, test_state};
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        let hits = std::sync::Arc::new(AtomicUsize::new(0));
+        let counter = hits.clone();
+        let backend = axum::Router::new().fallback(move || {
+            counter.fetch_add(1, Ordering::SeqCst);
+            async { "backend" }
+        });
+        let backend_url = serve(backend).await;
+        let service: Service = serde_json::from_value(serde_json::json!({
+            "name": "svc", "listen_path": "", "real_target_url": format!("{backend_url}/base/"),
+            "is_mocked": false, "rewrite_directory_urls": false, "group_name": null,
+            "wsdl_mode": "auto", "rules": []
+        }))
+        .unwrap();
+        let data_dir = temp_data_dir("dot-segments");
+        let config = crate::models::MockConfig {
+            services: vec![service],
+            groups: vec![],
+        };
+        let state = test_state(&data_dir, config, auth_disabled()).await;
+        let root = serve(crate::server::build_router(state, &data_dir)).await;
+        let addr = root.trim_start_matches("http://").to_string();
+
+        // Raw requests: an HTTP client library would resolve the dot segments before sending.
+        for path in ["/svc/../admin", "/svc/%2e%2e/%2E%2E/admin", "/svc/./x"] {
+            let mut stream = tokio::net::TcpStream::connect(&addr).await.unwrap();
+            let request =
+                format!("GET {path} HTTP/1.1\r\nHost: {addr}\r\nConnection: close\r\n\r\n");
+            stream.write_all(request.as_bytes()).await.unwrap();
+            let mut response = String::new();
+            stream.read_to_string(&mut response).await.unwrap();
+            assert!(response.starts_with("HTTP/1.1 400"), "{path}: {response}");
+        }
+        assert_eq!(hits.load(Ordering::SeqCst), 0);
+
+        let ok = reqwest::get(format!("{root}/svc/orders")).await.unwrap();
+        assert_eq!(ok.text().await.unwrap(), "backend");
+        assert_eq!(hits.load(Ordering::SeqCst), 1);
     }
 }
