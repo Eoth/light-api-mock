@@ -471,9 +471,9 @@ impl MatchEngine {
                     }
                     stack.pop();
                 }
-                Ok(Event::Text(e)) => {
-                    if capture && let Ok(t) = e.unescape() {
-                        result.push_str(&t);
+                Ok(event @ (Event::Text(_) | Event::GeneralRef(_))) => {
+                    if capture && let Some(text) = Self::xml_text(&event) {
+                        result.push_str(&text);
                     }
                 }
                 Ok(Event::End(_)) => {
@@ -494,8 +494,26 @@ impl MatchEngine {
     // (fonction native Rhai `parse_xml_items`) pour ne pas dupliquer le decapage
     // de prefixe de namespace XML (`soap:Body` -> `Body`).
     pub(crate) fn local_name(e: &quick_xml::events::BytesStart<'_>) -> String {
-        let full = String::from_utf8_lossy(e.name().as_ref()).to_string();
-        full.split(':').next_back().unwrap_or(&full).to_string()
+        let name = e.name();
+        let full: &str = name.as_ref();
+        full.split(':').next_back().unwrap_or(full).to_string()
+    }
+
+    /// The text a text or reference event stands for. The reader reports `&amp;`, `&#233;`... as reference
+    /// events of their own: the five predefined entities and character references are resolved, any other
+    /// reference is dropped (no DTD is ever read, so it cannot be defined).
+    pub(crate) fn xml_text(event: &quick_xml::events::Event<'_>) -> Option<String> {
+        use quick_xml::events::Event;
+        match event {
+            Event::Text(text) => Some(text.xml10_content().into_owned()),
+            Event::GeneralRef(reference) => match reference.resolve_char_ref() {
+                Ok(Some(c)) => Some(c.to_string()),
+                Ok(None) => quick_xml::escape::resolve_xml_entity(&reference.xml10_content())
+                    .map(str::to_string),
+                Err(_) => None,
+            },
+            _ => None,
+        }
     }
 
     fn extract_form_field(body: &[u8], field: &str) -> Option<String> {
@@ -1625,5 +1643,15 @@ mod tests {
         assert_eq!(url_decode("100%"), "100%");
         assert_eq!(url_decode("%2"), "%2");
         assert_eq!(url_decode("%41%zz"), "A%zz");
+    }
+
+    #[test]
+    fn xpath_text_resolves_entities_and_character_references() {
+        let body =
+            b"<order><customer>Tom &amp; Jerry &#233;t&#xE9; &lt;3 &unknown;</customer></order>";
+        assert_eq!(
+            MatchEngine::extract_xpath(body, "order/customer").as_deref(),
+            Some("Tom & Jerry été <3 ")
+        );
     }
 }
