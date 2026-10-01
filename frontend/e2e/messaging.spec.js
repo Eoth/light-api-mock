@@ -70,18 +70,20 @@ test.describe('Messaging (Kafka) — journal des messages via simulation UI', ()
     await page.goto('/');
     await page.waitForLoadState('networkidle');
     await docsScreenshot(page, 'kafka-nav-button.png');
-    await page.getByTitle('Journal des messages Kafka').click();
-    await expect(page.getByRole('heading', { name: 'Messages Kafka' })).toBeVisible();
+    await page.getByTitle('Kafka message log').click();
+    await expect(page.getByRole('heading', { name: 'Kafka messages' })).toBeVisible();
 
     await page.getByLabel('Topic of the simulated message').fill('orders.in');
     await page.getByLabel('Body of the simulated message').fill('{"type":"order.created"}');
     await docsScreenshot(page, 'kafka-simulation-form.png');
     await page.getByRole('button', { name: 'Simulate' }).click();
 
-    const row = page.locator('tr', { hasText: 'orders.in' });
+    // The message log outlives a configuration reset, and lists the newest message first: on a server that already ran
+    // this suite, the row of this run is the first one with its topic.
+    const row = page.locator('tr', { hasText: 'orders.in' }).first();
     await expect(row).toBeVisible();
     await expect(row).toContainText('kafka-svc / order-created');
-    await expect(row).toContainText('Matche');
+    await expect(row).toContainText('Matches');
     await docsScreenshot(page, 'kafka-message-log.png');
   });
 
@@ -91,13 +93,13 @@ test.describe('Messaging (Kafka) — journal des messages via simulation UI', ()
 
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    await page.getByTitle('Journal des messages Kafka').click();
+    await page.getByTitle('Kafka message log').click();
 
     await page.getByLabel('Topic of the simulated message').fill('orders.unmatched');
     await page.getByLabel('Body of the simulated message').fill('{"type":"order.cancelled"}');
     await page.getByRole('button', { name: 'Simulate' }).click();
 
-    const row = page.locator('tr', { hasText: 'orders.unmatched' });
+    const row = page.locator('tr', { hasText: 'orders.unmatched' }).first();
     await expect(row).toBeVisible();
     await expect(row).toContainText('Does not match');
   });
@@ -111,27 +113,27 @@ test.describe('Messaging (Kafka) — journal des messages via simulation UI', ()
 
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    await page.getByTitle('Journal des messages Kafka').click();
+    await page.getByTitle('Kafka message log').click();
 
     await page.getByLabel('Topic of the simulated message').fill('orders.big');
     await page.getByLabel('Body of the simulated message').fill(bigPayload);
     await page.getByRole('button', { name: 'Simulate' }).click();
 
-    const row = page.locator('tr', { hasText: 'orders.big' });
+    const row = page.locator('tr', { hasText: 'orders.big' }).first();
     await expect(row).toBeVisible();
-    await expect(row).toContainText('Tronque');
+    await expect(row).toContainText('Truncated');
 
     // Le detail doit conserver la taille REELLE malgre la troncature de l'apercu.
     await row.locator('.btn-detail').click({ timeout: 20000 });
     const dialog = page.getByRole('dialog', { name: 'Message details' });
     await expect(dialog).toBeVisible();
-    await expect(dialog).toContainText(`${bigPayload.length} octets`);
+    await expect(dialog).toContainText(`${bigPayload.length} bytes`);
   });
 
   test('simuler sans topic affiche une notification d\'erreur et ne journalise rien', async ({ page, request }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    await page.getByTitle('Journal des messages Kafka').click();
+    await page.getByTitle('Kafka message log').click();
 
     await page.getByRole('button', { name: 'Simulate' }).click();
     await expect(page.getByText('A topic is required to simulate a message.')).toBeVisible();
