@@ -18,7 +18,7 @@ Each item has an identifier that never changes, a size (S: a day or less, M: a f
 
 ## Order of work
 
-1. [Ready for an international launch](#1-ready-for-an-international-launch): R1 to R9.
+1. [Ready for an international launch](#1-ready-for-an-international-launch): R1 to R10.
 2. [Trust and operations](#2-trust-and-operations): T1 to T11.
 3. [Make it indispensable](#3-make-it-indispensable): U1 to U16, in the listed order.
 4. [Engineering backlog](#4-engineering-backlog): taken alongside, when they unblock an item above.
@@ -55,16 +55,6 @@ Size S
 
 **Done when.** Copying the release binary alone to an empty machine and running it serves the full UI; binary size growth is measured and stated in the changelog.
 
-### R4. Pin CI actions and keep them pinned
-
-Size S
-
-**Why.** Actions referenced by tag (`@v4`) can change under the same tag; security reviewers ask for immutable references.
-
-**What.** Pin every action of `.github/workflows/` to a commit SHA with the version in a comment; Dependabot already proposes updates for `github-actions`. Add the OpenSSF Scorecard workflow and show its badge.
-
-**Done when.** No `uses:` line without a SHA; Scorecard runs weekly and its score is visible in the README.
-
 ### R5. English screenshots, English end-to-end tests
 
 Size M
@@ -94,6 +84,16 @@ Size S
 **What.** Restore accents and typography (non-breaking space before `:`, `«»` quotes) in `src/locales/fr.json` and `frontend/src/locales/fr.json`; the existing catalogue tests keep placeholders intact.
 
 **Done when.** A spell check of both French catalogues passes.
+
+### R10. Public supply-chain score
+
+**Decision needed** (the repository must be public, and results are published to the OpenSSF) · Size S
+
+**Why.** Reviewers increasingly start from the OpenSSF Scorecard: it checks pinned dependencies, branch protection, signed releases, CI tests and more, and shows the result as a badge.
+
+**What.** Add the Scorecard workflow (weekly and on pushes to `main`) with published results, show the badge in the README, and fix what it flags (branch protection and required reviews are repository settings).
+
+**Done when.** The badge is visible and the score is 8 or more.
 
 ## 2. Trust and operations
 

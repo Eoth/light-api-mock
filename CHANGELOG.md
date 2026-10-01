@@ -21,6 +21,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - The responses that lightMock itself sends to the applications under test (no matching rule, purely mocked service, refused path) are in English.
 
 ### Security
+- Every GitHub Action of the CI is pinned to a commit SHA, so a moved tag cannot change what runs; the container scan referenced a Trivy action tag that no longer exists, which would have failed the job.
 - The Windows build script no longer turns off certificate revocation checks for crate downloads; when a proxy blocks revocation lists, it says how to do it knowingly. Both build scripts install the UI's exact locked dependencies without running their install scripts.
 - With authentication enabled, the Kafka message log and `POST /api/messaging/simulate` are reserved to super-admins: Kafka is configured for the whole instance, its log spans every group's services, and a simulation publishes on the real reply topic.
 - Dependencies upgraded past known vulnerabilities: quick-xml 0.42 (RUSTSEC-2026-0194 and -0195: quadratic time and unbounded allocation on crafted XML, which lightMock parses from incoming requests), rustls 0.23.45 (RUSTSEC-2026-0285), and the yanked chacha20 0.10.0. XML text now resolves character references (`&#233;`) as well as the predefined entities.
