@@ -14,6 +14,7 @@ Only names change. Most of them need nothing from you; the table says which do.
 | Kubernetes resources `lightmock`, volume `lightmock-data` | `mimicway`, `mimicway-data`, namespace `mimicway` | Keep your volume (see [Kubernetes](#kubernetes)). |
 | Repository `github.com/Eoth/light-api-mock` | `github.com/Eoth/mimicway` | Nothing: old links and `git remote` URLs redirect. Update them when convenient. |
 | Exported file `lightmock-config-<date>.json` | `mimicway-config-<date>.json` | Nothing: imports accept any file name. |
+| Guide pages `docs/<French name>.md` | `docs/en/<English name>.md` and `docs/fr/<English name>.md` | Update bookmarks and links to the guide (see [Documentation](#documentation)). |
 
 ## Binary
 
@@ -81,3 +82,26 @@ To start clean in the new `mimicway` namespace instead, apply `k8s/ingress` as d
 ## Kafka
 
 The consumer group used when `KAFKA_CONSUMER_GROUP` is not set is now `mimicway`. A new group starts from the latest messages: nothing is consumed twice, but messages sent while the instance was stopped are not consumed. To carry on exactly where lightMock stopped, set `KAFKA_CONSUMER_GROUP=lightmock`.
+
+## Documentation
+
+The user guide was a single French tree under French file names. It now exists in English and in French, with the same English file names in both languages, and each page links to its other language. Former addresses do not redirect; this is where each page went:
+
+| Former page | English | French |
+|---|---|---|
+| `docs/index.md` | [docs/en/index.md](docs/en/index.md) | [docs/fr/index.md](docs/fr/index.md) |
+| `docs/services.md` | [docs/en/services.md](docs/en/services.md) | [docs/fr/services.md](docs/fr/services.md) |
+| `docs/groupes.md` | [docs/en/groups.md](docs/en/groups.md) | [docs/fr/groups.md](docs/fr/groups.md) |
+| `docs/ping-de-disponibilite.md` | [docs/en/availability-check.md](docs/en/availability-check.md) | [docs/fr/availability-check.md](docs/fr/availability-check.md) |
+| `docs/regles-de-matching.md` | [docs/en/matching-rules.md](docs/en/matching-rules.md) | [docs/fr/matching-rules.md](docs/fr/matching-rules.md) |
+| `docs/reponses-et-templates.md` | [docs/en/responses-and-templates.md](docs/en/responses-and-templates.md) | [docs/fr/responses-and-templates.md](docs/fr/responses-and-templates.md) |
+| `docs/scripts-rhai.md` | [docs/en/rhai-scripts.md](docs/en/rhai-scripts.md) | [docs/fr/rhai-scripts.md](docs/fr/rhai-scripts.md) |
+| `docs/testeur-de-regle-et-conflits.md` | [docs/en/rule-tester-and-conflicts.md](docs/en/rule-tester-and-conflicts.md) | [docs/fr/rule-tester-and-conflicts.md](docs/fr/rule-tester-and-conflicts.md) |
+| `docs/journal-des-requetes.md` | [docs/en/request-log.md](docs/en/request-log.md) | [docs/fr/request-log.md](docs/fr/request-log.md) |
+| `docs/observation-de-trafic.md` | [docs/en/traffic-observation.md](docs/en/traffic-observation.md) | [docs/fr/traffic-observation.md](docs/fr/traffic-observation.md) |
+| `docs/sauvegardes-et-restauration.md` | [docs/en/backups-and-restore.md](docs/en/backups-and-restore.md) | [docs/fr/backups-and-restore.md](docs/fr/backups-and-restore.md) |
+| `docs/administration.md` | [docs/en/administration.md](docs/en/administration.md) | [docs/fr/administration.md](docs/fr/administration.md) |
+| `docs/authentification.md` | [docs/en/authentication.md](docs/en/authentication.md) | [docs/fr/authentication.md](docs/fr/authentication.md) |
+| `docs/messaging-kafka.md` | [docs/en/kafka-messaging.md](docs/en/kafka-messaging.md) | [docs/fr/kafka-messaging.md](docs/fr/kafka-messaging.md) |
+
+The security model, which was only in English, is at [docs/en/security.md](docs/en/security.md) and [docs/fr/security.md](docs/fr/security.md). The README has a French version, [README.fr.md](README.fr.md).

@@ -18,7 +18,7 @@ Each item has an identifier that never changes, a size (S: a day or less, M: a f
 
 ## Order of work
 
-1. [Ready for an international launch](#1-ready-for-an-international-launch): R2, R10, R5, R6, R11, R9.
+1. [Ready for an international launch](#1-ready-for-an-international-launch): R2, R10, R5, R6, R11, R12, R9.
 2. [Trust and operations](#2-trust-and-operations): T1 to T11.
 3. [Make it indispensable](#3-make-it-indispensable): U1 to U16, in the listed order.
 4. [Engineering backlog](#4-engineering-backlog): taken alongside, when they unblock an item above.
@@ -41,11 +41,11 @@ Size S (what is left)
 
 Size M
 
-**Why.** The end-to-end suite now runs in English and produces the guide's screenshots, but some states of the interface are not reached by any test, so the guide has no image for them: group members, combined conditions, rule reordering, the JSON breadcrumb, chaos settings, the fake data picker, the import dialog and the reset confirmation. The three Kafka images still show the former French interface, because they need a build with the `messaging-kafka` feature.
+**Why.** The end-to-end suite produces every screenshot of the guide in English and French (`docs/en/screenshots/`, `docs/fr/screenshots/`), but some states of the interface are not reached by any test, so the guide has no image for them: group members, combined conditions, rule reordering, the JSON breadcrumb, chaos settings, the fake data picker, the import dialog and the reset confirmation. Some existing images also miss their subject: `rhai-autocompletion.png` leaves the suggestion list below the bottom edge, `rule-conflict-warning.png` cuts the warning before its "Save anyway" and "Edit the rule" buttons, and `rule-script-json-repetition.png`, `rule-script-parse-date.png` and `rule-script-soap-extraction.png` show the response template but not the script they illustrate.
 
-**What.** Add the end-to-end steps that reach these states, each with an assertion on what it shows and a screenshot, and reference the images from the guide. Regenerate the Kafka images from a build with the feature, ideally in the Kafka CI job, which already compiles it.
+**What.** Add the end-to-end steps that reach the missing states, each with an assertion on what it shows and a screenshot, and reference the images from both languages of the guide. Frame the five images above on their subject (scroll the element into view before the capture: a `target` on the scenario's `screenshot` step, `scrollIntoViewIfNeeded()` in a spec). Regenerate the Kafka images from a build with `messaging-kafka`, as the Kafka CI job builds it.
 
-**Done when.** Every feature page of `docs/` shows its main state, and no image shows French text.
+**Done when.** Every feature page of `docs/en/` and `docs/fr/` shows its main state, every image shows what its caption says, and the English images show no French text.
 
 ### R6. English code comments
 
@@ -75,9 +75,19 @@ Size S
 
 **Depends on** R11. · **Why.** Many French messages were written without accents ("reserve", "deja", "regle"), which reads as careless to French users.
 
-**What.** Restore accents and typography (non-breaking space before `:`, `«»` quotes) in `src/locales/fr.json` and `frontend/src/locales/fr.json`; the existing catalogue tests keep placeholders intact.
+**What.** Restore accents and typography (non-breaking space before `:`, `«»` quotes) in `src/locales/fr.json` and `frontend/src/locales/fr.json`; the existing catalogue tests keep placeholders intact. Fix the mistranslations the French screenshots show, such as "Réécriture annuaire" for "Directory URL rewriting" and an example name that differs from the English one ("ex: get-siret" for "e.g. get-customer"). Then regenerate the screenshots (`npm run docs:screenshots`): the French images show the catalogue as it is today.
 
-**Done when.** A spell check of both French catalogues passes.
+**Done when.** A spell check of both French catalogues passes, and the French screenshots are regenerated from them.
+
+### R12. Readable condition labels in the rule form
+
+Size S
+
+**Why.** The list of a rule's conditions shows each one as `QueryParam(id) Eq(42)`: internal type names, identical in every language, which QA and business users cannot be expected to decode and which the guide's screenshots show in English and French alike. The pseudo-locale test does not catch it, because the label is assembled from data. The rule tester and the traffic suggestions already word conditions in the user's language.
+
+**What.** Build the label in `RuleConditionsEditor.svelte` from the source and operator labels the condition form already translates (`Query parameter`, `HTTP header`, `Equals`, `Exists (any value)`…), through `t()` with placeholders, one message per operator shape, as `ObservationSuggestions.svelte` does; translate the new messages in `frontend/src/locales/fr.json`; regenerate the screenshots that show a condition list.
+
+**Done when.** No condition in the interface shows a source or operator type name, in either language, and a Vitest test covers the label of each source and operator.
 
 ### R10. Public supply-chain score
 
