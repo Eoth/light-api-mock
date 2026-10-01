@@ -2590,7 +2590,7 @@ mod tests {
 
     #[tokio::test]
     async fn observe_service_rejects_mocked_service() {
-        let svc = svc_named("mocked-svc", None); // is_mocked: true par defaut
+        let svc = svc_named("mocked-svc", None); // svc_named builds a mocked service
         let base = spawn_test_app(MockConfig {
             services: vec![svc],
             groups: vec![],
