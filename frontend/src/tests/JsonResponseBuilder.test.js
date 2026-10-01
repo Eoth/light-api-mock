@@ -149,3 +149,39 @@ describe('JsonResponseBuilder — source "Resultat du script"', () => {
     expect(updated[0].value).toBe('total');
   });
 });
+
+describe('JsonResponseBuilder: a fold follows its field', () => {
+  const object = (key) => ({ key, fieldType: 'object', children: [{ key: `${key}-child`, fieldType: 'value', source: 'fixed', value: '1', pipe: '', asNumber: false }] });
+  const expanded = (container, testPath) =>
+    container.querySelector(`[data-testid="json-builder-collapse-button-${testPath}"]`).getAttribute('aria-expanded');
+  const click = (container, testId) => fireEvent.click(container.querySelector(`[data-testid="${testId}"]`));
+
+  it('when the folded field moves down', async () => {
+    const { container } = render(JsonResponseBuilder, { props: { fields: [object('first'), object('second')] } });
+    await click(container, 'json-builder-collapse-button-0');
+    await click(container, 'json-builder-movedown-button-0');
+
+    expect(container.querySelector('[data-testid="json-builder-key-input-1"]').value).toBe('first');
+    expect(expanded(container, '1')).toBe('false');
+    expect(expanded(container, '0')).toBe('true');
+  });
+
+  it('when a field before it is deleted', async () => {
+    const { container } = render(JsonResponseBuilder, { props: { fields: [object('first'), object('second')] } });
+    await click(container, 'json-builder-collapse-button-1');
+    await click(container, 'json-builder-delete-button-0');
+
+    expect(container.querySelector('[data-testid="json-builder-key-input-0"]').value).toBe('second');
+    expect(expanded(container, '0')).toBe('false');
+  });
+
+  it('when its parent moves, with the folds inside it', async () => {
+    const parent = { key: 'parent', fieldType: 'object', children: [object('inner')] };
+    const { container } = render(JsonResponseBuilder, { props: { fields: [object('first'), parent] } });
+    await click(container, 'json-builder-collapse-button-1-children-0');
+    await click(container, 'json-builder-moveup-button-1');
+
+    expect(expanded(container, '0-children-0')).toBe('false');
+    expect(expanded(container, '0')).toBe('true');
+  });
+});

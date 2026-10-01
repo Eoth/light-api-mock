@@ -1,5 +1,6 @@
 <script>
   import { buildExpr as sharedBuildExpr, templateToPreview, xmlFieldsToTemplate } from '../tpl-utils.js';
+  import { removeFolds, swapFolds } from '../fold-paths.js';
   import { t, tCount } from '../i18n.svelte.js';
 
   // rootAttributes come from a pasted sample: this view does not edit them, but keeps them in the template. A renamed
@@ -79,16 +80,19 @@
   }
 
   function removeAt(path, idx) {
+    const length = getByPath(fields, path).length;
     mutate(root => getByPath(root, path).splice(idx, 1));
+    collapsedPaths = removeFolds(collapsedPaths, path, idx, length);
   }
 
   function moveAt(path, idx, dir) {
     const target = idx + dir;
+    if (target < 0 || target >= getByPath(fields, path).length) return;
     mutate(root => {
       const arr = getByPath(root, path);
-      if (target < 0 || target >= arr.length) return;
       [arr[idx], arr[target]] = [arr[target], arr[idx]];
     });
+    collapsedPaths = swapFolds(collapsedPaths, path, idx, target);
   }
 
   function updateProp(path, idx, prop, val) {
@@ -128,7 +132,7 @@
   }
 
   // Folding of parent nodes, as in JsonResponseBuilder.svelte: an in-memory Set keyed by the positional test path,
-  // everything unfolded at first.
+  // carried along when a node moves or is deleted (fold-paths.js), everything unfolded at first.
   let collapsedPaths = $state(new Set());
 
   function isCollapsed(testPath) { return collapsedPaths.has(testPath); }

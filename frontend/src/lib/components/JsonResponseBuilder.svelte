@@ -1,5 +1,6 @@
 <script>
   import { fieldsToTemplate, buildExpr as sharedBuildExpr, templateToPreview } from '../tpl-utils.js';
+  import { removeFolds, swapFolds } from '../fold-paths.js';
   import { t, tCount } from '../i18n.svelte.js';
 
   // arrayRoot: the sample pasted by example was an array; these fields then shape its item.
@@ -64,7 +65,8 @@
   let focusedFields = $derived(getByPathSafe(fields, focusPath) ?? []);
 
   // Folding of nested fields (object, array), as in an IDE: an in-memory Set, local to this editing session and never
-  // stored. Keyed by the positional test path (the one of the data-testid attributes). Everything starts unfolded.
+  // stored. Keyed by the positional test path (the one of the data-testid attributes), so moving or deleting a field
+  // carries the folds along (fold-paths.js). Everything starts unfolded.
   let collapsedPaths = $state(new Set());
 
   function isCollapsed(testPath) { return collapsedPaths.has(testPath); }
@@ -134,16 +136,19 @@
   }
 
   function removeAt(path, idx) {
+    const length = getByPath(fields, path).length;
     mutate(root => getByPath(root, path).splice(idx, 1));
+    collapsedPaths = removeFolds(collapsedPaths, path, idx, length);
   }
 
   function moveAt(path, idx, dir) {
     const t = idx + dir;
+    if (t < 0 || t >= getByPath(fields, path).length) return;
     mutate(root => {
       const arr = getByPath(root, path);
-      if (t < 0 || t >= arr.length) return;
       [arr[idx], arr[t]] = [arr[t], arr[idx]];
     });
+    collapsedPaths = swapFolds(collapsedPaths, path, idx, t);
   }
 
   function updateProp(path, idx, prop, val) {

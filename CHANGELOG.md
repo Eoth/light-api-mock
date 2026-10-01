@@ -54,6 +54,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - The action of a rule (Mock or Proxy) can be chosen with the keyboard: Tab reaches it, the arrow keys change it, and the focused card is outlined. Its radio buttons were removed from the page (`display: none`), so only a mouse could change the action.
 - Switching a JSON or XML response built by example to "Advanced template" turns it into its template, as the detailed view already did; it warned that data might be lost and then dropped the response, which also broke the way the guide suggests from XML to JSON (through "Advanced template").
 - The rule form reads the traffic of its own service only: with two services of the same name in different groups, the rule tester offered the requests of both, and the query parameters suggested for conditions came from both.
+- In the detailed JSON and XML builders, a folded field stays folded when it is moved or a field before it is deleted; the fold stayed at the position and landed on the field that came there.
 - The rule tester writes a failed script as "Custom script: …" in English; the French spacing (" : ") showed in every language.
 - Pasting invalid JSON by example reports "Invalid JSON: …" in English; the message was written in French in every language.
 - The raw TCP mock form opens a response or a prefix that is not valid hexadecimal (possible in a hand-written `tcp-config.yaml`) in hexadecimal mode; a value such as `1z` read as the text of byte `01`, which saving the rule then wrote back as `01`.

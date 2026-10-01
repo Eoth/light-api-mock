@@ -107,3 +107,19 @@ describe('XmlResponseBuilder — source "Resultat script"', () => {
     expect(lastCall[0]).toMatchObject({ source: 'script', value: 'total' });
   });
 });
+
+describe('XmlResponseBuilder: a fold follows its node', () => {
+  const parent = (tag) => ({ tag, nodeType: 'parent', children: [{ tag: `${tag}-child`, nodeType: 'value', source: 'fixed', value: '1' }] });
+  const expanded = (container, testPath) =>
+    container.querySelector(`[data-testid="xml-builder-collapse-button-${testPath}"]`).getAttribute('aria-expanded');
+
+  it('when the folded node moves up', async () => {
+    const { container } = render(XmlResponseBuilder, { props: { fields: [parent('first'), parent('second')] } });
+    await fireEvent.click(container.querySelector('[data-testid="xml-builder-collapse-button-1"]'));
+    await fireEvent.click(container.querySelector('[data-testid="xml-builder-moveup-button-1"]'));
+
+    expect(container.querySelector('[data-testid="xml-builder-tag-input-0"]').value).toBe('second');
+    expect(expanded(container, '0')).toBe('false');
+    expect(expanded(container, '1')).toBe('true');
+  });
+});
