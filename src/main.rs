@@ -1,3 +1,7 @@
+// No unsafe Rust in the shipped binary. Tests use it only to set environment variables (unsafe since edition
+// 2024), which is why the attribute is limited to non-test builds.
+#![cfg_attr(not(test), forbid(unsafe_code))]
+
 // Modules du projet — chaque dossier src/<module>/ contient un mod.rs
 // Pour modifier un comportement, trouver le module correspondant :
 //   auth/      → authentification Keycloak, permissions groupes
