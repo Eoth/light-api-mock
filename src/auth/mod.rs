@@ -25,7 +25,9 @@ pub struct AuthConfig {
 }
 
 impl AuthConfig {
-    pub fn from_env() -> Self {
+    /// The authentication settings, or a message naming what is missing when authentication is enabled without
+    /// the Keycloak settings it needs (lightMock then refuses to start rather than run half-protected).
+    pub fn from_env() -> Result<Self, String> {
         let enabled = std::env::var("AUTH_ENABLED")
             .unwrap_or_else(|_| "false".into())
             .eq_ignore_ascii_case("true");
@@ -49,12 +51,13 @@ impl AuthConfig {
             .eq_ignore_ascii_case("true");
 
         if enabled && (keycloak_url.is_empty() || realm.is_empty() || client_id.is_empty()) {
-            panic!(
-                "AUTH_ENABLED=true requires KEYCLOAK_URL, KEYCLOAK_REALM, and KEYCLOAK_CLIENT_ID"
+            return Err(
+                "AUTH_ENABLED=true requires KEYCLOAK_URL, KEYCLOAK_REALM and KEYCLOAK_CLIENT_ID"
+                    .into(),
             );
         }
 
-        Self {
+        Ok(Self {
             enabled,
             keycloak_url,
             realm,
@@ -62,7 +65,7 @@ impl AuthConfig {
             issuer,
             super_admins,
             show_reset_button,
-        }
+        })
     }
 
     pub fn is_super_admin(&self, username: &str) -> bool {
@@ -279,7 +282,7 @@ mod tests {
         let _guard = ENV_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
         unsafe { std::env::remove_var("SHOW_RESET_BUTTON") };
         unsafe { std::env::remove_var("AUTH_ENABLED") };
-        let cfg = AuthConfig::from_env();
+        let cfg = AuthConfig::from_env().unwrap();
         assert!(!cfg.show_reset_button);
     }
 
@@ -288,7 +291,7 @@ mod tests {
         let _guard = ENV_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
         unsafe { std::env::remove_var("AUTH_ENABLED") };
         unsafe { std::env::set_var("SHOW_RESET_BUTTON", "true") };
-        let cfg = AuthConfig::from_env();
+        let cfg = AuthConfig::from_env().unwrap();
         assert!(cfg.show_reset_button);
         unsafe { std::env::remove_var("SHOW_RESET_BUTTON") };
     }

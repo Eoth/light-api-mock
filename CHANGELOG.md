@@ -23,6 +23,7 @@ entre versions mineures.
 - With `AUTH_ENABLED=true`, only the management API (`/api/...`) requires a token, as documented. The mocked and proxied service routes required one too, which broke every mock for the applications under test and forwarded the lightMock token to the real backends on proxied rules.
 
 ### Fixed
+- A start that cannot succeed (authentication enabled without its Keycloak settings, unreadable configuration, port already in use, invalid `BIND_ADDRESS`) stops with one clear message and exit code 2 instead of a panic and its stack trace.
 - Regular expressions of rule conditions and raw TCP matchers are compiled once and cached instead of on every evaluated request, with a 1 MiB limit on their compiled size; a rule whose expression does not compile is refused when saved instead of silently never matching.
 - A service could be renamed onto another service of the same group, or created in a group that does not exist; an ungrouped service named like a group code (or the reverse) made `/{code}/...` route to two places. All are refused. Creating a service returns the one of the requested group when another group has a namesake. The ping cache no longer mixes up namesake services of different groups. Request log entries carry the service's `group_name`.
 - `PUT /api/config` (and the UI import) refuses a service that refers to a group the configuration does not define; such a service silently lost its group URL prefix and permissions.
