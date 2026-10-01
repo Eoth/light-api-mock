@@ -46,7 +46,8 @@ jobs:
           toolchain: stable
           components: clippy
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-      - run: sudo apt-get update && sudo apt-get install -y cmake
+      # librdkafka is built from source; on Linux it links libcurl, so it needs the curl headers.
+      - run: sudo apt-get update && sudo apt-get install -y cmake libcurl4-openssl-dev
       - run: cargo clippy --features messaging-kafka --all-targets -- -D warnings
       - run: cargo test --features messaging-kafka
 
