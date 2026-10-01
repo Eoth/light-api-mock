@@ -106,27 +106,21 @@
 
   function emit() { onUpdate(fields); }
 
-  // 'script' doit rester dans cette liste : c'est le champ qui permet de
-  // preciser QUELLE cle du resultat de script utiliser. La vue "par exemple"
-  // (XmlPasteBuilder.svelte) l'a toujours eu.
+  // 'script' needs a value input: it names the key of the script result to use.
   function needsValueInput(src) { return ['fixed','path','query','header','body','xpath','script'].includes(src); }
 
   function valuePlaceholder(src) {
     if (src === 'body') return t("e.g. /user/name");
     if (src === 'xpath') return t("e.g. Envelope/Body/search/Id");
-    // Un seul niveau de cle plate est navigable ({{script.champ}}, jamais
-    // {{script.objet.champ}}) : si le script retourne un objet imbrique
-    // sous une cle, cette cle contiendra du JSON serialise en entier, pas
-    // ses propres sous-champs adressables individuellement. Utiliser le
-    // testeur de regle pour voir les cles reellement produites avant de les
-    // referencer ici.
+    // A script result is read one flat key deep ({{script.field}}, never {{script.object.field}}): an object nested
+    // under a key comes out whole, as JSON, not as fields of its own. The rule tester shows the keys a script really
+    // returns.
     if (src === 'script') return t("e.g. name (empty = the whole {{script}}; one level only: test the rule to see the keys)");
     return t("value");
   }
 
-  // Pliage/depliage des noeuds parents (memes principes que
-  // JsonResponseBuilder.svelte : Set en memoire, cle par testPath
-  // positionnel, tout deplie par defaut).
+  // Folding of parent nodes, as in JsonResponseBuilder.svelte: an in-memory Set keyed by the positional test path,
+  // everything unfolded at first.
   let collapsedPaths = $state(new Set());
 
   function isCollapsed(testPath) { return collapsedPaths.has(testPath); }

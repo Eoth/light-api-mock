@@ -1,24 +1,16 @@
 <script>
   import { t, tCount } from '../i18n.svelte.js';
-  // Mode "coller un exemple" JSON : edite uniquement les VALEURS (source/
-  // pipe) des champs deja detectes par l'analyse de l'exemple colle -- ni
-  // renommage de cle, ni ajout/suppression/reordonnancement, ni changement
-  // de type (contrairement au mode guide, JsonResponseBuilder.svelte, qui
-  // partage la MEME forme de Fields mais permet l'edition complete).
-  // RuleResponseSection.svelte affiche un bouton "Modifier en detail" qui
-  // reutilise TEL QUEL le tableau `fields` de ce composant pour ouvrir
-  // JsonResponseBuilder, transition sans perte puisque la structure de
-  // donnees est identique.
+  // The by-example JSON view: edits only the values (source, pipe) of the fields found in the pasted sample. No key is
+  // renamed, added, removed, moved or retyped here, unlike the detailed view (JsonResponseBuilder.svelte), which edits
+  // the same shape of fields in full. The "Edit in detail" button of RuleResponseSection.svelte hands this component's
+  // `fields` array to that view as it is.
   import { untrack } from 'svelte';
   import { buildExpr as sharedBuildExpr, fieldsToTemplate, exampleJsonToFields } from '../tpl-utils.js';
 
-  // startParsed : seede l'etat initial `parsed` a la restauration d'une
-  // regle existante (fields deja peuple par le parent depuis le template
-  // persiste, cf RuleResponseSection.svelte::computeInitialEditorState) --
-  // saute la zone de collage et affiche directement la liste de champs. Lu
-  // UNE SEULE FOIS a la creation du composant (untrack, meme idiome que
-  // RuleForm.svelte::init) : les changements ulterieurs de cette prop ne
-  // doivent pas rouvrir/refermer la zone de collage a l'insu de l'utilisateur.
+  // startParsed: the parent already holds fields (rebuilt from a saved template by computeInitialEditorState in
+  // RuleResponseSection.svelte, or kept from the other view), so the list of fields shows instead of the paste area.
+  // Read once, when the component is created (untrack): a later change of this prop must not open or close the paste
+  // area behind the user's back.
   let { fields = [], startParsed = false, onUpdate = () => {} } = $props();
 
   let pasteInput = $state('');
@@ -26,13 +18,9 @@
   let parsed = $state(untrack(() => startParsed));
   let isArrayRoot = $state(false);
 
-  // Pliage/depliage des champs 'object' (seul type imbrique reellement
-  // rendu par renderFields ci-dessous -- array-values/array-objects
-  // n'affichent qu'un badge "tableau" sans recursion, limitation
-  // preexistante non liee a ce mecanisme). Meme approche que
-  // XmlPasteBuilder.svelte/JsonResponseBuilder.svelte : Set en memoire, cle
-  // par testPath positionnel, tout deplie par defaut, attribut `hidden`
-  // jamais un {#if} (demonter perdrait le contenu du sous-arbre replie).
+  // Folding of 'object' fields, the only nested type this view renders (an array field shows an "array" badge only).
+  // As in XmlPasteBuilder.svelte and JsonResponseBuilder.svelte: an in-memory Set keyed by the positional test path,
+  // everything unfolded at first, and a folded subtree hidden with the `hidden` attribute.
   let collapsedPaths = $state(new Set());
 
   function isCollapsed(testPath) { return collapsedPaths.has(testPath); }
@@ -64,9 +52,7 @@
     'BoolRandom', 'LoremSentence', 'CountryFR', 'IbanFR',
   ];
 
-  // Pipes : memes options que JsonResponseBuilder.svelte, dans la limite du
-  // raisonnable -- uniquement la liste deja existante, aucune nouvelle
-  // transformation inventee ici.
+  // The pipe suggestions of JsonResponseBuilder.svelte: each one is a pipe of the template engine.
   const pipeOptions = [
     { value: 'lower', get label() { return t("lower — lowercase"); } },
     { value: 'upper', get label() { return t("upper — uppercase"); } },
@@ -129,9 +115,8 @@
     return ['fixed', 'path', 'query', 'header', 'body', 'script'].includes(src);
   }
 
-  // Meme clarification que JsonResponseBuilder.svelte/XmlResponseBuilder.svelte :
-  // un seul niveau de cle plate est navigable ({{script.champ}}), jamais un
-  // chemin imbrique.
+  // As in JsonResponseBuilder.svelte and XmlResponseBuilder.svelte: a script result is read one flat key deep
+  // ({{script.field}}), never through a nested path.
   function valuePlaceholder(src) {
     if (src === 'fixed') return t("fixed value");
     if (src === 'script') return t("e.g. name (empty = the whole {{script}}; one level only: test the rule to see the keys)");

@@ -1,36 +1,23 @@
 <script>
-  // Mode "coller un exemple" pour XML. Miroir fonctionnel de
-  // JsonPasteBuilder.svelte (paste -> exampleXmlToFields -> assignation de
-  // source champ par champ, jamais de renommage/ajout/suppression de
-  // structure ici -- pour ces retouches, repasser par le mode "XML guide"
-  // habituel, cf docs/en/responses-and-templates.md) mais avec DEUX ajouts
-  // volontaires par rapport a la parite stricte JSON :
-  //  - navigation par fil d'Ariane (focusPath) + chevrons de pliage
-  //    (collapsedPaths, meme mecanisme `hidden` que XmlResponseBuilder.svelte
-  //    -- jamais un {#if} qui demonterait le contenu) : un XML colle
-  //    (typiquement une enveloppe SOAP) est generalement bien plus imbrique
-  //    qu'un JSON REST plat, un rendu recursif entierement a plat (comme
-  //    JsonPasteBuilder) serait illisible.
-  //  - edition des ATTRIBUTS XML (absents du modele JSON) : chaque noeud
-  //    (racine incluse) peut porter des attributs, chacun avec sa propre
-  //    source (fixe/variable), meme mecanisme de source que le contenu
-  //    texte. Les noms d'attribut restent en lecture seule (comme les cles
-  //    JSON en mode paste) -- seule la source de la valeur est editable ici.
+  // The by-example XML view, counterpart of JsonPasteBuilder.svelte: the pasted sample goes through exampleXmlToFields,
+  // then each value gets a source. No node is renamed, added or removed here; the detailed view does that (see
+  // docs/en/responses-and-templates.md). Two additions over the JSON view:
+  //  - breadcrumb navigation (focusPath) and fold chevrons (collapsedPaths, hidden with the `hidden` attribute as in
+  //    XmlResponseBuilder.svelte): pasted XML, a SOAP envelope typically, is nested much deeper than a REST JSON
+  //    payload, and a fully expanded tree would be unreadable;
+  //  - XML attributes, which JSON does not have: every node, root included, may carry attributes, each with its own
+  //    source, as for text content. Attribute names stay read-only, like JSON keys in this view.
   //
-  // Namespaces XML : les prefixes ("soap:Envelope") et attributs xmlns/
-  // xmlns:* sont preserves tels quels comme texte litteral (aucune
-  // resolution semantique) -- cf tpl-utils.js::exampleXmlToFields pour le
-  // detail de cette limite assumee.
+  // Namespace prefixes ("soap:Envelope") and xmlns / xmlns:* attributes are kept as literal text, never resolved (see
+  // exampleXmlToFields in tpl-utils.js).
   import { untrack } from 'svelte';
   import { buildExpr as sharedBuildExpr, xmlFieldsToTemplate, exampleXmlToFields } from '../tpl-utils.js';
   import Sentence from './Sentence.svelte';
   import { t, tCount } from '../i18n.svelte.js';
 
-  // startParsed/initialRootTag/initialRootAttributes : seedent l'etat a la
-  // restauration d'une regle existante (fields/rootTag/rootAttributes deja
-  // reconstruits par le parent depuis le template persiste via
-  // templateToXmlFields, cf RuleResponseSection.svelte). Lus UNE SEULE FOIS
-  // a la creation (untrack), memes principes que JsonPasteBuilder.svelte.
+  // startParsed, rootTag and rootAttributes: when a saved rule is reopened, the parent has rebuilt the fields, root tag
+  // and root attributes from the template (templateToXmlFields, in RuleResponseSection.svelte). Read once, when the
+  // component is created (untrack), as in JsonPasteBuilder.svelte.
   let {
     fields = [],
     startParsed = false,
@@ -67,10 +54,8 @@
     'BoolRandom', 'LoremSentence', 'CountryFR', 'IbanFR',
   ];
 
-  // Pipes : uniquement sur le CONTENU d'un noeud valeur (memes options que
-  // XmlResponseBuilder.svelte guide) -- pas sur les attributs, qui n'ont
-  // aucun equivalent dans le mode guide (l'edition d'attributs est une
-  // capacite propre au mode "par exemple").
+  // Pipe suggestions for the content of value nodes, the same as XmlResponseBuilder.svelte. Attributes take a source
+  // but no pipe.
   const pipeOptions = [
     { value: 'lower', label: 'lower' },
     { value: 'upper', label: 'upper' },
@@ -103,10 +88,8 @@
     return current;
   }
 
-  // focusPath ne navigue que dans 'children' (pas d'equivalent 'items'/
-  // 'template' comme JsonResponseBuilder : un noeud XML n'a qu'une seule
-  // forme d'imbrication possible). Reset si le chemin ne pointe plus vers
-  // rien de valide (meme garde que JsonResponseBuilder).
+  // focusPath only enters 'children': a JSON field also nests through 'items' and 'template', an XML node one way only.
+  // It goes back to the root when it no longer points to anything (the same guard as JsonResponseBuilder.svelte).
   let focusPath = $state([]);
   let collapsedPaths = $state(new Set());
 
@@ -219,8 +202,7 @@
   function valuePlaceholder(src) {
     if (src === 'fixed') return t("fixed value");
     if (src === 'xpath') return t("e.g. Envelope/Body/search/Id");
-    // Meme clarification que XmlResponseBuilder.svelte : un seul niveau de
-    // cle plate est navigable ({{script.champ}}), jamais un chemin imbrique.
+    // As in XmlResponseBuilder.svelte: a script result is read one flat key deep ({{script.field}}).
     if (src === 'script') return t("e.g. name (empty = the whole {{script}}; one level only: test the rule to see the keys)");
     return t("parameter name");
   }

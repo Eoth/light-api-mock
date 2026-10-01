@@ -49,11 +49,9 @@
     return current;
   }
 
-  // Navigation dans l'arborescence (breadcrumb) : focusPath pointe vers un
-  // tableau de Fields (racine [] ou [...idx, 'children'|'template']). Le
-  // rendu complet reste disponible (aucune fonctionnalite perdue) — le
-  // breadcrumb est une aide de navigation en plus de l'indentation, pas un
-  // mode exclusif, pour ne pas regresser sur le builder existant.
+  // Breadcrumb navigation: focusPath points to an array of fields, the root ([]) or [...idx, 'children' | 'template'].
+  // It shows one level at a time, as a help on top of the indented tree, and goes back to the root when the path no
+  // longer exists (effect below).
   let focusPath = $state([]);
 
   $effect(() => {
@@ -64,15 +62,8 @@
 
   let focusedFields = $derived(getByPathSafe(fields, focusPath) ?? []);
 
-  // Pliage/depliage des noeuds imbriques (objet/tableau), style IDE. Etat
-  // purement local a la session d'edition (un simple Set en memoire, jamais
-  // persiste — meme sobriete que le niveau 1 de group-expansion-state.svelte.js
-  // mais sans meme le besoin de survivre a un demontage de composant ici).
-  // Cle par testPath (chemin positionnel, identique a celui deja utilise pour
-  // les data-testid) : comme le breadcrumb ci-dessus, ne suit pas un champ
-  // au-dela d'un reordonnancement/suppression — limitation mineure assumee.
-  // Par defaut tout est deplie (Set vide) : comportement inchange tant que
-  // l'utilisateur ne replie rien explicitement.
+  // Folding of nested fields (object, array), as in an IDE: an in-memory Set, local to this editing session and never
+  // stored. Keyed by the positional test path (the one of the data-testid attributes). Everything starts unfolded.
   let collapsedPaths = $state(new Set());
 
   function isCollapsed(testPath) { return collapsedPaths.has(testPath); }
@@ -184,10 +175,8 @@
 
   function emit() { onUpdate(fields); }
 
-  // 'script' doit rester dans cette liste : c'est le champ qui permet de
-  // preciser QUELLE cle du resultat de script utiliser (buildExpr produit
-  // `script.${f.value}`, ou juste `{{script}}` si vide -- cf tpl-utils.js).
-  // La vue "par exemple" (JsonPasteBuilder.svelte) l'a toujours eu.
+  // 'script' needs a value input: it names the key of the script result to use (buildExpr in tpl-utils.js produces
+  // `{{script.<value>}}`, or `{{script}}` when the value is empty).
   function needsValueInput(source) {
     return ['fixed', 'path', 'query', 'header', 'body', 'script'].includes(source);
   }
@@ -199,14 +188,9 @@
       case 'query': return t("e.g. page");
       case 'header': return t("e.g. x-request-id");
       case 'body': return t("e.g. /user/name");
-      // Un seul niveau de cle plate est navigable ({{script.champ}}, jamais
-      // {{script.objet.champ}}) : si le script retourne un objet imbrique
-      // sous une cle (ex. `#{ ville: pick, id: uuid() }`), cette cle
-      // contiendra du JSON serialise en entier (utile en "Template avance"),
-      // pas ses propres sous-champs individuellement adressables. Utiliser
-      // le testeur de regle (bloc "Tester contre une requete reelle") pour
-      // voir les cles reellement produites par le script avant de les
-      // referencer ici.
+      // A script result is read one flat key deep ({{script.field}}, never {{script.object.field}}): an object nested
+      // under a key (`#{ city: pick, id: uuid() }`) comes out whole, as JSON, not as fields of its own. The rule
+      // tester shows the keys a script really returns.
       case 'script': return t("e.g. name (empty = the whole {{script}}; one level only: test the rule to see the keys)");
       default: return '';
     }
