@@ -43,7 +43,7 @@ The configuration is one file on one volume, written by one process. A second re
 
 ## Pod security
 
-- `runAsNonRoot`, user 1000, no privilege escalation, every Linux capability dropped.
+- `runAsNonRoot`, user 1000, no privilege escalation, every Linux capability dropped; `fsGroup: 1000` makes the data volume writable whatever owner the storage class gives it.
 - Read-only root file system: only `/data` (the volume) is writable.
 - Memory limit 256 MiB: idle, Mimicway uses a few MiB, but request bodies up to 10 MiB are buffered to evaluate rules.
 - Mimicway serves plain HTTP: terminate TLS in your ingress (commented example in `ingress/ingress.yaml`).
