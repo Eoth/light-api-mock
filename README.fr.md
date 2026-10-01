@@ -327,7 +327,7 @@ examples/       configurations prêtes à importer
 
 ### Traductions
 
-L'anglais est la langue source : chaque message est écrit une fois, en anglais, dans le code. Chaque autre langue est un catalogue indexé par le texte anglais : [frontend/src/locales/fr.json](frontend/src/locales/fr.json) pour l'interface, [src/locales/fr.json](src/locales/fr.json) pour les messages de l'API. Des tests extraient chaque message du code et échouent quand un catalogue en oublie un, en garde un inutilisé ou perd un paramètre ; une exécution en pseudo-langue échoue sur tout texte de l'interface resté non traduit. Pour ajouter une langue, ajoutez les deux catalogues et déclarez la langue dans `frontend/src/lib/i18n.svelte.js` et `src/i18n.rs`. La documentation existe en anglais (`docs/en/`, `README.md`) et en français (`docs/fr/`, `README.fr.md`), avec les mêmes pages, titres et captures dans chaque langue.
+L'anglais est la langue source : chaque message est écrit une fois, en anglais, dans le code. Chaque autre langue est un catalogue indexé par le texte anglais : [frontend/src/locales/fr.json](frontend/src/locales/fr.json) pour l'interface, [src/locales/fr.json](src/locales/fr.json) pour les messages de l'API. Des tests extraient chaque message du code et échouent quand un catalogue en oublie un, en garde un inutilisé ou perd un paramètre ; une exécution en pseudo-langue échoue sur tout texte de l'interface resté non traduit. Pour ajouter une langue, ajoutez les deux catalogues et déclarez la langue dans `frontend/src/lib/i18n.svelte.js` et `src/i18n.rs`. La documentation existe en anglais (`docs/en/`, `README.md`) et en français (`docs/fr/`, `README.fr.md`), avec les mêmes pages, titres et captures dans chaque langue ; la CI le vérifie.
 
 ## Dépannage
 

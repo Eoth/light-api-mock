@@ -10,5 +10,5 @@
 
 - [ ] Tests cover the change (a bug fix includes the test that failed before it)
 - [ ] Visible texts go through `t()` or `tr()`, with their French translation
-- [ ] README, `docs/` and `CHANGELOG.md` (Unreleased) are updated where they describe this
+- [ ] README, guide and `CHANGELOG.md` (Unreleased) are updated where they describe this, in English and French (`docs/en/`, `docs/fr/`, `README.fr.md`)
 - [ ] No new outbound connection, dependency or setting, or it is documented (`docs/en/security.md`, README) and justified

@@ -122,6 +122,10 @@ jobs:
         run: npm run build
       - name: Every Markdown link, image and anchor resolves
         run: node scripts/check-doc-links.mjs
+      - name: The documentation checks fail on the drifts they are meant to catch
+        run: node --test scripts/*.test.mjs
+      - name: Every page and screenshot exists in English and French, with the same headings and images
+        run: node scripts/check-doc-translations.mjs
 
   e2e:
     name: End-to-end (real binary, real browser)

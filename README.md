@@ -327,7 +327,7 @@ examples/       configurations ready to import
 
 ### Translations
 
-English is the source language: every message is written once, in English, in the code. Each other language is one catalogue keyed by the English text: [frontend/src/locales/fr.json](frontend/src/locales/fr.json) for the UI, [src/locales/fr.json](src/locales/fr.json) for API messages. Tests extract every message from the code and fail when a catalogue misses one, keeps an unused one or loses a placeholder; a pseudo-locale run fails on any text left untranslated in the UI. To add a language, add both catalogues and register the language in `frontend/src/lib/i18n.svelte.js` and `src/i18n.rs`. The documentation exists in English (`docs/en/`, `README.md`) and French (`docs/fr/`, `README.fr.md`), with the same pages, headings and screenshots in each language.
+English is the source language: every message is written once, in English, in the code. Each other language is one catalogue keyed by the English text: [frontend/src/locales/fr.json](frontend/src/locales/fr.json) for the UI, [src/locales/fr.json](src/locales/fr.json) for API messages. Tests extract every message from the code and fail when a catalogue misses one, keeps an unused one or loses a placeholder; a pseudo-locale run fails on any text left untranslated in the UI. To add a language, add both catalogues and register the language in `frontend/src/lib/i18n.svelte.js` and `src/i18n.rs`. The documentation exists in English (`docs/en/`, `README.md`) and French (`docs/fr/`, `README.fr.md`), with the same pages, headings and screenshots in each language; CI checks it.
 
 ## Troubleshooting
 
