@@ -1860,6 +1860,7 @@ mod tests {
     // croisee entre groupes) : une regression doit etre detectee par
     // `cargo test` seul, sans dependre de la suite Playwright.
     async fn spawn_test_app(config: MockConfig) -> String {
+        crate::server::test_support::assert_consistent(&config);
         let data_dir =
             std::env::temp_dir().join(format!("lightmock-api-test-{}", fastrand::u64(..)));
         std::fs::create_dir_all(&data_dir).unwrap();
@@ -1907,6 +1908,19 @@ mod tests {
         format!("http://127.0.0.1:{port}/api")
     }
 
+    fn groups_named(names: &[&str]) -> Vec<Group> {
+        names
+            .iter()
+            .enumerate()
+            .map(|(i, name)| Group {
+                name: name.to_string(),
+                code: format!("grp{i:02}"),
+                admins: vec![],
+                members: vec![],
+            })
+            .collect()
+    }
+
     fn ambiguous_services() -> Vec<Service> {
         vec![
             svc_named("shared-name", Some("team-a")),
@@ -1919,7 +1933,7 @@ mod tests {
     async fn get_service_grouped_route_returns_only_the_matching_group() {
         let base = spawn_test_app(MockConfig {
             services: ambiguous_services(),
-            groups: vec![],
+            groups: groups_named(&["team-a", "team-b"]),
         })
         .await;
         let client = reqwest::Client::new();
@@ -1950,7 +1964,7 @@ mod tests {
     async fn delete_ambiguous_service_only_removes_the_targeted_group() {
         let base = spawn_test_app(MockConfig {
             services: ambiguous_services(),
-            groups: vec![],
+            groups: groups_named(&["team-a", "team-b"]),
         })
         .await;
         let client = reqwest::Client::new();
@@ -1996,7 +2010,7 @@ mod tests {
     async fn update_via_flat_route_does_not_touch_grouped_namesakes() {
         let base = spawn_test_app(MockConfig {
             services: ambiguous_services(),
-            groups: vec![],
+            groups: groups_named(&["team-a", "team-b"]),
         })
         .await;
         let client = reqwest::Client::new();
@@ -2649,7 +2663,7 @@ mod tests {
         };
         let base = spawn_test_app(MockConfig {
             services: vec![svc],
-            groups: vec![],
+            groups: groups_named(&["team-a"]),
         })
         .await;
         let client = reqwest::Client::new();
@@ -2671,6 +2685,62 @@ mod tests {
             .unwrap();
         assert_eq!(status.len(), 1);
         assert_eq!(status[0].group_name.as_deref(), Some("team-a"));
+    }
+
+    #[tokio::test]
+    async fn observation_works_for_a_service_of_a_real_group() {
+        // Groups are addressed by name in the API and by code in service URLs: the observation was enabled
+        // under the name and looked up under the code, so it never started for a grouped service.
+        let target_app = axum::Router::new().fallback(|| async { "from-backend" });
+        let target_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let target_port = target_listener.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            axum::serve(target_listener, target_app).await.unwrap();
+        });
+        let svc = Service {
+            is_mocked: false,
+            real_target_url: format!("http://127.0.0.1:{target_port}"),
+            ..svc_named("billing", Some("team-a"))
+        };
+        let group = Group {
+            name: "team-a".into(),
+            code: "tma01".into(),
+            admins: vec![],
+            members: vec![],
+        };
+        let base = spawn_test_app(MockConfig {
+            services: vec![svc],
+            groups: vec![group],
+        })
+        .await;
+        let client = reqwest::Client::new();
+        let observe = client
+            .post(format!("{base}/groups/team-a/services/billing/observe"))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(observe.status(), StatusCode::NO_CONTENT);
+
+        let proxy_base = base.trim_end_matches("/api");
+        for _ in 0..crate::server::suggestion::min_samples() {
+            let resp = client
+                .get(format!("{proxy_base}/tma01/billing/invoices"))
+                .send()
+                .await
+                .unwrap();
+            assert_eq!(resp.text().await.unwrap(), "from-backend");
+        }
+
+        let suggestions: Vec<serde_json::Value> = client
+            .get(format!("{base}/groups/team-a/services/billing/suggestions"))
+            .send()
+            .await
+            .unwrap()
+            .json()
+            .await
+            .unwrap();
+        assert_eq!(suggestions.len(), 1, "{suggestions:?}");
+        assert_eq!(suggestions[0]["outcome"], "Unconditional");
     }
 
     #[tokio::test]
