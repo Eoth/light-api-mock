@@ -15,13 +15,10 @@ pub struct RequestData {
     pub remaining_path: String,
 }
 
-/// Resultat detaille de l'evaluation d'UNE condition — utilise uniquement par le
-/// testeur de regle (UI), jamais par le chemin de production (`matches_group`,
-/// qui reste un simple booleen pour ne pas alourdir le hot path HTTP). Expose
-/// la valeur trouvee (ou son absence) et, si la condition echoue, un indice
-/// "cross-source" (`hint`) quand la meme cle existe dans une AUTRE source de
-/// la requete (ex. choix de source probablement errone : path param au lieu
-/// de query param).
+/// How one condition was judged, for the rule tester only; the production path (`matches_group`) stays a plain
+/// boolean so as not to weigh on every request. Holds the value found (or its absence) and, when the condition
+/// fails, a hint when the same key exists in another source of the request (a path parameter typed as a query
+/// parameter, for instance).
 #[derive(Debug, Clone, Serialize)]
 pub struct ConditionEvaluation {
     pub condition: Condition,
@@ -30,10 +27,8 @@ pub struct ConditionEvaluation {
     pub hint: Option<String>,
 }
 
-/// Resultat detaille de l'evaluation d'un `ConditionGroup` (all_of + any_of),
-/// miroir instrumente de `MatchEngine::matches_group`. Voir le commentaire sur
-/// `evaluate_group` pour le choix de dupliquer la glue all/any plutot que d'y
-/// faire deleguer `matches_group`.
+/// How a `ConditionGroup` (all_of and any_of) was judged: the detailed twin of `MatchEngine::matches_group` (see
+/// `evaluate_group` for why the all/any glue is written twice).
 #[derive(Debug, Clone, Serialize)]
 pub struct GroupEvaluation {
     pub all_of: Vec<ConditionEvaluation>,
@@ -41,16 +36,15 @@ pub struct GroupEvaluation {
     pub matched: bool,
 }
 
-/// Entree du testeur de regle : le brouillon de regle en cours d'edition
-/// (pas necessairement sauvegarde), teste contre une requete deja capturee.
+/// Input of the rule tester: the rule being edited, saved or not, tested against a captured request.
 pub struct RuleTestInput<'a> {
     pub method: &'a str,
     pub sub_path: &'a Option<String>,
     pub conditions: &'a ConditionGroup,
 }
 
-/// Resultat complet du testeur de regle : method/sub_path/conditions, chacun
-/// avec son propre statut, plus le detail par condition.
+/// Result of the rule tester: method, sub-path and conditions, each with its own verdict, and the detail of each
+/// condition.
 #[derive(Debug, Clone, Serialize)]
 pub struct RuleTestOutcome {
     pub method_matches: bool,
@@ -60,18 +54,16 @@ pub struct RuleTestOutcome {
     pub overall_matched: bool,
 }
 
-/// Brouillon de regle en cours de sauvegarde (createur ou edition), pour le
-/// detecteur de conflit (`find_rule_conflicts`). Meme forme que
-/// `RuleTestInput`, un type distinct car le point d'entree/l'usage differe
-/// (sauvegarde vs testeur de trafic reel).
+/// The rule about to be saved (created or edited), for conflict detection (`find_rule_conflicts`). Same shape as
+/// `RuleTestInput`, a separate type because it serves another purpose.
 pub struct RuleConflictDraft<'a> {
     pub method: &'a str,
     pub sub_path: &'a Option<String>,
     pub conditions: &'a ConditionGroup,
 }
 
-/// Une AUTRE regle du meme service, telle qu'elle existe deja (position
-/// implicite = son index dans le slice passe a `find_rule_conflicts`).
+/// Another rule of the same service, as stored; its position is its index in the slice given to
+/// `find_rule_conflicts`.
 pub struct OtherRuleConflictInput<'a> {
     pub name: &'a str,
     pub method: &'a str,
@@ -79,19 +71,15 @@ pub struct OtherRuleConflictInput<'a> {
     pub conditions: &'a ConditionGroup,
 }
 
-/// Laquelle des deux regles en conflit s'appliquerait reellement, compte
-/// tenu de l'ordre ACTUEL du tableau `rules` (first-match, cf commentaire
-/// sur `find_rule_conflicts`). Purement informatif : ne change rien a la
-/// resolution reelle, juste explique a l'utilisateur ce qui se passerait.
+/// Which of two overlapping rules would really apply, given the current order (first match wins). Informative
+/// only: it explains, it changes nothing.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ConflictWinner {
-    /// La regle en cours de sauvegarde s'appliquerait en premier — l'autre
-    /// regle citee serait masquee pour les requetes concernees.
+    /// The rule being saved comes first: the other rule would be hidden for the requests concerned.
     Draft,
-    /// L'autre regle citee (deja existante, positionnee avant) s'appliquerait
-    /// en premier — la regle en cours de sauvegarde ne se declencherait
-    /// jamais pour les requetes concernees par ce conflit.
+    /// The other rule, already stored before it, comes first: the rule being saved would never trigger for these
+    /// requests.
     Other,
 }
 
@@ -118,13 +106,12 @@ impl MatchEngine {
         })
     }
 
-    /// pub(crate) (plutot que privee) : reutilisee par `evaluate_rule_test`
-    /// (testeur de regle) en plus de `first_match` (chemin de production).
+    /// Shared by the production path (`first_match`) and the rule tester (`evaluate_rule_test`).
     pub(crate) fn matches_method(rule_method: &str, request_method: &str) -> bool {
         rule_method.eq_ignore_ascii_case(request_method)
     }
 
-    /// pub(crate) (plutot que privee) : idem, reutilisee par `evaluate_rule_test`.
+    /// Shared with the rule tester as well.
     pub(crate) fn matches_sub_path(
         sub_path: &Option<String>,
         remaining: &str,
@@ -135,10 +122,8 @@ impl MatchEngine {
         }
     }
 
-    /// pub(crate) (plutot que privee) : reutilisee telle quelle par
-    /// `messaging::matcher` (feature "messaging-kafka") pour matcher un
-    /// message Kafka contre les conditions d'une regle, sans les notions
-    /// HTTP-only method/sub_path (voir commentaire dans messaging/matcher.rs).
+    /// Also used by `messaging::matcher` to match a Kafka message against a rule's conditions, without the HTTP-only
+    /// method and sub-path.
     pub(crate) fn matches_group(group: &ConditionGroup, req: &RequestData) -> bool {
         let all_ok = group.all_of.is_empty() || group.all_of.iter().all(|c| Self::eval(c, req));
         let any_ok = group.any_of.is_empty() || group.any_of.iter().any(|c| Self::eval(c, req));
@@ -150,20 +135,12 @@ impl MatchEngine {
         Self::apply_op(&condition.operator, extracted.as_deref())
     }
 
-    /// Variante instrumentee de `matches_group`, pour le testeur de regle
-    /// (UI) uniquement. Reutilise les MEMES primitives que le chemin de
-    /// production (`extract`/`apply_op`) : aucune logique de matching n'est
-    /// dupliquee, seule la glue "all/any" ci-dessous l'est (~5 lignes).
+    /// The detailed version of `matches_group`, for the rule tester only. It uses the same primitives (`extract`,
+    /// `apply_op`), so no matching logic is duplicated; only the all/any glue below is.
     ///
-    /// Pourquoi ne pas faire deleguer `matches_group` a cette fonction : le
-    /// chemin HTTP de production appelle `matches_group` sur CHAQUE requete
-    /// recue (potentiellement un fort volume) ; construire ici le detail
-    /// complet (clone de `Condition`, calcul de hints, allocations de String)
-    /// pour un resultat immediatement jete ailleurs que dans ce testeur
-    /// alourdirait ce hot path sans aucun benefice. `matches_group` reste
-    /// donc un booleen pur, et un test dedie (`evaluate_group_matches_agree_with_matches_group`,
-    /// voir tests) garantit que les deux ne divergent jamais, plutot que de
-    /// s'appuyer sur une delegation qui masquerait ce cout de perf.
+    /// `matches_group` does not delegate to it because production calls `matches_group` on every request, and building
+    /// the detail (cloned conditions, hints, strings) only to drop it would slow that path for nothing. A test
+    /// (`evaluate_group_matches_agree_with_matches_group`) keeps the two in agreement instead.
     pub fn evaluate_group(group: &ConditionGroup, req: &RequestData) -> GroupEvaluation {
         let all_of: Vec<ConditionEvaluation> = group
             .all_of
@@ -200,13 +177,9 @@ impl MatchEngine {
         }
     }
 
-    /// Suggestion pedagogique quand une condition a cle simple (QueryParam,
-    /// Header, PathParam, FormField) ne matche pas : cherche si la MEME cle
-    /// existe dans une AUTRE source de la requete capturee, pour signaler un
-    /// choix de source probablement errone (ex. "je voulais PathParam, j'ai
-    /// mis QueryParam"). Pas de hint pour JsonPointer/XPath/BodyRaw : ce ne
-    /// sont pas de simples cles nommees comparables entre elles (chemin
-    /// structure ou corps entier, pas un nom de champ).
+    /// When a condition on a named key (query parameter, header, path parameter, form field) fails, looks for the same
+    /// key in another source of the captured request, to point at a probably wrong source choice. JSON pointers, XPath
+    /// and the raw body are paths or whole bodies, not names that compare across sources: no hint for them.
     fn cross_source_hint(source: &ConditionSource, req: &RequestData) -> Option<String> {
         let query = || crate::i18n::tr("query parameter", &[]);
         let header = || crate::i18n::tr("header", &[]);
@@ -243,12 +216,9 @@ impl MatchEngine {
         }
     }
 
-    /// Point d'entree unique du testeur de regle (endpoint `POST /api/rule-test`) :
-    /// recalcule method/sub_path/conditions pour le brouillon de regle en
-    /// cours d'edition contre une requete deja capturee (`RequestLog`), sans
-    /// aucune mutation ni appel reseau. Reutilise `matches_method`/
-    /// `matches_sub_path`/`evaluate_group` — le meme trio que `first_match`,
-    /// zero logique de matching dupliquee.
+    /// The rule tester (`POST /api/rule-test`): evaluates method, sub-path and conditions of the rule being edited
+    /// against a captured request, with no change and no network call, through the same `matches_method`,
+    /// `matches_sub_path` and `evaluate_group` as `first_match`.
     pub fn evaluate_rule_test(input: RuleTestInput, req: &RequestData) -> RuleTestOutcome {
         let method_matches = Self::matches_method(input.method, &req.method);
         let sub_params = Self::matches_sub_path(input.sub_path, &req.remaining_path);
@@ -274,63 +244,29 @@ impl MatchEngine {
         }
     }
 
-    /// Detecteur de conflit a la SAUVEGARDE d'une regle (POST
-    /// `/api/rule-conflicts`, endpoint stateless comme `/api/rule-test`) —
-    /// JAMAIS appele sur le chemin de matching HTTP de production
-    /// (`first_match`), qui reste totalement inchange. Deux
-    /// regles "pourraient entrer en conflit" si une meme requete pourrait
-    /// satisfaire les DEUX a la fois (meme method, sub_path compatible,
-    /// conditions qui se recoupent) — auquel cas seule la premiere dans
-    /// l'ordre du tableau `rules` s'applique reellement (`first_match`
-    /// itere dans l'ordre et s'arrete au premier match, cf tete de fichier).
+    /// Conflict detection when a rule is saved (`POST /api/rule-conflicts`, stateless); never called on the
+    /// production path. Two rules conflict when one request could satisfy both (same method, compatible sub-paths,
+    /// overlapping conditions): only the first in `rules` order would then apply.
     ///
-    /// `other_rules` est la liste des AUTRES regles du service dans leur
-    /// ordre ACTUEL (celle en cours d'edition exclue par l'appelant).
-    /// `draft_position` est la position ou la regle en cours de sauvegarde
-    /// se retrouvera dans le tableau final : l'index d'edition inchange
-    /// pour une modification en place, ou `other_rules.len()` pour un ajout
-    /// (toujours ajoutee en fin de liste cote frontend, cf
-    /// ServiceDetail.svelte::handleSaveRule). Le gagnant se deduit
-    /// uniquement de cette position : toute autre regle a un index strict-
-    /// ement inferieur a `draft_position` gagnerait sur le brouillon (elle
-    /// est evaluee avant lui), et vice-versa.
+    /// `other_rules` are the service's other rules in their current order (the one being edited left out by the
+    /// caller). `draft_position` is where the saved rule will sit: its index for an edit in place, or
+    /// `other_rules.len()` for a new rule (the UI appends it). The winner follows from that position alone: a rule with
+    /// a lower index is evaluated first and wins, and the reverse.
     ///
-    /// **Detection PRAGMATIQUE, pas exhaustive** (limite assumee et
-    /// documentee) :
-    /// - `method` : doit etre strictement egale (case-insensitive) — deux
-    ///   regles sur des methodes differentes ne peuvent jamais matcher la
-    ///   meme requete, donc jamais de conflit entre elles.
-    /// - `sub_path` : compatible si les deux sont absents, si un seul est
-    ///   absent (`None` matche n'importe quel chemin restant, cf
-    ///   `matches_sub_path`), ou si les deux patterns ont la MEME FORME
-    ///   apres normalisation (`{nom}`/`:nom` reduits a un placeholder
-    ///   generique, segments litteraux et `*` inchanges) — donc `/a/{id}`
-    ///   et `/a/{orderId}` sont consideres compatibles (meme forme, noms de
-    ///   parametre differents), mais `/a/{id}` et `/b` ne le sont pas.
-    ///   Deux patterns de forme differente qui se chevauchent PARTIELLEMENT
-    ///   sans etre de meme forme (ex. `/a/*` vs `/a/{id}/b`) ne sont PAS
-    ///   detectes comme compatibles : faux negatif assume plutot que
-    ///   d'implementer un vrai moteur de recouvrement de patterns.
-    /// - `conditions` : chevauchement detecte uniquement pour les cas
-    ///   evidents — ensembles `all_of`/`any_of` strictement identiques, OU
-    ///   l'ensemble `all_of` d'une regle est un sous-ensemble STRICT de
-    ///   l'autre ET les deux `any_of` sont vides (le cas "regle generale +
-    ///   regle plus specifique en fallback" explicitement legitime).
-    ///   Toute combinaison impliquant un `any_of` non-vide et
-    ///   non strictement identique aux deux n'est PAS analysee (la
-    ///   semantique OR rend la detection de sous-ensemble non triviale sans
-    ///   sur-ingenierie) — aucun conflit remonte dans ce cas : faux negatif
-    ///   assume, jamais de faux positif.
+    /// **Detection is pragmatic, not exhaustive**, on purpose:
+    /// - `method`: equal, ignoring case; rules on different methods can never match the same request.
+    /// - `sub_path`: compatible when both are absent, when one is (`None` matches any remaining path), or when both
+    ///   patterns have the same shape once parameters are reduced to a placeholder (`/a/{id}` and `/a/{orderId}` are
+    ///   compatible, `/a/{id}` and `/b` are not). Patterns that overlap without having the same shape (`/a/*` and
+    ///   `/a/{id}/b`) are missed: a false negative rather than a full pattern overlap engine.
+    /// - `conditions`: only the clear cases: identical `all_of` and `any_of`, or one `all_of` strictly included in the
+    ///   other with both `any_of` empty (a general rule next to a more specific one). As soon as an `any_of` is
+    ///   non-empty and the two differ, nothing is reported: OR semantics would need real modeling, and a missed
+    ///   conflict is better than a false alarm.
     ///
-    /// Reutilise les types partages `Condition`/`ConditionGroup` (et leur
-    /// `PartialEq` derive, aucune reimplementation d'egalite de condition)
-    /// ainsi que `normalize_colon_syntax` (deja utilisee par `match_path`)
-    /// pour la canonicalisation de pattern — mais PAS `matches_group`/
-    /// `extract`/`apply_op` : ces primitives evaluent une condition contre
-    /// une requete CONCRETE (`RequestData`), alors qu'ici on compare deux
-    /// ensembles de conditions entre eux sans aucune requete — fabriquer
-    /// une requete factice pour reutiliser `matches_group` n'aurait aucun
-    /// sens semantique et ne serait pas une reutilisation fidele.
+    /// It compares conditions with their derived `PartialEq` and patterns with `normalize_colon_syntax`, but not with
+    /// `matches_group`, which judges conditions against a concrete request; here two sets of conditions are compared
+    /// with no request at all.
     pub fn find_rule_conflicts(
         draft: &RuleConflictDraft,
         other_rules: &[OtherRuleConflictInput],
@@ -427,21 +363,16 @@ impl MatchEngine {
         }
     }
 
-    // pub(crate) : reutilisee telle quelle par `engine::template::resolve_variable`
-    // (variable de template `{{xpath.chemin}}`, source "XPath (XML/SOAP)" du
-    // builder de reponse XML) pour ne pas dupliquer le parsing XML.
+    // Also used by `engine::template::resolve_variable` for {{xpath.path}}, so XML is parsed in one place.
     pub(crate) fn extract_xpath(body: &[u8], path: &str) -> Option<String> {
         let text = std::str::from_utf8(body).ok()?;
         let segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
         Self::walk_xml(text, &segments)
     }
 
-    // Suit une VRAIE pile d'ancetres (`stack`, local names dans l'ordre d'imbrication
-    // reelle) et compare la pile ENTIERE aux segments attendus, plutot qu'un compteur
-    // plat de profondeur : un compteur incremente/decremente sur n'importe quel evenement
-    // End casserait le matching des qu'un element frere non lie au chemin recherche (ex.
-    // un <Header></Header> non-autoferme, sibling de <Body>) se referme entre deux
-    // segments deja matches.
+    // Tracks the real stack of ancestors (local names, in nesting order) and compares the whole stack with the expected
+    // segments. A flat depth counter, moved on any end event, broke as soon as an unrelated sibling element (an empty
+    // <Header></Header> written in full before <Body>) closed between two matched segments.
     fn walk_xml(xml: &str, segments: &[&str]) -> Option<String> {
         use quick_xml::events::Event;
         use quick_xml::reader::Reader;
@@ -468,7 +399,7 @@ impl MatchEngine {
                     }
                 }
                 Ok(Event::Empty(e)) => {
-                    // Element auto-ferme (`<tag/>`) : pas de Text/End separes a suivre.
+                    // A self-closing element (`<tag/>`): no separate text or end event follows.
                     stack.push(Self::local_name(&e));
                     if path_matches(&stack) {
                         return Some(result);
@@ -494,9 +425,8 @@ impl MatchEngine {
         None
     }
 
-    // pub(crate) : reutilise tel quel par engine::script::parse_xml_items_impl
-    // (fonction native Rhai `parse_xml_items`) pour ne pas dupliquer le decapage
-    // de prefixe de namespace XML (`soap:Body` -> `Body`).
+    // Also used by the parse_xml_items script function, so namespace prefixes (`soap:Body` -> `Body`) are dropped in
+    // one place.
     pub(crate) fn local_name(e: &quick_xml::events::BytesStart<'_>) -> String {
         let name = e.name();
         let full: &str = name.as_ref();
@@ -828,8 +758,8 @@ mod tests {
 
     #[test]
     fn xpath_soap_with_header_sibling_before_body() {
-        // Regression : un <Header></Header> non-autoferme, sibling de <Body> sous
-        // <Envelope>, ne doit plus casser le matching d'un ancetre deja matche (Envelope).
+        // An empty <Header></Header> written in full next to <Body> must not break the match of an ancestor already
+        // matched (Envelope).
         let body = br#"<SOAP:Envelope><SOAP-ENV:Header></SOAP-ENV:Header><SOAP-ENV:Body><ns3:recherche><ns3:Siret>12345678901234</ns3:Siret></ns3:recherche></SOAP-ENV:Body></SOAP:Envelope>"#;
         let rules = vec![simple_rule(
             "soap-header-sibling",
@@ -847,9 +777,8 @@ mod tests {
 
     #[test]
     fn xpath_soap_distinguishes_sibling_operations() {
-        // Deux operations possibles sur le meme service (recherche vs mode), meme
-        // structure d'enveloppe avec Header sibling : seule la regle dont la condition
-        // XPath correspond a l'operation reellement presente doit matcher.
+        // Two operations of one service (recherche, mode), same envelope with a Header: only the rule whose XPath names the
+        // operation present in the body matches.
         let body_recherche = br#"<SOAP:Envelope><SOAP-ENV:Header></SOAP-ENV:Header><SOAP-ENV:Body><ns3:recherche><ns3:Siret>12345678901234</ns3:Siret></ns3:recherche></SOAP-ENV:Body></SOAP:Envelope>"#;
         let rules = vec![
             simple_rule(
@@ -880,8 +809,7 @@ mod tests {
 
     #[test]
     fn xpath_matches_self_closing_target_element() {
-        // Event::Empty (<tag/>) : necessaire si l'operation ciblee n'a pas de contenu
-        // (ex. <ns3:mode/> sans enfant), cas non couvert avant ce correctif.
+        // A self-closing operation element (<ns3:mode/>, with no children) must match too.
         let body = br#"<SOAP:Envelope><SOAP-ENV:Header/><SOAP-ENV:Body><ns3:mode/></SOAP-ENV:Body></SOAP:Envelope>"#;
         let result = MatchEngine::extract_xpath(body, "Envelope/Body/mode");
         assert_eq!(result, Some(String::new()));
@@ -1147,7 +1075,7 @@ mod tests {
         assert!(match_path("/", "/").is_none());
     }
 
-    // --- evaluate_group / ConditionEvaluation tests (testeur de regle) ---
+    // --- evaluate_group / ConditionEvaluation (rule tester) ---
 
     fn cg(all_of: Vec<Condition>, any_of: Vec<Condition>) -> ConditionGroup {
         ConditionGroup { all_of, any_of }
@@ -1172,8 +1100,7 @@ mod tests {
 
     #[test]
     fn evaluate_group_hint_query_param_found_as_path_param() {
-        // Cas typique : l'utilisateur voulait un path param mais a
-        // choisi query param par erreur.
+        // The typical mistake: a path parameter chosen as a query parameter.
         let group = cg(
             vec![Condition {
                 source: ConditionSource::QueryParam("foo".into()),
@@ -1229,8 +1156,7 @@ mod tests {
 
     #[test]
     fn evaluate_group_no_hint_for_structured_sources() {
-        // JsonPointer/XPath/BodyRaw ne sont pas des cles nommees comparables :
-        // jamais de hint cross-source, meme en echec.
+        // JSON pointers, XPath and the raw body are not named keys: never a cross-source hint, even on failure.
         let group = cg(
             vec![Condition {
                 source: ConditionSource::JsonPointer("/missing".into()),
@@ -1246,9 +1172,8 @@ mod tests {
 
     #[test]
     fn evaluate_group_matches_agree_with_matches_group() {
-        // Garde de non-regression : evaluate_group ne doit JAMAIS diverger du
-        // resultat booleen du chemin de production, sur toute une matrice de
-        // cas (match/no-match, all_of/any_of, differentes sources).
+        // evaluate_group must never disagree with the production boolean, over a matrix of cases (match or not, all_of
+        // and any_of, several sources).
         let cases: Vec<(ConditionGroup, RequestData)> = vec![
             (
                 cg(
@@ -1375,8 +1300,7 @@ mod tests {
 
         assert!(!outcome.sub_path_matches);
         assert!(!outcome.overall_matched);
-        // Le detail des conditions reste calcule et exact meme si le
-        // sub_path lui-meme ne matche pas — utile pour le diagnostic UI.
+        // The conditions are still detailed when the sub-path itself does not match: the UI needs them to explain.
         assert!(outcome.group.matched);
     }
 
@@ -1432,9 +1356,8 @@ mod tests {
 
     #[test]
     fn find_rule_conflicts_subset_conditions_detected() {
-        // draft: aucune condition (matche tout) ; other: une condition en
-        // plus (regle generale ajoutee APRES une regle plus specifique —
-        // cas "fallback" explicitement legitime, toujours signale).
+        // The draft has no condition (matches everything) and the other rule one more: a general rule added after a more
+        // specific one, a legitimate fallback that is still reported.
         let draft_conditions = ConditionGroup::default();
         let other_conditions = cg(vec![header_eq("x-env", "prod")], vec![]);
         let draft = RuleConflictDraft {
@@ -1570,8 +1493,7 @@ mod tests {
             conditions: &conditions,
         };
 
-        // other est a l'index 0, draft_position = 1 (ajout en fin de liste)
-        // -> other est evalue avant le brouillon, donc other gagne.
+        // The other rule is at index 0 and the draft is appended (position 1): the other rule is evaluated first and wins.
         let conflicts = MatchEngine::find_rule_conflicts(&draft, &[other], 1);
         assert_eq!(conflicts[0].winner, ConflictWinner::Other);
     }
@@ -1591,18 +1513,15 @@ mod tests {
             conditions: &conditions,
         };
 
-        // draft_position = 0 (edition d'une regle deja en tete de liste) ->
-        // other est a l'index 0 >= draft_position, donc le brouillon gagne.
+        // The draft is edited in place at the head (position 0): the other rule comes after it, so the draft wins.
         let conflicts = MatchEngine::find_rule_conflicts(&draft, &[other], 0);
         assert_eq!(conflicts[0].winner, ConflictWinner::Draft);
     }
 
     #[test]
     fn find_rule_conflicts_non_empty_any_of_skips_subset_detection() {
-        // Limite assumee et documentee : des que l'un des any_of est
-        // non-vide (et que les deux ne sont pas strictement identiques), la
-        // detection de sous-ensemble est desactivee plutot que de risquer
-        // un faux positif sur une semantique OR mal modelisee.
+        // As documented: once an any_of is non-empty and the two differ, inclusion is not analyzed, rather than risk a
+        // false alarm on OR semantics.
         let draft_conditions = ConditionGroup::default();
         let other_conditions = cg(
             vec![],
