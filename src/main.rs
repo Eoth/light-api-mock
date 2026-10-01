@@ -13,6 +13,7 @@
 //                active par defaut — ce module ne compile meme pas sinon
 pub mod auth;
 pub mod engine;
+pub mod i18n;
 #[cfg(feature = "messaging-kafka")]
 pub mod messaging;
 pub mod models;

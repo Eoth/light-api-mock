@@ -21,8 +21,8 @@ pub enum HexDecodeError {
 impl std::fmt::Display for HexDecodeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            HexDecodeError::OddLength => write!(f, "longueur hexadecimale impaire"),
-            HexDecodeError::InvalidChar(c) => write!(f, "caractere hexadecimal invalide: {c:?}"),
+            HexDecodeError::OddLength => write!(f, "odd hexadecimal length"),
+            HexDecodeError::InvalidChar(c) => write!(f, "invalid hexadecimal character: {c:?}"),
         }
     }
 }

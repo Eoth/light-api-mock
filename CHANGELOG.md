@@ -11,6 +11,10 @@ entre versions mineures.
 
 ### Added
 - The interface is available in English and French: it follows the browser's language (English when no catalogue exists for it), and a language selector in the header remembers the choice. Each sentence is written once, in English, where it is used, and a language adds one catalogue (`frontend/src/locales/<language>.json`), loaded only by its users; a test fails on any message missing from a catalogue, any catalogue entry no longer used, any lost placeholder, and any visible word of the interface that escapes translation (rendered in a pseudo-locale).
+- The messages of the server that people read (API validation errors, rule tester hints, script errors, availability-test errors) follow the `Accept-Language` of the request, which the UI sets to its own language; English by default. Same rule and same test as the UI, with `src/locales/fr.json`.
+
+### Changed
+- The responses that lightMock itself sends to the applications under test (no matching rule, purely mocked service, refused path) are in English.
 
 ### Security
 - With authentication enabled, the Kafka message log and `POST /api/messaging/simulate` are reserved to super-admins: Kafka is configured for the whole instance, its log spans every group's services, and a simulation publishes on the real reply topic.

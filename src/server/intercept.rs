@@ -136,12 +136,12 @@ async fn do_proxy(
             context = %context, mode = "proxy-blocked",
             "proxy attempted on a purely-mocked service (no target configured)"
         );
-        let message = "Ce service est purement mocke (aucune cible configuree) : impossible de relayer cette requete.";
+        let message = "This service is purely mocked (no target configured): the request cannot be forwarded.";
         state.request_log.log_proxy(
             service,
             method_str,
             path,
-            "(aucune cible configuree)",
+            "(no target configured)",
             StatusCode::BAD_GATEWAY.as_u16(),
             captured,
         );
@@ -379,9 +379,9 @@ async fn handle_service(
         // service avec cible qui manque juste une regle, pour orienter le
         // diagnostic.
         let message = if service.real_target_url.trim().is_empty() {
-            "Aucune regle ne correspond a cette requete : ce service est purement mocke (aucune cible configuree)."
+            "No rule matches this request: this service is purely mocked (no target configured)."
         } else {
-            "Aucune regle ne correspond a cette requete pour ce service."
+            "No rule matches this request for this service."
         };
         return (StatusCode::NOT_FOUND, message).into_response();
     };
@@ -1322,7 +1322,7 @@ mod tests {
         assert_eq!(resp.status().as_u16(), 404);
         let body = resp.text().await.unwrap();
         assert!(
-            body.contains("purement mock"),
+            body.contains("purely mocked"),
             "le message doit expliciter l'absence de cible, obtenu: {body}"
         );
 
@@ -1368,7 +1368,7 @@ mod tests {
         assert_eq!(resp.status().as_u16(), 404);
         let body = resp.text().await.unwrap();
         assert!(
-            !body.contains("purement mock"),
+            !body.contains("purely mocked"),
             "un service avec cible ne doit pas afficher le message 'purement mocke', obtenu: {body}"
         );
 
@@ -1397,7 +1397,7 @@ mod tests {
             .unwrap();
         assert_eq!(resp.status().as_u16(), 502);
         let body = resp.text().await.unwrap();
-        assert!(body.contains("purement mocke") || body.contains("impossible de relayer"));
+        assert!(body.contains("purely mocked") && body.contains("cannot be forwarded"));
 
         let logged = request_log_handle.recent(1);
         assert_eq!(logged[0].mode, "proxy");

@@ -37,7 +37,7 @@ test.describe('Service purement mocke : comportement reseau', () => {
     const resp = await request.get(`${BASE}/nocible-nomatch/anything`);
     expect(resp.status()).toBe(404);
     const body = await resp.text();
-    expect(body).toContain('purement mock');
+    expect(body).toContain('purely mocked');
   });
 
   test('une requete sans regle correspondante sur un service AVEC cible reste generique (pas de mention de cible absente)', async ({ request }) => {
@@ -48,7 +48,7 @@ test.describe('Service purement mocke : comportement reseau', () => {
     const resp = await request.get(`${BASE}/avecible-nomatch/anything`);
     expect(resp.status()).toBe(404);
     const body = await resp.text();
-    expect(body).not.toContain('purement mock');
+    expect(body).not.toContain('purely mocked');
   });
 
   test('un service purement mocke avec une regle qui matche continue de repondre normalement', async ({ request }) => {

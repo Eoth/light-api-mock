@@ -157,7 +157,7 @@ test.describe('Rule name uniqueness', () => {
     const res = await request.post(`${API}/services`, { data: svc });
     expect(res.status()).toBe(400);
     const body = await res.json();
-    expect(body.error).toContain('nom de regle');
+    expect(body.error).toContain('used several times');
   });
 
   test('accepts same rule name across different services', async ({ request }) => {

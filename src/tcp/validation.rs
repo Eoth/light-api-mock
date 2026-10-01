@@ -2,6 +2,7 @@
 // `server::validation::validate_service` cote HTTP (ValidationError { field,
 // message }) mais schema totalement different (pas de listen_path/method,
 // port + regles a octets bruts a la place).
+use crate::i18n::tr;
 use crate::tcp::config::{TcpMatcher, TcpService};
 use crate::tcp::hex;
 
@@ -23,78 +24,71 @@ pub fn validate_tcp_service(
     existing: &[TcpService],
 ) -> Result<(), ValidationError> {
     let name = service.name.trim();
+    let error = |field, message| Err(ValidationError { field, message });
 
     if name.is_empty() {
-        return Err(ValidationError {
-            field: "name",
-            message: "Le nom du service est requis.".into(),
-        });
+        return error("name", tr("The service name is required.", &[]));
     }
-
     if !NAME_CHARSET_RE.is_match(name) {
-        return Err(ValidationError {
-            field: "name",
-            message: "Le nom du service ne peut contenir que des lettres, chiffres, tirets (-) et underscores (_).".into(),
-        });
+        return error(
+            "name",
+            tr(
+                "A service name can only contain letters, digits, dashes (-) and underscores (_).",
+                &[],
+            ),
+        );
     }
-
     if existing.iter().any(|s| s.name == name) {
-        return Err(ValidationError {
-            field: "name",
-            message: format!("Un service TCP nomme \"{name}\" existe deja."),
-        });
+        return error(
+            "name",
+            tr("A TCP service named \"{0}\" already exists.", &[&name]),
+        );
     }
-
     if existing
         .iter()
         .any(|s| s.listen_port == service.listen_port)
     {
-        return Err(ValidationError {
-            field: "listen_port",
-            message: format!(
-                "Le port {} est deja utilise par un autre service TCP.",
-                service.listen_port
+        return error(
+            "listen_port",
+            tr(
+                "The port {0} is already used by another TCP service.",
+                &[&service.listen_port],
             ),
-        });
+        );
     }
 
     for (i, rule) in service.rules.iter().enumerate() {
         if rule.name.trim().is_empty() {
-            return Err(ValidationError {
-                field: "rules",
-                message: format!("La regle #{i} n'a pas de nom."),
-            });
+            return error("rules", tr("The rule #{0} has no name.", &[&i]));
         }
         match &rule.matcher {
-            TcpMatcher::Prefix(hex_str) => {
-                if hex::decode(hex_str).is_err() {
-                    return Err(ValidationError {
-                        field: "rules",
-                        message: format!(
-                            "Regle \"{}\" : le prefixe n'est pas de l'hexadecimal valide.",
-                            rule.name
-                        ),
-                    });
-                }
+            TcpMatcher::Prefix(hex_str) if hex::decode(hex_str).is_err() => {
+                return error(
+                    "rules",
+                    tr(
+                        "Rule \"{0}\": the prefix is not valid hexadecimal.",
+                        &[&rule.name],
+                    ),
+                );
             }
-            TcpMatcher::Regex(pattern) => {
-                if crate::engine::regex_cache::check_bytes(pattern).is_err() {
-                    return Err(ValidationError {
-                        field: "rules",
-                        message: format!("Regle \"{}\" : pattern regex invalide.", rule.name),
-                    });
-                }
+            TcpMatcher::Regex(pattern)
+                if crate::engine::regex_cache::check_bytes(pattern).is_err() =>
+            {
+                return error(
+                    "rules",
+                    tr("Rule \"{0}\": invalid regex pattern.", &[&rule.name]),
+                );
             }
-            TcpMatcher::Any => {}
+            _ => {}
         }
         if hex::decode(&rule.response_hex).is_err() {
-            return Err(ValidationError {
-                field: "rules",
-                message: format!(
-                    "Regle \"{}\" : la reponse n'est pas de l'hexadecimal valide.",
-                    rule.name
+            return error(
+                "rules",
+                tr(
+                    "Rule \"{0}\": the response is not valid hexadecimal.",
+                    &[&rule.name],
                 ),
-            });
+            );
         }
     }
 

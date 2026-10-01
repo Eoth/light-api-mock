@@ -5,6 +5,7 @@ use crate::engine::matcher::{
     RuleConflictDraft, RuleTestInput,
 };
 use crate::engine::script::ScriptContext;
+use crate::i18n::tr;
 use crate::models::{ConditionGroup, Group, MockConfig, RuleAction, Service};
 use crate::server::AppState;
 use crate::server::request_log::LogEntry;
@@ -151,15 +152,16 @@ async fn login(
     Json(req): Json<LoginRequest>,
 ) -> Result<Json<LoginResponse>, AppError> {
     if !state.auth_config.enabled {
-        return Err(AppError::Validation(
-            "L'authentification n'est pas activee".into(),
-        ));
+        return Err(AppError::Validation(tr(
+            "Authentication is not enabled.",
+            &[],
+        )));
     }
 
     let kc = state
         .keycloak
         .as_ref()
-        .ok_or(AppError::Validation("Auth non configuree".into()))?;
+        .ok_or_else(|| AppError::Validation(tr("Authentication is not configured.", &[])))?;
 
     use crate::auth::keycloak::AuthError;
     let tokens = kc
@@ -206,15 +208,16 @@ async fn validate_token(
     Json(req): Json<ValidateRequest>,
 ) -> Result<Json<LoginResponse>, AppError> {
     if !state.auth_config.enabled {
-        return Err(AppError::Validation(
-            "L'authentification n'est pas activee".into(),
-        ));
+        return Err(AppError::Validation(tr(
+            "Authentication is not enabled.",
+            &[],
+        )));
     }
 
     let kc = state
         .keycloak
         .as_ref()
-        .ok_or(AppError::Validation("Auth non configuree".into()))?;
+        .ok_or_else(|| AppError::Validation(tr("Authentication is not configured.", &[])))?;
 
     let username = kc.validate_token(&req.token).await.map_err(|e| match e {
         crate::auth::keycloak::AuthError::KeycloakUnavailable(_) => AppError::Unavailable,
@@ -311,8 +314,9 @@ async fn put_config(
     }
 
     if let Some((service, group)) = config.unknown_group_references().first() {
-        return Err(AppError::Validation(format!(
-            "Service \"{service}\" refers to the group \"{group}\", which is not defined in this configuration."
+        return Err(AppError::Validation(tr(
+            "Service \"{0}\" refers to the group \"{1}\", which is not defined in this configuration.",
+            &[service, group],
         )));
     }
 
@@ -482,10 +486,10 @@ async fn observe_service_impl(
     }
 
     if enable && svc.is_mocked {
-        return Err(AppError::Validation(
-            "L'observation de trafic n'a d'effet que sur un service purement proxifie (is_mocked=false)."
-                .into(),
-        ));
+        return Err(AppError::Validation(tr(
+            "Traffic observation only applies to a service that is a pure proxy (is_mocked=false).",
+            &[],
+        )));
     }
 
     if enable {
@@ -859,7 +863,7 @@ fn check_service_scope(
 }
 
 fn unknown_group(group: &str) -> AppError {
-    AppError::Validation(format!("The group \"{group}\" does not exist."))
+    AppError::Validation(tr("The group \"{0}\" does not exist.", &[&group]))
 }
 
 /// Whether `service` can take its (group, name) slot in `cfg`, the service currently at `replacing` excepted:
@@ -881,9 +885,9 @@ fn check_service_slot(
             && replacing.is_none_or(|(g, n)| !service_matches(s, g, n))
     });
     if taken {
-        return Err(AppError::Conflict(format!(
-            "A service named \"{}\" already exists in this group.",
-            service.name
+        return Err(AppError::Conflict(tr(
+            "A service named \"{0}\" already exists in this group.",
+            &[&service.name],
         )));
     }
     if group.is_none()
@@ -892,9 +896,9 @@ fn check_service_slot(
             .iter()
             .find(|g| g.code.eq_ignore_ascii_case(&service.name))
     {
-        return Err(AppError::Conflict(format!(
-            "\"{}\" is the URL code of the group \"{}\": an ungrouped service cannot use it as its name.",
-            service.name, g.name
+        return Err(AppError::Conflict(tr(
+            "\"{0}\" is the URL code of the group \"{1}\": an ungrouped service cannot use it as its name.",
+            &[&service.name, &g.name],
         )));
     }
     Ok(())
@@ -1303,7 +1307,7 @@ fn check_group_identity(
 ) -> Result<Group, AppError> {
     group.name = group.name.trim().to_string();
     if group.name.is_empty() {
-        return Err(AppError::Validation("Le nom du groupe est requis.".into()));
+        return Err(AppError::Validation(tr("The group name is required.", &[])));
     }
     let others: Vec<&Group> = cfg
         .groups
@@ -1314,9 +1318,9 @@ fn check_group_identity(
         .iter()
         .any(|g| g.name.eq_ignore_ascii_case(&group.name))
     {
-        return Err(AppError::Conflict(format!(
-            "Un groupe avec le nom \"{}\" existe deja.",
-            group.name
+        return Err(AppError::Conflict(tr(
+            "A group named \"{0}\" already exists.",
+            &[&group.name],
         )));
     }
     group.code = if group.code.trim().is_empty() {
@@ -1326,17 +1330,18 @@ fn check_group_identity(
         group.code.trim().to_lowercase()
     };
     if group.code.len() != 5 || !group.code.chars().all(|ch| ch.is_ascii_alphanumeric()) {
-        return Err(AppError::Validation(
-            "Le code groupe doit faire exactement 5 caracteres alphanumeriques.".into(),
-        ));
+        return Err(AppError::Validation(tr(
+            "A group code is exactly 5 letters or digits.",
+            &[],
+        )));
     }
     if others
         .iter()
         .any(|g| g.code.eq_ignore_ascii_case(&group.code))
     {
-        return Err(AppError::Conflict(format!(
-            "Le code \"{}\" est deja utilise par un autre groupe.",
-            group.code
+        return Err(AppError::Conflict(tr(
+            "The code \"{0}\" is already used by another group.",
+            &[&group.code],
         )));
     }
     if let Some(s) = cfg
@@ -1344,9 +1349,9 @@ fn check_group_identity(
         .iter()
         .find(|s| s.group_name.is_none() && s.name.eq_ignore_ascii_case(&group.code))
     {
-        return Err(AppError::Conflict(format!(
-            "The code \"{}\" is the name of the ungrouped service \"{}\": choose another code.",
-            group.code, s.name
+        return Err(AppError::Conflict(tr(
+            "The code \"{0}\" is the name of the ungrouped service \"{1}\": choose another code.",
+            &[&group.code, &s.name],
         )));
     }
     Ok(group)
@@ -1858,17 +1863,19 @@ impl IntoResponse for AppError {
                 .into_response(),
             AppError::Unauthorized => (
                 StatusCode::UNAUTHORIZED,
-                Json(serde_json::json!({ "error": "Identifiants invalides" })),
+                Json(serde_json::json!({ "error": tr("Invalid credentials.", &[]) })),
             )
                 .into_response(),
             AppError::Forbidden => (
                 StatusCode::FORBIDDEN,
-                Json(serde_json::json!({ "error": "Acces refuse" })),
+                Json(serde_json::json!({ "error": tr("Access denied.", &[]) })),
             )
                 .into_response(),
             AppError::Unavailable => (
                 StatusCode::SERVICE_UNAVAILABLE,
-                Json(serde_json::json!({ "error": "Service d'authentification indisponible" })),
+                Json(
+                    serde_json::json!({ "error": tr("Authentication service unavailable.", &[]) }),
+                ),
             )
                 .into_response(),
         }
@@ -2261,7 +2268,7 @@ mod tests {
         assert!(!result.overall_matched);
         assert!(!result.all_of[0].matched);
         let hint = result.all_of[0].hint.as_deref().unwrap();
-        assert!(hint.contains("parametre de chemin"));
+        assert!(hint.contains("path parameter"));
     }
 
     #[tokio::test]

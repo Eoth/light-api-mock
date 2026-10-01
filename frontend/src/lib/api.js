@@ -10,14 +10,15 @@
 // exposee sur une origine distincte de celle qui sert la SPA.
 import { auth, logout } from './auth.svelte.js';
 import { getApiBaseUrl } from './runtime-config.js';
-import { t } from './i18n.svelte.js';
+import { t, getLocale } from './i18n.svelte.js';
 
 const BASE = '/api';
 
 async function request(method, path, body) {
   const opts = {
     method,
-    headers: { 'Content-Type': 'application/json' },
+    // The server words its error messages in the language of the interface.
+    headers: { 'Content-Type': 'application/json', 'Accept-Language': getLocale() },
   };
   if (auth.token) {
     opts.headers['Authorization'] = `Bearer ${auth.token}`;
