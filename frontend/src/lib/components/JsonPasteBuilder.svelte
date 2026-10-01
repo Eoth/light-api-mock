@@ -99,7 +99,7 @@
       onArrayRootChange(isArrayRoot);
       emit();
     } catch (e) {
-      parseError = `JSON invalide : ${e.message}`;
+      parseError = t("Invalid JSON: {0}", e.message);
     }
   }
 

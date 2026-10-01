@@ -351,6 +351,18 @@ describe('pseudo-locale: no visible word escapes t', () => {
     );
   });
 
+  it('the errors of the by-example builders', async () => {
+    const JsonPasteBuilder = (await import('../lib/components/JsonPasteBuilder.svelte')).default;
+    const XmlPasteBuilder = (await import('../lib/components/XmlPasteBuilder.svelte')).default;
+    for (const [component, prefix, sample] of [[JsonPasteBuilder, 'json', '{oops'], [XmlPasteBuilder, 'xml', '<oops']]) {
+      await expectFullyTranslated(component, {}, async (c) => {
+        await fireEvent.input(c.querySelector(`[data-testid="${prefix}-paste-builder-textarea"]`), { target: { value: sample } });
+        await click(c, `${prefix}-paste-builder-analyze-button`);
+        expect(c.querySelector(`[data-testid="${prefix}-paste-builder-error"]`)).not.toBeNull();
+      });
+    }
+  });
+
   it('the logs, groups, backups, TCP and sign-in screens', async () => {
     const RequestLog = (await import('../lib/components/RequestLog.svelte')).default;
     const MessagingLog = (await import('../lib/components/MessagingLog.svelte')).default;
