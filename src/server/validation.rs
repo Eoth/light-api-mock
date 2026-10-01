@@ -167,6 +167,19 @@ pub fn validate_service(service: &Service) -> Result<(), ValidationError> {
                 ),
             });
         }
+        // A pattern that does not compile would never match, silently: refuse it when it is saved.
+        for condition in rule.conditions.all_of.iter().chain(&rule.conditions.any_of) {
+            if let crate::models::Operator::Regex(pattern) = &condition.operator
+                && let Err(error) = crate::engine::regex_cache::check_text(pattern)
+            {
+                return Err(ValidationError {
+                    field: "rules",
+                    message: format!(
+                        "Rule \"{rn}\": invalid regular expression \"{pattern}\": {error}"
+                    ),
+                });
+            }
+        }
         if !seen_rules.insert(rn.to_lowercase()) {
             return Err(ValidationError {
                 field: "rules",
@@ -425,6 +438,23 @@ mod tests {
         ] {
             assert!(!is_management_api_route(path), "{path}");
         }
+    }
+
+    #[test]
+    fn reject_a_rule_whose_regex_does_not_compile() {
+        let mut service = svc_with_rules("svc", &["r1"]);
+        service.rules[0]
+            .conditions
+            .any_of
+            .push(crate::models::Condition {
+                source: crate::models::ConditionSource::QueryParam("id".into()),
+                operator: crate::models::Operator::Regex("([0-9]+".into()),
+            });
+        let error = validate_service(&service).unwrap_err();
+        assert!(error.message.contains("([0-9]+"), "{}", error.message);
+        service.rules[0].conditions.any_of[0].operator =
+            crate::models::Operator::Regex("^[0-9]+$".into());
+        assert!(validate_service(&service).is_ok());
     }
 
     #[test]

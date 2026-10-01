@@ -78,7 +78,7 @@ pub fn validate_tcp_service(
                 }
             }
             TcpMatcher::Regex(pattern) => {
-                if regex::bytes::Regex::new(pattern).is_err() {
+                if crate::engine::regex_cache::check_bytes(pattern).is_err() {
                     return Err(ValidationError {
                         field: "rules",
                         message: format!("Regle \"{}\" : pattern regex invalide.", rule.name),
