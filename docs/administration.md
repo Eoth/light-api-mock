@@ -1,40 +1,39 @@
-# Administration : import, export, réinitialisation, mode sombre
+# Administration: import, export, reset, dark mode
 
-Quelques fonctionnalités transversales, accessibles depuis la barre de navigation en haut de l'interface.
+A few features that apply to everything, from the navigation bar at the top of the interface.
 
-## Export : sauvegarder toute la configuration dans un fichier
+## Export: save the whole configuration to a file
 
-Le bouton **"Export"** télécharge un fichier contenant l'intégralité de la configuration actuelle (tous les services, groupes et règles) — pratique pour partager une configuration avec un collègue, la versionner, ou en garder une copie avant une manipulation risquée.
+**"Export"** downloads a file holding the whole current configuration (every service, group and rule): handy to share a configuration with a colleague, version it, or keep a copy before a risky change.
 
-![Bouton Export dans la barre de navigation](screenshots/administration-bouton-export.png)
+![The Export button in the navigation bar](screenshots/administration-bouton-export.png)
 
-## Import : recharger une configuration depuis un fichier
+## Import: load a configuration from a file
 
-Le bouton **"Import"** permet de charger un fichier exporté précédemment. Deux modes sont proposés au moment de l'import :
+**"Import"** loads a file exported earlier (or an example such as [examples/devops-toolchain.json](../examples/devops-toolchain.json)). Two modes are offered:
 
-- **Remplacer** : la configuration importée remplace entièrement la configuration actuelle.
-- **Fusionner** : la configuration importée est ajoutée à l'existant, sans supprimer ce qui est déjà présent.
+- **Replace everything**: the imported configuration replaces the current one entirely.
+- **Merge (add what is missing)**: the imported services and groups are added to the existing ones, without removing anything.
 
-*(Capture manquante — aucun scénario E2E existant n'ouvre la modale d'import via l'interface [`config.spec.mjs` importe uniquement via l'API] ; à réaliser manuellement, cf `frontend/e2e/README.md` section captures.)*
+> As for any change, an [automatic backup](backups-and-restore.md) of the previous state is written before the import: a mistake can be undone.
 
-> Comme pour toute modification, une [sauvegarde automatique](sauvegardes-et-restauration.md) de l'état précédent est créée avant l'import — une erreur de manipulation reste réversible.
+## Full reset
 
-## Réinitialisation complète
+**"Reset"** deletes **every** service and group at once. It is destructive, so it is doubly guarded:
 
-Le bouton **"Reset"** supprime **tous** les services et groupes en une seule action. C'est une opération destructrice, protégée par une double sécurité :
+- An **explicit confirmation** is required: the confirm button only unlocks once you type an exact keyword, so it cannot be clicked by accident.
+- A [special backup](backups-and-restore.md), out of reach of the normal rotation for 30 days, is written right before, to allow going back.
 
-- Une **confirmation explicite** est demandée (il faut taper un mot-clé exact pour activer le bouton de confirmation — impossible de cliquer par accident).
-- Une [sauvegarde spéciale](sauvegardes-et-restauration.md), à l'abri de la purge automatique pendant 30 jours, est créée juste avant, pour permettre un retour en arrière si besoin.
+## Dark mode
 
-*(Capture manquante — aucun scénario E2E existant n'ouvre la confirmation du bouton "Reset" via l'interface [le reset est déclenché uniquement via l'API dans les tests existants] ; à réaliser manuellement, cf `frontend/e2e/README.md` section captures.)*
+The **"Dark"/"Light"** button of the navigation bar switches the visual theme. Your choice is remembered for your next visits; until you choose, the theme follows your browser or system preference.
 
-## Mode sombre
+## Language
 
-Le bouton **"Sombre"/"Clair"** dans la barre de navigation bascule le thème visuel de l'interface. Le choix est mémorisé pour vos prochaines visites (ou suit automatiquement la préférence de votre navigateur/système si vous n'avez jamais choisi explicitement).
+The language selector of the navigation bar switches the interface between the available languages (English and French today). Your choice is remembered; until you choose, the interface follows your browser's language, and falls back to English. Error messages from the server follow the same choice.
 
-## Prérequis et limites
+## Requirements and limits
 
-- Aucun prérequis particulier : ces fonctionnalités sont disponibles dès l'installation de base.
-- Le bouton "Reset" n'est visible que pour les utilisateurs autorisés (super-administrateurs si l'[authentification](authentification.md) est activée ; sinon, sa visibilité dépend d'un réglage
-  fait par l'administrateur système de votre instance — dans tous les cas, l'autorisation réelle est toujours vérifiée côté serveur, pas seulement par l'affichage ou non du bouton).
-- Import/Export portent sur **toute** la configuration : il n'y a pas d'export partiel (un seul service ou groupe) depuis ces boutons.
+- No requirement: available in every installation.
+- "Reset" is only shown to users allowed to use it (super-admins when [authentication](authentication.md) is on; otherwise, its display depends on a setting chosen by whoever runs your instance). Either way, the server checks the permission itself: hiding or showing the button is never the protection.
+- Import and export cover **the whole** configuration: these buttons do not export a single service or group.

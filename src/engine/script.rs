@@ -12,7 +12,7 @@
 // pour le cas d'usage "la requete contient une liste d'objets, la reponse
 // doit contenir le meme nombre d'elements construits par position" (JSON et
 // XML/SOAP) — ni {{variable}} ni les conditions de regle ne peuvent boucler.
-// Cf docs/scripts-rhai.md pour deux exemples complets verifies bout-en-bout.
+// Cf docs/rhai-scripts.md pour deux exemples complets verifies bout-en-bout.
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -1416,7 +1416,7 @@ mod tests {
         assert!(result.value.contains("<doubledQty>18</doubledQty>"));
     }
 
-    // --- Scripts "complexes" representatifs (cf docs/scripts-rhai.md) :
+    // --- Scripts "complexes" representatifs (cf docs/rhai-scripts.md) :
     // map/lookup, boucle avec condition, acces combine a plusieurs sources de
     // contexte. Couvre la VRAIE syntaxe correcte : indexation de map `#{}` par
     // cle, `.contains()`, `in`, `.get()`, `switch` fonctionnent tous sans
@@ -1463,7 +1463,7 @@ mod tests {
     fn map_lookup_via_switch_expression() {
         // Variante avec `switch`, alternative valide au if/mapping.contains
         // ci-dessus — les deux syntaxes sont documentees dans
-        // docs/scripts-rhai.md.
+        // docs/rhai-scripts.md.
         let engine = ScriptEngine::new();
         let script = r#"
             let key = request.path.name;

@@ -279,7 +279,7 @@ test.describe('Testeur de regle : execution des scripts', () => {
     // Meme script, meme syntaxe verifiee, que le test d'integration backend
     // (map_lookup_by_path_param_returns_correct_target_and_falls_back_for_unknown_key,
     // src/server/intercept.rs) et que l'exemple documente dans
-    // docs/scripts-rhai.md.
+    // docs/rhai-scripts.md.
     await page.getByRole('switch', { name: /Script personnalis/ }).click();
     await page.locator('#rule-script').fill(
       'let mapping = #{ "billing": "svc-billing-042", "orders": "svc-orders-017" };\n' +

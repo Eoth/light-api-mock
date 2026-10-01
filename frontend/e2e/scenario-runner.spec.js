@@ -404,7 +404,7 @@ test.describe('Runner data-driven (scenarios JSON) - lot 7 (pliage JSON + option
 });
 
 // Lot 8 : couverture E2E neuve (pas une migration) illustrant, pour la doc
-// utilisateur (docs/regles-de-matching.md), qu'un meme service peut deja
+// utilisateur (docs/matching-rules.md), qu'un meme service peut deja
 // repondre differemment selon le header SOAPAction via deux regles
 // independantes (chacune avec sa propre condition Header/SOAPAction) --
 // aucune fonctionnalite nouvelle, juste la capture des deux ecrans de
@@ -421,7 +421,7 @@ test.describe('Runner data-driven (scenarios JSON) - lot 8 (doc SOAPAction)', ()
 });
 
 // Lot 9 : couverture E2E neuve (pas une migration) illustrant, pour la doc
-// utilisateur (docs/scripts-rhai.md), le pattern "la requete contient une
+// utilisateur (docs/rhai-scripts.md), le pattern "la requete contient une
 // liste d'objets, la reponse doit contenir le meme nombre d'elements
 // construits par position" via parse_json/to_json (script Rhai). Seul
 // l'exemple JSON est illustre en UI (l'exemple XML/SOAP equivalent est deja
