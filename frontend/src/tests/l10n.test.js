@@ -334,6 +334,8 @@ describe('pseudo-locale: no visible word escapes t', () => {
       { key: 'k5', fieldType: 'array-objects', template: [] },
     ];
     await expectFullyTranslated(JsonResponseBuilder, { fields: jsonFields });
+    // Inside a nested field, the breadcrumb names the root.
+    await expectFullyTranslated(JsonResponseBuilder, { fields: jsonFields }, (c) => click(c, 'json-builder-navigate-button-1'));
     await expectFullyTranslated(JsonPasteBuilder, { fields: jsonFields.slice(0, 2), startParsed: true });
     const xmlFields = [
       { tag: 'k1', nodeType: 'value', source: 'query', value: 'q', pipe: '', attributes: [{ name: 'k6', source: 'fixed', value: '1' }] },
@@ -341,6 +343,11 @@ describe('pseudo-locale: no visible word escapes t', () => {
     ];
     await expectFullyTranslated(XmlResponseBuilder, { fields: xmlFields, rootTag: 'k0' });
     await expectFullyTranslated(XmlPasteBuilder, { fields: xmlFields, rootTag: 'k0', rootAttributes: [], startParsed: true });
+    await expectFullyTranslated(
+      XmlPasteBuilder,
+      { fields: xmlFields, rootTag: 'k0', rootAttributes: [], startParsed: true },
+      (c) => click(c, 'xml-paste-builder-navigate-button-1'),
+    );
   });
 
   it('the logs, groups, backups, TCP and sign-in screens', async () => {
