@@ -165,7 +165,7 @@ async fn do_proxy(
     );
     if observe {
         return do_proxy_observed(
-            state, service, path, method_str, group_code, proxy_path, &target, req, captured,
+            state, service, path, method_str, proxy_path, &target, req, captured,
         )
         .await;
     }
@@ -211,7 +211,6 @@ async fn do_proxy_observed(
     service: &Service,
     path: &str,
     method_str: &str,
-    group_code: Option<&str>,
     proxy_path: &str,
     target: &str,
     req: Request<Body>,
@@ -229,8 +228,10 @@ async fn do_proxy_observed(
                 .request_log
                 .log_proxy(&service.name, method_str, path, target, status, captured);
             if let Some(raw) = capture {
+                // Keyed by group name, like the API that enables observation and lists suggestions (the
+                // group code only exists in service URLs).
                 let key = crate::server::observation::ObservationKey {
-                    group_name: group_code.map(|s| s.to_string()),
+                    group_name: service.group_name.clone(),
                     service_name: service.name.clone(),
                     method: method_str.to_string(),
                     sub_path: proxy_path.to_string(),
@@ -283,7 +284,10 @@ async fn handle_service(
         // active l'observation de ce service (ObservationToggle, jamais
         // automatique), `do_proxy` tente une capture bornee pour armer une
         // future suggestion de regle de mock — cf `server::observation`.
-        let observe = state.observation.toggle.is_enabled(gc, &service.name);
+        let observe = state
+            .observation
+            .toggle
+            .is_enabled(service.group_name.as_deref(), &service.name);
         return do_proxy(
             state,
             service,
@@ -1229,6 +1233,7 @@ mod tests {
         std::path::PathBuf,
     ) {
         let data_dir = temp_dir_for_intercept_test();
+        crate::server::test_support::assert_consistent(&config);
         let store = MockStore::new(data_dir.join("mock-config.yaml"));
         store.replace(config).await.unwrap();
         store.flush().await;

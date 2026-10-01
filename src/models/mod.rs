@@ -219,6 +219,18 @@ impl MockConfig {
             groups: vec![],
         }
     }
+
+    /// `(service, group)` for every service whose `group_name` names no group of the configuration. Such a
+    /// service has no group code, so its URL and its permissions silently fall back to the ungrouped ones.
+    pub fn unknown_group_references(&self) -> Vec<(&str, &str)> {
+        self.services
+            .iter()
+            .filter_map(|s| {
+                let group = s.group_name.as_deref()?;
+                (!self.groups.iter().any(|g| g.name == group)).then_some((s.name.as_str(), group))
+            })
+            .collect()
+    }
 }
 
 #[cfg(test)]

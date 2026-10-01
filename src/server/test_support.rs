@@ -8,6 +8,16 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
+/// A fixture with a service in a group it does not define does not run like production (no group code, so
+/// another URL): it once hid the fact that traffic observation never worked for grouped services.
+pub(crate) fn assert_consistent(config: &MockConfig) {
+    let dangling = config.unknown_group_references();
+    assert!(
+        dangling.is_empty(),
+        "test fixture refers to undefined groups: {dangling:?}"
+    );
+}
+
 pub(crate) fn temp_data_dir(prefix: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("lightmock-{prefix}-{}", fastrand::u64(..)));
     std::fs::create_dir_all(&dir).unwrap();
@@ -46,6 +56,7 @@ pub(crate) async fn test_state(
     config: MockConfig,
     auth_config: AuthConfig,
 ) -> AppState {
+    assert_consistent(&config);
     let store = crate::store::MockStore::new(data_dir.join("mock-config.yaml"));
     store.replace(config).await.unwrap();
     store.flush().await;
