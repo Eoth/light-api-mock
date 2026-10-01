@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { render, fireEvent, waitFor } from '@testing-library/svelte';
 import { describe, it, expect, vi } from 'vitest';
 import UrlHealthBadge from '../lib/components/UrlHealthBadge.svelte';
@@ -59,5 +61,14 @@ describe('UrlHealthBadge', () => {
 
     expect(getByText('Expiré')).toBeInTheDocument();
     vi.useRealTimers();
+  });
+});
+
+describe('UrlHealthBadge: the lifetime of a result', () => {
+  it('expires a result when the server forgets it (PING_TTL_MS of src/server/ping.rs)', () => {
+    const constant = (file, pattern) => Number(readFileSync(join(__dirname, file), 'utf8').match(pattern)[1].replaceAll('_', ''));
+    const server = constant('../../../src/server/ping.rs', /pub const PING_TTL_MS: u64 = ([\d_]+);/);
+    const badge = constant('../lib/components/UrlHealthBadge.svelte', /const PING_TTL_MS = ([\d_]+);/);
+    expect(badge).toBe(server);
   });
 });

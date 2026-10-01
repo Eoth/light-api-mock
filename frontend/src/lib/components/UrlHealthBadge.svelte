@@ -2,8 +2,8 @@
   import { pingService } from '../api.js';
   import { t } from '../i18n.svelte.js';
 
-  // Must match PING_TTL_MS in src/server/ping.rs. Repeated here rather than read from the server: a display constant
-  // is not worth a request of its own.
+  // PING_TTL_MS of src/server/ping.rs, repeated here rather than read from the server: a display constant is not worth
+  // a request of its own. UrlHealthBadge.test.js fails when the two differ.
   const PING_TTL_MS = 120_000;
 
   let { serviceName, groupName = null } = $props();
