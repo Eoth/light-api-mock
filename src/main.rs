@@ -46,18 +46,19 @@ async fn main() {
         )
         .init();
 
-    let bind_ip = match bind_address() {
-        Ok(ip) => ip,
-        Err(message) => {
-            eprintln!("{message}");
-            std::process::exit(2);
-        }
-    };
+    let bind_ip = bind_address().unwrap_or_else(|message| exit_with(&message));
+
+    let auth_config = AuthConfig::from_env().unwrap_or_else(|message| exit_with(&message));
 
     let data_dir = MockStore::data_path();
     let store = MockStore::load_or_init(&data_dir)
         .await
-        .expect("failed to load config");
+        .unwrap_or_else(|e| {
+            exit_with(&format!(
+                "cannot load the configuration from {} (DATA_PATH): {e}",
+                data_dir.display()
+            ))
+        });
 
     let static_dir = std::env::var("STATIC_DIR")
         .map(PathBuf::from)
@@ -68,7 +69,6 @@ async fn main() {
         .and_then(|p| p.parse().ok())
         .unwrap_or(7342);
 
-    let auth_config = AuthConfig::from_env();
     let keycloak = if auth_config.enabled {
         tracing::info!(
             keycloak_url = %auth_config.keycloak_url,
@@ -153,12 +153,18 @@ async fn main() {
 
     let listener = tokio::net::TcpListener::bind(&addr)
         .await
-        .expect("failed to bind");
+        .unwrap_or_else(|e| {
+            exit_with(&format!(
+                "cannot listen on {addr}: {e} (another process may use the port; see PORT and BIND_ADDRESS)"
+            ))
+        });
 
-    axum::serve(listener, app)
+    if let Err(e) = axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
         .await
-        .expect("server error");
+    {
+        tracing::error!(error = %e, "server stopped on an error");
+    }
 
     // Arret gracieux (SIGTERM K8s) : draine la file d'ecriture write-behind
     // avant de quitter, pour reduire la fenetre de risque de perte des
@@ -166,6 +172,12 @@ async fn main() {
     // contre un SIGKILL/crash brutal.
     tracing::info!("draining pending config writes before exit");
     store_for_shutdown.flush().await;
+}
+
+/// Stops the start with a message meant for whoever configures the process, instead of a panic and its trace.
+fn exit_with(message: &str) -> ! {
+    eprintln!("lightMock cannot start: {message}");
+    std::process::exit(2)
 }
 
 // Loopback by default: without authentication (the default), a server reachable from the network lets anyone on it
