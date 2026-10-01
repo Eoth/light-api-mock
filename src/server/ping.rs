@@ -1,14 +1,8 @@
-// Cache du statut de disponibilite de la cible reelle (real_target_url) d'un
-// service. Le statut lui-meme (PingStatus) est produit par ProxyClient::ping()
-// (src/engine/proxy.rs) et n'est jamais persiste dans Service/YAML (choix
-// assume : pas de retrocompat serde sur les champs obligatoires) — c'est
-// un etat transitoire en memoire, tenu par nom de service.
+// Recent results of the availability check of each service's real target (ProxyClient::ping, a TCP connection
+// only), kept in memory per service and never saved with the configuration.
 //
-// Decision : test a la demande (bouton UI -> POST /api/services/:name/ping) +
-// cache TTL court cote serveur, PAS de tache de fond/cron. Un clic repete dans
-// la fenetre PING_TTL_MS renvoie le resultat en cache (lookup HashMap O(1))
-// au lieu de relancer une requete reseau — c'est le compromis le plus econome
-// (green IT, pas de polling permanent, cout proportionnel a l'usage reel).
+// The check runs when a user asks for it, never in the background: a repeated click within PING_TTL_MS gets the
+// cached result instead of a new connection, so the network cost follows actual use.
 use crate::engine::PingStatus;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};

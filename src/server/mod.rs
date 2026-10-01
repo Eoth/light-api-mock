@@ -1,8 +1,9 @@
-// Serveur HTTP Axum — contient le routeur, les handlers API, et le middleware d'interception.
-//   api.rs       → handlers REST (/api/services, /api/groups, /api/auth, etc.)
-//   intercept.rs → middleware qui intercepte les requetes et les route vers mock ou proxy
-//   validation.rs → validation des noms de services, methodes HTTP, etc.
-//   request_log.rs → journal en memoire des 200 dernieres requetes interceptees
+// The Axum router and its middleware, in the order a request goes through them (see `build_router_with`).
+//   api.rs           management API handlers (/api/...), with the authorization of each endpoint
+//   intercept.rs     service traffic: matching, mock rendering, proxying
+//   browser_guard.rs what a web page may do with the management API (CORS, cross-site writes, DNS rebinding)
+//   validation.rs    names, reserved routes and paths, before anything is stored or forwarded
+//   request_log.rs   the last 200 requests, in memory, credentials redacted (redaction.rs)
 mod api;
 pub mod browser_guard;
 pub(crate) mod codegen;
@@ -61,42 +62,18 @@ impl AppState {
     }
 }
 
-// Reponse de `GET /runtime-config.json` — voir le commentaire au-dessus de
-// `runtime_config_handler` pour le detail complet de ce mecanisme.
+// Body of `GET /runtime-config.json`, see `runtime_config_handler`.
 #[derive(serde::Serialize)]
 struct RuntimeConfig {
     api_base_url: String,
 }
 
-// Permet de configurer l'URL de base que le frontend utilise pour appeler
-// l'API (`/api/*`) INDEPENDAMMENT du Host sur lequel la SPA elle-meme est
-// chargee. Sans configuration, le frontend continue de deriver l'URL de
-// l'API de son propre Host (comportement historique, URL relative) : ca
-// fonctionne quand front et back sont co-localises (deploiement par defaut),
-// mais casse des que l'infrastructure route `/api` vers une origine
-// distincte de celle qui sert les assets statiques (ex. K8s/Gloo Edge avec
-// un VirtualService pour le front et un RouteTable/Upstream separe pour le
-// back).
+// Tells the UI where the management API lives (`API_BASE_URL`), for deployments that route `/api` to another origin
+// than the UI's files. Empty means the UI's own origin, which is the default and covers one process serving both.
 //
-// Servi EN DEHORS de `/api` (route enregistree directement sur le Router
-// racine, pas nestee sous `api::routes()`) et ajoute a `is_internal_route`
-// (src/server/validation.rs), hors de l'API de gestion : ce fichier doit
-// rester joignable meme quand `/api` est route vers une origine differente
-// par l'infrastructure — il doit arriver au frontend par le MEME chemin que
-// index.html/le bundle JS (c'est ce qui lui permet, une fois charge,
-// d'apprendre ou se trouve l'API). Pour la meme raison il est exempte
-// d'authentification : le frontend doit pouvoir le lire avant meme de
-// savoir s'il est connecte.
-//
-// Configuration au niveau du CONTENEUR (variable d'environnement
-// `API_BASE_URL`, lue directement ici a chaque requete), pas au moment du
-// BUILD : la meme image Docker, buildee une seule fois, peut ainsi etre
-// configuree differemment par environnement de deploiement sans rebuild.
-// Lu directement via `std::env::var` plutot que mis en cache dans
-// `AppState` : evite d'ajouter un champ a AppState et a ses ~11 sites de
-// construction dans les tests, pour un parametre qui ne varie jamais en
-// cours d'execution d'un pod — meme discipline que BACKUP_MAX_COUNT/
-// MESSAGE_LOG_TTL_MS.
+// It is served outside `/api`, next to index.html, so that the UI can always fetch it from where it was loaded, and
+// without authentication, since the UI reads it before knowing whether anyone is signed in. The value is read from
+// the environment at each request rather than baked into the UI at build time: one image serves every environment.
 async fn runtime_config_handler() -> axum::Json<RuntimeConfig> {
     let api_base_url = std::env::var("API_BASE_URL")
         .unwrap_or_default()
@@ -166,10 +143,8 @@ pub(crate) mod test_support;
 mod tests {
     use super::*;
 
-    // API_BASE_URL est une variable d'environnement process-wide : les tests
-    // qui la mutent doivent tenir ce mutex pour tout leur corps sans quoi deux
-    // tests concurrents (cargo test lance les fns de test en parallele) se
-    // marchent dessus de facon intermittente.
+    // API_BASE_URL is process-wide and test functions run in parallel: every test that sets it holds this mutex for
+    // its whole body.
     static ENV_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
     #[tokio::test]
@@ -198,9 +173,6 @@ mod tests {
         assert_eq!(config.api_base_url, "https://api.example.com");
     }
 
-    // runtime_config_handler n'a volontairement aucune dependance a AppState
-    // (lit l'env directement) : un nouveau champ obligatoire sur AppState
-    // ajouterait un site de construction de plus a maintenir dans les tests.
     async fn spawn_test_app(auth_config: crate::auth::AuthConfig) -> String {
         let data_dir = crate::server::test_support::temp_data_dir("servermod-test");
         std::fs::create_dir_all(&data_dir).unwrap();
@@ -248,11 +220,8 @@ mod tests {
 
     #[tokio::test]
     async fn runtime_config_route_accessible_without_token_when_auth_enabled() {
-        // Meme si AUTH_ENABLED=true et qu'aucun KeycloakClient n'est
-        // configure (auth_middleware ferait echouer TOUTE autre route
-        // protegee en 500, cf point "fail closed" de middleware.rs), cette
-        // route doit rester accessible sans token : elle doit pouvoir etre
-        // lue avant meme de savoir si l'utilisateur est authentifie.
+        // Authentication on with no Keycloak client makes every protected route fail closed (500); this one must
+        // still answer without a token, since the UI reads it before anyone signs in.
         let _guard = ENV_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
         unsafe { std::env::set_var("API_BASE_URL", "https://api.example.com") };
         let auth_config = crate::auth::AuthConfig {
@@ -279,9 +248,7 @@ mod tests {
 
     #[tokio::test]
     async fn runtime_config_route_not_intercepted_as_a_mock_service() {
-        // Preuve bout-en-bout que la route traverse bien intercept_layer
-        // (is_internal_route) sans jamais etre evaluee contre les services
-        // configures, meme quand des services existent.
+        // Through the real router: the interception layer lets it pass (is_internal_route) even when services exist.
         let _guard = ENV_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
         unsafe { std::env::remove_var("API_BASE_URL") };
         let auth_config = crate::auth::AuthConfig {

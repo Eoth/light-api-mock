@@ -23,10 +23,9 @@ const RESERVED_PATH_PREFIXES: &[&str] = &[
 static NAME_CHARSET_RE: std::sync::LazyLock<regex::Regex> =
     std::sync::LazyLock::new(|| regex::Regex::new(r"^[A-Za-z0-9_-]+$").unwrap());
 
-// Les deux schemas de nommage generes par MockStore : "mock-config-{ts}-{seq}.yaml"
-// (backups/) et "pre-reset-{ts}.yaml" (backups/protected/). Le charset exclut
-// tout separateur de chemin ('/', '\\') et toute sequence '..', empechant une
-// traversee de repertoire meme si le nom vient d'un segment d'URL decode.
+// The two names MockStore gives backups: "mock-config-{ts}-{seq}.yaml" (backups/) and "pre-reset-{ts}.yaml"
+// (backups/protected/). The character set leaves out path separators and "..", so a name decoded from a URL
+// segment cannot leave the backup directory.
 static BACKUP_FILENAME_RE: std::sync::LazyLock<regex::Regex> =
     std::sync::LazyLock::new(|| regex::Regex::new(r"^[A-Za-z0-9_-]+\.yaml$").unwrap());
 
@@ -267,9 +266,7 @@ mod tests {
         assert!(validate_service(&svc("index.html", "/foo")).is_err());
         assert!(validate_service(&svc("assets", "/foo")).is_err());
         assert!(validate_service(&svc("favicon.ico", "/foo")).is_err());
-        // Meme si le charset (pas de '.') rejetterait deja ce nom, la liste
-        // reservee le documente explicitement (defense en profondeur, meme
-        // logique que "index.html"/"favicon.ico" ci-dessus).
+        // The character set alone would refuse it; the reserved list states it anyway, as for index.html.
         assert!(validate_service(&svc("runtime-config.json", "/foo")).is_err());
     }
 
@@ -331,9 +328,7 @@ mod tests {
 
     #[test]
     fn accept_empty_target_when_purely_mocked() {
-        // Service "purement mocke" : real_target_url vide est accepte tant
-        // que is_mocked reste true (les regles sont toujours evaluees, aucun
-        // proxy n'est jamais tente).
+        // A purely mocked service: no target is fine while the rules answer (is_mocked stays true).
         let mut s = svc("purely-mocked", "/v1/*");
         s.real_target_url = "".into();
         s.is_mocked = true;
@@ -342,9 +337,7 @@ mod tests {
 
     #[test]
     fn reject_empty_target_without_is_mocked() {
-        // is_mocked=false (proxy pur niveau service) sans cible est une
-        // combinaison invalide : ce serait un proxy vers une URL vide a
-        // chaque requete.
+        // A pure proxy without a target would forward every request to an empty URL.
         let mut s = svc("broken", "/v1/*");
         s.real_target_url = "".into();
         s.is_mocked = false;

@@ -14,13 +14,9 @@ pub struct AuthConfig {
     /// Expected `iss` of the tokens; empty means the realm URL derived from `keycloak_url` (`KEYCLOAK_ISSUER`).
     pub issuer: String,
     pub super_admins: Vec<String>,
-    /// Controle uniquement l'AFFICHAGE du bouton "Reset complet" cote UI quand
-    /// AUTH_ENABLED=false (quand l'auth est active, la visibilite est deja
-    /// pilotee par le role super-admin reel). Defaut false : le bouton reste
-    /// cache tant qu'il n'est pas explicitement active. Ce n'est PAS une
-    /// mesure de securite — reset_config() reste protege server-side par
-    /// require_super_admin(), qui n'apporte aucune protection reelle quand
-    /// AUTH_ENABLED=false puisque anonymous() a is_super_admin=true.
+    /// Whether the UI shows the full reset button when authentication is off (`SHOW_RESET_BUTTON`, hidden by
+    /// default); with authentication on, the user's super-admin role decides. Display only: the server checks the
+    /// permission itself, and without authentication every caller is an anonymous super-admin anyway.
     pub show_reset_button: bool,
 }
 
