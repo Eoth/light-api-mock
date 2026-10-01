@@ -71,7 +71,9 @@ Size L, to split by module
 
 **Why.** Reviewers read the code, and most comments are still in French, often long session narratives rather than the reason the code is the way it is.
 
-**What.** Module by module, in reading order of the [reviewer guide](REVIEWING.md) (startup, server, auth, engine, store, then the rest and the UI), rewrite comments in English and keep only what explains *why* (an invariant, a pitfall, a specification reference); history stays in Git. Translate test names and test messages at the same time.
+**What.** Module by module, in reading order of the [reviewer guide](REVIEWING.md), rewrite comments in English and keep only what explains *why* (an invariant, a pitfall, a specification reference); history stays in Git. Translate test names and test messages at the same time.
+
+**Progress.** Done: `main.rs`, `server/mod.rs`, `server/browser_guard.rs`, `server/redaction.rs`, `server/validation.rs`, `server/ping.rs`, `server/codegen.rs`, `auth/`, `i18n.rs`, `tcp/hex.rs`. Next, by number of French comment lines: `server/api.rs` (about 130), `engine/script.rs` (120), `store/mod.rs` (120), `engine/matcher.rs` (110), `server/intercept.rs` (90), `server/suggestion.rs` (70), `engine/proxy.rs`, `server/observation.rs`, `tcp/`, `messaging/`, `models/`, `server/request_log.rs`, `engine/template.rs`, then the UI.
 
 **Done when.** No French comment left in `src/` and `frontend/src/`, checked by a script in CI that flags French stop words in comments.
 

@@ -1,8 +1,5 @@
-// Codec hexadecimal minimal pour les octets bruts (prefixe de matching,
-// corps de reponse mock) stockes dans le YAML. Prefere a une dependance
-// `hex`/`base64` externe : quelques lignes suffisent, zero crate
-// supplementaire a auditer pour cette premiere tranche du mock TCP (cf
-// Cargo.toml, feature "tcp-mock").
+// Hexadecimal text for the raw bytes the TCP mocks store in YAML (match prefixes, responses). A few lines here
+// rather than one more crate to audit.
 
 pub fn encode(bytes: &[u8]) -> String {
     let mut out = String::with_capacity(bytes.len() * 2);

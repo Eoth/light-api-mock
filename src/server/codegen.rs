@@ -1,15 +1,11 @@
-// Generation de codes courts uniques pour les groupes.
-// Algorithme : hash FNV-1a du nom (deterministe, reproductible cross-instance)
-// encode en base36, tronque a 5 chars. En cas de collision, on ajoute un
-// discriminant incremental au hash avant re-encodage.
-// Cela garantit que le meme nom produit le meme code sur deux instances
-// independantes (sauf collision avec un groupe existant).
+// Short URL codes for groups: the FNV-1a hash of the name in base 36, cut to 5 characters, with an increasing
+// discriminant mixed in on a collision. The same name gets the same code on every instance (unless that code is
+// already taken), so URLs stay stable when a configuration moves between instances.
 
 const BASE36: &[u8] = b"abcdefghijklmnopqrstuvwxyz0123456789";
 const CODE_LEN: usize = 5;
 
-// pub(crate) : reutilise tel quel par engine::script pour seeded_int/seeded_pick
-// (meme mecanisme de hash deterministe, pas de nouvelle dependance de hashing).
+// Also used by the seeded script functions (seeded_int, seeded_pick), which need the same stable hash.
 pub(crate) fn fnv1a_hash(input: &str) -> u64 {
     let mut hash: u64 = 0xcbf29ce484222325;
     for byte in input.as_bytes() {

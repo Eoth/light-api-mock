@@ -2,15 +2,14 @@
 // 2024), which is why the attribute is limited to non-test builds.
 #![cfg_attr(not(test), forbid(unsafe_code))]
 
-// Modules du projet — chaque dossier src/<module>/ contient un mod.rs
-// Pour modifier un comportement, trouver le module correspondant :
-//   auth/      → authentification Keycloak, permissions groupes
-//   models/    → structures de donnees (Service, Rule, Group, etc.)
-//   engine/    → moteur de matching, proxy HTTP, template, scripts rhai
-//   store/     → persistance YAML sur disque
-//   server/    → API REST (routes /api/*), middleware d'interception HTTP
-//   messaging/ → cadrage MOM/Kafka (etude), feature "messaging-kafka" NON
-//                active par defaut — ce module ne compile meme pas sinon
+//   auth/      Keycloak token validation, group permissions
+//   models/    configuration schema (Service, Rule, Group...)
+//   engine/    matching, HTTP proxy, templates, Rhai scripts
+//   store/     YAML persistence, backups
+//   server/    management API (/api/*), service interception, browser guard
+//   i18n       server messages in the language of the request
+//   messaging/ Kafka, compiled only with the "messaging-kafka" feature
+//   tcp/       raw TCP mocks, compiled only with the "tcp-mock" feature
 pub mod auth;
 pub mod engine;
 pub mod i18n;
@@ -35,9 +34,8 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
-// Point d'entree — lit la config depuis les variables d'environnement,
-// initialise le store YAML, le proxy HTTP, l'auth Keycloak (si active),
-// le moteur de scripts rhai, puis demarre le serveur Axum.
+// Reads the configuration from the environment, loads the stored mocks, builds the proxy, the Keycloak client (when
+// authentication is on) and the script engine, then serves HTTP until SIGTERM or Ctrl+C.
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt()
@@ -108,17 +106,9 @@ async fn main() {
         }
     };
 
-    // Ecoutes TCP brutes (protocoles binaires non-HTTP), en parallele du
-    // serveur HTTP : jamais sur le meme port, un service TCP a le sien.
-    // Reconfigurable a chaud ensuite via l'API REST (server/api.rs,
-    // TcpRuntime::replace) sans redemarrer le processus. Taches detachees
-    // (tokio::spawn, geree par TcpRuntime) : a l'arret gracieux, seul le
-    // serveur HTTP est draine proprement (with_graceful_shutdown ci-dessous)
-    // puis la config flush(ee) ; les connexions TCP brutes en cours sont
-    // coupees net avec le runtime, comme le serait un SIGKILL. Raisonnable
-    // pour cette premiere tranche : un protocole binaire n'a pas de
-    // mecanisme generique de "fin de session propre" a declencher cote
-    // client de toute facon.
+    // Raw TCP mocks listen on their own ports, next to the HTTP server, and are reconfigured live through the API
+    // (TcpRuntime::replace). Their tasks are detached: on shutdown only HTTP is drained, and open TCP connections are
+    // cut, since a binary protocol has no generic way to end a session cleanly from the server side anyway.
     #[cfg(feature = "tcp-mock")]
     let tcp_runtime = crate::tcp::TcpRuntime::load_and_spawn(&data_dir).await;
 
@@ -167,10 +157,8 @@ async fn main() {
         tracing::error!(error = %e, "server stopped on an error");
     }
 
-    // Arret gracieux (SIGTERM K8s) : draine la file d'ecriture write-behind
-    // avant de quitter, pour reduire la fenetre de risque de perte des
-    // dernieres mutations en cas d'arret normal du pod. Ne protege pas
-    // contre un SIGKILL/crash brutal.
+    // Changes are written to disk in the background: drain that queue before exiting, so a normal stop keeps the last
+    // changes. A SIGKILL or a crash can still lose the writes still queued.
     tracing::info!("draining pending config writes before exit");
     store_for_shutdown.flush().await;
 }
