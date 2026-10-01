@@ -8,11 +8,9 @@ use std::time::Duration;
 
 const PING_TIMEOUT: Duration = Duration::from_secs(3);
 
-/// Statut de disponibilite RESEAU (pas applicatif) d'une URL cible
-/// (real_target_url d'un service). Base uniquement sur une connexion TCP :
-/// "joignable" = le socket s'est ouvert avant le timeout, "injoignable" =
-/// timeout, connexion refusee ou echec DNS. Aucune requete HTTP n'est
-/// envoyee — voir `ProxyClient::ping`.
+/// Whether a service's real target can be reached over the network, judged on a TCP connection only: reachable
+/// when the socket opened before the timeout, unreachable on a timeout, a refused connection or a DNS failure. No
+/// HTTP request is sent (see `ProxyClient::ping`).
 #[derive(Debug, Clone, Serialize)]
 pub struct PingStatus {
     pub reachable: bool,
@@ -67,12 +65,9 @@ impl ProxyClient {
         }
     }
 
-    /// Verifie l'accessibilite RESEAU d'une URL cible : une simple connexion TCP
-    /// vers host:port, resolue depuis l'URL (port explicite, sinon 443 pour
-    /// https, 80 sinon). AUCUNE requete HTTP n'est envoyee — pas de GET/HEAD,
-    /// pas de handshake TLS, pas d'appel a une route applicative du backend
-    /// cible. La reponse ne dit donc rien sur la sante fonctionnelle de l'API,
-    /// seulement "le socket s'est ouvert ou non" dans le timeout imparti.
+    /// Opens a TCP connection to the target's host and port (the URL's port, else 443 for https and 80 otherwise) and
+    /// closes it. Nothing else: no HTTP request, no TLS handshake, no call to any route of the backend, so the answer
+    /// says whether the socket opened in time, not whether the API works.
     pub async fn ping(&self, url: &str) -> PingStatus {
         let (host, port) = match parse_host_port(url) {
             Ok(hp) => hp,
@@ -196,33 +191,19 @@ impl ProxyClient {
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
     }
 
-    /// Variante de `forward()` qui tente, EN PLUS de relayer la requete,
-    /// de capturer requete+reponse pour l'observation de trafic (cf
-    /// `server::observation`). Ne change RIEN au chemin par defaut : cette
-    /// methode n'est appelee que quand l'utilisateur a explicitement active
-    /// l'observation d'un service (jamais automatique).
+    /// `forward()`, plus a copy of the request and the response for traffic observation (`server::observation`). Only
+    /// called for a service a user chose to observe; the default path never captures.
     ///
-    /// La capture n'est tentee que si la taille est connue et sure a l'avance,
-    /// sur CHAQUE cote independamment :
-    /// - requete non capturable (Content-Length > `max_buffer`, ou
-    ///   Transfer-Encoding: chunked — taille reellement inconnue) : bascule
-    ///   integralement sur `forward()` (streaming inchange), retourne `None`.
-    ///   Une requete SANS Content-Length ET sans chunked (GET/DELETE typique
-    ///   sans corps) est traitee comme un corps vide, capturable.
-    /// - reponse non capturable (meme critere, verifie APRES connexion a la
-    ///   cible via `upstream_resp.content_length()`) : la reponse est quand
-    ///   meme relayee en streaming normalement, mais la capture retournee est
-    ///   `None` (echange partiel jamais retenu par l'appelant, cf
-    ///   `ObservationStore`).
+    /// Each side is captured only when its size is known and within `max_buffer`:
+    /// - a request with a larger Content-Length, or sent in chunks (size unknown), goes through `forward()` unchanged
+    ///   and returns no capture; a request with neither header (a GET without body, typically) has an empty body and is
+    ///   captured;
+    /// - a response with the same problem (checked once the backend answered) is still streamed to the client, and no
+    ///   capture is returned.
     ///
-    /// Dans les deux cas de repli, la reponse renvoyee au client est
-    /// STRICTEMENT identique a ce que `forward()` aurait produit — aucune
-    /// perte fonctionnelle pour l'utilisateur final, seulement une capture en
-    /// moins. Seule exception theorique : une requete sans Content-Length ET
-    /// sans chunked qui porterait malgre tout un corps au-dela de
-    /// `max_buffer` (HTTP mal forme — hyper ne laisse jamais passer ce cas
-    /// sur une vraie connexion reseau) recevrait un 413 au lieu d'etre
-    /// relayee telle quelle.
+    /// Either way the client gets exactly what `forward()` would have sent; only the capture is missing. The one
+    /// exception is malformed HTTP that hyper never lets through on a real connection: a request with neither header
+    /// carrying a body larger than `max_buffer` would get 413.
     pub async fn forward_with_capture(
         &self,
         target_base: &str,
@@ -237,11 +218,8 @@ impl ProxyClient {
             .get(axum::http::header::CONTENT_LENGTH)
             .and_then(|v| v.to_str().ok())
             .and_then(|v| v.parse::<usize>().ok());
-        // Une requete sans Content-Length ET sans Transfer-Encoding: chunked
-        // (typiquement GET/DELETE sans corps) est, par construction HTTP,
-        // un corps vide -- sure a bufferiser (0 octet) sans avoir besoin
-        // d'une taille annoncee. Seule une requete VRAIMENT de taille
-        // inconnue (chunked) bascule sur le streaming pur.
+        // With neither Content-Length nor chunked encoding, HTTP defines the body as empty: safe to buffer. Only a body of
+        // truly unknown size (chunked) falls back to plain streaming.
         let is_chunked = parts
             .headers
             .get(axum::http::header::TRANSFER_ENCODING)
@@ -383,11 +361,8 @@ impl ProxyClient {
     }
 }
 
-/// Requete + reponse brutes capturees par `ProxyClient::forward_with_capture`
-/// quand les deux cotes etaient surs a bufferiser. La troncature pour
-/// stockage/affichage (cf `server::observation::max_body_size`) est la
-/// responsabilite de l'appelant, pas de ce type — celui-ci porte les octets
-/// complets tels que recus.
+/// The raw request and response captured by `ProxyClient::forward_with_capture` when both sides could be buffered,
+/// complete; truncating them for storage (`server::observation::max_body_size`) is the caller's job.
 #[derive(Debug, Clone)]
 pub struct ProxyCaptureRaw {
     pub request_query_params: HashMap<String, String>,
@@ -400,9 +375,7 @@ pub struct ProxyCaptureRaw {
     pub response_content_type: Option<String>,
 }
 
-/// Extrait host+port d'une URL pour le test de connectivite TCP. Port
-/// explicite dans l'URL en priorite, sinon 443 pour https, 80 pour tout le
-/// reste (http ou schema inconnu).
+/// Host and port of a URL for the TCP check: the URL's port, else 443 for https and 80 for anything else.
 fn parse_host_port(url: &str) -> Result<(String, u16), String> {
     let parsed = url::Url::parse(url).map_err(|e| crate::i18n::tr("invalid URL: {0}", &[&e]))?;
     let host = parsed
@@ -471,10 +444,8 @@ mod tests {
 
     #[tokio::test]
     async fn ping_reachable_host_returns_reachable_via_tcp_only() {
-        // Un simple listener TCP local, sans serveur HTTP derriere : si ping()
-        // envoyait une vraie requete HTTP (GET/HEAD), le listener n'y repondrait
-        // jamais correctement. Le fait que reachable=true prouve que seul le
-        // handshake TCP compte.
+        // A bare TCP listener with no HTTP server behind it: an HTTP request would never get a proper answer, so reachable
+        // = true shows that only the TCP handshake counts.
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
         tokio::spawn(async move {
@@ -489,9 +460,7 @@ mod tests {
 
     #[test]
     fn ping_never_issues_http_request() {
-        // parse_host_port ne fait que du parsing d'URL, aucun I/O reseau —
-        // garantit que la resolution host/port ne declenche jamais elle-meme
-        // un appel HTTP (contrairement a l'ancienne implementation HEAD).
+        // Parsing only, no network I/O: resolving the host and port never sends a request.
         let (host, port) =
             parse_host_port("http://example.invalid:1234/some/business/path").unwrap();
         assert_eq!(host, "example.invalid");
@@ -552,13 +521,9 @@ mod tests {
         assert_eq!(combined, "http://svc:8080/api/v1");
     }
 
-    /// Capture la requete brute recue par une fausse cible TCP, pour
-    /// verifier au plus pres du fil ce que `forward()` transmet reellement
-    /// (methode, chemin+query, en-tetes, corps) sans dependre du parsing
-    /// HTTP d'un client. Voir aussi les tests bout-en-bout dans
-    /// `server::intercept::tests` qui couvrent le
-    /// meme invariant a travers tout le pipeline (intercept_layer/do_proxy),
-    /// pas seulement ProxyClient::forward() en isolation.
+    /// Reads the raw request a fake TCP target receives, to check what `forward()` really sends (method, path and
+    /// query, headers, body) without an HTTP client's parsing in between. The end-to-end tests of
+    /// `server::intercept::tests` check the same through the whole pipeline.
     async fn capture_raw_request(port_rx: tokio::sync::oneshot::Sender<u16>) -> String {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
@@ -578,7 +543,7 @@ mod tests {
             }
             buf.extend_from_slice(&chunk[..n]);
             if buf.windows(4).any(|w| w == b"\r\n\r\n") {
-                // corps eventuel : on tente une derniere lecture courte
+                // a body may follow: one last short read
                 let n2 = tokio::time::timeout(Duration::from_millis(100), stream.read(&mut chunk))
                     .await
                     .unwrap_or(Ok(0))
@@ -627,21 +592,16 @@ mod tests {
             raw.to_lowercase().contains("x-custom-header: custom-value"),
             "custom header missing:\n{raw}"
         );
-        // Corps transmis en chunked transfer-encoding (streaming) : on
-        // verifie sa presence par sous-chaine, pas par
-        // egalite/suffixe exact, puisque la trame chunked ajoute une taille
-        // hexadecimale et un terminateur autour de la charge utile.
+        // The body is streamed with chunked encoding, which wraps the payload in hexadecimal sizes and a terminator: look
+        // for it as a substring.
         assert!(
             raw.contains("payload-body"),
             "body missing/incomplete:\n{raw}"
         );
     }
 
-    /// Petit serveur axum local pour les tests de `forward_with_capture` :
-    /// contrairement a `capture_raw_request` (parsing bas niveau au fil de
-    /// l'eau), on a besoin ici d'une VRAIE reponse HTTP avec un
-    /// Content-Length maitrise (present ou volontairement absent) pour
-    /// exercer les deux branches capturable/non-capturable.
+    /// A small local Axum server for the `forward_with_capture` tests: they need real HTTP responses with a
+    /// Content-Length present or deliberately absent, to reach both the captured and the streamed branches.
     async fn spawn_test_target(
         body: &'static str,
         chunked: bool,
@@ -733,7 +693,7 @@ mod tests {
         assert_eq!(resp.status(), StatusCode::OK);
         assert!(
             capture.is_none(),
-            "requete au-dela du buffer max ne doit jamais etre capturee"
+            "a request larger than the buffer must never be captured"
         );
     }
 
@@ -755,9 +715,9 @@ mod tests {
         assert_eq!(resp.status(), StatusCode::OK);
         assert!(
             capture.is_none(),
-            "reponse sans Content-Length ne doit jamais etre capturee"
+            "a response without Content-Length must never be captured"
         );
-        // Mais le trafic doit rester relaye correctement au client.
+        // The traffic still reaches the client.
         let body = axum::body::to_bytes(resp.into_body(), 1024).await.unwrap();
         assert_eq!(&body[..], br#"{"id":1}"#);
     }

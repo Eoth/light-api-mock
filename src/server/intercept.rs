@@ -12,11 +12,9 @@ use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use std::collections::HashMap;
 
-/// Execute un des 3 blocs de script d'une regle (pre_script/script/post_script),
-/// independamment des autres (meme ScriptContext, pas de chainage — voir
-/// commentaire sur Rule dans models/mod.rs). `None` si le slot n'a pas de
-/// script. En cas d'erreur d'execution, log + repli sur un resultat vide
-/// (soft-fail : la requete continue, jamais bloquee par un script casse).
+/// Runs one of a rule's three script slots (pre_script, script, post_script). The slots are independent: same
+/// context, no chaining (see `Rule`). `None` when the slot is empty. A runtime error is logged and gives an empty
+/// result: a broken script never blocks the response.
 fn run_rule_script(
     engine: &ScriptEngine,
     rule_name: &str,
@@ -34,9 +32,9 @@ fn run_rule_script(
     }
 }
 
-// Middleware Axum execute sur CHAQUE requete HTTP entrante.
-// Pipeline : route interne? → skip | chercher service par path → mock ou proxy
-// Les regles (Rule) sont evaluees dans l'ordre (first-match) si le service est en mode mock.
+// Runs on every incoming request: internal routes (UI, API) pass through; otherwise the service is found from the
+// path, then the request is either proxied (pure proxy service) or matched against the rules in order, first match
+// wins, and mocked or proxied as that rule says.
 pub async fn intercept_layer(
     State(state): State<AppState>,
     req: Request<Body>,
@@ -108,9 +106,7 @@ fn build_effective_pattern(group_code: Option<&str>, name: &str, listen_path: &s
     }
 }
 
-// clippy::too_many_arguments deja present avant ce chantier (8 parametres,
-// au-dela du seuil par defaut) ; `observe` en ajoute un neuvieme plutot que
-// de forcer un regroupement en struct hors perimetre de cette tranche.
+// More arguments than clippy's default allows; they belong in a request context struct.
 #[allow(clippy::too_many_arguments)]
 async fn do_proxy(
     state: &AppState,
@@ -123,13 +119,9 @@ async fn do_proxy(
     captured: Option<CapturedRequest>,
     observe: bool,
 ) -> Response {
-    // Service "purement mocke" (real_target_url vide) : ne jamais tenter de
-    // proxifier vers une URL vide. `validate_service` bloque deja cette
-    // combinaison a la sauvegarde quand is_mocked=false, mais une regle
-    // action=Proxy peut matcher meme si le service est is_mocked=true et sans
-    // cible (bascule a posteriori non bloquante) : garde defensive ici pour
-    // renvoyer une erreur claire plutot qu'une erreur technique confuse (URL
-    // invalide, echec DNS...).
+    // A purely mocked service has no target: never try to proxy to an empty URL. Saving refuses a pure proxy without a
+    // target, but a proxy rule can still match on a service that became purely mocked later (saving only warns), so
+    // answer with a clear error here rather than a confusing one (invalid URL, DNS failure).
     if service.real_target_url.trim().is_empty() {
         tracing::warn!(
             service_key = %service.name, method = %method_str, path = %path,
@@ -200,15 +192,10 @@ async fn do_proxy(
     }
 }
 
-/// Meme relais que la branche par defaut de `do_proxy`, en tentant EN PLUS de
-/// capturer requete+reponse pour l'observation de trafic (cf
-/// `server::observation`) — jamais appelee sauf si l'utilisateur a active
-/// explicitement l'observation de CE service (`ObservationToggle`, cf
-/// `handle_service`). `ProxyClient::forward_with_capture` degrade
-/// automatiquement en streaming pur (comme `forward()`) des qu'une capture
-/// n'est pas sure (taille inconnue/trop grande) : aucune perte fonctionnelle
-/// pour le trafic relaye, seulement une capture en moins pour l'echange
-/// concerne.
+/// The same relay as `do_proxy`'s default branch, plus a capture for traffic observation (`server::observation`).
+/// Only called for a service a user chose to observe. `ProxyClient::forward_with_capture` falls back to plain
+/// streaming whenever a capture would not be safe (size unknown or too large): the relayed traffic is unchanged,
+/// only that exchange is not observed.
 #[allow(clippy::too_many_arguments)]
 async fn do_proxy_observed(
     state: &AppState,
@@ -281,13 +268,9 @@ async fn handle_service(
     let gc = group_code.as_deref();
 
     if !service.is_mocked {
-        // Proxy niveau service : chemin streame sans buffering (aucun
-        // RequestData construit ici), donc aucun detail capturable pour le
-        // testeur de regle sur ce chemin ("Proxy streaming"). Exception
-        // deliberee et OPT-IN uniquement : si l'utilisateur a explicitement
-        // active l'observation de ce service (ObservationToggle, jamais
-        // automatique), `do_proxy` tente une capture bornee pour armer une
-        // future suggestion de regle de mock — cf `server::observation`.
+        // Service-level proxy: the request is streamed, nothing is buffered, so the request log keeps no details for the
+        // rule tester on this path. The one opt-in exception is observation: when a user turned it on for this service,
+        // `do_proxy` captures bounded copies to suggest mock rules (`server::observation`).
         let observe = state
             .observation
             .toggle
@@ -356,10 +339,8 @@ async fn handle_service(
         remaining_path: remaining,
     };
 
-    // Construit une seule fois : le corps/headers/query/path params sont deja
-    // entierement bufferises ci-dessus pour le matching (`request_data`), donc
-    // retenir ce detail pour le testeur de regle ne cree aucune nouvelle
-    // capture de trafic (cf CapturedRequest, src/server/request_log.rs).
+    // The request is already fully buffered for matching (`request_data`), so keeping its details for the rule tester
+    // costs one copy, not a new capture (see CapturedRequest in request_log.rs).
     let captured = Some(CapturedRequest::from_request_data(&request_data));
 
     let matched = MatchEngine::first_match(&service.rules, &request_data);
@@ -373,11 +354,8 @@ async fn handle_service(
         state
             .request_log
             .log_no_rule(service, &method_str, path, captured);
-        // Un service "purement mocke" (aucune cible) n'a de toute facon jamais
-        // tente de proxy de repli ici (is_mocked=true => uniquement les regles
-        // sont evaluees, voir plus haut). Le message differencie ce cas d'un
-        // service avec cible qui manque juste une regle, pour orienter le
-        // diagnostic.
+        // Tell a purely mocked service apart from a service with a target that only lacks a rule, to point the diagnosis
+        // in the right direction.
         let message = if service.real_target_url.trim().is_empty() {
             "No rule matches this request: this service is purely mocked (no target configured)."
         } else {
@@ -413,10 +391,8 @@ async fn handle_service(
     let mut merged_params = path_params;
     merged_params.extend(sub_params);
 
-    // pre_script/script/post_script s'executent independamment (meme
-    // ScriptContext, pas de chainage entre eux — voir commentaire sur Rule
-    // dans models/mod.rs). Meme comportement "soft-fail" pour les 3 : une
-    // erreur de script est loggee mais ne bloque pas la requete.
+    // The three slots run independently (same context, no chaining, see `Rule`); a failing one is logged and never
+    // blocks the response.
     let script_ctx = ScriptContext {
         body: String::from_utf8_lossy(&request_data.body).into_owned(),
         headers: request_data.headers.clone(),
@@ -571,7 +547,7 @@ mod tests {
         assert_eq!(
             build_effective_pattern(None, "svc", "/api/v4"),
             "/svc/api/v4/*",
-            "listen_path sans wildcard ni param doit ajouter /* implicitement"
+            "a listen_path without wildcard or parameter gets an implicit /*"
         );
     }
 
@@ -806,7 +782,7 @@ mod tests {
             &script,
             &empty_script_ctx(),
         );
-        // Soft-fail : jamais None ni panique, un ScriptResult vide en repli.
+        // Never None, never a panic: an empty ScriptResult instead.
         assert_eq!(result.unwrap().value, "");
     }
 
@@ -826,14 +802,9 @@ mod tests {
         assert!(script_result.is_none());
     }
 
-    // --- Test de non-regression bout-en-bout : proxy transmet query params,
-    // headers custom, methode et corps intacts.
-    // Capture la requete BRUTE recue par une fausse cible TCP en aval du vrai
-    // serveur Axum (build_router), pour prouver que rien n'est perdu entre
-    // l'entree HTTP et la sortie proxy — pas seulement au niveau de
-    // ProxyClient::forward() en isolation (couvert separement dans
-    // engine/proxy.rs), mais a travers tout le pipeline intercept_layer /
-    // do_proxy / handle_service.
+    // --- The proxy forwards query parameters, custom headers, the method and the body untouched. A fake TCP target
+    // behind the real router reads the raw request it receives, which checks the whole pipeline (intercept layer,
+    // do_proxy, handle_service), not only ProxyClient::forward() (tested on its own in engine/proxy.rs).
 
     fn temp_dir_for_intercept_test() -> std::path::PathBuf {
         let dir = crate::server::test_support::temp_data_dir("intercept-test");
@@ -862,9 +833,7 @@ mod tests {
                 break;
             }
             buf.extend_from_slice(&chunk[..n]);
-            // Une fois les en-tetes recus, on laisse une derniere fenetre
-            // courte pour le corps (chunked) avant de considerer la requete
-            // complete.
+            // Once the headers are in, allow one short last read for a chunked body before calling the request complete.
             if buf.windows(4).any(|w| w == b"\r\n\r\n") {
                 let n2 = tokio::time::timeout(
                     std::time::Duration::from_millis(200),
@@ -899,13 +868,12 @@ mod tests {
 
     #[tokio::test]
     async fn proxy_end_to_end_preserves_query_headers_method_and_body() {
-        // 1. Fausse cible reelle (capture la requete brute recue).
+        // 1. A fake target that records the raw request.
         let (target_ready_tx, target_ready_rx) = tokio::sync::oneshot::channel();
         let target_server = tokio::spawn(capture_one_raw_request(target_ready_tx));
         let target_port = target_ready_rx.await.unwrap();
 
-        // 2. Service en mode proxy pur (is_mocked=false : do_proxy direct,
-        // sans passer par l'evaluation des regles).
+        // 2. A pure proxy service (is_mocked=false: straight to do_proxy, no rule evaluated).
         let data_dir = temp_dir_for_intercept_test();
         let store = MockStore::new(data_dir.join("mock-config.yaml"));
         store
@@ -926,7 +894,7 @@ mod tests {
             .unwrap();
         store.flush().await;
 
-        // 3. Vrai serveur Axum complet (meme routeur qu'en production).
+        // 3. The production router on a real port.
         #[cfg(feature = "messaging-kafka")]
         let messaging = crate::messaging::MessagingState {
             message_log: crate::messaging::message_log::MessageLog::new(),
@@ -958,8 +926,7 @@ mod tests {
             axum::serve(listener, app).await.unwrap();
         });
 
-        // 4. Requete reelle avec query params + header custom + methode POST
-        // + corps, envoyee au serveur lightMock (pas directement a la cible).
+        // 4. A POST with query parameters, a custom header and a body, sent to lightMock (not to the target).
         let client = reqwest::Client::new();
         let resp = client
             .post(format!(
@@ -980,20 +947,18 @@ mod tests {
         );
         assert!(
             request_line.contains("/foo/bar?a=1&b=two"),
-            "query params/chemin non preserves dans la requete proxifiee: {request_line}"
+            "query parameters or path lost in the proxied request: {request_line}"
         );
         assert!(
             raw.to_lowercase().contains("x-custom-header: custom-value"),
-            "header custom manquant dans la requete proxifiee:\n{raw}"
+            "custom header missing from the proxied request:\n{raw}"
         );
         assert!(
             raw.contains("payload-body"),
-            "corps de requete manquant dans la requete proxifiee:\n{raw}"
+            "request body missing from the proxied request:\n{raw}"
         );
 
-        // Proxy NIVEAU SERVICE : aucun RequestData n'est construit sur ce
-        // chemin (streaming zero-buffering), donc aucun
-        // detail n'est capturable pour le testeur de regle.
+        // Service-level proxy: streamed without buffering, so no details are kept for the rule tester.
         let logged = request_log_handle.recent(1);
         assert_eq!(logged.len(), 1);
         assert!(logged[0].captured.is_none());
@@ -1003,11 +968,8 @@ mod tests {
 
     #[tokio::test]
     async fn rule_level_proxy_action_preserves_query_headers_method_and_body() {
-        // Meme verification que le test precedent, mais pour l'AUTRE chemin
-        // de code proxy : service is_mocked=true avec une regle
-        // action=proxy, qui passe par rebuild_request_for_proxy() plutot que
-        // par le Request original tel quel. Les deux chemins doivent se
-        // comporter de facon identique du point de vue de la cible.
+        // The same check through the other proxy path: a mocked service whose rule says proxy, which rebuilds the request
+        // (rebuild_request_for_proxy) instead of forwarding the original one. The target must see no difference.
         let (target_ready_tx, target_ready_rx) = tokio::sync::oneshot::channel();
         let target_server = tokio::spawn(capture_one_raw_request(target_ready_tx));
         let target_port = target_ready_rx.await.unwrap();
@@ -1107,18 +1069,17 @@ mod tests {
         );
         assert!(
             raw.contains("payload-body"),
-            "corps de requete manquant (rule-level proxy):\n{raw}"
+            "request body missing (rule-level proxy):\n{raw}"
         );
 
-        // Proxy NIVEAU REGLE : RequestData est deja bufferise pour evaluer les
-        // regles avant ce branchement, donc le detail EST capturable ici,
-        // contrairement au proxy niveau service ci-dessus.
+        // Rule-level proxy: the request was buffered to evaluate the rules, so its details are kept, unlike the
+        // service-level proxy above.
         let logged = request_log_handle.recent(1);
         assert_eq!(logged.len(), 1);
         let captured = logged[0]
             .captured
             .as_ref()
-            .expect("rule-level proxy doit capturer le detail de la requete");
+            .expect("a rule-level proxy keeps the request details");
         assert_eq!(captured.query_params.get("a").unwrap(), "1");
         assert_eq!(
             captured.headers.get("x-custom-header").unwrap(),
@@ -1131,8 +1092,7 @@ mod tests {
 
     #[tokio::test]
     async fn mock_response_captures_request_detail_in_log() {
-        // Verifie que le chemin mock (pas seulement proxy) capture bien le
-        // detail de la requete pour le testeur de regle.
+        // The mock path keeps the request details for the rule tester too.
         let data_dir = temp_dir_for_intercept_test();
         let store = MockStore::new(data_dir.join("mock-config.yaml"));
         store
@@ -1216,7 +1176,7 @@ mod tests {
         let captured = logged[0]
             .captured
             .as_ref()
-            .expect("le mock doit capturer le detail de la requete");
+            .expect("a mocked request keeps its details");
         assert_eq!(captured.path_params.get("id").unwrap(), "42");
         assert_eq!(captured.query_params.get("foo").unwrap(), "bar");
         assert!(!captured.body_truncated);
@@ -1224,10 +1184,8 @@ mod tests {
         std::fs::remove_dir_all(&data_dir).ok();
     }
 
-    // --- Service "purement mocke" (real_target_url vide) ---
-    // Helper partage par les 3 tests ci-dessous : construit un vrai serveur
-    // Axum (meme routeur qu'en production) pour une config donnee — factorise
-    // ici car les 3 scenarios suivants ne different que par la config initiale.
+    // --- Purely mocked services (no real_target_url). One helper starts the production router for a given
+    // configuration, since the three cases below only differ by it.
     async fn spawn_test_server(
         config: MockConfig,
     ) -> (
@@ -1289,8 +1247,7 @@ mod tests {
 
     #[tokio::test]
     async fn no_rule_match_message_mentions_purely_mocked_when_target_empty() {
-        // Regle qui ne peut jamais matcher un GET (methode POST uniquement),
-        // pour forcer le chemin "aucune regle ne correspond".
+        // A POST-only rule, so that a GET reaches the "no rule matches" path.
         let rule = Rule {
             name: "post-only".into(),
             method: "POST".into(),
@@ -1323,7 +1280,7 @@ mod tests {
         let body = resp.text().await.unwrap();
         assert!(
             body.contains("purely mocked"),
-            "le message doit expliciter l'absence de cible, obtenu: {body}"
+            "the message must say there is no target, got: {body}"
         );
 
         let logged = request_log_handle.recent(1);
@@ -1369,7 +1326,7 @@ mod tests {
         let body = resp.text().await.unwrap();
         assert!(
             !body.contains("purely mocked"),
-            "un service avec cible ne doit pas afficher le message 'purement mocke', obtenu: {body}"
+            "a service with a target must not get the purely mocked message, got: {body}"
         );
 
         std::fs::remove_dir_all(&data_dir).ok();
@@ -1377,11 +1334,8 @@ mod tests {
 
     #[tokio::test]
     async fn service_level_proxy_with_empty_target_returns_clear_error() {
-        // Combinaison normalement bloquee par validate_service a la
-        // sauvegarde (is_mocked=false + cible vide), mais atteignable si la
-        // config a ete modifiee hors de l'API (edition manuelle du YAML) :
-        // le garde-fou runtime de do_proxy doit rester la derniere ligne de
-        // defense.
+        // Saving refuses a pure proxy without a target, but a YAML file edited by hand can hold one: the runtime guard of
+        // do_proxy is the last line of defense.
         let mut service = purely_mocked_service(vec![]);
         service.is_mocked = false;
         let (port, request_log_handle, data_dir) = spawn_test_server(MockConfig {
@@ -1408,11 +1362,8 @@ mod tests {
 
     #[tokio::test]
     async fn rule_level_proxy_action_with_empty_target_returns_clear_error() {
-        // Bascule a posteriori : un service devenu "purement mocke" peut
-        // encore contenir une regle action=Proxy (avertissement non-bloquant
-        // a la sauvegarde) — si cette regle matche malgre tout en production,
-        // la requete ne doit jamais atteindre un vrai appel proxy vers une
-        // URL vide.
+        // A service made purely mocked later can still hold a proxy rule (saving only warns): if it matches, the request
+        // must never reach a proxy call to an empty URL.
         let rule = Rule {
             name: "stale-proxy-rule".into(),
             method: "GET".into(),
@@ -1446,13 +1397,9 @@ mod tests {
         std::fs::remove_dir_all(&data_dir).ok();
     }
 
-    // --- Pattern "repetition JSON/XML" (parse_json/to_json/parse_xml_items/
-    // xml_element) : la requete contient une liste d'objets, la reponse doit
-    // contenir le meme nombre d'elements construits par position. Verifie
-    // bout-en-bout (vrai serveur Axum + vraie requete HTTP)
-    // pour N=2, N=1 et N=0, en JSON (REST) et en XML (SOAP) — memes scripts
-    // que ceux documentes dans docs/rhai-scripts.md, pour garantir qu'un
-    // utilisateur qui copie-colle l'exemple obtient bien ce comportement.
+    // --- Repeating response items per request item (parse_json/to_json/parse_xml_items/xml_element), end to end, for
+    // 2, 1 and 0 items, in JSON and in SOAP. The scripts are the ones of docs/rhai-scripts.md, so that copying the
+    // documented example gives the documented result.
     fn json_repetition_rule() -> Rule {
         Rule {
             name: "calcul-devis".into(),
@@ -1510,7 +1457,7 @@ mod tests {
         let client = reqwest::Client::new();
         let url = format!("http://127.0.0.1:{port}/devis/calcul");
 
-        // N=2 : deux lignes distinctes, valeurs piochees par position.
+        // 2 items: two lines, each built from the item at the same position.
         let resp = client
             .post(&url)
             .json(&serde_json::json!({"lines": [
@@ -1529,12 +1476,11 @@ mod tests {
         assert_eq!(lines[0]["qty"], 3);
         assert_eq!(lines[1]["sku"], "REF-002");
         assert_eq!(lines[1]["qty"], 1);
-        // Determinisme : le meme SKU produit toujours le meme unitPrice
-        // (seeded_int), verifie plus bas sur l'appel N=1 avec le meme REF-001.
+        // The same SKU always gives the same unitPrice (seeded_int), checked again below with REF-001 alone.
         let ref001_price = lines[0]["unitPrice"].as_i64().unwrap();
         assert_eq!(lines[0]["lineTotal"], ref001_price * 3);
 
-        // N=1 : une seule ligne, meme SKU que ci-dessus -> meme unitPrice.
+        // 1 item, the same SKU as above: the same unitPrice.
         let resp = client
             .post(&url)
             .json(&serde_json::json!({"lines": [{"sku": "REF-001", "qty": 9}]}))
@@ -1549,7 +1495,7 @@ mod tests {
         assert_eq!(lines[0]["unitPrice"].as_i64().unwrap(), ref001_price);
         assert_eq!(lines[0]["lineTotal"], ref001_price * 9);
 
-        // N=0 : liste vide -> reponse avec un tableau vide, pas d'erreur.
+        // 0 items: an empty array in the response, no error.
         let resp = client
             .post(&url)
             .json(&serde_json::json!({"lines": []}))
@@ -1624,7 +1570,7 @@ mod tests {
         let client = reqwest::Client::new();
         let url = format!("http://127.0.0.1:{port}/commande-soap/totaux");
 
-        // N=2
+        // 2 items
         let body_xml = soap_request(
             "<article><sku>REF-001</sku><qty>3</qty></article><article><sku>REF-002</sku><qty>1</qty></article>",
         );
@@ -1641,7 +1587,7 @@ mod tests {
         assert!(text.contains("<count>2</count>"));
         assert!(text.contains("<sku>REF-001</sku>"));
         assert!(text.contains("<sku>REF-002</sku>"));
-        // lineTotal = unitPrice * qty ; REF-001 qty=3 -> extraire unitPrice pour verifier.
+        // lineTotal = unitPrice * qty; REF-001 has qty=3: read unitPrice to check it.
         let unit_price_pos = text.find("<sku>REF-001</sku>").unwrap();
         let after = &text[unit_price_pos..];
         let up_start = after.find("<unitPrice>").unwrap() + "<unitPrice>".len();
@@ -1649,7 +1595,7 @@ mod tests {
         let ref001_price: i64 = after[up_start..up_end].parse().unwrap();
         assert!(text.contains(&format!("<lineTotal>{}</lineTotal>", ref001_price * 3)));
 
-        // N=1 : meme SKU REF-001 -> meme unitPrice (determinisme seeded_int).
+        // 1 item, the same SKU REF-001: the same unitPrice (seeded_int).
         let body_xml = soap_request("<article><sku>REF-001</sku><qty>9</qty></article>");
         let resp = client
             .post(&url)
@@ -1665,7 +1611,7 @@ mod tests {
         assert!(text.contains(&format!("<unitPrice>{ref001_price}</unitPrice>")));
         assert!(text.contains(&format!("<lineTotal>{}</lineTotal>", ref001_price * 9)));
 
-        // N=0 : aucun article -> reponse avec <articles></articles> vide, pas d'erreur.
+        // 0 items: an empty <articles></articles>, no error.
         let body_xml = soap_request("");
         let resp = client
             .post(&url)
@@ -1682,12 +1628,9 @@ mod tests {
         std::fs::remove_dir_all(&data_dir).ok();
     }
 
-    // --- Cas d'usage "map de correspondance + lookup par path param, reponse
-    // XML" : verifie bout-en-bout que la VRAIE syntaxe Rhai correcte pour ce
-    // pattern (map literale #{...}, `.contains(cle)` + indexation
-    // `mapping[cle]`, fallback via if/else) fonctionne, y compris la branche
-    // de repli quand la cle est absente — meme script que celui documente
-    // dans docs/rhai-scripts.md, pour garantir qu'un copier-coller fonctionne.
+    // --- A lookup table keyed by a path parameter, with an XML response: the documented script (a `#{...}` map,
+    // `.contains(key)`, `mapping[key]`, an if/else fallback) works end to end, fallback included, so copying the
+    // example from docs/rhai-scripts.md works.
     fn service_lookup_rule() -> Rule {
         Rule {
             name: "lookup-service".into(),
@@ -1735,7 +1678,7 @@ mod tests {
         .await;
         let client = reqwest::Client::new();
 
-        // Cle presente dans la map : lookup reussi.
+        // A key of the table: found.
         let resp = client
             .get(format!("http://127.0.0.1:{port}/annuaire/lookup/billing"))
             .send()
@@ -1747,10 +1690,7 @@ mod tests {
         assert!(text.contains("<id>svc-billing-042</id>"));
         assert!(text.contains("<found>true</found>"));
 
-        // Cle absente de la map : la branche de repli (else) s'execute
-        // correctement — c'est exactement ce que le script silencieusement
-        // en echec (fonction inexistante) du bug d'origine ne parvenait
-        // jamais a atteindre.
+        // A key missing from the table: the else branch answers, which a script calling a missing function never reached.
         let resp = client
             .get(format!(
                 "http://127.0.0.1:{port}/annuaire/lookup/nonexistent"
@@ -1767,14 +1707,10 @@ mod tests {
         std::fs::remove_dir_all(&data_dir).ok();
     }
 
-    // --- Condition XPath sur XML SOAP namespace + extraction requete->reponse :
-    // verifie bout-en-bout que la condition XPath "Envelope/Body/recherche"
-    // (sans prefixe de namespace, cf MatchEngine::local_name) route
-    // correctement selon l'operation SOAP presente dans le corps, meme avec
-    // un <Header></Header> non-autoferme sibling de <Body> (structure SOAP
-    // realiste, cf commentaire sur MatchEngine::walk_xml). Verifie aussi que
-    // le script d'extraction (parse_xml_items) recupere une valeur du corps
-    // de requete (Siret) et la reinjecte dans la reponse.
+    // --- An XPath condition on a SOAP body with namespaces, and a value copied from the request into the response:
+    // "Envelope/Body/recherche" (no namespace prefix, see MatchEngine::local_name) picks the right operation even with
+    // an empty <Header></Header> written in full before <Body> (see MatchEngine::walk_xml), and the extraction script
+    // (parse_xml_items) copies the request's Siret into the response.
     fn soap_condition_rules() -> Vec<Rule> {
         vec![
             Rule {
@@ -1849,9 +1785,7 @@ mod tests {
         let client = reqwest::Client::new();
         let url = format!("http://127.0.0.1:{port}/annuaire-soap/service");
 
-        // Requete "recherche" avec un Header non-autoferme sibling de Body (structure
-        // SOAP realiste) : la condition XPath doit matcher malgre le Header, et le
-        // Siret de la requete doit se retrouver tel quel dans la reponse.
+        // The "recherche" operation with a full Header before Body: the condition matches and the Siret comes back as is.
         let body_recherche = r#"<SOAP:Envelope><SOAP-ENV:Header></SOAP-ENV:Header><SOAP-ENV:Body><ns3:recherche><ns3:Nom>Test</ns3:Nom><ns3:Siret>12345678901234</ns3:Siret></ns3:recherche></SOAP-ENV:Body></SOAP:Envelope>"#;
         let resp = client
             .post(&url)
@@ -1864,11 +1798,10 @@ mod tests {
         let text = resp.text().await.unwrap();
         assert!(
             text.contains("<siret>12345678901234</siret>"),
-            "le Siret de la requete doit etre reinjecte dans la reponse, obtenu: {text}"
+            "the request's Siret must come back in the response, got: {text}"
         );
 
-        // Requete "mode" (autre operation, meme structure d'enveloppe avec Header) :
-        // la regle "recherche" ne doit PAS matcher, "mode" doit repondre a la place.
+        // The "mode" operation, same envelope: the "recherche" rule does not match, "mode" answers instead.
         let body_mode = r#"<SOAP:Envelope><SOAP-ENV:Header></SOAP-ENV:Header><SOAP-ENV:Body><ns3:mode><ns3:Valeur>test</ns3:Valeur></ns3:mode></SOAP-ENV:Body></SOAP:Envelope>"#;
         let resp = client
             .post(&url)
