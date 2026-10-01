@@ -344,10 +344,8 @@ async fn reset_config(
         .replace(MockConfig::empty())
         .await
         .map_err(AppError::Store)?;
-    // Meme raison que delete_service_impl : sans ca, un service recree apres
-    // un reset heriterait silencieusement du statut "observe" d'un service
-    // disparu (ObservationToggle est independant du cycle de vie de
-    // MockConfig).
+    // Observation state lives outside the configuration: without this, a service created again after the reset would
+    // start out observed.
     state.observation.toggle.clear_all();
     Ok(StatusCode::NO_CONTENT)
 }
@@ -422,13 +420,10 @@ async fn get_logs(
     Json(entries)
 }
 
-// --------------- Observation de trafic (proxy niveau service) ---------------
-// Active/desactive EXPLICITEMENT par l'utilisateur (jamais automatique, cf
-// `server::observation`) : n'a d'effet que sur un service purement proxifie
-// (is_mocked=false) — c'est le seul chemin ou le proxy est aujourd'hui
-// streame sans aucune capture par defaut. Meme garde d'auth que
-// toggle/ping/reorder (can_access_service, pas de restriction super-admin :
-// action reversible, pas une mutation de la configuration persistee).
+// --------------- Traffic observation (service-level proxy) ---------------
+// Turned on and off by a user, never automatically, and only for a pure proxy (is_mocked=false), the one path that
+// streams traffic without capturing it. Same access rule as toggle and ping: a reversible action that changes no
+// stored configuration.
 
 #[derive(serde::Serialize, serde::Deserialize)]
 struct ObservationStatusEntry {
@@ -532,11 +527,8 @@ async fn unobserve_service_grouped(
     observe_service_impl(state, user, Some(group), name, false).await
 }
 
-/// Recalcule TOUJOURS a la demande depuis `ObservationStore` (cf commentaire
-/// de module de `server::suggestion`) : aucun etat de suggestion separe a
-/// tenir a jour. Ne renvoie que les cles avec assez d'observations
-/// (`suggestion::min_samples()`) — une cle en-dessous du seuil est
-/// silencieusement omise, pas signalee comme "en cours".
+/// Computed from `ObservationStore` at each call, so there is no suggestion state to keep in sync. Endpoints with
+/// fewer observations than `suggestion::min_samples()` are left out.
 async fn get_service_suggestions_impl(
     state: AppState,
     user: AuthUser,
@@ -587,18 +579,13 @@ async fn get_service_suggestions_grouped(
 }
 
 // --------------- Messaging (Kafka) ---------------
-// Feature-gated : ces routes n'existent meme pas dans un build par defaut
-// (cf routes() ci-dessus). Meme garde d'auth que /logs (utilisateur
-// authentifie, pas de restriction super-admin — lecture seule + simulation,
-// pas d'operation destructive).
+// Only compiled with the "messaging-kafka" feature (see routes()).
 
 #[cfg(feature = "messaging-kafka")]
 #[derive(serde::Serialize)]
 struct MessagingStatusResponse {
-    /// Toujours `true` ici : l'existence meme de la reponse (200, pas 404)
-    /// suffit au frontend a detecter que le binaire a ete compile avec la
-    /// feature "messaging-kafka" — c'est ce champ qui distingue "route
-    /// absente" (binaire sans la feature) de "fonctionnalite compilee".
+    /// Always true: the UI only needs to know that the route exists, which tells it the binary has the feature (a
+    /// binary without it answers 404).
     available: bool,
 }
 
@@ -622,13 +609,8 @@ async fn get_messaging_logs(
     Ok(Json(state.messaging.message_log.recent(q.limit)))
 }
 
-/// Simule la reception d'un message sur le topic d'ecoute : declenche
-/// exactement le meme pipeline (match -> rendu -> journal -> publication
-/// eventuelle sur reply_topic) que le vrai consumer Kafka
-/// (messaging::consumer::process_message), sans dependre d'un producteur
-/// Kafka externe. Utile pour tester une regle de messaging depuis l'UI
-/// (bouton "Simuler un message") et pour les tests E2E dans un environnement
-/// sans broker Kafka reel.
+/// Runs a message through the same steps as the Kafka consumer (match, render, log, publish to the reply topic when
+/// one is configured), without a Kafka producer: for testing messaging rules from the UI and in end-to-end tests.
 #[cfg(feature = "messaging-kafka")]
 #[derive(serde::Deserialize)]
 struct SimulateMessageRequest {
@@ -660,18 +642,10 @@ async fn simulate_message(
     Ok(StatusCode::NO_CONTENT)
 }
 
-// --------------- TCP brut (protocoles binaires non-HTTP) ---------------
-// Feature-gated. /tcp/status reste sans auth (meme garde que /health et
-// /messaging/status : lecture seule, aucune donnee sensible au-dela de ce
-// que l'operateur a deja ecrit dans tcp-config.yaml). Le CRUD sur
-// /tcp/services EXPOSE le contenu des regles (matchers, reponses en hex) et
-// PEUT OUVRIR/FERMER des ports reseau -- traite comme une operation
-// sensible : lecture requiert un utilisateur authentifie (quand l'auth est
-// active), toute mutation requiert super-admin, meme garde que
-// reset_config/restore_backup. Chaque mutation reussie appelle
-// TcpRuntime::replace(), qui persiste sur disque PUIS relance les listeners
-// concernes -- effective immediatement, aucun redemarrage du processus
-// necessaire (contrairement a un edit manuel du YAML).
+// --------------- Raw TCP mocks ---------------
+// Only compiled with the "tcp-mock" feature. Reading the services shows their matchers and responses, and changing
+// them opens or closes network ports: with authentication on, reading needs a signed-in user and every change a
+// super-admin. A change is written to disk, then the affected listeners restart, without restarting the process.
 
 #[cfg(feature = "tcp-mock")]
 async fn get_tcp_status(State(state): State<AppState>) -> Json<Vec<crate::tcp::TcpServiceStatus>> {
@@ -729,9 +703,8 @@ async fn update_tcp_service(
         return Err(AppError::NotFound);
     };
 
-    // Exclut le service qu'on est en train de remplacer de la verification
-    // d'unicite nom/port -- sinon un PUT qui ne change rien se rejetterait
-    // lui-meme (cf doc de validate_tcp_service).
+    // Leave the service being replaced out of the name and port checks, or a PUT that changes nothing would conflict
+    // with itself.
     let others: Vec<_> = config
         .services
         .iter()
@@ -794,11 +767,8 @@ async fn list_services(
     ))
 }
 
-// Un service est identifie de facon non ambigue par (group_name, name) : le
-// nom seul ne suffit pas puisque `create_service` autorise deux services du
-// meme nom dans des groupes differents (cf commit 8fdb9c0, "unicite service
-// par groupe, pas globale"). `group` vaut `None` pour le perimetre "sans
-// groupe", qui forme son propre espace de noms au meme titre qu'un groupe.
+// A service is identified by its group and its name: two groups may each hold a service of the same name, and the
+// ungrouped services (`group` = None) form one more such namespace.
 fn service_matches(s: &Service, group: Option<&str>, name: &str) -> bool {
     s.name == name && s.group_name.as_deref() == group
 }
@@ -1032,11 +1002,8 @@ async fn delete_service_impl(
     {
         Err(AppError::NotFound)
     } else {
-        // Sans ca, un futur service RECREE sous le meme (group, name)
-        // heriterait silencieusement du statut "observe" d'un service deja
-        // supprime (ObservationToggle est ephemere mais totalement
-        // independant du cycle de vie de MockConfig) -- confusion pure pour
-        // l'utilisateur, aucune donnee sensible en jeu.
+        // Observation state lives outside the configuration: without this, a service created again under the same group
+        // and name would start out observed.
         state.observation.toggle.disable(group.as_deref(), &name);
         Ok(StatusCode::NO_CONTENT)
     }
@@ -1545,22 +1512,12 @@ async fn validate_script(
     }
 }
 
-// --------------- Testeur de regle (rejeu en lecture seule) ---------------
+// --------------- Rule tester (read-only replay) ---------------
 //
-// Endpoint totalement stateless : aucun acces au store, aucune reference a un
-// service persiste. Le frontend envoie le brouillon de regle EN COURS
-// D'EDITION (pas necessairement sauvegarde) et le detail d'une requete deja
-// capturee (RequestLog::CapturedRequest, cf src/server/request_log.rs). Le
-// handler ne fait que deserialiser, reconstruire un RequestData, deleguer a
-// MatchEngine::evaluate_rule_test, puis serialiser le resultat — aucune
-// mutation, aucun appel reseau/proxy, un vrai rejeu local en lecture seule.
-//
-// Garde d'auth : utilisateur authentifie requis, MEME garde que /logs (pas de
-// can_access_service supplementaire) — /logs lui-meme n'est pas scope par
-// service aujourd'hui, on ne cree pas ici une incoherence de modele de
-// securite pour ce seul endpoint. Pas de variante flat/groupee non plus :
-// aucun service n'est charge depuis le store, donc pas d'identite de service
-// a desambiguiser (cf service_matches).
+// Stateless: the UI sends the rule being edited, saved or not, and a request captured earlier (CapturedRequest);
+// the handler rebuilds the request, evaluates the rule on it (MatchEngine::evaluate_rule_test) and runs its scripts.
+// Nothing is stored, nothing is sent over the network. Any signed-in user may call it: it reads no service from the
+// configuration, and the captured request it replays is one the caller already received from /api/logs.
 
 #[derive(serde::Deserialize, Default)]
 struct RuleTestCapturedRequest {
@@ -1585,19 +1542,9 @@ struct RuleTestRequest {
     method: String,
     sub_path: Option<String>,
     conditions: ConditionGroup,
-    // Les 4 champs ci-dessous sont optionnels (absents des payloads envoyes
-    // avant cette extension) : #[serde(default)] preserve la compatibilite
-    // avec un frontend qui n'enverrait pas encore ces champs. `action` par
-    // defaut Mock (RuleAction::default()), coherent avec le modele Rule.
-    //
-    // `pre_script`/`script`/`post_script` sont executes (si la regle matche
-    // et n'est pas en action=Proxy, memes conditions que la production, cf
-    // run_rule_script dans intercept.rs) contre la VRAIE requete capturee
-    // choisie par l'utilisateur — jamais contre un contexte synthetique/vide,
-    // ce qui evite tout faux positif (contrairement a une validation "a vide"
-    // qui ferait planter a tort un script comme
-    // `parse_json(request.body).len()` des que le corps de test est
-    // absent/invalide).
+    // Optional, for UIs that do not send them. The scripts run under the production conditions (the rule matches and
+    // is not a proxy rule, see run_rule_script in intercept.rs) and against the captured request itself, never an empty
+    // one, so that a script such as `parse_json(request.body).len()` is not reported as failing for lack of a body.
     #[serde(default)]
     action: RuleAction,
     #[serde(default)]
@@ -1615,15 +1562,9 @@ struct ScriptExecutionError {
     message: String,
 }
 
-// Resultat REUSSI d'un bloc de script (value + fields, cf ScriptResult) —
-// distinct de ScriptExecutionError : un script peut s'executer sans la
-// moindre erreur tout en produisant un resultat que l'auteur de la regle
-// n'attendait pas (typo de cle, chemin imbrique non supporte par
-// {{script.champ}}...). /api/rule-test executait deja les scripts pour
-// detecter les erreurs mais jetait silencieusement le ScriptResult en cas de
-// succes — aucune fonctionnalite du produit ne permettait alors a
-// l'utilisateur de voir ce que son script avait REELLEMENT produit avant de
-// sauvegarder la regle.
+// What a script returned (value and fields, see ScriptResult). A script can run without error and still produce
+// something its author did not expect (a misspelled key, a nested path that {{script.field}} cannot reach): the
+// tester shows the result so that this is seen before the rule is saved.
 #[derive(serde::Serialize)]
 struct ScriptExecutionResult {
     slot: &'static str,
@@ -1640,23 +1581,11 @@ struct RuleTestResponse {
     body_truncated: bool,
     all_of: Vec<ConditionEvaluation>,
     any_of: Vec<ConditionEvaluation>,
-    // Erreurs d'execution des blocs de script (pre_script/script/post_script),
-    // rejouees contre la VRAIE requete capturee (jamais un contexte
-    // synthetique). Vide si la regle ne matche pas (les scripts ne
-    // s'executent jamais dans ce cas, memes conditions que la production) ou
-    // si aucun script n'est configure. C'est le SEUL endroit ou une erreur
-    // d'execution de script redevient visible pour l'utilisateur : en
-    // production (intercept.rs::run_rule_script), la meme erreur est
-    // deliberement avalee en soft-fail (repli sur un ScriptResult vide, la
-    // requete n'est jamais bloquee par un script casse) et seulement
-    // journalisee cote serveur (tracing::warn!) — invisible sans acces aux
-    // logs K8s. Ne jamais faire disparaitre ce champ ou le rendre silencieux.
+    // Script errors, replayed against the captured request; empty when the rule does not match (scripts do not run
+    // then, as in production) or has no script. In production a failing script never blocks the response: the error
+    // only reaches the server log and the template gets an empty result. This field is where a user sees it.
     script_errors: Vec<ScriptExecutionError>,
-    // Resultats REUSSIS des blocs de script (value + fields), memes
-    // conditions d'execution que script_errors ci-dessus (mutuellement
-    // exclusif par slot : un slot execute apparait soit ici, soit dans
-    // script_errors, jamais les deux). Cf ScriptExecutionResult pour la
-    // justification complete.
+    // What the scripts that ran without error returned. A script slot appears either here or in script_errors.
     script_results: Vec<ScriptExecutionResult>,
 }
 
@@ -1685,9 +1614,8 @@ async fn test_rule(
         &req,
     );
 
-    // Memes conditions qu'en production (intercept.rs) pour executer les
-    // scripts : la regle doit matcher ET ne pas etre en action=Proxy (un
-    // proxy ne rend jamais de template, donc n'execute jamais de script).
+    // As in production: scripts run only when the rule matches and is not a proxy rule (a proxied request renders no
+    // template).
     let mut script_errors = Vec::new();
     let mut script_results = Vec::new();
     if outcome.overall_matched && payload.action != RuleAction::Proxy {
@@ -1728,22 +1656,11 @@ async fn test_rule(
     })
 }
 
-// --------------- Detecteur de conflit entre regles (a la sauvegarde) ---------------
+// --------------- Rule conflict detection (when saving) ---------------
 //
-// Endpoint stateless, meme famille que /api/rule-test ci-dessus : aucun acces
-// au store, aucune reference a un service persiste. Le frontend envoie le
-// brouillon de regle EN COURS DE SAUVEGARDE (RuleForm, avant l'appel PUT
-// /api/services/:name qui persiste reellement), la liste des AUTRES regles
-// du service dans leur ordre actuel, et la position ou le brouillon se
-// retrouvera une fois sauvegarde. Le handler ne fait que deserialiser,
-// deleguer a MatchEngine::find_rule_conflicts, serialiser le resultat —
-// aucune mutation, purement informatif (voir MatchEngine::find_rule_conflicts
-// pour le detail de l'algorithme et ses limites assumees).
-//
-// Garde d'auth : utilisateur authentifie requis, MEME garde que /rule-test
-// et /logs — pas de can_access_service supplementaire, cette route ne
-// charge aucun service depuis le store donc pas d'identite de service a
-// desambiguiser (cf service_matches).
+// Stateless, like the rule tester: the UI sends the rule about to be saved, the service's other rules in their
+// current order and the position the new rule will take; MatchEngine::find_rule_conflicts says which overlaps
+// would hide one rule behind another. Informative only: it changes nothing, and any signed-in user may call it.
 
 #[derive(serde::Deserialize)]
 struct RuleConflictDraftRequest {
@@ -1889,10 +1806,7 @@ mod authz_tests;
 mod tests {
     use super::*;
 
-    // require_super_admin() est le seul garde-fou reel derriere reset_config
-    // ET restore_backup : verifie directement ici plutot que
-    // via un test HTTP bout-en-bout (pas d'infra de test router dans ce
-    // fichier a ce jour).
+    // require_super_admin() is what stands between any user and reset_config or restore_backup.
     #[test]
     fn require_super_admin_rejects_non_admin() {
         let user = AuthUser {
@@ -1914,11 +1828,8 @@ mod tests {
         assert!(require_super_admin(&user).is_ok());
     }
 
-    // service_matches() est la seule fonction qui decide de l'identite d'un
-    // service (name + group_name) — utilisee par TOUS les handlers scopes
-    // (get/update/delete/toggle/ping/reorder). Ces tests couvrent directement
-    // la portee reelle de l'unicite (par groupe, pas globale) sans avoir
-    // besoin d'un serveur HTTP complet.
+    // service_matches() alone decides which service a scoped handler acts on (get, update, delete, toggle, ping,
+    // reorder): names are unique per group, not globally.
     fn svc_named(name: &str, group: Option<&str>) -> Service {
         Service {
             name: name.into(),
@@ -1958,12 +1869,8 @@ mod tests {
         assert!(!service_matches(&s, Some("team-a"), "bar"));
     }
 
-    // --- Infra de test HTTP minimale (reprend le pattern deja etabli dans
-    // server::intercept::tests : vrai routeur Axum + vrai listener TCP,
-    // plutot qu'un style tower::oneshot qui n'existe pas encore dans ce
-    // projet). Justifie ici par la gravite du bug couvert (suppression
-    // croisee entre groupes) : une regression doit etre detectee par
-    // `cargo test` seul, sans dependre de la suite Playwright.
+    // --- The real router on a real port, called with reqwest: a regression such as deleting a same-named service of
+    // another group must fail `cargo test`, not only the browser suite.
     async fn spawn_test_app(config: MockConfig) -> String {
         crate::server::test_support::assert_consistent(&config);
         let data_dir = crate::server::test_support::temp_data_dir("api-test");
@@ -2060,7 +1967,7 @@ mod tests {
         let svc: Service = via_flat.json().await.unwrap();
         assert_eq!(
             svc.group_name, None,
-            "la route non scopee doit resoudre au service SANS groupe, pas au premier trouve"
+            "the route without a group must resolve to the ungrouped service, not to the first one found"
         );
     }
 
@@ -2088,7 +1995,7 @@ mod tests {
         assert_eq!(
             still_team_b.status(),
             200,
-            "le service de team-b ne doit pas avoir ete supprime"
+            "the service of team-b must not be deleted"
         );
 
         let still_ungrouped = client
@@ -2099,7 +2006,7 @@ mod tests {
         assert_eq!(
             still_ungrouped.status(),
             200,
-            "le service sans groupe ne doit pas avoir ete supprime"
+            "the ungrouped service must not be deleted"
         );
 
         let gone_team_a = client
@@ -2139,20 +2046,17 @@ mod tests {
             .unwrap();
         assert_eq!(
             team_a.real_target_url, "http://example.com",
-            "team-a ne doit pas avoir ete modifie par un PUT scope sans groupe"
+            "team-a must not change through a PUT on the ungrouped route"
         );
     }
 
-    // --- test_rule() : testeur de regle, endpoint stateless ---
+    // --- test_rule(): the stateless rule tester ---
 
     fn anon_user() -> AuthUser {
         AuthUser::anonymous()
     }
 
-    // AppState minimal pour appeler test_rule() directement (sans passer par
-    // un vrai serveur HTTP, cf spawn_test_app plus haut pour le pattern
-    // complet) : seul script_engine est reellement exerce par ces tests,
-    // le reste est un etat vide/desactive standard.
+    // A minimal state to call test_rule() directly: only the script engine matters to these tests.
     async fn test_state() -> AppState {
         let data_dir = crate::server::test_support::temp_data_dir("scripttest");
         std::fs::create_dir_all(&data_dir).unwrap();
@@ -2310,13 +2214,9 @@ mod tests {
         assert!(result.body_truncated);
     }
 
-    // --- test_rule() : execution des scripts (visibilite des erreurs) ---
+    // --- test_rule(): script errors ---
     //
-    // Avant cette extension, /api/rule-test ne rejouait QUE le matching —
-    // un script casse (fonction Rhai inexistante, erreur de type...) restait
-    // invisible du testeur de regle, exactement comme en production
-    // (run_rule_script soft-fail + log serveur uniquement).
-    // Ces tests couvrent le champ `script_errors`.
+    // In production a failing script only reaches the server log; the tester is where a user sees it (`script_errors`).
 
     #[tokio::test]
     async fn test_rule_reports_script_execution_error_when_rule_matches() {
@@ -2324,9 +2224,7 @@ mod tests {
             method: "GET".into(),
             sub_path: None,
             conditions: ConditionGroup::default(),
-            // Fonction inexistante : compile() (utilise par /api/script/validate)
-            // ne la detecterait pas, seule une vraie execution le peut — c'est
-            // exactement la classe d'erreur diagnostiquee comme cause racine.
+            // A function that does not exist: compiling the script (/api/script/validate) accepts it, only running it fails.
             script: Some("totally_undefined_fn(1, 2)".into()),
             request: empty_captured("GET", "/x"),
             ..Default::default()
@@ -2388,11 +2286,11 @@ mod tests {
         .await;
         assert!(
             !result.overall_matched,
-            "GET != POST : la regle ne doit pas matcher"
+            "GET is not POST: the rule must not match"
         );
         assert!(
             result.script_errors.is_empty(),
-            "un script n'est jamais execute pour une regle qui ne matche pas, meme conditions qu'en production"
+            "a script never runs for a rule that does not match, as in production"
         );
     }
 
@@ -2440,22 +2338,14 @@ mod tests {
         assert!(result.script_errors.is_empty());
     }
 
-    // --- test_rule() : script_results (visibilite d'un resultat REUSSI mais
-    // errone) ---
+    // --- test_rule(): what a script returned ---
     //
-    // Un script qui s'execute sans erreur mais produit un resultat inattendu
-    // (typo de cle, objet imbrique non navigable) reste totalement opaque
-    // meme via le testeur de regle : script_errors reste vide (a raison, il
-    // n'y a pas d'erreur), mais l'utilisateur n'a aucun moyen de voir CE QUE
-    // le script a produit pour s'en rendre compte lui-meme. Ces tests
-    // couvrent le champ `script_results`.
+    // A script can run without error and still return something unexpected (a misspelled key, a nested object that a
+    // template path cannot reach); `script_results` shows what it produced.
 
     #[tokio::test]
     async fn test_rule_reports_successful_script_result_fields() {
-        // Reproduction exacte du signalement : une liste d'objets ville +
-        // seeded_pick, retourne directement (le pattern qui fonctionne) —
-        // le testeur doit desormais montrer les champs produits, pas
-        // seulement l'absence d'erreur.
+        // The reported case: an object picked from a list of cities and returned as is; the tester shows each field.
         let mut captured = empty_captured("GET", "/quote/44306184100047");
         captured
             .path_params
@@ -2490,7 +2380,7 @@ mod tests {
         assert_eq!(script_result.slot, "script");
         assert!(
             !script_result.fields.is_empty(),
-            "les champs de la ville piochee doivent etre exposes"
+            "the fields of the picked city must be shown"
         );
         assert!(script_result.fields.contains_key("name"));
         assert!(script_result.fields.contains_key("cp"));
@@ -2499,14 +2389,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_rule_script_result_exposes_nested_object_as_valid_json_field() {
-        // Variante ou l'objet pioche est imbrique sous une cle (pattern
-        // naturel des qu'on combine plusieurs infos dans un seul script) : le
-        // testeur doit montrer la valeur REELLEMENT produite pour ce champ
-        // (desormais du JSON valide suite au correctif de
-        // dynamic_field_to_string, plus la syntaxe Rhai #{...} d'avant), ce
-        // qui permet a l'utilisateur de constater immediatement qu'un chemin
-        // imbrique type {{script.ville.name}} n'y correspond pas (seule la
-        // cle plate "ville" existe).
+        // The picked object nested under a key, as soon as a script returns several things: the tester shows that field as
+        // JSON, which makes it plain that a nested path such as {{script.city.name}} does not exist (only "city" does).
         let payload = RuleTestRequest {
             method: "GET".into(),
             sub_path: None,
@@ -2644,8 +2528,7 @@ mod tests {
 
     #[tokio::test]
     async fn check_rule_conflicts_reports_subset_conditions_with_draft_winner() {
-        // Le brouillon est repositionne AVANT l'autre regle (edition en
-        // place a l'index 0) : c'est donc le brouillon qui gagnerait.
+        // The draft moves before the other rule (edited in place at index 0), so the draft is the one that would win.
         let payload = RuleConflictsRequest {
             draft: RuleConflictDraftRequest {
                 method: "POST".into(),
@@ -2668,8 +2551,7 @@ mod tests {
         assert_eq!(result.conflicts[0].winner, ConflictWinner::Draft);
     }
 
-    // --- Observation de trafic (proxy niveau service) : meme infra
-    // spawn_test_app que le reste de ce fichier, auth desactivee.
+    // --- Traffic observation (service-level proxy), authentication off.
 
     #[tokio::test]
     async fn observe_service_enables_toggle_for_proxy_service() {
@@ -2899,9 +2781,8 @@ mod tests {
 
     #[tokio::test]
     async fn suggestions_end_to_end_through_real_proxy_traffic() {
-        // Vraie cible : renvoie 200 pour id=1, 404 pour id=2, sur le meme
-        // (method, sub_path) -- exactement le cas piege (variance legitime,
-        // discriminee ici par le query param `id`).
+        // A real target answering 200 for id=1 and 404 for id=2 on the same method and path: legitimate variance, explained
+        // here by the `id` query parameter.
         async fn target(
             axum::extract::Query(params): axum::extract::Query<HashMap<String, String>>,
         ) -> axum::response::Response {
@@ -3011,8 +2892,7 @@ mod tests {
             .await
             .unwrap();
 
-        // Un service RECREE sous le meme nom ne doit pas heriter du statut
-        // "observe" du service supprime.
+        // A service created again under the same name does not inherit the deleted one's observation.
         client
             .post(format!("{base}/services"))
             .json(&svc)
@@ -3071,12 +2951,8 @@ mod tests {
         assert!(status.is_empty());
     }
 
-    // --- CRUD TCP (feature "tcp-mock") : meme infra spawn_test_app que le
-    // reste de ce fichier (vrai routeur, vrai port TCP), auth desactivee
-    // (spawn_test_app force auth_config.enabled: false) donc les gardes
-    // require_super_admin ne sont pas exercees ici -- couvertes indirectement
-    // par require_super_admin_rejects_non_admin plus haut, meme fonction que
-    // le reste du CRUD HTTP utilise.
+    // --- Raw TCP mock CRUD ("tcp-mock" feature), authentication off; who may change TCP mocks is covered by the
+    // authorization tests.
 
     #[cfg(feature = "tcp-mock")]
     #[tokio::test]
@@ -3238,10 +3114,8 @@ mod tests {
     #[cfg(feature = "tcp-mock")]
     #[tokio::test]
     async fn tcp_service_created_via_api_is_immediately_reachable_over_raw_tcp() {
-        // Preuve bout-en-bout que TcpRuntime::replace() relance vraiment les
-        // listeners : cree un service via l'API HTTP, puis se connecte en
-        // TCP brut sur le port declare et verifie la reponse mockee -- sans
-        // redemarrer le processus entre les deux.
+        // TcpRuntime::replace() really restarts the listeners: create a service through the API, then connect to its port
+        // and read the mocked answer, without restarting anything in between.
         use crate::tcp::config::{TcpMatcher, TcpRule, TcpService};
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
@@ -3252,8 +3126,7 @@ mod tests {
         .await;
         let client = reqwest::Client::new();
 
-        // Port 0 refuse cote validation (aucune contrainte dessus), mais on a
-        // besoin d'un port REEL pour s'y connecter ensuite : en reserve un.
+        // The service needs a port that can be connected to: reserve a free one.
         let probe = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let port = probe.local_addr().unwrap().port();
         drop(probe);
