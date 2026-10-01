@@ -1,6 +1,6 @@
 # Mimicway UI
 
-A Svelte 5 single-page application (no SvelteKit), built to static files that the Mimicway binary serves. It has no runtime dependency: `package.json` only lists build and test tools.
+A Svelte 5 single-page application (no SvelteKit), built to static files that the Mimicway binary serves. Its one runtime dependency is Svelte, whose runtime the compiler puts in the bundle; everything else in `package.json` is a build or test tool, and the release SBOM of the UI lists exactly what ships.
 
 ## Develop
 
