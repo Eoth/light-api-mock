@@ -259,13 +259,10 @@ export function varNameToSource(varName) {
   return { source: 'fixed', value: varName };
 }
 
-// ── Example JSON: raw value → Fields (mode "coller un exemple") ──────
-// Contrairement a templateToFields (qui parse un template {{...}} deja
-// existant), cette fonction part d'un exemple JSON brut (litteral, sans
-// {{}}) tel que colle par l'utilisateur : chaque valeur devient un champ
-// fieldType:'value', source:'fixed' pre-rempli avec la valeur collee, que
-// l'utilisateur peut ensuite reassigner (path/query/fake/etc.) dans le
-// builder guide.
+// ── Example JSON: raw value → Fields (builder by example) ────────────
+// Unlike templateToFields, which parses an existing {{...}} template, this starts from a literal JSON example, without
+// {{}}, as the user pasted it: each value becomes a fixed field (fieldType 'value', source 'fixed') holding the pasted
+// value, which the user can then bind to another source (path, query, fake data...) in the builder.
 
 export function exampleJsonToFields(value) {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
@@ -403,14 +400,10 @@ function splitTplArray(inner) {
 
 // ── XML: Fields → Template string ────────────────────────────────────
 //
-// `attributes` (optionnel) : liste de {name, source, value, pipe} portee
-// par un noeud (racine incluse via `rootAttributes`) ou par un champ
-// value/parent. Retro-compatible : un champ/racine sans `attributes`
-// produit exactement le meme texte qu'avant, `xmlAttrsToTpl` renvoyant ''
-// pour une liste vide/absente. Aucun echappement des valeurs d'attribut
-// (guillemets compris) : coherent avec le choix deliberement fait pour le
-// contenu texte des elements (resolve_variable ne re-echappe jamais) --
-// le template reste du texte brut de bout en bout.
+// `attributes` (optional): a list of {name, source, value, pipe} on a value or parent node, and on the root through
+// `rootAttributes`; absent or empty, it adds nothing to the text. Attribute values are not escaped, quotes included,
+// like the text of elements: the server inserts template values as they are (resolve_variable in
+// src/engine/template.rs), so the template stays raw text from end to end.
 
 export function xmlFieldsToTemplate(fields, rootTag = 'response', rootAttributes = []) {
   const attrs = xmlAttrsToTpl(rootAttributes);
@@ -436,30 +429,19 @@ function xmlNodeToTpl(field) {
   return `<${t}${attrs}>${buildExpr(field)}</${t}>`;
 }
 
-// ── Example XML: raw text → Fields (mode "coller un exemple", XML) ────
-// Miroir de exampleJsonToFields (voir plus haut) pour le XML : part d'un
-// exemple XML brut (litteral, sans {{}}) tel que colle par l'utilisateur
-// (typiquement une reponse SOAP reelle), et retourne { rootTag,
-// rootAttributes, fields } ou `fields` est la liste des ELEMENTS ENFANTS
-// DIRECTS de la racine, au meme format que celui consomme par
-// XmlResponseBuilder.svelte (tag/nodeType/source/value/children), etendu
-// avec `attributes`.
+// ── Example XML: raw text → Fields (builder by example, XML) ─────────
+// The XML counterpart of exampleJsonToFields: starts from a literal XML example, without {{}}, as the user pasted it
+// (typically a real SOAP response), and returns { rootTag, rootAttributes, fields }, where `fields` are the direct
+// child elements of the root, in the shape XmlResponseBuilder.svelte uses (tag/nodeType/source/value/children), plus
+// `attributes`.
 //
-// Limites assumees et documentees (pas des bugs a corriger silencieusement,
-// meme esprit que la limite deja assumee pour parse_xml_items cote Rhai) :
-//  - Prefixes de namespace ("soap:Envelope") et declarations xmlns/xmlns:*
-//    sont preserves TELS QUELS comme du texte litteral dans le nom de
-//    tag/attribut (DOMParser les restitue deja ainsi via .tagName/.name) --
-//    aucune resolution semantique (pas de mapping prefixe -> URI). Suffisant
-//    pour reconstruire un template fidele au XML colle sans jamais planter
-//    dessus ; une validation stricte des namespaces est hors scope.
-//  - Contenu mixte (texte + elements enfants sur le meme noeud) : les
-//    elements enfants gagnent (noeud traite comme 'parent'), le texte
-//    direct du noeud est ignore -- cas rare pour des reponses API/SOAP
-//    typiques (texte pur en feuille XOR structure imbriquee).
-//  - Une racine sans aucun element enfant (uniquement du texte) est
-//    rejetee avec un message explicite, comme un tableau JSON vide cote
-//    exampleJsonToFields.
+// Deliberate limits:
+//  - Namespace prefixes ("soap:Envelope") and xmlns/xmlns:* declarations stay literal text in tag and attribute names,
+//    as DOMParser gives them (.tagName, .name); no prefix is resolved to its URI and no namespace is validated. That
+//    is enough to rebuild a template faithful to the pasted XML, without ever failing on it.
+//  - Mixed content (text and child elements in one node): the child elements win (a 'parent' node) and the node's
+//    own text is dropped. API and SOAP responses rarely mix them: a leaf holds text, a parent holds elements.
+//  - A root without any child element (text only) is refused with a message that says so.
 
 export function exampleXmlToFields(xmlString) {
   const text = xmlString.trim();
@@ -486,19 +468,13 @@ export function exampleXmlToFields(xmlString) {
   };
 }
 
-// ── XML template string → Fields (restauration de la vue d'origine) ──
-// Miroir XML de templateToFields() (JSON) : contrairement a
-// exampleXmlToFields (qui part d'un exemple XML LITTERAL, sans {{}}, colle
-// par l'utilisateur), cette fonction part d'un TEMPLATE deja rendu par
-// xmlFieldsToTemplate() (avec {{expr | pipe}} deja en place) et reconstruit
-// la structure Fields (tag/nodeType/source/value/pipe/children/attributes)
-// consommee aussi bien par XmlResponseBuilder.svelte (guide) que
-// XmlPasteBuilder.svelte (par exemple) — ces deux modes partagent la meme
-// forme de Fields. Utilise DOMParser comme exampleXmlToFields (les
-// caracteres {, }, |, ( ) sont du texte XML litteral valide, aucun
-// echappement necessaire) ; seule la lecture de la feuille differe : on y
-// detecte un eventuel {{expr | pipe}} au lieu de toujours traiter comme une
-// valeur fixe.
+// ── XML template string → Fields (back to the structured view) ──────
+// The XML counterpart of templateToFields() (JSON). Unlike exampleXmlToFields, which starts from literal XML, this
+// starts from a template that xmlFieldsToTemplate() built ({{expr | pipe}} in place) and rebuilds the Fields
+// (tag/nodeType/source/value/pipe/children/attributes) that both XML builders use, guided (XmlResponseBuilder.svelte)
+// and by example (XmlPasteBuilder.svelte). DOMParser reads it as exampleXmlToFields does ({, }, |, ( and ) are valid
+// literal XML text, nothing to escape); only the leaves differ: a leaf that is a {{expr | pipe}} expression keeps its
+// source and pipe instead of becoming a fixed value.
 export function templateToXmlFields(tpl) {
   const text = tpl.trim();
   if (!text) {
@@ -536,12 +512,9 @@ function xmlElementToTplField(el) {
   return { tag, nodeType: 'value', attributes, ...parseXmlLeafExpr(el.textContent ?? '') };
 }
 
-// Lit le contenu d'une feuille XML (texte d'element ou valeur d'attribut) :
-// si c'est EXACTEMENT une expression {{expr | pipe}}, la decompose comme
-// parseTplValue() le fait pour JSON (reutilise varNameToSource +
-// findPipeSeparator) ; sinon, valeur fixe litterale. Pas de notion
-// d'asNumber/guillemets ici (contrairement a JSON) : le texte XML n'a pas
-// cette distinction.
+// Reads an XML leaf (element text or attribute value): when it is exactly one {{expr | pipe}} expression, splits it
+// as parseTplValue() does for JSON (varNameToSource, findPipeSeparator); otherwise a fixed literal value. No asNumber
+// here, unlike JSON: XML text has no quoted and unquoted values.
 function parseXmlLeafExpr(raw) {
   const trimmed = (raw ?? '').trim();
   const varMatch = trimmed.match(/^\{\{([^}].*?)\}\}$/);
