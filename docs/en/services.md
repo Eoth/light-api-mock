@@ -8,23 +8,24 @@ On the home screen, **"+ Add a service"** opens a form with:
 
 - **Name**: identifies the service and is the first segment of its URL (see below). Letters, digits, dashes and underscores only.
 - **Listen path** (`listen_path`): the part of the URL after the service name, for example `/v1/users/{id}`. It can hold parameters in braces (`{id}`) that responses can reuse. Left empty, the service answers **any path** under its name.
+- **Purely mocked service** (switch): see the next section.
 - **Real target URL** (`real_target_url`): the address of the real backend, used when a request is relayed in proxy mode (see below) and by the [availability check](availability-check.md).
-- **Purely mocked service** (checkbox): see the next section.
-- **Mock mode**: a switch between mocked and relayed (see below).
 - **Service type**: REST (default) or SOAP; see the section further down.
-- **Group** (optional): attaches the service to a [group](groups.md).
+- **Group** (optional, offered once a group exists): attaches the service to a [group](groups.md).
+
+A new service with a target starts in proxy mode: it relays every request until you turn on the **Mock** switch of its card in the service list (see below).
 
 ![Form to create a service](screenshots/service-create-form.png)
 
 ## Purely mocked service (no target)
 
-Some services are never meant to relay a real request: they only produce mocked answers, and typing a target URL for them is pointless. The **"Purely mocked service"** checkbox removes that step:
+Some services are never meant to relay a real request: they only produce mocked answers, and typing a target URL for them is pointless. The **"Purely mocked service"** switch removes that step:
 
-- Once checked, the **Real target URL** field disappears from the form, and so does the [availability check](availability-check.md), which means nothing without a target.
+- Once it is on, the **Real target URL** field disappears from the form, and so does the [availability check](availability-check.md), which means nothing without a target.
 - The service stays in mock mode (the mock switch cannot be turned off for a service without a target: relaying to nowhere could only fail).
-- Unchecking the box at any time, including when editing, shows the target field again without losing anything: rules, group and service type stay as they were.
+- Turning it off at any time, including when editing, shows the target field again without losing anything: rules, group and service type stay as they were.
 
-![The form with "Purely mocked service" checked: the target field is gone](screenshots/service-purely-mocked-form.png)
+![The form with "Purely mocked service" on: the target field is gone](screenshots/service-purely-mocked-form.png)
 
 **A request that no rule matches**: on a purely mocked service, the answer is a `404` with an explicit message ("this service is purely mocked, no target configured") rather than a failed attempt to relay to an empty address.
 
