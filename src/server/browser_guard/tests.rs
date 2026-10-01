@@ -72,7 +72,7 @@ async fn spawn_app() -> String {
     let state = test_state(&data_dir, config, auth_disabled()).await;
     serve(crate::server::build_router_with(
         state,
-        &data_dir,
+        crate::server::ui_files::UiSource::Directory(data_dir.clone()),
         BrowserGuard::new(UI),
     ))
     .await

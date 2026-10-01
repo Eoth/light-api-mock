@@ -12,7 +12,7 @@ npm run dev           # http://localhost:5173, proxies /api and /runtime-config.
 ## Build and test
 
 ```bash
-npm run build         # dist/, served by the binary (STATIC_DIR)
+npm run build         # dist/, embedded by the next cargo build (or served with STATIC_DIR)
 npm test              # Vitest unit tests, including the translation checks
 npm run test:e2e      # Playwright, against a Mimicway running on :7342 (see e2e/README.md)
 npm run docs:screenshots   # regenerates the images of docs/ from the end-to-end suite

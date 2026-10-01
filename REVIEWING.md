@@ -4,8 +4,8 @@ This guide is for the engineer asked to approve Mimicway before it runs in their
 
 ## Facts that bound the review
 
-- One Rust binary, no database, no code generation, no build script of its own (`build.rs`), and no `unsafe` code outside tests (`#![forbid(unsafe_code)]` in `src/main.rs`).
-- The UI is a static Svelte bundle served by the binary; it has no runtime dependency (`frontend/package.json` lists build and test tools only).
+- One Rust binary, no database, no code generation, and no `unsafe` code outside tests (`#![forbid(unsafe_code)]` in `src/main.rs`). Its one build script, `build.rs`, lists the files of the built UI so that `include_bytes!` embeds them; it reads nothing else, downloads nothing and runs nothing.
+- The UI is a static Svelte bundle embedded in the binary and served by `src/server/ui_files.rs`, which answers only the exact files of that bundle; it has no runtime dependency (`frontend/package.json` lists build and test tools only).
 - Optional features are off by default and not compiled unless requested: `messaging-kafka` (Kafka, pulls `rdkafka` and C code) and `tcp-mock` (raw TCP mocks, no extra dependency).
 - Every dependency comes from crates.io or npm, is pinned by a committed lockfile and checked in CI for advisories and licenses.
 
@@ -16,7 +16,7 @@ Read along the path a request takes, from the outside in. Production code lives 
 | Order | File | What to check |
 |---|---|---|
 | 1 | `src/main.rs` | Configuration from the environment, bind address (loopback by default), graceful shutdown on SIGTERM. |
-| 2 | `src/server/mod.rs` | Router and middleware order: CORS, security headers, browser guard, authentication, service interception, API routes. |
+| 2 | `src/server/mod.rs`, `src/server/ui_files.rs`, `build.rs` | Router and middleware order: CORS, security headers, browser guard, authentication, service interception, API routes; the UI files embedded at build time and served by exact name. |
 | 3 | `src/server/browser_guard.rs` | CORS per path, refusal of cross-site writes, DNS-rebinding guard, response headers. |
 | 4 | `src/auth/middleware.rs`, `src/auth/keycloak.rs` | Which paths require a token; local JWT validation (algorithms, issuer, expiry, client); key-set refresh limits. |
 | 5 | `src/server/api.rs` | Authorization of each endpoint (matrix below); validation of every mutation, done under the store's write lock (`try_update`). |

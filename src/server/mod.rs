@@ -13,6 +13,7 @@ pub mod ping;
 pub mod redaction;
 pub mod request_log;
 pub mod suggestion;
+pub mod ui_files;
 pub mod validation;
 
 use crate::auth::AuthConfig;
@@ -24,7 +25,6 @@ use axum::Router;
 use ping::PingCache;
 use request_log::RequestLog;
 use std::collections::HashMap;
-use std::path::Path;
 use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, RwLock};
 use tower_http::services::ServeDir;
@@ -86,13 +86,17 @@ async fn runtime_config_handler() -> axum::Json<RuntimeConfig> {
 /// The production router with the default browser guard (no extra CORS origin, all host names accepted), for
 /// tests; `main` builds its guard from the configuration.
 #[cfg(test)]
-pub fn build_router(state: AppState, static_dir: &Path) -> Router {
-    build_router_with(state, static_dir, browser_guard::BrowserGuard::new(""))
+pub fn build_router(state: AppState, static_dir: &std::path::Path) -> Router {
+    build_router_with(
+        state,
+        ui_files::UiSource::Directory(static_dir.to_path_buf()),
+        browser_guard::BrowserGuard::new(""),
+    )
 }
 
 pub fn build_router_with(
     state: AppState,
-    static_dir: &Path,
+    ui: ui_files::UiSource,
     guard: browser_guard::BrowserGuard,
 ) -> Router {
     let cors = guard.cors_layer();
@@ -101,13 +105,23 @@ pub fn build_router_with(
     let auth_config = state.auth_config.clone();
     let keycloak = state.keycloak.clone();
 
-    Router::new()
+    let router = Router::new()
         .route(
             "/runtime-config.json",
             axum::routing::get(runtime_config_handler),
         )
-        .nest("/api", api_routes)
-        .fallback_service(ServeDir::new(static_dir).append_index_html_on_directories(true))
+        .nest("/api", api_routes);
+    let router = match ui {
+        ui_files::UiSource::Directory(dir) => {
+            router.fallback_service(ServeDir::new(dir).append_index_html_on_directories(true))
+        }
+        ui_files::UiSource::Embedded(files) => router.fallback(
+            move |method: axum::http::Method, uri: axum::http::Uri| async move {
+                ui_files::serve(files, &method, &uri)
+            },
+        ),
+    };
+    router
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
             intercept::intercept_layer,

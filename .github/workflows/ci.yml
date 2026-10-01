@@ -109,13 +109,14 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - run: cargo build
+      # The UI first, so that build.rs embeds it: the suite then runs against the binary alone, as released.
       - working-directory: frontend
         run: npm ci --ignore-scripts && npm run build && npx playwright install --with-deps chromium
-      - name: Start Mimicway
+      - run: cargo build
+      - name: Start Mimicway (embedded UI, no STATIC_DIR)
         run: |
           mkdir -p data
-          DATA_PATH=./data STATIC_DIR=./frontend/dist ./target/debug/mimicway > mimicway.log 2>&1 &
+          DATA_PATH=./data ./target/debug/mimicway > mimicway.log 2>&1 &
           for i in $(seq 1 50); do curl -sf http://localhost:7342/api/health && exit 0; sleep 0.2; done
           cat mimicway.log; exit 1
       - working-directory: frontend

@@ -31,7 +31,6 @@ use crate::server::request_log::RequestLog;
 use crate::server::{AppState, build_router_with};
 use crate::store::MockStore;
 use std::collections::HashMap;
-use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
 // Reads the configuration from the environment, loads the stored mocks, builds the proxy, the Keycloak client (when
@@ -65,9 +64,7 @@ async fn main() {
             ))
         });
 
-    let static_dir = std::env::var("STATIC_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| PathBuf::from("./frontend/dist"));
+    let ui = crate::server::ui_files::UiSource::from_env();
 
     let port: u16 = std::env::var("PORT")
         .ok()
@@ -136,7 +133,8 @@ async fn main() {
 
     let store_for_shutdown = state.store.clone();
     let guard = BrowserGuard::from_env().with_loopback_hosts_only(bind_ip.is_loopback());
-    let app = build_router_with(state, &static_dir, guard);
+    tracing::info!(ui = %ui.describe(), "serving the UI");
+    let app = build_router_with(state, ui, guard);
     let addr = std::net::SocketAddr::new(bind_ip, port);
 
     if bind_ip.is_loopback() {

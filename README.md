@@ -54,7 +54,7 @@ cargo build --release
 ./target/release/mimicway          # mimicway.exe on Windows
 ```
 
-The binary reads its UI from `./frontend/dist` and its data from `./data` by default; see [Configuration](#configuration).
+Building the UI first embeds it in the binary: `target/release/mimicway` is then complete on its own, and keeps its data in `./data` by default (see [Configuration](#configuration)).
 
 ### Your first mock
 
@@ -137,7 +137,7 @@ Everything is set through environment variables; none is required.
 | `PORT` | `7342` | HTTP port. |
 | `BIND_ADDRESS` | `127.0.0.1` | Interface to listen on. `0.0.0.0` (or `::`) accepts remote connections; the container image sets it. |
 | `DATA_PATH` | `./data` | Directory of `mock-config.yaml` and its `backups/`. |
-| `STATIC_DIR` | `./frontend/dist` | Built UI served at `/`. |
+| `STATIC_DIR` | *(the UI embedded in the binary)* | A directory to serve the UI from instead, for UI development or a customized UI. A binary built without the UI reads `./frontend/dist`. |
 | `RUST_LOG` | `mimicway=info` | Log filter, for example `mimicway=debug`. |
 | `BACKUP_MAX_COUNT` | `5` | Backups kept in `{DATA_PATH}/backups/` before rotation. |
 | `API_BASE_URL` | *(empty)* | Where the UI calls the API when they are served from different origins; see [Split UI and API](#split-ui-and-api). |
@@ -225,7 +225,7 @@ A rule can also run up to three [Rhai](https://rhai.rs) scripts (`pre_script`, `
 
 ### Container
 
-The [Dockerfile](Dockerfile) builds the UI and the binary, then copies them into a minimal Alpine image running as an unprivileged user (uid 1000). The image listens on every interface (`BIND_ADDRESS=0.0.0.0`) and keeps its data in `/data`: mount a volume there.
+The [Dockerfile](Dockerfile) builds the UI, embeds it in the binary, and copies that single file into a minimal Alpine image running as an unprivileged user (uid 1000). The image listens on every interface (`BIND_ADDRESS=0.0.0.0`) and keeps its data in `/data`: mount a volume there.
 
 ```yaml
 # compose.yaml
@@ -294,7 +294,7 @@ cd frontend && npm test                  # Vitest
 cd frontend && npm run test:e2e          # Playwright, against a running Mimicway on :7342
 ```
 
-For UI work with hot reload, run the binary, then `cd frontend && npm run dev` and open <http://localhost:5173>.
+For UI work with hot reload, run the binary, then `cd frontend && npm run dev` and open <http://localhost:5173>. `build.rs` embeds `frontend/dist` when it exists; `cargo build` without a built UI gives a binary that serves `STATIC_DIR` (`./frontend/dist` by default).
 
 CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs formatting, clippy and tests with each feature, the UI tests and build, the end-to-end suite against the real binary, `cargo-deny`, `npm audit`, an image build scanned by Trivy, and a secret scan.
 
@@ -326,7 +326,7 @@ English is the source language: every message is written once, in English, in th
 |---|---|
 | A mock answers 404 | The URL must start with the service name (`/{name}/...`), and with the group code for a grouped service. The service page shows the exact URL. |
 | A method or sub-path is not mocked | Methods belong to rules: add a rule for that method and sub-path. |
-| The UI shows a blank page | `STATIC_DIR` must point to the built UI (`frontend/dist`); use an absolute path on Windows. |
+| The UI shows a blank page | The binary was built before the UI: build the UI, then the binary again, or point `STATIC_DIR` to `frontend/dist` (an absolute path on Windows). The startup log says where the UI comes from. |
 | Port 7342 already in use | Set `PORT`, or stop the other process. |
 | Other machines cannot reach Mimicway | It listens on `127.0.0.1` by default: set `BIND_ADDRESS=0.0.0.0`. |
 | 403 "Cross-site request refused" | The UI is served from another origin: add it to `CORS_ALLOWED_ORIGINS`. |

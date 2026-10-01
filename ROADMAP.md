@@ -35,16 +35,6 @@ Each item has an identifier that never changes, a size (S: a day or less, M: a f
 
 **Done when.** `cosign verify` and `gh attestation verify` succeed on the published image and binaries, and the README quick start uses the published image instead of `docker build`.
 
-### R3. Ship the UI inside the binary
-
-Size S
-
-**Why.** The binary needs a `frontend/dist` folder next to it: "one program" is only true in the container. The UI weighs about 400 KB.
-
-**What.** Embed the built UI at compile time (`include_bytes!` through a small build step, or the `rust-embed` crate if its cost is justified); keep `STATIC_DIR` as an override for UI development.
-
-**Done when.** Copying the release binary alone to an empty machine and running it serves the full UI; binary size growth is measured and stated in the changelog.
-
 ### R5. Complete the documentation screenshots
 
 Size M
