@@ -145,7 +145,11 @@ impl ProxyClient {
         builder = builder.body(reqwest::Body::wrap_stream(req_stream));
 
         let upstream_resp = builder.send().await.map_err(|e| {
-            tracing::error!(error = %e, url = %url, "proxy forward failed");
+            tracing::error!(
+                error = %e.without_url(),
+                url = %crate::server::redaction::redact_url_credentials(&url),
+                "proxy forward failed"
+            );
             StatusCode::BAD_GATEWAY
         })?;
 
@@ -290,7 +294,11 @@ impl ProxyClient {
         builder = builder.body(body_bytes.to_vec());
 
         let upstream_resp = builder.send().await.map_err(|e| {
-            tracing::error!(error = %e, url = %url, "proxy forward (observed) failed");
+            tracing::error!(
+                error = %e.without_url(),
+                url = %crate::server::redaction::redact_url_credentials(&url),
+                "proxy forward (observed) failed"
+            );
             StatusCode::BAD_GATEWAY
         })?;
 
@@ -325,7 +333,11 @@ impl ProxyClient {
         }
 
         let response_bytes = upstream_resp.bytes().await.map_err(|e| {
-            tracing::error!(error = %e, url = %url, "reading observed response body failed");
+            tracing::error!(
+                error = %e.without_url(),
+                url = %crate::server::redaction::redact_url_credentials(&url),
+                "reading observed response body failed"
+            );
             StatusCode::BAD_GATEWAY
         })?;
         let resp = response_builder

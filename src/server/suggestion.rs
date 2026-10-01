@@ -167,6 +167,7 @@ fn build_response(exchange: &ObservedExchange) -> MockResponse {
         .iter()
         .filter(|(name, _)| {
             !NEVER_SUGGESTED_RESPONSE_HEADERS.contains(&name.to_lowercase().as_str())
+                && !crate::server::redaction::is_sensitive_header(name)
         })
         .map(|(name, value)| HeaderEntry {
             name: name.clone(),
@@ -384,6 +385,27 @@ mod tests {
             }
             other => panic!("expected Unconditional, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn suggested_response_never_includes_credential_headers() {
+        // A rule saved from a suggestion is served to anyone: a Set-Cookie of the real backend would hand out
+        // a real session.
+        let mut e = exchange(200, "ok");
+        e.response_headers
+            .insert("Set-Cookie".into(), "session=abc".into());
+        e.response_headers.insert("x-env".into(), "prod".into());
+        let obs = vec![e.clone(), e.clone(), e];
+        let Suggestion::Unconditional { rule } = suggest("GET", "/orders", &obs).unwrap() else {
+            panic!("expected an unconditional suggestion");
+        };
+        let names: Vec<&str> = rule
+            .response
+            .headers
+            .iter()
+            .map(|h| h.name.as_str())
+            .collect();
+        assert_eq!(names, vec!["x-env"]);
     }
 
     #[test]

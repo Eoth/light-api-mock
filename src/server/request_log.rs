@@ -54,7 +54,7 @@ impl CapturedRequest {
             remaining_path: req.remaining_path.clone(),
             path_params: req.path_params.clone(),
             query_params: req.query_params.clone(),
-            headers: req.headers.clone(),
+            headers: crate::server::redaction::redact_headers(&req.headers),
             body: String::from_utf8_lossy(slice).into_owned(),
             body_truncated: truncated,
             content_type: req.content_type.clone(),
@@ -145,7 +145,7 @@ impl RequestLog {
             path: path.into(),
             mode: "proxy".into(),
             rule_matched: None,
-            target_url: Some(target.into()),
+            target_url: Some(crate::server::redaction::redact_url_credentials(target)),
             status,
             captured,
         });
