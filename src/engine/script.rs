@@ -1,5 +1,9 @@
 // Moteur de scripts utilisateur base sur Rhai (https://rhai.rs).
-// Sandboxe : 10K operations max, 1MB strings, pas d'acces fichier/reseau.
+// Sandbox: a rule script comes from whoever can edit the configuration and runs on every matching request, so it
+// gets bounded CPU and memory (operations, call depth, string/array/map sizes) and no way out of the process:
+// `import` cannot load files (Rhai's default resolver reads `.rhai` files from the disk), `eval` is disabled so that
+// validating a script really validates all the code it runs, and `print`/`debug` go to the debug log instead of
+// the server's stdout. The native functions registered below never panic, whatever their arguments.
 // Chaque regle peut avoir un champ `script` optionnel qui est execute
 // avant le rendu du template. Le resultat est accessible via {{script}}
 // (si string) ou {{script.champ}} (si l'objet retourne est un map #{}).
@@ -43,12 +47,20 @@ impl ScriptEngine {
         engine.set_max_string_size(1_048_576);
         engine.set_max_array_size(1_000);
         engine.set_max_map_size(500);
+        engine.set_max_call_levels(32);
+        engine.set_max_expr_depths(64, 32);
+        engine.set_module_resolver(rhai::module_resolvers::DummyModuleResolver::new());
+        engine.disable_symbol("eval");
+        engine.on_print(|text| tracing::debug!(target: "light_mock::script", "print: {text}"));
+        engine.on_debug(
+            |text, _source, _pos| tracing::debug!(target: "light_mock::script", "debug: {text}"),
+        );
 
         engine.register_fn("random_int", |min: i64, max: i64| -> i64 {
             if min >= max {
                 return min;
             }
-            min + (fastrand::i64(..) % (max - min + 1)).abs()
+            fastrand::i64(min..=max)
         });
 
         engine.register_fn("now_ms", || -> i64 {
@@ -241,6 +253,9 @@ impl ScriptEngine {
 // Reutilise civil_from_days (deja ecrit pour epoch_to_iso, algorithme de Howard
 // Hinnant) plutot que d'ajouter une dependance de formatage de date.
 fn format_date_offset(days_delta: i64, format: &str) -> String {
+    // About ±10,000 years: beyond, no calendar date exists and the arithmetic below would overflow.
+    const MAX_DAYS: i64 = 3_652_425;
+    let days_delta = days_delta.clamp(-MAX_DAYS, MAX_DAYS);
     let now_secs = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
@@ -334,6 +349,11 @@ fn parse_date_impl(text: &str, pattern: &str) -> Result<i64, Box<rhai::EvalAltRe
     let year = year.ok_or_else(|| {
         format!("parse_date: le pattern '{pattern}' ne contient pas d'annee (yyyy)")
     })?;
+    if !(0..=9999).contains(&year) {
+        return Err(
+            format!("parse_date: year {year} in '{text}' is out of range (0000 to 9999)").into(),
+        );
+    }
     let month = month.ok_or_else(|| {
         format!("parse_date: le pattern '{pattern}' ne contient pas de mois (MM)")
     })?;
@@ -394,8 +414,9 @@ fn seeded_int_impl(seed: &str, min: i64, max: i64) -> i64 {
         return min;
     }
     let hash = crate::server::codegen::fnv1a_hash(seed);
-    let range = (max - min + 1) as u64;
-    min + (hash % range) as i64
+    // i128: `max - min + 1` overflows i64 (and is 0 once wrapped) for the widest ranges.
+    let range = (max as i128 - min as i128 + 1) as u128;
+    (min as i128 + (hash as u128 % range) as i128) as i64
 }
 
 fn seeded_pick_impl(seed: &str, list: &rhai::Array) -> rhai::Dynamic {
@@ -1686,5 +1707,73 @@ mod tests {
             "une cle absente ne doit jamais lever d'erreur"
         );
         assert_eq!(result.unwrap().value, "");
+    }
+
+    #[test]
+    fn import_cannot_load_a_script_file_from_the_disk() {
+        let dir = std::env::temp_dir().join(format!("lightmock-rhai-import-{}", fastrand::u64(..)));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("secret.rhai"), "fn read() { \"leaked\" }").unwrap();
+        let module = dir.join("secret").to_string_lossy().replace('\\', "/");
+        let script = format!("import \"{module}\" as m; m::read()");
+        let result = ScriptEngine::new().execute(&script, &empty_ctx());
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(result.is_err(), "a rule script read a file: {result:?}");
+    }
+
+    #[test]
+    fn eval_is_not_available_to_rule_scripts() {
+        assert!(
+            ScriptEngine::new()
+                .execute("eval(\"40 + 2\")", &empty_ctx())
+                .is_err()
+        );
+        assert!(ScriptEngine::new().validate("eval(\"40 + 2\")").is_err());
+    }
+
+    #[test]
+    fn print_and_debug_are_accepted_without_writing_to_stdout() {
+        let result = ScriptEngine::new().execute("print(\"x\"); debug(\"y\"); 1", &empty_ctx());
+        assert_eq!(result.unwrap().value, "1");
+    }
+
+    #[test]
+    fn random_and_seeded_ints_accept_the_full_i64_range() {
+        let engine = ScriptEngine::new();
+        let full = "-9223372036854775807 - 1, 9223372036854775807";
+        for script in [
+            format!("random_int({full})"),
+            format!("seeded_int(\"seed\", {full})"),
+        ] {
+            let result = engine.execute(&script, &empty_ctx());
+            assert!(result.is_ok(), "{script}: {result:?}");
+        }
+        let value: i64 = engine
+            .execute("seeded_int(\"seed\", -5, 5)", &empty_ctx())
+            .unwrap()
+            .value
+            .parse()
+            .unwrap();
+        assert!((-5..=5).contains(&value));
+    }
+
+    #[test]
+    fn date_offsets_out_of_any_calendar_do_not_panic() {
+        let engine = ScriptEngine::new();
+        for script in [
+            "date_past(9223372036854775807)",
+            "date_future(9223372036854775807, \"fr\")",
+        ] {
+            assert!(engine.execute(script, &empty_ctx()).is_ok(), "{script}");
+        }
+    }
+
+    #[test]
+    fn parse_date_rejects_years_wider_than_four_digits() {
+        let result = ScriptEngine::new().execute(
+            "parse_date(\"999999999999999999-01-01\", \"yyyyyyyyyyyyyyyyyy-MM-dd\")",
+            &empty_ctx(),
+        );
+        assert!(result.is_err());
     }
 }
