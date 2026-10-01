@@ -13,13 +13,16 @@ COPY Cargo.toml Cargo.lock build.rs ./
 COPY src/ src/
 # build.rs embeds the built UI in the binary.
 COPY --from=frontend /build/frontend/dist frontend/dist
-RUN cargo build --release --locked
+RUN cargo build --release --locked && mkdir /build/data
 
-FROM alpine:3.21@sha256:ce64758a109eb420d874a118f87920e625e12d3634e03b4a5573fd9f6e5d3507
-RUN adduser -D -u 1000 app && mkdir -p /data && chown app:app /data
-WORKDIR /app
+# Nothing but the binary and its data directory: the binary is linked statically (musl) and carries its own TLS roots
+# (rustls with webpki-roots), so the image needs no operating system, no shell and no system package, which leaves a
+# vulnerability scan nothing to flag that Mimicway does not use.
+FROM scratch
+COPY --from=backend --chown=1000:1000 /build/data /data
 COPY --from=backend /build/target/release/mimicway /app/mimicway
-USER app
+WORKDIR /app
+USER 1000:1000
 ENV DATA_PATH=/data PORT=7342 BIND_ADDRESS=0.0.0.0
 EXPOSE 7342
 ENTRYPOINT ["/app/mimicway"]

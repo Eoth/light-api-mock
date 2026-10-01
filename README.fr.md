@@ -234,7 +234,7 @@ Une règle peut aussi exécuter jusqu'à trois scripts [Rhai](https://rhai.rs) (
 
 ### Conteneur
 
-Le [Dockerfile](Dockerfile) construit l'interface, l'intègre au binaire, et copie ce fichier unique dans une image Alpine minimale exécutée par un utilisateur non privilégié (uid 1000). L'image écoute sur toutes les interfaces (`BIND_ADDRESS=0.0.0.0`) et garde ses données dans `/data` : montez-y un volume.
+Le [Dockerfile](Dockerfile) construit l'interface, l'intègre au binaire, et copie ce fichier unique dans une image vide par ailleurs (`scratch` : ni système d'exploitation, ni shell), exécutée par un utilisateur non privilégié (uid 1000). L'image écoute sur toutes les interfaces (`BIND_ADDRESS=0.0.0.0`) et garde ses données dans `/data` : montez-y un volume.
 
 ```yaml
 # compose.yaml

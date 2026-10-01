@@ -31,6 +31,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - The responses that Mimicway itself sends to the applications under test (no matching rule, purely mocked service, refused path) are in English.
 
 ### Security
+- The container image holds the binary and its data directory only (`FROM scratch`), built and released alike. The Alpine base shipped OpenSSL, which Mimicway never used (it is linked statically and its TLS goes through rustls with its own root certificates), and which lagged behind Alpine's fixes: the image scan failed on two of them (CVE-2026-75804, CVE-2026-84782). With no operating system left, there is no shell in the container either: `docker exec … sh` no longer works.
 - Raw TCP mocks listen on `BIND_ADDRESS`, like the HTTP server; they listened on every interface, so a TCP mock created on a workstation was reachable from the local network while the rest of Mimicway was not. `GET /api/tcp/status` now reports the address of each listener.
 - Every GitHub Action of the CI is pinned to a commit SHA, so a moved tag cannot change what runs; the container scan referenced a Trivy action tag that no longer exists, which would have failed the job.
 - The Windows build script no longer turns off certificate revocation checks for crate downloads; when a proxy blocks revocation lists, it says how to do it knowingly. Both build scripts install the UI's exact locked dependencies without running their install scripts.

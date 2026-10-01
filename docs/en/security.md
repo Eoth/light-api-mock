@@ -68,7 +68,7 @@ The login form uses Keycloak's password grant. Replacing it with the authorizati
 - CI fails on any known vulnerability or yanked crate, on a license outside a permissive allow-list and on a dependency from outside crates.io ([deny.toml](../../deny.toml)), on high-severity npm advisories, on critical or high vulnerabilities of the container image (Trivy) and on committed secrets (gitleaks).
 - The CI's third-party actions are pinned to commit SHAs, and Dependabot proposes their updates along with those of the crates, npm packages and base images.
 - The production code contains no `unsafe` Rust (`#![forbid(unsafe_code)]` outside tests).
-- The image is a multi-stage build ending on Alpine, running as a dedicated non-root user; the Kubernetes manifests add a read-only root filesystem, no privilege escalation and no Linux capability.
+- The image holds the static binary and its data directory, nothing else (`FROM scratch`): no operating system, shell or system package, so nothing in it but Mimicway's own code for a vulnerability to sit in. It runs as a non-root user (uid 1000); the Kubernetes manifests add a read-only root filesystem, no privilege escalation and no Linux capability.
 - Releases are built from the tagged commit by `.github/workflows/release.yml`: every archive has a build provenance attestation and a CycloneDX SBOM (one for the Rust crates, one for the UI's shipped packages), and the image is signed keylessly with cosign. [SECURITY.md](../../SECURITY.md#verifying-a-release) gives the verification commands.
 - The base images of both Dockerfiles are pinned by digest.
 
