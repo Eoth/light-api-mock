@@ -64,6 +64,7 @@ The login form uses Keycloak's password grant. Replacing it with the authorizati
 
 - `Cargo.lock` and `frontend/package-lock.json` are committed: builds resolve exactly the same dependency graph.
 - CI fails on any known vulnerability or yanked crate, on a license outside a permissive allow-list and on a dependency from outside crates.io ([deny.toml](../deny.toml)), on high-severity npm advisories, on critical or high vulnerabilities of the container image (Trivy) and on committed secrets (gitleaks).
+- The CI's third-party actions are pinned to commit SHAs, and Dependabot proposes their updates along with those of the crates, npm packages and base images.
 - The production code contains no `unsafe` Rust (`#![forbid(unsafe_code)]` outside tests).
 - The image is a multi-stage build ending on Alpine, running as a dedicated non-root user; the Kubernetes manifests add a read-only root filesystem, no privilege escalation and no Linux capability.
 - Generating an SBOM: `cargo cyclonedx --format json` for the binary, `npx @cyclonedx/cyclonedx-npm --output-file sbom.json` in `frontend/` for the UI.
