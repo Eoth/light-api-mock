@@ -38,7 +38,9 @@ Each **object** or **array** field (JSON and XML) shows a **chevron** (▼/▶) 
 
 ![A folded JSON field: the chevron points right and a note says content is hidden](screenshots/rule-json-folded-node.png)
 
-To move around a deeply nested structure, a breadcrumb above the editor (a clickable path such as `root > address > city`) lets you enter a level and come back out in one click.
+To move around a deeply nested structure, the **→** button of an object field enters it: the editor then shows only that level, under a breadcrumb (a clickable path such as `root > customer > address`) that takes you back out in one click.
+
+![The detailed JSON builder inside customer > address: the breadcrumb above the city and postcode fields](screenshots/response-json-breadcrumb.png)
 
 ### Changing format on the way
 
@@ -103,12 +105,20 @@ Example: `{{path.siret | first(9)}}` keeps the first 9 characters of the SIRET r
 
 To fill a response with realistic-looking data without typing it: first name, last name, email, French phone number, company, street, city, postcode, SIREN/SIRET, full address, past or future date, timestamp, random boolean, filler sentence ("lorem"), country, French IBAN. The builder also offers an integer in a range (`Integer{min,max}`). Several kinds follow French formats today; locale-aware fake data is planned (see the [roadmap](../../ROADMAP.md)).
 
+In the builder, choose **Fake data** as the source of a field, then the kind of data in the menu next to it. The expression it writes for the field (`{{fake.CompanyName}}`) shows on its right, and a new value is drawn for every request.
+
+![Two fields of a pasted JSON sample switched to fake data: a company name and a French city](screenshots/response-fake-data.png)
+
 ## Chaos mode: failures and slowness on demand
 
 To test how an application copes with an unreliable backend, each mocked response can turn on a "chaos mode":
 
 - **Latency**: a fixed delay, or a random one between a minimum and a maximum, before answering.
 - **Error rate**: a share of requests that get an HTTP error instead of the normal response (configurable status, `500` by default).
+
+These settings appear when the **Chaos mode** switch of the rule is on. When both a minimum and a maximum latency are set, each delay is drawn between them and the fixed latency is ignored.
+
+![Chaos mode on: a latency between 200 and 800 ms, and 20% of the requests answered with a 503 error](screenshots/rule-chaos-settings.png)
 
 ## Requirements and limits
 

@@ -79,7 +79,7 @@
   }
 </script>
 
-<fieldset class="section">
+<fieldset class="section" data-testid="rule-form-conditions-allof">
   <legend>{t("AND conditions (all must match)")}</legend>
   <p class="section-help">{t("Without any condition, the rule matches every request.")}</p>
   {#if allOf.length > 0}
@@ -124,7 +124,7 @@
   {/if}
 </fieldset>
 
-<fieldset class="section">
+<fieldset class="section" data-testid="rule-form-conditions-anyof">
   <legend>{t("OR conditions (at least one must match)")}</legend>
   {#if anyOf.length > 0}
     <ul class="cond-list" role="list">
