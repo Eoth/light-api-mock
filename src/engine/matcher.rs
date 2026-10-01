@@ -518,24 +518,29 @@ impl MatchEngine {
     }
 }
 
+/// Percent-decodes `s` into UTF-8 (an invalid sequence becomes U+FFFD): `%C3%A9` is `é`, in any script. Decoding
+/// byte by byte into chars read every escaped byte as Latin-1, so non-ASCII path parameters came out garbled.
 fn url_decode(s: &str) -> String {
-    let mut result = String::with_capacity(s.len());
     let bytes = s.as_bytes();
+    let mut decoded = Vec::with_capacity(bytes.len());
     let mut i = 0;
     while i < bytes.len() {
         if bytes[i] == b'%'
             && i + 2 < bytes.len()
-            && let Ok(byte) =
-                u8::from_str_radix(std::str::from_utf8(&bytes[i + 1..i + 3]).unwrap_or(""), 16)
+            && let (Some(high), Some(low)) = (hex_digit(bytes[i + 1]), hex_digit(bytes[i + 2]))
         {
-            result.push(byte as char);
+            decoded.push(high << 4 | low);
             i += 3;
             continue;
         }
-        result.push(bytes[i] as char);
+        decoded.push(bytes[i]);
         i += 1;
     }
-    result
+    String::from_utf8_lossy(&decoded).into_owned()
+}
+
+fn hex_digit(byte: u8) -> Option<u8> {
+    (byte as char).to_digit(16).map(|d| d as u8)
 }
 
 pub(crate) fn match_path(
@@ -1601,5 +1606,24 @@ mod tests {
 
         let conflicts = MatchEngine::find_rule_conflicts(&draft, &[other], 1);
         assert!(conflicts.is_empty());
+    }
+
+    #[test]
+    fn path_params_are_decoded_as_utf8_in_any_script() {
+        let (params, _) = match_path("/users/{name}", "/users/%C3%A9t%C3%A9").unwrap();
+        assert_eq!(params["name"], "été");
+        let (params, _) = match_path("/商品/{id}", "/%E5%95%86%E5%93%81/7").unwrap();
+        assert_eq!(params["id"], "7");
+        let (params, _) = match_path("/q/{text}", "/q/%D9%85%D8%B1%D8%AD%D8%A8%D8%A7").unwrap();
+        assert_eq!(params["text"], "مرحبا");
+        assert!(match_path("/café/{id}", "/caf%C3%A9/42").is_some());
+    }
+
+    #[test]
+    fn only_two_hex_digits_form_an_escape() {
+        assert_eq!(url_decode("%+1"), "%+1");
+        assert_eq!(url_decode("100%"), "100%");
+        assert_eq!(url_decode("%2"), "%2");
+        assert_eq!(url_decode("%41%zz"), "A%zz");
     }
 }
