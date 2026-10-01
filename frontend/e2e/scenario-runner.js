@@ -88,16 +88,26 @@ async function runStep(page, step) {
       await expect(page.locator(resolveTarget(target, params))).toContainText(value);
       return;
     }
+    case 'resizeToContent': {
+      // What a user does with the resize handle of a text area, until all its text shows without scrolling: for an
+      // image that must show a long script whole.
+      await page.locator(resolveTarget(target, params)).evaluate((element) => {
+        element.style.height = `${element.scrollHeight + element.offsetHeight - element.clientHeight}px`;
+      });
+      return;
+    }
     case 'screenshot': {
-      // No-op sauf regeneration explicite des captures docs/ (cf
-      // docs-screenshot.js) -- ne ralentit jamais la suite E2E standard.
-      // `step.file` est un nom de fichier simple (pas un chemin), ecrit dans
-      // docs/<langue>/screenshots/, une fois par langue du guide.
-      await docsScreenshot(page, step.file);
+      // `target` is the subject of the image, required: one logical name, or several when the image shows several
+      // elements together (their params are merged). It is framed in every run; the capture itself only happens when
+      // the documentation screenshots are regenerated (docs-screenshot.js). `file` is a plain file name, written to
+      // docs/<language>/screenshots/ once per language of the guide.
+      if (!target) throw new Error('screenshot: "target" (the subject of the image) is required');
+      const subject = [target].flat().map((name) => resolveTarget(name, params)).join(', ');
+      await docsScreenshot(page, step.file, subject);
       return;
     }
     default:
-      throw new Error(`Action non supportee "${action}". Actions disponibles : goto, click, fill, selectOption, assertVisible, assertHidden, assertText, screenshot.`);
+      throw new Error(`Action non supportee "${action}". Actions disponibles : goto, click, fill, selectOption, assertVisible, assertHidden, assertText, resizeToContent, screenshot.`);
   }
 }
 

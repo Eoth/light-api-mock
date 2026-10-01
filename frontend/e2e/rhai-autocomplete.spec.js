@@ -46,7 +46,11 @@ test('autocompletion : la selection au clic insere la fonction avec ses parametr
 
   const option = page.getByRole('option', { name: /seeded_pick/ });
   await expect(option).toBeVisible();
-  await docsScreenshot(page, 'rhai-autocompletion.png');
+  await docsScreenshot(
+    page,
+    'rhai-autocompletion.png',
+    '[data-testid="rhai-script-editor-textarea-rule-script"], [data-testid="rhai-script-editor-suggestions-rule-script"]',
+  );
   await option.click();
 
   await expect(scriptField).toHaveValue('seeded_pick(seed, ["a", "b"])');

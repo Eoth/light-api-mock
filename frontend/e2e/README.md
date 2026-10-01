@@ -33,7 +33,8 @@ e2e/
     rules.scenarios.json      rule creation, edition, deletion on a service
     services.scenarios.json   service creation, search, mock switch, same names in different groups
   *.spec.js / *.spec.mjs    classic specs
-  docs-screenshot.js        writes docs/en/screenshots/*.png, only when DOCS_SCREENSHOTS is set
+  docs-screenshot.js        frames the subject of a guide image; writes docs/<language>/screenshots/*.png when DOCS_SCREENSHOTS is set
+  docs-screenshot.spec.js   checks that framing guard
 ```
 
 ## Scenario files
@@ -61,7 +62,8 @@ One file per functional domain, holding several scenarios:
 - `target` is `"component.key"`, as written in `selectors.json`.
 - A repeated element (a card per service, for instance) has placeholders in its selector, filled by `params`: `{ "action": "click", "target": "serviceCard.configureButton", "params": { "name": "my-service" } }`.
 - `value` is required by `fill`, `selectOption` and `assertText`.
-- Actions: `goto`, `click`, `fill`, `selectOption`, `assertVisible`, `assertHidden`, `assertText`, `screenshot`. Add one only for a real need: the runner stays minimal.
+- Actions: `goto`, `click`, `fill`, `selectOption`, `assertVisible`, `assertHidden`, `assertText`, `resizeToContent`, `screenshot`. Add one only for a real need: the runner stays minimal.
+- `resizeToContent` makes a text area as tall as its text, as a user would with its resize handle: for an image that must show a long script whole.
 - `goto` takes a `page`, not a URL: the UI has no router, so only `"services"` (the root) is mapped; other views are reached by clicking their navigation button (`app.navLogsButton`, `app.navGroupsButton`…).
 - Scenarios only interact with the UI. Data setup (creating a service through the API, resetting the configuration) belongs to the spec that replays the scenario (`test.beforeEach`, `request.post(...)`), as in `scenario-runner.spec.js`.
 
@@ -96,10 +98,11 @@ grep -rhoE 'data-testid="[^"]*"' frontend/src --include="*.svelte" | sort -u
 
 The images of `docs/` are taken by this suite, so they follow the interface instead of going stale. The guide exists in English and French with the same pages, so every image exists in both languages.
 
-- `docsScreenshot(page, file)` (`docs-screenshot.js`) does nothing unless `DOCS_SCREENSHOTS` is set: the standard run takes no screenshot and pays nothing.
-- In a scenario, a `{ "action": "screenshot", "file": "name.png" }` step captures the page at that point; in a spec, `await docsScreenshot(page, 'name.png')` does the same.
+- Every image names its **subject**, the element (or elements) it is taken to show. In a scenario, a `{ "action": "screenshot", "file": "name.png", "target": "ruleForm.conflictWarning" }` step captures the page at that point; `target` is required and may list several logical names that must show together (`"target": ["ruleForm.fragmentTemplateTextarea", "rhaiScriptEditor.textarea"]`, their `params` merged). In a spec, `await docsScreenshot(page, 'name.png', '<CSS selector of the subject>')` does the same.
+- The subject is scrolled into view when it is not entirely there, only as far as needed, so a screen already framed keeps its position and its open lists. The call then fails when the subject matches nothing, is not displayed, hides part of its own content (a text area scrolled inside: see `resizeToContent`), or does not fit entirely in the 1280×720 view, in either language. This check runs in the standard run too, so CI fails when a change of the interface pushes the subject of an image out of it; `docs-screenshot.spec.js` shows each case.
+- Capturing only happens when `DOCS_SCREENSHOTS` is set: the standard run takes no screenshot.
 - Each call captures the page in English, switches it to French with the interface's language selector (no reload: the screen keeps its state), captures it again and switches back, so the test goes on in English. A screen without the navigation bar (the login screen) has no selector: pass `{ reopenWaitingFor: '<selector>' }` and the French image is taken by opening the same URL in a French browser. Without that option, a missing selector fails the test rather than producing an image in the wrong language.
-- `playwright.docs-screenshots.config.js` sets `DOCS_SCREENSHOTS` and runs only the files that take screenshots.
+- `playwright.docs-screenshots.config.js` sets `DOCS_SCREENSHOTS` and runs only the files that take screenshots, found by reading them (a call to `docsScreenshot(` or `runScenario(`): there is no list to keep up to date.
 
 ```bash
 npm run docs:screenshots   # from frontend/, with Mimicway running on :7342

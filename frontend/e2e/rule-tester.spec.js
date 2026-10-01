@@ -91,7 +91,7 @@ test.describe('Testeur de regle : condition mal choisie contre une vraie requete
     await expect(page.getByText(/value found: none/)).toBeVisible();
     await expect(page.getByText(/present as a path parameter/)).toBeVisible();
     // The hint is worded by the server in the language of the request: test again after each language switch.
-    await docsScreenshot(page, 'rule-tester-hint.png', {
+    await docsScreenshot(page, 'rule-tester-hint.png', '[data-testid="rule-tester-result"]', {
       afterSwitch: async (p) => {
         const answered = p.waitForResponse('**/api/rule-test');
         await p.getByTestId('rule-tester-test-button').click();
@@ -266,7 +266,7 @@ test.describe('Testeur de regle : execution des scripts', () => {
     await expect(errorBanner).toBeVisible();
     await expect(errorBanner).toContainText('totally_undefined_fn');
     await expect(page.getByTestId('rule-tester-script-error-script')).toBeVisible();
-    await docsScreenshot(page, 'rule-tester-script-error.png');
+    await docsScreenshot(page, 'rule-tester-script-error.png', '[data-testid="rule-tester-script-errors"]');
   });
 
   test('un script de correspondance (map/lookup) correct ne produit aucune erreur', async ({ page, request }) => {
