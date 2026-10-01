@@ -19,6 +19,6 @@ COPY --from=backend /build/target/release/light-mock /app/light-mock
 COPY --from=frontend /build/frontend/dist /app/static
 RUN mkdir -p /data && chown app:app /data
 USER app
-ENV DATA_PATH=/data STATIC_DIR=/app/static PORT=7342
+ENV DATA_PATH=/data STATIC_DIR=/app/static PORT=7342 BIND_ADDRESS=0.0.0.0
 EXPOSE 7342
 ENTRYPOINT ["/app/light-mock"]
