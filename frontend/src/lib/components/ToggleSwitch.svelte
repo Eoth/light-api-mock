@@ -1,5 +1,8 @@
 <script>
-  let { checked = false, label = '', disabled = false, onchange = () => {} } = $props();
+  import { t } from '../i18n.svelte.js';
+  // `name` identifies the switch (DOM ids, test id) whatever the language of its label.
+  let { checked = false, label = '', name = null, disabled = false, onchange = () => {} } = $props();
+  let key = $derived(name ?? label.replace(/\s+/g, '-'));
 
   function handleClick() {
     if (disabled) return;
@@ -15,24 +18,24 @@
 </script>
 
 <div class="toggle-wrapper">
-  <span class="toggle-label" id="toggle-label-{label.replace(/\s+/g, '-')}">{label}</span>
+  <span class="toggle-label" id="toggle-label-{key}">{label}</span>
   <button
     type="button"
     role="switch"
     aria-checked={checked}
-    aria-labelledby="toggle-label-{label.replace(/\s+/g, '-')}"
+    aria-labelledby="toggle-label-{key}"
     class="toggle-switch"
     class:active={checked}
     {disabled}
     onclick={handleClick}
     onkeydown={handleKeydown}
-    data-testid="toggle-switch-{label.replace(/\s+/g, '-')}"
+    data-testid="toggle-switch-{key}"
   >
     <span class="toggle-knob"></span>
-    <span class="sr-only">{checked ? 'Activé' : 'Désactivé'}</span>
+    <span class="sr-only">{checked ? t("Enabled") : t("Disabled")}</span>
   </button>
   <span class="toggle-status" aria-live="polite">
-    {checked ? 'ON' : 'OFF'}
+    {checked ? t("ON") : t("OFF")}
   </span>
 </div>
 

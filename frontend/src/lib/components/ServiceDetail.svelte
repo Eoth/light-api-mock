@@ -6,6 +6,7 @@
   import ObservationSuggestions from './ObservationSuggestions.svelte';
   import ConfirmDialog from './ConfirmDialog.svelte';
   import { updateService, deleteService, reorderRules } from '../api.js';
+  import { t } from '../i18n.svelte.js';
 
   let {
     service,
@@ -35,9 +36,9 @@
       const result = await updateService(name, groupName, updated);
       onUpdate(result, groupName);
       editing = false;
-      onNotify(`Service "${result.name}" mis à jour`, 'success');
+      onNotify(t("Service \"{0}\" updated", result.name), 'success');
     } catch (e) {
-      onNotify(`Erreur : ${e.message}`, 'error');
+      onNotify(t("Error: {0}", e.message), 'error');
     }
   }
 
@@ -47,10 +48,10 @@
     const groupName = service.group_name;
     try {
       await deleteService(name, groupName);
-      onNotify(`Service "${name}" supprimé`, 'success');
+      onNotify(t("Service \"{0}\" deleted", name), 'success');
       onDelete(name, groupName);
     } catch (e) {
-      onNotify(`Erreur : ${e.message}`, 'error');
+      onNotify(t("Error: {0}", e.message), 'error');
     }
   }
 
@@ -61,7 +62,7 @@
       const result = await reorderRules(name, groupName, order);
       onUpdate(result, groupName);
     } catch (e) {
-      onNotify(`Erreur de réordonnancement : ${e.message}`, 'error');
+      onNotify(t("Reordering error: {0}", e.message), 'error');
     }
   }
 
@@ -80,9 +81,9 @@
       onUpdate(result, groupName);
       editingRuleIdx = null;
       addingRule = false;
-      onNotify(`Règle "${rule.name}" enregistrée`, 'success');
+      onNotify(t("Rule \"{0}\" saved", rule.name), 'success');
     } catch (e) {
-      onNotify(`Erreur : ${e.message}`, 'error');
+      onNotify(t("Error: {0}", e.message), 'error');
     }
   }
 
@@ -114,20 +115,20 @@
     try {
       const result = await updateService(name, groupName, updated);
       onUpdate(result, groupName);
-      onNotify('Règle supprimée', 'success');
+      onNotify(t("Rule deleted"), 'success');
     } catch (e) {
-      onNotify(`Erreur : ${e.message}`, 'error');
+      onNotify(t("Error: {0}", e.message), 'error');
     }
   }
 </script>
 
 {#if !service}
-  <p>Chargement...</p>
+  <p>{t("Loading...")}</p>
 {:else}
 <div class="service-detail">
-  <nav class="detail-nav" aria-label="Navigation du service">
+  <nav class="detail-nav" aria-label={t("Service navigation")}>
     <button type="button" class="btn btn-secondary btn-back" onclick={onBack} data-testid="service-detail-back-button">
-      &#8592; Retour
+      &#8592; {t("Back")}
     </button>
     <h2>{service.name}</h2>
   </nav>
@@ -138,35 +139,35 @@
     <div class="detail-card">
       <dl class="detail-dl">
         <div class="dl-row">
-          <dt>Chemin d'écoute</dt>
+          <dt>{t("Listen path")}</dt>
           <dd><code>{service.listen_path}</code></dd>
         </div>
         {#if service.real_target_url?.trim()}
           <div class="dl-row">
-            <dt>URL cible réelle</dt>
+            <dt>{t("Real target URL")}</dt>
             <dd><code>{service.real_target_url}</code></dd>
           </div>
           <div class="dl-row">
-            <dt>Disponibilité</dt>
+            <dt>{t("Availability")}</dt>
             <dd><UrlHealthBadge serviceName={service.name} groupName={service.group_name} /></dd>
           </div>
         {:else}
           <div class="dl-row">
-            <dt>URL cible réelle</dt>
-            <dd>Service purement mocké (aucune cible)</dd>
+            <dt>{t("Real target URL")}</dt>
+            <dd>{t("Purely mocked service (no target)")}</dd>
           </div>
         {/if}
         <div class="dl-row">
-          <dt>Réécriture annuaire</dt>
-          <dd>{service.rewrite_directory_urls ? 'Oui' : 'Non'}</dd>
+          <dt>{t("Directory URL rewriting")}</dt>
+          <dd>{service.rewrite_directory_urls ? t("Yes") : t("No")}</dd>
         </div>
       </dl>
       <div class="detail-actions">
         <button type="button" class="btn btn-primary" onclick={() => editing = true} data-testid="service-detail-edit-button">
-          Modifier le service
+          {t("Edit the service")}
         </button>
         <button type="button" class="btn btn-danger" onclick={() => confirmDelete = true} data-testid="service-detail-delete-button">
-          Supprimer
+          {t("Delete")}
         </button>
       </div>
     </div>
@@ -174,9 +175,9 @@
 
   <ConfirmDialog
     open={confirmDelete}
-    title="Supprimer le service"
-    message={`Confirmer la suppression du service "${service.name}" ? Cette action est irreversible.`}
-    confirmLabel="Oui, supprimer"
+    title={t("Delete the service")}
+    message={t("Delete the service \"{0}\"? This cannot be undone.", service.name)}
+    confirmLabel={t("Yes, delete")}
     onConfirm={handleDeleteService}
     onCancel={() => confirmDelete = false}
   />

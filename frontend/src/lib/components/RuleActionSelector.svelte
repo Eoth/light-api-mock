@@ -1,4 +1,5 @@
 <script>
+  import { t } from '../i18n.svelte.js';
   // Selecteur d'action (Mock/Proxy) d'une regle. Purement controle : aucun
   // etat interne, la valeur courante et les changements transitent par
   // props/callback (meme convention que les autres composants du dossier,
@@ -12,21 +13,21 @@
 </script>
 
 <fieldset class="section action-section">
-  <legend>Action quand cette regle matche</legend>
+  <legend>{t("Action when this rule matches")}</legend>
   {#if isPurelyMocked}
-    <p class="section-help" data-testid="rule-form-purely-mocked-hint">Ce service est purement mocké (aucune cible configurée) : seule l'action Mock est disponible.</p>
+    <p class="section-help" data-testid="rule-form-purely-mocked-hint">{t("This service is purely mocked (no target configured): only the Mock action is available.")}</p>
   {/if}
   <div class="action-selector">
     <label class="action-option" class:selected={action === 'mock'} data-testid="rule-form-action-mock-option">
       <input type="radio" checked={action === 'mock'} onchange={() => onChange('mock')} data-testid="rule-form-action-mock-radio" />
-      <span class="action-label">Mock</span>
-      <span class="action-desc">Retourner la reponse simulee ci-dessous</span>
+      <span class="action-label">{t("Mock")}</span>
+      <span class="action-desc">{t("Return the simulated response below")}</span>
     </label>
     {#if !isPurelyMocked}
       <label class="action-option" class:selected={action === 'proxy'} data-testid="rule-form-action-proxy-option">
         <input type="radio" checked={action === 'proxy'} onchange={() => onChange('proxy')} data-testid="rule-form-action-proxy-radio" />
-        <span class="action-label">Proxy</span>
-        <span class="action-desc">Forwarder vers la cible reelle du service</span>
+        <span class="action-label">{t("Proxy")}</span>
+        <span class="action-desc">{t("Forward to the real target of the service")}</span>
       </label>
     {/if}
   </div>

@@ -1,6 +1,7 @@
 import { mount } from 'svelte';
 import App from './App.svelte';
 import { loadRuntimeConfig } from './lib/runtime-config.js';
+import { initLocale } from './lib/i18n.svelte.js';
 import './app.css';
 
 // Charge la configuration runtime (URL de base de l'API, cf
@@ -10,6 +11,6 @@ import './app.css';
 // configuree par Vite ne le supporte pas (ecrase silencieusement en
 // production sinon).
 (async () => {
-  await loadRuntimeConfig();
+  await Promise.all([loadRuntimeConfig(), initLocale()]);
   mount(App, { target: document.getElementById('app') });
 })();

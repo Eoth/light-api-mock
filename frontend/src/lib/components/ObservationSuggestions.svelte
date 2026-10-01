@@ -13,6 +13,7 @@
   // detecteur de conflit) — decide explicitement avec l'utilisateur plutot
   // qu'un endpoint "materialiser en un clic" qui bypasserait ces gardes.
   import { observeService, unobserveService, getObservationStatus, getServiceSuggestions } from '../api.js';
+  import { t } from '../i18n.svelte.js';
 
   let { serviceName, groupName = null, isMocked = true, onUseSuggestion = () => {} } = $props();
 
@@ -70,16 +71,18 @@
     }
   }
 
-  const SOURCE_LABELS = {
-    QueryParam: 'Paramètre de requête',
-    Header: 'En-tête HTTP',
-    JsonPointer: 'Champ JSON du corps',
-  };
+  function sourceLabel(type) {
+    switch (type) {
+      case 'QueryParam': return t("Query parameter");
+      case 'Header': return t("HTTP header");
+      case 'JsonPointer': return t("JSON field of the body");
+      default: return type;
+    }
+  }
 
   function conditionSummary(condition) {
     if (!condition) return null;
-    const sourceLabel = SOURCE_LABELS[condition.source?.type] ?? condition.source?.type;
-    return `${sourceLabel} "${condition.source?.key}" = "${condition.operator?.value}"`;
+    return t("{0} \"{1}\" = \"{2}\"", sourceLabel(condition.source?.type), condition.source?.key, condition.operator?.value);
   }
 
   function toRuleDraft(rule) {
@@ -108,9 +111,9 @@
 </script>
 
 {#if !isMocked}
-  <section class="observation-panel" aria-label="Observation du trafic proxy" data-testid="observation-panel-{serviceName}">
+  <section class="observation-panel" aria-label={t("Observation of the proxied traffic")} data-testid="observation-panel-{serviceName}">
     <div class="panel-header">
-      <h4>Suggestions de règles à partir du trafic réel</h4>
+      <h4>{t("Rule suggestions from real traffic")}</h4>
       <button
         type="button"
         class="btn btn-sm {observing ? 'btn-outline' : 'btn-primary'}"
@@ -118,12 +121,11 @@
         disabled={toggling || !statusLoaded}
         data-testid="observation-toggle-button-{serviceName}"
       >
-        {observing ? 'Arrêter d\'observer' : 'Observer ce service'}
+        {observing ? t("Stop observing") : t("Observe this service")}
       </button>
     </div>
     <p class="panel-hint">
-      Capture bornée requête+réponse pendant que ce service est en mode proxy pur, pour proposer
-      des règles de mock à partir d'appels réellement observés — jamais activé automatiquement.
+      {t("Captures bounded copies of requests and responses while this service is a pure proxy, to suggest mock rules from calls actually observed. Never switched on automatically.")}
     </p>
 
     {#if observing}
@@ -135,23 +137,20 @@
           disabled={loadingSuggestions}
           data-testid="observation-refresh-suggestions-button-{serviceName}"
         >
-          {loadingSuggestions ? 'Chargement...' : 'Actualiser les suggestions'}
+          {loadingSuggestions ? t("Loading...") : t("Refresh the suggestions")}
         </button>
       </div>
 
       {#if suggestions.length === 0 && !loadingSuggestions}
         <p class="panel-empty" data-testid="observation-suggestions-empty-{serviceName}">
-          Aucune suggestion pour l'instant — appelez ce service via le proxy plusieurs fois, puis
-          actualisez.
+          {t("No suggestion yet: call this service through the proxy several times, then refresh.")}
         </p>
       {/if}
 
       {#each suggestions as suggestion, i (i)}
         {#if suggestion.outcome === 'VarianceUnexplained'}
           <p class="panel-unexplained" role="status" data-testid="observation-suggestion-unexplained-{serviceName}-{i}">
-            Réponses variables observées ({suggestion.sample_count} appels, {suggestion.response_class_count}
-            réponses distinctes) mais aucun champ de la requête ne permet de les distinguer de façon
-            fiable — aucune règle proposée.
+            {t("Varying responses observed ({0} calls, {1} distinct responses) but no field of the request tells them apart reliably: no rule suggested.", suggestion.sample_count, suggestion.response_class_count)}
           </p>
         {:else}
           {#each (suggestion.outcome === 'Unconditional' ? [suggestion.rule] : suggestion.rules) as rule, j (j)}
@@ -159,9 +158,9 @@
               <div class="suggestion-summary">
                 <code>{rule.method} {rule.sub_path}</code>
                 {#if conditionSummary(rule.condition)}
-                  <span class="suggestion-condition">si {conditionSummary(rule.condition)}</span>
+                  <span class="suggestion-condition">{t("if {0}", conditionSummary(rule.condition))}</span>
                 {:else}
-                  <span class="suggestion-condition">sans condition ({rule.sample_count} appels identiques)</span>
+                  <span class="suggestion-condition">{t("no condition ({0} identical calls)", rule.sample_count)}</span>
                 {/if}
               </div>
               <div class="suggestion-response">
@@ -174,7 +173,7 @@
                 onclick={() => onUseSuggestion(toRuleDraft(rule))}
                 data-testid="observation-use-suggestion-{serviceName}-{i}-{j}"
               >
-                Utiliser cette suggestion
+                {t("Use this suggestion")}
               </button>
             </div>
           {/each}

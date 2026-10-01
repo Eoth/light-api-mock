@@ -38,7 +38,7 @@ async function openAddRuleForm(page) {
 test('autocompletion : la selection au clic insere la fonction avec ses parametres', async ({ page }) => {
   await openAddRuleForm(page);
   await page.locator('input#rule-name').fill('ac-rule-click');
-  await page.getByRole('switch', { name: 'Script personnalise' }).click();
+  await page.getByRole('switch', { name: 'Script personnalisé' }).click();
 
   const scriptField = page.locator('#rule-script');
   await scriptField.click();
@@ -56,7 +56,7 @@ test('autocompletion : la selection au clic insere la fonction avec ses parametr
 test('autocompletion : navigation clavier (fleches + Entree) insere la fonction active', async ({ page }) => {
   await openAddRuleForm(page);
   await page.locator('input#rule-name').fill('ac-rule-kbd');
-  await page.getByRole('switch', { name: 'Script personnalise' }).click();
+  await page.getByRole('switch', { name: 'Script personnalisé' }).click();
 
   const scriptField = page.locator('#rule-script');
   await scriptField.click();
@@ -71,7 +71,7 @@ test('autocompletion : navigation clavier (fleches + Entree) insere la fonction 
 test('autocompletion : Echap ferme la liste sans rien inserer', async ({ page }) => {
   await openAddRuleForm(page);
   await page.locator('input#rule-name').fill('ac-rule-esc');
-  await page.getByRole('switch', { name: 'Script personnalise' }).click();
+  await page.getByRole('switch', { name: 'Script personnalisé' }).click();
 
   const scriptField = page.locator('#rule-script');
   await scriptField.click();
@@ -86,7 +86,7 @@ test('autocompletion : Echap ferme la liste sans rien inserer', async ({ page })
 test('autocompletion : Ctrl+Espace ouvre la liste complete sans prefixe tape', async ({ page }) => {
   await openAddRuleForm(page);
   await page.locator('input#rule-name').fill('ac-rule-ctrlspace');
-  await page.getByRole('switch', { name: 'Script personnalise' }).click();
+  await page.getByRole('switch', { name: 'Script personnalisé' }).click();
 
   const scriptField = page.locator('#rule-script');
   await scriptField.click();
@@ -100,7 +100,7 @@ test('autocompletion : Ctrl+Espace ouvre la liste complete sans prefixe tape', a
 test('la fonction inseree via autocompletion est bien enregistree telle quelle', async ({ page, request }) => {
   await openAddRuleForm(page);
   await page.locator('input#rule-name').fill('ac-rule-persist');
-  await page.getByRole('switch', { name: 'Script personnalise' }).click();
+  await page.getByRole('switch', { name: 'Script personnalisé' }).click();
 
   const scriptField = page.locator('#rule-script');
   await scriptField.click();

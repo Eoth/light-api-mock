@@ -3,6 +3,7 @@
   import ConfirmDialog from './ConfirmDialog.svelte';
   import RemovableList from './RemovableList.svelte';
   import FormField from './FormField.svelte';
+  import { t, tCount } from '../i18n.svelte.js';
 
   let {
     services = [],
@@ -40,7 +41,7 @@
       const loaded = await getGroups();
       setGroups(loaded);
     } catch (e) {
-      onNotify(`Erreur chargement groupes : ${e.message}`, 'error');
+      onNotify(t("Error while loading the groups: {0}", e.message), 'error');
     } finally {
       loading = false;
     }
@@ -50,14 +51,14 @@
     e.preventDefault();
     formError = '';
     const name = newGroupName.trim();
-    if (!name) { formError = 'Le nom du groupe est requis.'; return; }
+    if (!name) { formError = t("The group name is required."); return; }
 
     try {
       const created = await createGroup({ name, code: '', admins: [], members: [] });
       setGroups([...groups, created]);
       newGroupName = '';
       showForm = false;
-      onNotify(`Groupe "${name}" cree`, 'success');
+      onNotify(t("Group \"{0}\" created", name), 'success');
     } catch (e) {
       formError = e.message;
     }
@@ -72,9 +73,9 @@
       for (const svc of services.filter(s => s.group_name === name)) {
         onServiceUpdate({ ...svc, group_name: null }, svc.group_name);
       }
-      onNotify(`Groupe "${name}" supprime, services dissocies`, 'success');
+      onNotify(t("Group \"{0}\" deleted, its services are now ungrouped", name), 'success');
     } catch (e) {
-      onNotify(`Erreur : ${e.message}`, 'error');
+      onNotify(t("Error: {0}", e.message), 'error');
     }
   }
 
@@ -90,9 +91,9 @@
     try {
       const updated = await updateService(serviceName, svc.group_name, { ...svc, group_name: groupName || null });
       onServiceUpdate(updated, svc.group_name);
-      onNotify(`Service "${serviceName}" associe au groupe "${groupName}"`, 'success');
+      onNotify(t("Service \"{0}\" added to the group \"{1}\"", serviceName, groupName), 'success');
     } catch (e) {
-      onNotify(`Erreur : ${e.message}`, 'error');
+      onNotify(t("Error: {0}", e.message), 'error');
     }
   }
 
@@ -104,9 +105,9 @@
       delete payload.group_name;
       const updated = await updateService(serviceName, svc.group_name, payload);
       onServiceUpdate(updated, svc.group_name);
-      onNotify(`Service "${serviceName}" retire du groupe`, 'success');
+      onNotify(t("Service \"{0}\" removed from the group", serviceName), 'success');
     } catch (e) {
-      onNotify(`Erreur : ${e.message}`, 'error');
+      onNotify(t("Error: {0}", e.message), 'error');
     }
   }
 
@@ -116,7 +117,7 @@
     const group = groups.find(g => g.name === groupName);
     if (!group) return;
     if (group.members.includes(username) || group.admins.includes(username)) {
-      onNotify(`"${username}" est deja dans le groupe`, 'error');
+      onNotify(t("\"{0}\" is already in the group", username), 'error');
       return;
     }
     try {
@@ -127,7 +128,7 @@
       setGroups(groups.map(g => g.name === groupName ? updated : g));
       newMember = '';
     } catch (e) {
-      onNotify(`Erreur : ${e.message}`, 'error');
+      onNotify(t("Error: {0}", e.message), 'error');
     }
   }
 
@@ -137,7 +138,7 @@
     const group = groups.find(g => g.name === groupName);
     if (!group) return;
     if (group.admins.includes(username)) {
-      onNotify(`"${username}" est deja admin`, 'error');
+      onNotify(t("\"{0}\" is already an admin", username), 'error');
       return;
     }
     try {
@@ -149,7 +150,7 @@
       setGroups(groups.map(g => g.name === groupName ? updated : g));
       newAdmin = '';
     } catch (e) {
-      onNotify(`Erreur : ${e.message}`, 'error');
+      onNotify(t("Error: {0}", e.message), 'error');
     }
   }
 
@@ -162,7 +163,7 @@
       const updated = await updateGroupMembers(groupName, { admins, members });
       setGroups(groups.map(g => g.name === groupName ? updated : g));
     } catch (e) {
-      onNotify(`Erreur : ${e.message}`, 'error');
+      onNotify(t("Error: {0}", e.message), 'error');
     }
   }
 
@@ -171,12 +172,12 @@
 
 <div class="group-manager">
   <div class="list-header">
-    <h2>Groupes de services</h2>
+    <h2>{t("Service groups")}</h2>
     <div class="header-actions">
       <button type="button" class="btn btn-primary btn-sm" onclick={() => { showForm = !showForm; formError = ''; }} data-testid="group-manager-new-group-button">
-        {showForm ? 'Annuler' : '+ Nouveau groupe'}
+        {showForm ? t("Cancel") : t("+ New group")}
       </button>
-      <button type="button" class="btn btn-outline btn-sm" onclick={onBack} data-testid="group-manager-back-button">Retour</button>
+      <button type="button" class="btn btn-outline btn-sm" onclick={onBack} data-testid="group-manager-back-button">{t("Back")}</button>
     </div>
   </div>
 
@@ -184,10 +185,10 @@
     <form class="group-create-form" onsubmit={handleCreateGroup} data-testid="group-manager-create-form">
       <FormField
         id="new-group-name"
-        label="Nom du groupe"
+        label={t("Group name")}
         required
         error={formError}
-        hint="Un code URL de 5 caracteres est genere automatiquement a partir du nom."
+        hint={t("A 5-character URL code is generated from the name.")}
       >
         {#snippet children({ id, describedBy, invalid })}
           <input
@@ -196,22 +197,22 @@
             aria-describedby={describedBy}
             aria-invalid={invalid}
             bind:value={newGroupName}
-            placeholder="ex: API Internes"
+            placeholder={t("e.g. Internal APIs")}
             required
             data-testid="group-manager-name-input"
           />
         {/snippet}
       </FormField>
       <div class="form-actions">
-        <button type="submit" class="btn btn-primary btn-sm" data-testid="group-manager-create-submit-button">Creer</button>
+        <button type="submit" class="btn btn-primary btn-sm" data-testid="group-manager-create-submit-button">{t("Create")}</button>
       </div>
     </form>
   {/if}
 
   {#if loading}
-    <p class="loading-text">Chargement des groupes...</p>
+    <p class="loading-text">{t("Loading the groups...")}</p>
   {:else if groups.length === 0}
-    <p class="empty-text">Aucun groupe. Creez-en un pour organiser vos services par domaine.</p>
+    <p class="empty-text">{t("No group. Create one to organize your services by domain.")}</p>
   {:else}
     <div class="group-list">
       {#each groups as group}
@@ -220,13 +221,13 @@
           <div class="group-header-row">
             <h3>{group.name}</h3>
             <span class="group-code-badge">/{group.code}</span>
-            <span class="group-count">{groupServices.length} service{groupServices.length !== 1 ? 's' : ''}</span>
+            <span class="group-count">{tCount(groupServices.length, "{0} service", "{0} services")}</span>
             <div class="group-actions">
               <button type="button" class="btn btn-outline btn-sm" onclick={() => startEdit(group.name)} data-testid="group-manager-manage-button-{group.name}">
-                {editingGroup === group.name ? 'Fermer' : 'Gerer'}
+                {editingGroup === group.name ? t("Close") : t("Manage")}
               </button>
               <button type="button" class="btn btn-danger-outline btn-sm" onclick={() => groupPendingDelete = group.name} data-testid="group-manager-delete-button-{group.name}">
-                Supprimer
+                {t("Delete")}
               </button>
             </div>
           </div>
@@ -237,21 +238,21 @@
                 <li>
                   <span class="service-chip">
                     {svc.name}
-                    <button type="button" class="chip-remove" onclick={() => removeServiceFromGroup(svc.name)} title="Retirer du groupe" aria-label="Retirer {svc.name} du groupe" data-testid="group-manager-remove-service-button-{group.name}-{svc.name}">x</button>
+                    <button type="button" class="chip-remove" onclick={() => removeServiceFromGroup(svc.name)} title={t("Remove from the group")} aria-label={t("Remove {0} from the group", svc.name)} data-testid="group-manager-remove-service-button-{group.name}-{svc.name}">x</button>
                   </span>
                 </li>
               {/each}
             </ul>
           {:else}
-            <p class="empty-hint">Aucun service dans ce groupe. Utilisez le menu ci-dessous pour en ajouter.</p>
+            <p class="empty-hint">{t("No service in this group. Use the menu below to add some.")}</p>
           {/if}
 
           {#if editingGroup === group.name}
             <div class="group-edit">
               <div class="edit-section">
-                <h4>Ajouter un service</h4>
+                <h4>{t("Add a service")}</h4>
                 {#if ungroupedServices.length === 0}
-                  <p class="empty-hint">Tous les services sont deja dans un groupe.</p>
+                  <p class="empty-hint">{t("Every service is already in a group.")}</p>
                 {:else}
                   <div class="service-assign-list">
                     {#each ungroupedServices as svc}
@@ -265,27 +266,27 @@
 
               {#if authEnabled}
                 <div class="edit-section">
-                  <h4>Administrateurs</h4>
+                  <h4>{t("Administrators")}</h4>
                   <RemovableList
                     items={group.admins}
                     onRemove={(admin) => removePerson(group.name, admin, 'admin')}
-                    emptyText="Aucun administrateur"
+                    emptyText={t("No administrator")}
                   />
                   <div class="inline-form">
-                    <input type="text" bind:value={newAdmin} placeholder="Ajouter un admin" data-testid="group-manager-new-admin-input-{group.name}" />
+                    <input type="text" bind:value={newAdmin} placeholder={t("Add an admin")} data-testid="group-manager-new-admin-input-{group.name}" />
                     <button type="button" class="btn btn-outline btn-sm" onclick={() => addAdmin(group.name)} data-testid="group-manager-add-admin-button-{group.name}">+</button>
                   </div>
                 </div>
 
                 <div class="edit-section">
-                  <h4>Membres</h4>
+                  <h4>{t("Members")}</h4>
                   <RemovableList
                     items={group.members}
                     onRemove={(member) => removePerson(group.name, member, 'member')}
-                    emptyText="Aucun membre"
+                    emptyText={t("No member")}
                   />
                   <div class="inline-form">
-                    <input type="text" bind:value={newMember} placeholder="Ajouter un membre" data-testid="group-manager-new-member-input-{group.name}" />
+                    <input type="text" bind:value={newMember} placeholder={t("Add a member")} data-testid="group-manager-new-member-input-{group.name}" />
                     <button type="button" class="btn btn-outline btn-sm" onclick={() => addMember(group.name)} data-testid="group-manager-add-member-button-{group.name}">+</button>
                   </div>
                 </div>
@@ -299,9 +300,9 @@
 
   <ConfirmDialog
     open={groupPendingDelete !== null}
-    title="Supprimer le groupe"
-    message={groupPendingDelete ? `Supprimer le groupe "${groupPendingDelete}" ? Les services associes seront dissocies.` : ''}
-    confirmLabel="Oui, supprimer"
+    title={t("Delete the group")}
+    message={groupPendingDelete ? t("Delete the group \"{0}\"? Its services will no longer belong to any group.", groupPendingDelete) : ''}
+    confirmLabel={t("Yes, delete")}
     onConfirm={() => handleDeleteGroup(groupPendingDelete)}
     onCancel={() => groupPendingDelete = null}
   />

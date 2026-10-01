@@ -5,13 +5,14 @@
   // dans GroupManager/App). Reutilise .modal-overlay/.modal-content/
   // .modal-header/.modal-footer/.btn-close d'app.css — ne redefinit rien.
   import { tick } from 'svelte';
+  import { t } from '../i18n.svelte.js';
 
   let {
     open = false,
-    title = 'Confirmer',
+    title = null,
     message = '',
-    confirmLabel = 'Confirmer',
-    cancelLabel = 'Annuler',
+    confirmLabel = null,
+    cancelLabel = null,
     danger = true,
     confirmKeyword = null,
     onConfirm = () => {},
@@ -58,13 +59,13 @@
   >
     <div class="modal-content" role="document">
       <div class="modal-header">
-        <h3 id="confirm-dialog-title">{title}</h3>
-        <button type="button" class="btn-close" onclick={onCancel} aria-label="Fermer" data-testid="confirm-dialog-close-button">&#10005;</button>
+        <h3 id="confirm-dialog-title">{title ?? t("Confirm")}</h3>
+        <button type="button" class="btn-close" onclick={onCancel} aria-label={t("Close")} data-testid="confirm-dialog-close-button">&#10005;</button>
       </div>
       <p>{message}</p>
       {#if confirmKeyword}
         <div class="form-field">
-          <label for="confirm-keyword-input">Tapez « {confirmKeyword} » pour confirmer</label>
+          <label for="confirm-keyword-input">{t("Type “{0}” to confirm", confirmKeyword)}</label>
           <input
             id="confirm-keyword-input"
             type="text"
@@ -77,7 +78,7 @@
         </div>
       {/if}
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" onclick={onCancel} data-testid="confirm-dialog-cancel-button">{cancelLabel}</button>
+        <button type="button" class="btn btn-secondary" onclick={onCancel} data-testid="confirm-dialog-cancel-button">{cancelLabel ?? t("Cancel")}</button>
         <button
           type="button"
           class={danger ? 'btn btn-danger' : 'btn btn-primary'}
@@ -86,7 +87,7 @@
           disabled={!canConfirm}
           data-testid="confirm-dialog-confirm-button"
         >
-          {confirmLabel}
+          {confirmLabel ?? t("Confirm")}
         </button>
       </div>
     </div>

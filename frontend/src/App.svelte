@@ -12,6 +12,7 @@
   import GroupManager from './lib/components/GroupManager.svelte';
   import BackupManager from './lib/components/BackupManager.svelte';
   import ConfirmDialog from './lib/components/ConfirmDialog.svelte';
+  import { t, getLocale, setLocale, LOCALES } from './lib/i18n.svelte.js';
 
   let services = $state([]);
   let resetPending = $state(false);
@@ -120,7 +121,7 @@
         const result = await validateToken(silentToken);
         setAuth(result);
       } catch {
-        showNotification('Token invalide', 'error');
+        showNotification(t("Invalid token"), 'error');
       }
     }
 
@@ -135,7 +136,7 @@
       services = await getServices();
       try { groups = await getGroups(); } catch { groups = []; }
     } catch (e) {
-      showNotification(`Erreur de chargement : ${e.message}`, 'error');
+      showNotification(t("Loading error: {0}", e.message), 'error');
     }
   }
 
@@ -156,9 +157,9 @@
     try {
       const updated = await toggleService(name, groupName, isMocked);
       services = services.map(s => s.name === name && s.group_name === groupName ? updated : s);
-      showNotification(`${name} : mode ${isMocked ? 'mock' : 'proxy'} active`, 'success');
+      showNotification(t("{0}: {1} mode on", name, isMocked ? 'mock' : 'proxy'), 'success');
     } catch (e) {
-      showNotification(`Erreur : ${e.message}`, 'error');
+      showNotification(t("Error: {0}", e.message), 'error');
     }
   }
 
@@ -167,7 +168,7 @@
   function handleSelect(name, groupName) { selectedService = name; selectedServiceGroup = groupName ?? null; view = 'detail'; }
   function handleBack() { selectedService = null; selectedServiceGroup = null; clonedService = null; view = 'list'; }
   function handleCloneService(svc) {
-    clonedService = { ...JSON.parse(JSON.stringify(svc)), name: `${svc.name}-copie` };
+    clonedService = { ...JSON.parse(JSON.stringify(svc)), name: t("{0}-copy", svc.name) };
     view = 'add';
   }
   // `previousGroupName` est le groupe AVANT la mutation (capture par
@@ -193,9 +194,9 @@
       view = 'detail';
       selectedService = result.name;
       selectedServiceGroup = result.group_name ?? null;
-      showNotification(`Service "${result.name}" cree`, 'success');
+      showNotification(t("Service \"{0}\" created", result.name), 'success');
     } catch (e) {
-      showNotification(`Erreur : ${e.message}`, 'error');
+      showNotification(t("Error: {0}", e.message), 'error');
       throw e;
     }
   }
@@ -204,9 +205,9 @@
     try {
       const result = await createService(demoService);
       services = [...services, result];
-      showNotification('Service de demo charge (users-api avec mock, proxy, script rhai)', 'success');
+      showNotification(t("Demo service loaded (users-api with a mock, a proxy and a Rhai script)"), 'success');
     } catch (e) {
-      showNotification(`Erreur : ${e.message}`, 'error');
+      showNotification(t("Error: {0}", e.message), 'error');
     }
   }
 
@@ -221,9 +222,9 @@
       a.download = `lightmock-config-${new Date().toISOString().slice(0,10)}.json`;
       a.click();
       URL.revokeObjectURL(url);
-      showNotification('Configuration exportee', 'success');
+      showNotification(t("Configuration exported"), 'success');
     } catch (e) {
-      showNotification(`Erreur export : ${e.message}`, 'error');
+      showNotification(t("Export error: {0}", e.message), 'error');
     }
   }
 
@@ -238,7 +239,7 @@
       const text = await file.text();
       const config = JSON.parse(text);
       if (!config.services || !Array.isArray(config.services)) {
-        throw new Error('Format invalide : "services" attendu');
+        throw new Error(t("Invalid format: \"services\" expected"));
       }
       if (!config.groups) config.groups = [];
       const canReplace = !auth.enabled || auth.isSuperAdmin;
@@ -248,7 +249,7 @@
         await doImportMerge(config);
       }
     } catch (e) {
-      showNotification(`Erreur import : ${e.message}`, 'error');
+      showNotification(t("Import error: {0}", e.message), 'error');
     }
     e.target.value = '';
   }
@@ -258,10 +259,10 @@
     try {
       await putConfig(config);
       await loadData();
-      showNotification(`Configuration remplacee (${config.services.length} services)`, 'success');
+      showNotification(t("Configuration replaced ({0} services)", config.services.length), 'success');
       view = 'list'; selectedService = null; selectedServiceGroup = null;
     } catch (e) {
-      showNotification(`Erreur import : ${e.message}`, 'error');
+      showNotification(t("Import error: {0}", e.message), 'error');
     }
   }
 
@@ -287,10 +288,10 @@
           added++;
         }
       }
-      showNotification(`${added} service(s) et ${addedGroups} groupe(s) ajoute(s)`, 'success');
+      showNotification(t("{0} service(s) and {1} group(s) added", added, addedGroups), 'success');
       view = 'list'; selectedService = null; selectedServiceGroup = null;
     } catch (e) {
-      showNotification(`Erreur import : ${e.message}`, 'error');
+      showNotification(t("Import error: {0}", e.message), 'error');
     }
   }
 
@@ -307,9 +308,9 @@
       selectedService = null;
       selectedServiceGroup = null;
       view = 'list';
-      showNotification('Configuration reinitialised — tous les services supprimes', 'success');
+      showNotification(t("Configuration reset: every service removed"), 'success');
     } catch (e) {
-      showNotification(`Erreur reset : ${e.message}`, 'error');
+      showNotification(t("Reset error: {0}", e.message), 'error');
     }
   }
 
@@ -321,10 +322,10 @@
   let availableGroupsList = $derived(groups.map(g => ({ name: g.name, code: g.code })));
 </script>
 
-<a href="#main-content" class="sr-only skip-link">Aller au contenu principal</a>
+<a href="#main-content" class="sr-only skip-link">{t("Skip to main content")}</a>
 
 {#if loading}
-  <div class="loading" role="status"><p>Chargement...</p></div>
+  <div class="loading" role="status"><p>{t("Loading...")}</p></div>
 {:else if auth.enabled && !isLoggedIn()}
   <LoginForm onLogin={handleLogin} />
 {:else}
@@ -333,28 +334,34 @@
       <button type="button" class="app-title-btn" onclick={handleBack} data-testid="app-title-button">
         <h1 class="app-title">lightMock</h1>
       </button>
-      <p class="app-subtitle">Mock &amp; Proxy Intelligent</p>
+      <p class="app-subtitle">{t("Smart mock & proxy")}</p>
       <div class="header-actions">
-        <button type="button" class="btn btn-sm btn-outline" onclick={() => view = 'logs'} title="Journal des requetes" data-testid="app-nav-logs-button">Logs</button>
+        <button type="button" class="btn btn-sm btn-outline" onclick={() => view = 'logs'} title={t("Request log")} data-testid="app-nav-logs-button">{t("Logs")}</button>
         {#if messagingAvailable}
-          <button type="button" class="btn btn-sm btn-outline" onclick={() => view = 'messaging'} title="Journal des messages Kafka" data-testid="app-nav-messaging-button">Messages Kafka</button>
+          <button type="button" class="btn btn-sm btn-outline" onclick={() => view = 'messaging'} title={t("Kafka message log")} data-testid="app-nav-messaging-button">{t("Kafka messages")}</button>
         {/if}
         {#if tcpAvailable}
-          <button type="button" class="btn btn-sm btn-outline" onclick={() => view = 'tcp'} title="Mock TCP brut" data-testid="app-nav-tcp-button">Mock TCP</button>
+          <button type="button" class="btn btn-sm btn-outline" onclick={() => view = 'tcp'} title={t("Raw TCP mock")} data-testid="app-nav-tcp-button">{t("TCP mock")}</button>
         {/if}
-        <button type="button" class="btn btn-sm btn-outline" onclick={() => view = 'groups'} title="Gestion des groupes" data-testid="app-nav-groups-button">Groupes</button>
-        <button type="button" class="btn btn-sm btn-outline" onclick={exportConfig} title="Telecharger la configuration" data-testid="app-export-button">Export</button>
-        <button type="button" class="btn btn-sm btn-outline" onclick={importConfig} title="Charger une configuration" data-testid="app-import-button">Import</button>
-        <button type="button" class="btn btn-sm btn-outline" onclick={() => view = 'backups'} title="Restaurer une sauvegarde de configuration" data-testid="app-nav-backups-button">Sauvegardes</button>
+        <button type="button" class="btn btn-sm btn-outline" onclick={() => view = 'groups'} title={t("Group management")} data-testid="app-nav-groups-button">{t("Groups")}</button>
+        <button type="button" class="btn btn-sm btn-outline" onclick={exportConfig} title={t("Download the configuration")} data-testid="app-export-button">{t("Export")}</button>
+        <button type="button" class="btn btn-sm btn-outline" onclick={importConfig} title={t("Load a configuration")} data-testid="app-import-button">{t("Import")}</button>
+        <button type="button" class="btn btn-sm btn-outline" onclick={() => view = 'backups'} title={t("Restore a configuration backup")} data-testid="app-nav-backups-button">{t("Backups")}</button>
         {#if canShowReset}
-          <button type="button" class="btn btn-sm btn-outline btn-danger-outline" onclick={() => resetPending = true} title="Supprimer tous les services" data-testid="app-reset-button">Reset</button>
+          <button type="button" class="btn btn-sm btn-outline btn-danger-outline" onclick={() => resetPending = true} title={t("Remove every service")} data-testid="app-reset-button">{t("Reset")}</button>
         {/if}
-        <button type="button" class="btn btn-sm btn-outline" onclick={() => darkMode = !darkMode} title={darkMode ? 'Mode clair' : 'Mode sombre'} aria-label={darkMode ? 'Activer le mode clair' : 'Activer le mode sombre'} data-testid="app-theme-toggle-button">
-          {darkMode ? 'Clair' : 'Sombre'}
+        <label class="sr-only" for="app-language-select">{t("Language")}</label>
+        <select id="app-language-select" class="language-select" value={getLocale()} onchange={(e) => setLocale(e.currentTarget.value)} data-testid="app-language-select">
+          {#each LOCALES as locale (locale.code)}
+            <option value={locale.code}>{locale.label}</option>
+          {/each}
+        </select>
+        <button type="button" class="btn btn-sm btn-outline" onclick={() => darkMode = !darkMode} title={darkMode ? t("Light mode") : t("Dark mode")} aria-label={darkMode ? t("Switch to light mode") : t("Switch to dark mode")} data-testid="app-theme-toggle-button">
+          {darkMode ? t("Light") : t("Dark")}
         </button>
         {#if auth.enabled}
-          <span class="user-badge" title={auth.isSuperAdmin ? 'Super-admin' : 'Utilisateur'} data-testid="app-user-badge">{auth.username}</span>
-          <button type="button" class="btn btn-sm btn-outline" onclick={handleLogout} data-testid="app-logout-button">Deconnexion</button>
+          <span class="user-badge" title={auth.isSuperAdmin ? t("Super-admin") : t("User")} data-testid="app-user-badge">{auth.username}</span>
+          <button type="button" class="btn btn-sm btn-outline" onclick={handleLogout} data-testid="app-logout-button">{t("Log out")}</button>
         {/if}
         <input type="file" accept=".json" style="display:none" bind:this={fileInput} onchange={handleFileImport} data-testid="app-import-file-input" />
       </div>
@@ -362,17 +369,17 @@
   </header>
 
   {#if view !== 'list'}
-    <nav class="breadcrumb" aria-label="Fil d'Ariane">
+    <nav class="breadcrumb" aria-label={t("Breadcrumb")}>
       <ol>
-        <li><button type="button" class="breadcrumb-link" onclick={handleBack} data-testid="app-breadcrumb-services-link">Services</button></li>
+        <li><button type="button" class="breadcrumb-link" onclick={handleBack} data-testid="app-breadcrumb-services-link">{t("Services")}</button></li>
         <li aria-current="page">
-          {#if view === 'logs'}Journal des requetes
-          {:else if view === 'messaging'}Messages Kafka
-          {:else if view === 'tcp'}Mock TCP brut
-          {:else if view === 'groups'}Groupes de services
-          {:else if view === 'backups'}Sauvegardes de configuration
-          {:else if view === 'add'}Ajouter un service
-          {:else if view === 'detail' && currentService}Detail : {currentService.name}
+          {#if view === 'logs'}{t("Request log")}
+          {:else if view === 'messaging'}{t("Kafka messages")}
+          {:else if view === 'tcp'}{t("Raw TCP mock")}
+          {:else if view === 'groups'}{t("Service groups")}
+          {:else if view === 'backups'}{t("Configuration backups")}
+          {:else if view === 'add'}{t("Add a service")}
+          {:else if view === 'detail' && currentService}{t("Details: {0}", currentService.name)}
           {/if}
         </li>
       </ol>
@@ -380,22 +387,22 @@
   {/if}
 
   {#if importPending}
-    <div class="modal-overlay" role="dialog" aria-modal="true" aria-label="Mode d'import" data-testid="app-import-modal">
+    <div class="modal-overlay" role="dialog" aria-modal="true" aria-label={t("Import mode")} data-testid="app-import-modal">
       <div class="modal-content">
         <div class="modal-header">
-          <h3>Importer la configuration</h3>
-          <button type="button" class="btn-close" onclick={() => importPending = null} aria-label="Fermer" data-testid="app-import-modal-close-button">&#10005;</button>
+          <h3>{t("Import the configuration")}</h3>
+          <button type="button" class="btn-close" onclick={() => importPending = null} aria-label={t("Close")} data-testid="app-import-modal-close-button">&#10005;</button>
         </div>
-        <p>{importPending.services.length} service(s) et {importPending.groups?.length ?? 0} groupe(s) trouves dans le fichier.</p>
+        <p>{t("{0} service(s) and {1} group(s) found in the file.", importPending.services.length, importPending.groups?.length ?? 0)}</p>
         <div class="import-actions">
           <button type="button" class="btn btn-primary" onclick={() => doImportReplace(importPending)} data-testid="app-import-replace-button">
-            Remplacer tout
+            {t("Replace everything")}
           </button>
           <button type="button" class="btn btn-outline" onclick={() => doImportMerge(importPending)} data-testid="app-import-merge-button">
-            Fusionner (ajouter les manquants)
+            {t("Merge (add what is missing)")}
           </button>
           <button type="button" class="btn btn-secondary" onclick={() => importPending = null} data-testid="app-import-cancel-button">
-            Annuler
+            {t("Cancel")}
           </button>
         </div>
       </div>
@@ -404,9 +411,9 @@
 
   <ConfirmDialog
     open={resetPending}
-    title="Reinitialiser la configuration"
-    message="Supprimer tous les services et repartir de zero ? Une sauvegarde protegee sera conservee 30 jours, mais cette action reste lourde de consequences."
-    confirmLabel="Reinitialiser"
+    title={t("Reset the configuration")}
+    message={t("Remove every service and start from scratch? A protected backup is kept for 30 days, but this action has heavy consequences.")}
+    confirmLabel={t("Reset everything")}
     confirmKeyword="RESET"
     onConfirm={handleReset}
     onCancel={() => resetPending = false}
@@ -438,16 +445,16 @@
       <ServiceDetail service={currentService} availableGroups={availableGroupsList} onBack={handleBack} onUpdate={handleServiceUpdate} onDelete={handleServiceDelete} onNotify={showNotification} />
     {:else}
       <div class="list-header">
-        <h2>Services</h2>
-        <button type="button" class="btn btn-primary" onclick={() => view = 'add'} data-testid="app-add-service-button">+ Ajouter un service</button>
+        <h2>{t("Services")}</h2>
+        <button type="button" class="btn btn-primary" onclick={() => view = 'add'} data-testid="app-add-service-button">{t("+ Add a service")}</button>
       </div>
       <ServiceList {services} {groups} onToggle={handleToggle} onSelect={handleSelect} onClone={handleCloneService} />
       {#if services.length === 0}
         <div class="demo-section">
           <button type="button" class="btn btn-outline btn-demo" onclick={loadDemo} data-testid="app-load-demo-button">
-            Charger un exemple
+            {t("Load an example")}
           </button>
-          <span class="field-hint">Service users-api avec mock (fake data, script rhai ratio 4/5) et proxy conditionnel.</span>
+          <span class="field-hint">{t("users-api service with a mock (fake data, a Rhai script with a 4 in 5 ratio) and a conditional proxy.")}</span>
         </div>
       {/if}
     {/if}
@@ -480,6 +487,16 @@
 
   .demo-section { text-align: center; margin-top: 1rem; }
   .btn-demo { font-size: 1rem; padding: 0.75rem 1.5rem; }
+
+  .language-select {
+    font: inherit;
+    font-size: 0.8125rem;
+    color: var(--color-text);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 0.25rem 0.5rem;
+  }
 
   .user-badge {
     font-size: 0.8125rem;

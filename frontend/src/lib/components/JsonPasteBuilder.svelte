@@ -1,4 +1,5 @@
 <script>
+  import { t, tCount } from '../i18n.svelte.js';
   // Mode "coller un exemple" JSON : edite uniquement les VALEURS (source/
   // pipe) des champs deja detectes par l'analyse de l'exemple colle -- ni
   // renommage de cle, ni ajout/suppression/reordonnancement, ni changement
@@ -43,17 +44,17 @@
   }
 
   const valueSources = [
-    { value: 'fixed', label: 'Garder la valeur' },
-    { value: 'path', label: 'Parametre URL' },
-    { value: 'query', label: 'Query param' },
-    { value: 'header', label: 'Header HTTP' },
-    { value: 'body', label: 'Echo body' },
-    { value: 'fake', label: 'Donnee fictive' },
-    { value: 'uuid', label: 'UUID' },
-    { value: 'now_ms', label: 'Timestamp (ms)' },
-    { value: 'now_iso', label: 'Date ISO' },
-    { value: 'seq', label: 'Compteur' },
-    { value: 'script', label: 'Resultat script' },
+    { value: 'fixed', get label() { return t("Keep the value"); } },
+    { value: 'path', get label() { return t("URL parameter"); } },
+    { value: 'query', get label() { return t("Query param"); } },
+    { value: 'header', get label() { return t("HTTP header"); } },
+    { value: 'body', get label() { return t("Echo of the body"); } },
+    { value: 'fake', get label() { return t("Fake data"); } },
+    { value: 'uuid', get label() { return t("UUID"); } },
+    { value: 'now_ms', get label() { return t("Timestamp (ms)"); } },
+    { value: 'now_iso', get label() { return t("ISO date"); } },
+    { value: 'seq', get label() { return t("Counter"); } },
+    { value: 'script', get label() { return t("Script result"); } },
   ];
 
   const fakeOptions = [
@@ -67,29 +68,29 @@
   // raisonnable -- uniquement la liste deja existante, aucune nouvelle
   // transformation inventee ici.
   const pipeOptions = [
-    { value: 'lower', label: 'lower — minuscules' },
-    { value: 'upper', label: 'upper — majuscules' },
-    { value: 'trim', label: 'trim — suppr. espaces' },
-    { value: 'capitalize', label: 'capitalize — 1ere maj.' },
-    { value: 'first(N)', label: 'first(N) — N premiers car.' },
-    { value: 'last(N)', label: 'last(N) — N derniers car.' },
-    { value: 'substr(start,len)', label: 'substr(start,len)' },
-    { value: 'default("val")', label: 'default("val") — si vide' },
-    { value: 'replace("a","b")', label: 'replace("a","b")' },
-    { value: 'prepend("prefix")', label: 'prepend("prefix")' },
-    { value: 'append("suffix")', label: 'append("suffix")' },
-    { value: 'length', label: 'length — nb car.' },
+    { value: 'lower', get label() { return t("lower — lowercase"); } },
+    { value: 'upper', get label() { return t("upper — uppercase"); } },
+    { value: 'trim', get label() { return t("trim — strip spaces"); } },
+    { value: 'capitalize', get label() { return t("capitalize — first letter uppercase"); } },
+    { value: 'first(N)', get label() { return t("first(N) — first N characters"); } },
+    { value: 'last(N)', get label() { return t("last(N) — last N characters"); } },
+    { value: 'substr(start,len)', get label() { return t("substr(start,len)"); } },
+    { value: 'default("val")', get label() { return t("default(\"val\") — when empty"); } },
+    { value: 'replace("a","b")', get label() { return t("replace(\"a\",\"b\")"); } },
+    { value: 'prepend("prefix")', get label() { return t("prepend(\"prefix\")"); } },
+    { value: 'append("suffix")', get label() { return t("append(\"suffix\")"); } },
+    { value: 'length', get label() { return t("length — number of characters"); } },
   ];
 
   function handleParse() {
     parseError = '';
     const text = pasteInput.trim();
-    if (!text) { parseError = 'Collez un JSON valide.'; return; }
+    if (!text) { parseError = t("Paste valid JSON."); return; }
     try {
       const data = JSON.parse(text);
       if (Array.isArray(data)) {
         if (data.length === 0) {
-          parseError = 'Le tableau est vide. Collez un tableau avec au moins un element.';
+          parseError = t("The array is empty. Paste an array with at least one element.");
           return;
         }
         isArrayRoot = true;
@@ -98,7 +99,7 @@
         isArrayRoot = false;
         fields = exampleJsonToFields(data);
       } else {
-        parseError = 'Le JSON doit etre un objet ou un tableau.';
+        parseError = t("The JSON must be an object or an array.");
         return;
       }
       parsed = true;
@@ -132,9 +133,9 @@
   // un seul niveau de cle plate est navigable ({{script.champ}}), jamais un
   // chemin imbrique.
   function valuePlaceholder(src) {
-    if (src === 'fixed') return 'valeur fixe';
-    if (src === 'script') return 'ex: nom (vide = {{script}} entier ; 1 seul niveau — testez la regle pour voir les cles)';
-    return 'nom du parametre';
+    if (src === 'fixed') return t("fixed value");
+    if (src === 'script') return t("e.g. name (empty = the whole {{script}}; one level only: test the rule to see the keys)");
+    return t("parameter name");
   }
 
   export function toTemplate() {
@@ -143,30 +144,32 @@
   }
 </script>
 
-<div class="paste-builder" aria-label="Constructeur JSON par exemple">
+<div class="paste-builder" aria-label={t("JSON builder by example")}>
   {#if !parsed}
     <div class="paste-zone">
-      <label for="json-paste-input">Collez un exemple de reponse JSON</label>
+      <label for="json-paste-input">{t("Paste an example of the JSON response")}</label>
       <textarea
         id="json-paste-input"
         bind:value={pasteInput}
         rows="6"
         class="paste-textarea"
-        placeholder={'{\n  "siret": "44306184100047",\n  "nom": "ACME Corp",\n  "status": "actif"\n}'}
+        placeholder={t("{\n  \"id\": \"42\",\n  \"name\": \"ACME Corp\",\n  \"status\": \"active\"\n}")}
         data-testid="json-paste-builder-textarea"
       ></textarea>
       {#if parseError}
         <div class="form-error" role="alert" data-testid="json-paste-builder-error">{parseError}</div>
       {/if}
       <button type="button" class="btn btn-primary btn-sm" onclick={handleParse} data-testid="json-paste-builder-analyze-button">
-        Analyser et variabiliser
+        {t("Analyze and make it variable")}
       </button>
     </div>
   {:else}
     <div class="paste-header">
-      <span class="field-hint">{isArrayRoot ? 'Tableau de ' : ''}{fields.length} champ{fields.length !== 1 ? 's' : ''} detecte{fields.length !== 1 ? 's' : ''} — choisissez la source de chaque valeur</span>
+      <span class="field-hint">{isArrayRoot
+        ? tCount(fields.length, "Array of {0} detected field: choose the source of each value", "Array of {0} detected fields: choose the source of each value")
+        : tCount(fields.length, "{0} field detected: choose the source of each value", "{0} fields detected: choose the source of each value")}</span>
       <button type="button" class="btn btn-outline btn-sm" onclick={() => { parsed = false; pasteInput = ''; }} data-testid="json-paste-builder-reset-button">
-        Recoller un JSON
+        {t("Paste another JSON")}
       </button>
     </div>
 
@@ -185,17 +188,17 @@
                 onclick={() => toggleCollapse(testPath)}
                 aria-expanded={!collapsed}
                 aria-controls="json-paste-builder-children-{testPath}"
-                aria-label={collapsed ? `Deplier ${field.key || 'ce champ'}` : `Replier ${field.key || 'ce champ'}`}
-                title={collapsed ? 'Deplier' : 'Replier'}
+                aria-label={collapsed ? t("Expand {0}", field.key || t("this field")) : t("Collapse {0}", field.key || t("this field"))}
+                title={collapsed ? t("Expand") : t("Collapse")}
                 data-testid="json-paste-builder-collapse-button-{testPath}"
               >{collapsed ? '▶' : '▼'}</button>
             {/if}
             <span class="paste-key">{field.key}</span>
 
             {#if isObject}
-              <span class="paste-type-badge">objet</span>
+              <span class="paste-type-badge">{t("object")}</span>
               {#if collapsed}
-                <span class="collapsed-indicator" data-testid="json-paste-builder-collapsed-indicator-{testPath}">({(field.children || []).length} masque{(field.children || []).length > 1 ? 's' : ''})</span>
+                <span class="collapsed-indicator" data-testid="json-paste-builder-collapsed-indicator-{testPath}">{tCount((field.children || []).length, "({0} hidden item)", "({0} hidden items)")}</span>
               {/if}
             {/if}
           </div>
@@ -205,17 +208,17 @@
               {@render renderFields(field.children, [...currentPath, 'children'], depth + 1)}
             </div>
           {:else if field.fieldType === 'array-values' || field.fieldType === 'array-objects'}
-            <span class="paste-type-badge">tableau</span>
+            <span class="paste-type-badge">{t("array")}</span>
           {:else}
             <div class="paste-controls">
-              <select value={field.source} onchange={(e) => updateField(currentPath, 'source', e.target.value)} aria-label="Source pour {field.key}" data-testid="json-paste-builder-source-select-{currentPath.join('-')}">
+              <select value={field.source} onchange={(e) => updateField(currentPath, 'source', e.target.value)} aria-label={t("Source for {0}", field.key)} data-testid="json-paste-builder-source-select-{currentPath.join('-')}">
                 {#each valueSources as vs}
                   <option value={vs.value}>{vs.label}</option>
                 {/each}
               </select>
 
               {#if field.source === 'fake'}
-                <select value={field.value} onchange={(e) => updateField(currentPath, 'value', e.target.value)} aria-label="Type fictif" data-testid="json-paste-builder-fake-select-{currentPath.join('-')}">
+                <select value={field.value} onchange={(e) => updateField(currentPath, 'value', e.target.value)} aria-label={t("Kind of fake data")} data-testid="json-paste-builder-fake-select-{currentPath.join('-')}">
                   {#each fakeOptions as fo}
                     <option value={fo}>{fo}</option>
                   {/each}
@@ -227,7 +230,7 @@
                   value={field.value}
                   oninput={(e) => updateField(currentPath, 'value', e.target.value)}
                   placeholder={valuePlaceholder(field.source)}
-                  aria-label="Valeur pour {field.key}"
+                  aria-label={t("Value for {0}", field.key)}
                   data-testid="json-paste-builder-value-input-{currentPath.join('-')}"
                 />
               {/if}
@@ -238,8 +241,8 @@
                   class="pipe-input"
                   value={field.pipe || ''}
                   oninput={(e) => updateField(currentPath, 'pipe', e.target.value)}
-                  placeholder="ex: first(9) | upper"
-                  aria-label="Pipe de transformation pour {field.key}"
+                  placeholder={t("e.g. {0}", "first(9) | upper")}
+                  aria-label={t("Transformation pipe for {0}", field.key)}
                   list="dl-paste-pipes"
                   autocomplete="off"
                   data-testid="json-paste-builder-pipe-input-{currentPath.join('-')}"
@@ -247,9 +250,9 @@
               {/if}
 
               {#if field.source === 'fixed'}
-                <span class="paste-preview-fixed">{field.value}</span>
+                <span class="paste-preview-fixed" translate="no">{field.value}</span>
               {:else}
-                <span class="paste-preview-var">{sharedBuildExpr(field)}</span>
+                <span class="paste-preview-var" translate="no">{sharedBuildExpr(field)}</span>
               {/if}
             </div>
           {/if}

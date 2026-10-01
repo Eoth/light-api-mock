@@ -1,4 +1,5 @@
 <script>
+  import { t } from '../i18n.svelte.js';
   let { active = false } = $props();
 </script>
 
@@ -6,10 +7,10 @@
   class="badge"
   class:active
   role="status"
-  aria-label={active ? 'Mode mock activé' : 'Mode proxy activé'}
+  aria-label={active ? t("Mock mode on") : t("Proxy mode on")}
   data-testid="status-badge"
 >
-  {active ? 'MOCK' : 'PROXY'}
+  {active ? t("MOCK") : t("PROXY")}
 </span>
 
 <style>

@@ -1,5 +1,6 @@
 <script>
   import { pingService } from '../api.js';
+  import { t } from '../i18n.svelte.js';
 
   // Doit rester alignee avec PING_TTL_MS cote backend (src/server/ping.rs).
   // Duplique volontairement plutot que d'ajouter un aller-retour reseau
@@ -43,13 +44,15 @@
     return status.reachable ? 'reachable' : 'unreachable';
   });
 
-  const LABELS = {
-    testing: 'Test en cours...',
-    unknown: 'Non testé',
-    expired: 'Expiré',
-    reachable: 'Accessible',
-    unreachable: 'Inaccessible',
-  };
+  function label(current) {
+    switch (current) {
+      case 'testing': return t("Testing...");
+      case 'expired': return t("Expired");
+      case 'reachable': return t("Reachable");
+      case 'unreachable': return t("Unreachable");
+      default: return t("Not tested");
+    }
+  }
 </script>
 
 <div class="url-health">
@@ -59,18 +62,17 @@
     aria-live="polite"
     data-testid="url-health-badge-status-{serviceName}"
   >
-    {LABELS[state()]}
+    {label(state())}
   </span>
   <button type="button" class="btn btn-sm btn-outline" onclick={handleTest} disabled={loading} data-testid="url-health-badge-test-button-{serviceName}">
-    Tester la cible (reseau uniquement)
+    {t("Test the target (network only)")}
   </button>
   {#if error}
     <span class="ping-error" role="alert" data-testid="url-health-badge-error-{serviceName}">{error}</span>
   {/if}
   {#if status && !isExpired && !status.reachable}
     <p class="ping-warning" role="alert" data-testid="url-health-badge-warning-{serviceName}">
-      Seul le mode mock est utilisable pour ce service tant que la cible n'est pas accessible
-      (test reseau uniquement — connexion TCP, pas d'appel applicatif).
+      {t("Only the mock mode can be used for this service while its target is unreachable (network test only: a TCP connection, no application call).")}
     </p>
   {/if}
 </div>

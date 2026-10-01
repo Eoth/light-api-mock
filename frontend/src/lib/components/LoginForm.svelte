@@ -1,6 +1,7 @@
 <script>
   import { login as apiLogin } from '../api.js';
   import { setAuth } from '../auth.svelte.js';
+  import { t } from '../i18n.svelte.js';
 
   let { onLogin = () => {} } = $props();
 
@@ -13,8 +14,8 @@
     e.preventDefault();
     error = '';
 
-    if (!username.trim()) { error = "Le nom d'utilisateur est requis."; return; }
-    if (!password) { error = 'Le mot de passe est requis.'; return; }
+    if (!username.trim()) { error = t("The user name is required."); return; }
+    if (!password) { error = t("The password is required."); return; }
 
     loading = true;
     try {
@@ -32,7 +33,7 @@
 <div class="login-container">
   <div class="login-card">
     <h1 class="login-title">lightMock</h1>
-    <p class="login-subtitle">Connexion requise</p>
+    <p class="login-subtitle">{t("Sign-in required")}</p>
 
     <form class="login-form" onsubmit={handleSubmit}>
       {#if error}
@@ -40,7 +41,7 @@
       {/if}
 
       <div class="form-field">
-        <label for="login-user">Nom d'utilisateur</label>
+        <label for="login-user">{t("User name")}</label>
         <input
           id="login-user"
           type="text"
@@ -53,7 +54,7 @@
       </div>
 
       <div class="form-field">
-        <label for="login-pass">Mot de passe</label>
+        <label for="login-pass">{t("Password")}</label>
         <input
           id="login-pass"
           type="password"
@@ -66,7 +67,7 @@
       </div>
 
       <button type="submit" class="btn btn-primary btn-login" disabled={loading} data-testid="login-form-submit-button">
-        {loading ? 'Connexion...' : 'Se connecter'}
+        {loading ? t("Signing in...") : t("Sign in")}
       </button>
     </form>
   </div>

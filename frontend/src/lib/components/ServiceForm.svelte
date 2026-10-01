@@ -3,6 +3,7 @@
   import FormField from './FormField.svelte';
   import ToggleSwitch from './ToggleSwitch.svelte';
   import { buildServiceTestUrl } from '../service-url.js';
+  import { t, tCount } from '../i18n.svelte.js';
 
   let {
     service = null,
@@ -48,15 +49,15 @@
 
   function validateName(n) {
     const trimmed = n.trim();
-    if (!trimmed) return 'Le nom du service est requis.';
+    if (!trimmed) return t("The service name is required.");
     if (RESERVED_NAMES.includes(trimmed.toLowerCase())) {
-      return `Le nom "${trimmed}" est reserve par lightMock (noms interdits : ${RESERVED_NAMES.join(', ')}).`;
+      return t("The name \"{0}\" is reserved by lightMock (forbidden names: {1}).", trimmed, RESERVED_NAMES.join(', '));
     }
     if (trimmed.includes('/') || trimmed.includes('\\')) {
-      return 'Le nom du service ne peut pas contenir de separateur de chemin (/ ou \\).';
+      return t("A service name cannot contain a path separator (/ or \\).");
     }
     if (!/^[A-Za-z0-9_-]+$/.test(trimmed)) {
-      return 'Le nom du service ne peut contenir que des lettres, chiffres, tirets (-) et underscores (_).';
+      return t("A service name can only contain letters, digits, dashes (-) and underscores (_).");
     }
     return null;
   }
@@ -119,7 +120,7 @@
     const pathErr = validatePath(listenPath);
     if (pathErr) { error = pathErr; return; }
 
-    if (!purelyMocked && !realTargetUrl.trim()) { error = "L'URL cible est requise."; return; }
+    if (!purelyMocked && !realTargetUrl.trim()) { error = t("The target URL is required."); return; }
 
     const payload = buildPayload();
 
@@ -149,12 +150,12 @@
   }
 </script>
 
-<form class="service-form" onsubmit={handleSubmit} aria-label={isEdit ? `Modifier le service ${name}` : 'Ajouter un service'}>
+<form class="service-form" onsubmit={handleSubmit} aria-label={isEdit ? t("Edit the service {0}", name) : t("Add a service")}>
   {#if error}
     <div class="form-error" role="alert" aria-live="assertive" data-testid="service-form-error">{error}</div>
   {/if}
 
-  <FormField id="svc-name" label="Nom du service" hint="Identifiant unique, sert aussi de prefixe URL : /{`{nom}`}/...">
+  <FormField id="svc-name" label={t("Service name")} hint={t("Unique identifier, also the URL prefix: /{name}/...")}>
     {#snippet children({ id, describedBy })}
       <input
         {id}
@@ -162,20 +163,20 @@
         bind:value={name}
         required
         disabled={isEdit}
-        placeholder="ex: service-users"
+        placeholder={t("e.g. users-service")}
         aria-describedby={describedBy}
         data-testid="service-form-name-input"
       />
     {/snippet}
   </FormField>
 
-  <FormField id="svc-path" label="Chemin d'ecoute (optionnel)" hint="Laissez vide pour intercepter tout le trafic sous /{`{nom}`}/. Sinon, utilisez /* pour wildcard ou {`{param}`} pour capturer des segments.">
+  <FormField id="svc-path" label={t("Listen path (optional)")} hint={t("Leave empty to intercept all the traffic under /{name}/. Otherwise use /* as a wildcard or {param} to capture segments.")}>
     {#snippet children({ id, describedBy })}
       <input
         {id}
         type="text"
         bind:value={listenPath}
-        placeholder="Vide = intercepte tout sous le nom du service"
+        placeholder={t("Empty = intercepts everything under the service name")}
         aria-describedby={describedBy}
         data-testid="service-form-path-input"
       />
@@ -184,22 +185,23 @@
 
   <div class="form-field">
     <ToggleSwitch
-      label="Service purement mocké"
+      label={t("Purely mocked service")}
+      name="purely-mocked"
       checked={purelyMocked}
       onchange={handlePurelyMockedChange}
     />
-    <span class="field-hint">Aucune cible réelle : pas de mode proxy, pas de test de disponibilité. Peut être activé à tout moment sans perdre les règles déjà configurées.</span>
+    <span class="field-hint">{t("No real target: no proxy mode, no availability test. Can be switched on at any time without losing the rules already configured.")}</span>
   </div>
 
   {#if !purelyMocked}
-    <FormField id="svc-target" label="URL cible réelle" hint="Adresse du vrai backend dans le cluster (utilisée en mode proxy)">
+    <FormField id="svc-target" label={t("Real target URL")} hint={t("Address of the real backend (used in proxy mode)")}>
       {#snippet children({ id, describedBy })}
         <input
           {id}
           type="url"
           bind:value={realTargetUrl}
           required
-          placeholder="ex: http://service-users.default.svc:8080"
+          placeholder={t("e.g. http://users-service.default.svc:8080")}
           aria-describedby={describedBy}
           data-testid="service-form-target-input"
         />
@@ -210,30 +212,29 @@
   {#if pendingPurelyMockedWarning}
     <div class="mode-warning" role="alert" data-testid="service-form-purely-mocked-warning">
       <p>
-        &#9888; {proxyRulesAffected.length > 1 ? 'Ces règles' : 'Cette règle'} de ce service {proxyRulesAffected.length > 1 ? 'sont' : 'est'} en action "Proxy" et ne {proxyRulesAffected.length > 1 ? 'fonctionneront' : 'fonctionnera'} plus une fois le service marqué purement mocké (elle{proxyRulesAffected.length > 1 ? 's' : ''} renverra une erreur claire au lieu de relayer vers une cible) :
-        {proxyRulesAffected.map(r => r.name).join(', ')}.
+        {tCount(proxyRulesAffected.length, "⚠ This rule of the service uses the \"Proxy\" action and will stop working once the service is purely mocked (it will return a clear error instead of forwarding to a target): {1}.", "⚠ These rules of the service use the \"Proxy\" action and will stop working once the service is purely mocked (they will return a clear error instead of forwarding to a target): {1}.", proxyRulesAffected.map(r => r.name).join(', '))}
       </p>
       <div class="mode-warning-actions">
-        <button type="button" class="btn btn-sm btn-primary" onclick={confirmSaveDespitePurelyMockedWarning} data-testid="service-form-purely-mocked-save-anyway-button">Enregistrer quand même</button>
-        <button type="button" class="btn btn-sm btn-secondary" onclick={cancelPurelyMockedWarning} data-testid="service-form-purely-mocked-cancel-button">Revenir en arrière</button>
+        <button type="button" class="btn btn-sm btn-primary" onclick={confirmSaveDespitePurelyMockedWarning} data-testid="service-form-purely-mocked-save-anyway-button">{t("Save anyway")}</button>
+        <button type="button" class="btn btn-sm btn-secondary" onclick={cancelPurelyMockedWarning} data-testid="service-form-purely-mocked-cancel-button">{t("Go back")}</button>
       </div>
     </div>
   {/if}
 
-  <FormField id="svc-type" label="Type de service" hint={serviceType === 'soap' ? 'Les requetes ?wsdl seront automatiquement proxyfiees vers le backend reel.' : 'API REST standard (JSON).'}>
+  <FormField id="svc-type" label={t("Service type")} hint={serviceType === 'soap' ? t("?wsdl requests will be forwarded to the real backend automatically.") : t("Standard REST API (JSON).")}>
     {#snippet children({ id, describedBy })}
       <select {id} bind:value={serviceType} aria-describedby={describedBy} data-testid="service-form-type-select">
-        <option value="rest">REST</option>
-        <option value="soap">SOAP / XML</option>
+        <option value="rest">{t("REST")}</option>
+        <option value="soap">{t("SOAP / XML")}</option>
       </select>
     {/snippet}
   </FormField>
 
   {#if availableGroups.length > 0}
-    <FormField id="svc-group" label="Groupe" hint="Associe le service a un groupe pour gerer les droits d'acces">
+    <FormField id="svc-group" label={t("Group")} hint={t("Puts the service in a group, which manages access rights")}>
       {#snippet children({ id, describedBy })}
         <select {id} bind:value={groupName} aria-describedby={describedBy} data-testid="service-form-group-select">
-          <option value="">-- Aucun groupe --</option>
+          <option value="">{t("-- No group --")}</option>
           {#each availableGroups as g}
             <option value={g.name}>{g.name} (/{g.code})</option>
           {/each}
@@ -244,16 +245,16 @@
 
   {#if name.trim()}
     <div class="url-preview">
-      <strong>URL de test :</strong> <code data-testid="service-form-url-preview">{testUrl()}</code>
+      <strong>{t("Test URL:")}</strong> <code data-testid="service-form-url-preview">{testUrl()}</code>
     </div>
   {/if}
 
   <div class="form-actions">
     <button type="submit" class="btn btn-primary" disabled={saving} data-testid="service-form-submit-button">
-      {saving ? 'Enregistrement...' : isEdit ? 'Enregistrer' : 'Ajouter'}
+      {saving ? t("Saving...") : isEdit ? t("Save") : t("Add")}
     </button>
     <button type="button" class="btn btn-secondary" onclick={onCancel} disabled={saving} data-testid="service-form-cancel-button">
-      Annuler
+      {t("Cancel")}
     </button>
   </div>
 </form>

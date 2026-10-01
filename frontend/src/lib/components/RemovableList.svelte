@@ -1,4 +1,5 @@
 <script>
+  import { t } from '../i18n.svelte.js';
   // Liste generique "chip/ligne + bouton supprimer". `getKey`/`getLabel`
   // restent personnalisables pour reutiliser ce composant avec des items
   // simples (chaines) ou des objets (ex: membres de groupe).
@@ -7,12 +8,12 @@
     getKey = (item) => item,
     getLabel = (item) => String(item),
     onRemove = () => {},
-    emptyText = 'Aucun élément.',
+    emptyText = null,
   } = $props();
 </script>
 
 {#if items.length === 0}
-  <p class="removable-list-empty">{emptyText}</p>
+  <p class="removable-list-empty">{emptyText ?? t("No item.")}</p>
 {:else}
   <ul class="removable-list">
     {#each items as item (getKey(item))}
@@ -22,8 +23,8 @@
           type="button"
           class="chip-remove"
           onclick={() => onRemove(item)}
-          aria-label={`Retirer ${getLabel(item)}`}
-          title="Retirer"
+          aria-label={t("Remove {0}", getLabel(item))}
+          title={t("Remove")}
           data-testid="removable-list-remove-button-{getKey(item)}"
         >
           &times;

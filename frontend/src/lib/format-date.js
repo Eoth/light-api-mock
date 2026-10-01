@@ -1,3 +1,5 @@
+import { intlLocale } from './i18n.svelte.js';
+
 // Source unique de verite pour le formatage date/heure (meme principe que
 // service-url.js/tpl-utils.js/path-params.js : cette logique ne doit jamais
 // etre re-dupliquee dans un composant). Regroupe les 3 fidelites d'affichage
@@ -17,6 +19,6 @@ const PRECISE_DATETIME_OPTIONS = {
 };
 
 // Format utilise par RequestLog.svelte et MessagingLog.svelte (journaux).
-export function formatDateTimePrecise(timestamp, locale = 'fr-FR') {
+export function formatDateTimePrecise(timestamp, locale = intlLocale()) {
   return formatDateTime(timestamp, PRECISE_DATETIME_OPTIONS, locale);
 }

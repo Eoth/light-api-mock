@@ -19,6 +19,7 @@
   import RuleTester from './RuleTester.svelte';
   import { getLogs, checkRuleConflicts } from '../api.js';
   import { combinePathParamNames } from '../path-params.js';
+  import { t } from '../i18n.svelte.js';
 
   import { untrack } from 'svelte';
 
@@ -153,9 +154,9 @@
     pendingStaleProxyPayload = null;
 
     const trimmedName = name.trim();
-    if (!trimmedName) { formError = 'Le nom de la regle est requis.'; return; }
+    if (!trimmedName) { formError = t("The rule name is required."); return; }
     if (existingRuleNames.some(n => n.toLowerCase() === trimmedName.toLowerCase())) {
-      formError = `Une regle avec le nom "${trimmedName}" existe deja dans ce service.`;
+      formError = t("A rule named \"{0}\" already exists in this service.", trimmedName);
       return;
     }
 
@@ -237,33 +238,33 @@
   }
 </script>
 
-<form class="rule-form" onsubmit={handleSubmit} aria-label={init ? `Modifier la regle ${init.name}` : 'Nouvelle regle'}>
+<form class="rule-form" onsubmit={handleSubmit} aria-label={init ? t("Edit the rule {0}", init.name) : t("New rule")}>
 
   {#if formError}
     <div class="form-error" role="alert" aria-live="assertive">{formError}</div>
   {/if}
 
   <div class="form-field">
-    <label for="rule-name">Nom de la regle</label>
-    <input id="rule-name" type="text" bind:value={name} required placeholder="ex: get-siret" aria-describedby="rn-hint" data-testid="rule-form-name-input" />
-    <span class="field-hint" id="rn-hint">Identifiant unique de cette regle dans le service</span>
+    <label for="rule-name">{t("Rule name")}</label>
+    <input id="rule-name" type="text" bind:value={name} required placeholder={t("e.g. get-customer")} aria-describedby="rn-hint" data-testid="rule-form-name-input" />
+    <span class="field-hint" id="rn-hint">{t("Unique identifier of this rule in the service")}</span>
   </div>
 
   <div class="form-row">
     <div class="form-field">
-      <label for="rule-method">Methode HTTP</label>
+      <label for="rule-method">{t("HTTP method")}</label>
       <select id="rule-method" bind:value={ruleMethod} aria-describedby="rule-method-hint" data-testid="rule-form-method-select">
         {#each httpMethods as m}
           <option value={m}>{m}</option>
         {/each}
       </select>
-      <span class="field-hint" id="rule-method-hint">Methode HTTP que cette regle intercepte</span>
+      <span class="field-hint" id="rule-method-hint">{t("HTTP method this rule intercepts")}</span>
     </div>
 
     <div class="form-field">
-      <label for="rule-subpath">Sous-chemin (optionnel)</label>
-      <input id="rule-subpath" type="text" bind:value={subPath} placeholder="ex: /users/{'{id}'}" aria-describedby="rule-subpath-hint" data-testid="rule-form-subpath-input" />
-      <span class="field-hint" id="rule-subpath-hint">Affine le matching au sein du service</span>
+      <label for="rule-subpath">{t("Sub-path (optional)")}</label>
+      <input id="rule-subpath" type="text" bind:value={subPath} placeholder={t("e.g. /users/{id}")} aria-describedby="rule-subpath-hint" data-testid="rule-form-subpath-input" />
+      <span class="field-hint" id="rule-subpath-hint">{t("Narrows the matching within the service")}</span>
     </div>
   </div>
 
@@ -319,9 +320,9 @@
   <!-- ACTIONS -->
   <div class="form-actions">
     <button type="submit" class="btn btn-primary" disabled={checkingConflicts} data-testid="rule-form-submit-button">
-      {#if checkingConflicts}Vérification…{:else}{init ? 'Enregistrer la regle' : 'Ajouter la regle'}{/if}
+      {#if checkingConflicts}{t("Checking…")}{:else}{init ? t("Save the rule") : t("Add the rule")}{/if}
     </button>
-    <button type="button" class="btn btn-secondary" onclick={onCancel} data-testid="rule-form-cancel-button">Annuler</button>
+    <button type="button" class="btn btn-secondary" onclick={onCancel} data-testid="rule-form-cancel-button">{t("Cancel")}</button>
   </div>
 </form>
 

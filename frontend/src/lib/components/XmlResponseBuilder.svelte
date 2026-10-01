@@ -1,26 +1,27 @@
 <script>
   import { buildExpr as sharedBuildExpr, templateToPreview, xmlFieldsToTemplate } from '../tpl-utils.js';
+  import { t, tCount } from '../i18n.svelte.js';
 
   let { fields = [], rootTag = 'response', onUpdate = () => {} } = $props();
 
   const nodeTypes = [
-    { value: 'value', label: 'Contenu' },
-    { value: 'parent', label: 'Noeud parent' },
+    { value: 'value', get label() { return t("Content"); } },
+    { value: 'parent', get label() { return t("Parent node"); } },
   ];
 
   const valueSources = [
-    { value: 'fixed', label: 'Valeur fixe' },
-    { value: 'path', label: 'Parametre URL' },
-    { value: 'query', label: 'Query param' },
-    { value: 'header', label: 'Header HTTP' },
-    { value: 'body', label: 'Echo body (JSON pointer)' },
-    { value: 'xpath', label: 'XPath (XML/SOAP)' },
-    { value: 'fake', label: 'Donnee fictive' },
-    { value: 'uuid', label: 'UUID' },
-    { value: 'now_ms', label: 'Timestamp (ms)' },
-    { value: 'now_iso', label: 'Date ISO' },
-    { value: 'seq', label: 'Compteur' },
-    { value: 'script', label: 'Resultat script' },
+    { value: 'fixed', get label() { return t("Fixed value"); } },
+    { value: 'path', get label() { return t("URL parameter"); } },
+    { value: 'query', get label() { return t("Query param"); } },
+    { value: 'header', get label() { return t("HTTP header"); } },
+    { value: 'body', get label() { return t("Echo of the body (JSON pointer)"); } },
+    { value: 'xpath', get label() { return t("XPath (XML/SOAP)"); } },
+    { value: 'fake', get label() { return t("Fake data"); } },
+    { value: 'uuid', get label() { return t("UUID"); } },
+    { value: 'now_ms', get label() { return t("Timestamp (ms)"); } },
+    { value: 'now_iso', get label() { return t("ISO date"); } },
+    { value: 'seq', get label() { return t("Counter"); } },
+    { value: 'script', get label() { return t("Script result"); } },
   ];
 
   const fakeOptions = [
@@ -46,7 +47,7 @@
   }
 
   const pipeOptions = [
-    { value: '', label: '(aucun)' },
+    { value: '', get label() { return t("(none)"); } },
     { value: 'lower', label: 'lower' },
     { value: 'upper', label: 'upper' },
     { value: 'capitalize', label: 'capitalize' },
@@ -74,11 +75,11 @@
   }
 
   function moveAt(path, idx, dir) {
-    const t = idx + dir;
+    const target = idx + dir;
     mutate(root => {
       const arr = getByPath(root, path);
-      if (t < 0 || t >= arr.length) return;
-      [arr[idx], arr[t]] = [arr[t], arr[idx]];
+      if (target < 0 || target >= arr.length) return;
+      [arr[idx], arr[target]] = [arr[target], arr[idx]];
     });
   }
 
@@ -111,16 +112,16 @@
   function needsValueInput(src) { return ['fixed','path','query','header','body','xpath','script'].includes(src); }
 
   function valuePlaceholder(src) {
-    if (src === 'body') return 'ex: /user/name';
-    if (src === 'xpath') return 'ex: Envelope/Body/recherche/Siret';
+    if (src === 'body') return t("e.g. /user/name");
+    if (src === 'xpath') return t("e.g. Envelope/Body/search/Id");
     // Un seul niveau de cle plate est navigable ({{script.champ}}, jamais
     // {{script.objet.champ}}) : si le script retourne un objet imbrique
     // sous une cle, cette cle contiendra du JSON serialise en entier, pas
     // ses propres sous-champs adressables individuellement. Utiliser le
     // testeur de regle pour voir les cles reellement produites avant de les
     // referencer ici.
-    if (src === 'script') return 'ex: nom (vide = {{script}} entier ; 1 seul niveau — testez la regle pour voir les cles)';
-    return 'valeur';
+    if (src === 'script') return t("e.g. name (empty = the whole {{script}}; one level only: test the rule to see the keys)");
+    return t("value");
   }
 
   // Pliage/depliage des noeuds parents (memes principes que
@@ -141,26 +142,26 @@
   }
 </script>
 
-<div class="xml-builder" aria-label="Constructeur de reponse XML">
+<div class="xml-builder" aria-label={t("XML response builder")}>
   <div class="builder-header">
-    <strong>Noeuds XML</strong>
-    <label class="inline-label">Tag racine : <input type="text" bind:value={rootTag} class="root-input" data-testid="xml-builder-root-tag-input" /></label>
+    <strong>{t("XML nodes")}</strong>
+    <label class="inline-label">{t("Root tag:")} <input type="text" bind:value={rootTag} class="root-input" data-testid="xml-builder-root-tag-input" /></label>
   </div>
 
   {#snippet renderValueControls(field, path, idx)}
     {@const testPath = [...path, idx].join('-')}
-    <select value={field.source} onchange={(e) => updateProp(path, idx, 'source', e.target.value)} aria-label="Source" data-testid="xml-builder-source-select-{testPath}">
+    <select value={field.source} onchange={(e) => updateProp(path, idx, 'source', e.target.value)} aria-label={t("Source")} data-testid="xml-builder-source-select-{testPath}">
       {#each valueSources as vs}<option value={vs.value}>{vs.label}</option>{/each}
     </select>
     {#if field.source === 'fake'}
-      <select value={field.value} onchange={(e) => updateProp(path, idx, 'value', e.target.value)} aria-label="Type fictif" data-testid="xml-builder-fake-select-{testPath}">
+      <select value={field.value} onchange={(e) => updateProp(path, idx, 'value', e.target.value)} aria-label={t("Kind of fake data")} data-testid="xml-builder-fake-select-{testPath}">
         {#each fakeOptions as fo}<option value={fo}>{fo}</option>{/each}
       </select>
     {:else if needsValueInput(field.source)}
-      <input type="text" class="value-input" value={field.value} oninput={(e) => updateProp(path, idx, 'value', e.target.value)} placeholder={valuePlaceholder(field.source)} aria-label="Valeur" data-testid="xml-builder-value-input-{testPath}" />
+      <input type="text" class="value-input" value={field.value} oninput={(e) => updateProp(path, idx, 'value', e.target.value)} placeholder={valuePlaceholder(field.source)} aria-label={t("Value")} data-testid="xml-builder-value-input-{testPath}" />
     {/if}
     {#if field.source !== 'fixed'}
-      <input type="text" class="pipe-input" value={field.pipe || ''} oninput={(e) => updateProp(path, idx, 'pipe', e.target.value)} placeholder="ex: lower | first(5)" aria-label="Pipe" list="dl-xml-pipes" autocomplete="off" data-testid="xml-builder-pipe-input-{testPath}" />
+      <input type="text" class="pipe-input" value={field.pipe || ''} oninput={(e) => updateProp(path, idx, 'pipe', e.target.value)} placeholder={t("e.g. {0}", "lower | first(5)")} aria-label={t("Pipe")} list="dl-xml-pipes" autocomplete="off" data-testid="xml-builder-pipe-input-{testPath}" />
     {/if}
   {/snippet}
 
@@ -178,31 +179,31 @@
               onclick={() => toggleCollapse(testPath)}
               aria-expanded={!collapsed}
               aria-controls="xml-builder-children-{testPath}"
-              aria-label={collapsed ? `Deplier ${field.tag || 'ce noeud'}` : `Replier ${field.tag || 'ce noeud'}`}
-              title={collapsed ? 'Deplier' : 'Replier'}
+              aria-label={collapsed ? t("Expand {0}", field.tag || t("this node")) : t("Collapse {0}", field.tag || t("this node"))}
+              title={collapsed ? t("Expand") : t("Collapse")}
               data-testid="xml-builder-collapse-button-{testPath}"
             >{collapsed ? '▶' : '▼'}</button>
           {/if}
-          <input type="text" class="tag-input" value={field.tag} oninput={(e) => updateProp(path, idx, 'tag', e.target.value)} placeholder="tag" aria-label="Tag XML" data-testid="xml-builder-tag-input-{testPath}" />
-          <select class="type-select" value={nt} onchange={(e) => changeNodeType(path, idx, e.target.value)} aria-label="Type de noeud" data-testid="xml-builder-type-select-{testPath}">
-            {#each nodeTypes as t}<option value={t.value}>{t.label}</option>{/each}
+          <input type="text" class="tag-input" value={field.tag} oninput={(e) => updateProp(path, idx, 'tag', e.target.value)} placeholder={t("tag")} aria-label={t("XML tag")} data-testid="xml-builder-tag-input-{testPath}" />
+          <select class="type-select" value={nt} onchange={(e) => changeNodeType(path, idx, e.target.value)} aria-label={t("Node type")} data-testid="xml-builder-type-select-{testPath}">
+            {#each nodeTypes as option}<option value={option.value}>{option.label}</option>{/each}
           </select>
           {#if nt === 'value'}
             {@render renderValueControls(field, path, idx)}
           {/if}
           {#if collapsed}
-            <span class="collapsed-indicator" data-testid="xml-builder-collapsed-indicator-{testPath}">({(field.children || []).length} masque{(field.children || []).length > 1 ? 's' : ''})</span>
+            <span class="collapsed-indicator" data-testid="xml-builder-collapsed-indicator-{testPath}">{tCount((field.children || []).length, "({0} hidden item)", "({0} hidden items)")}</span>
           {/if}
           <div class="field-actions">
-            <button type="button" class="btn-icon" onclick={() => moveAt(path, idx, -1)} disabled={idx === 0} aria-label="Monter" title="Monter" data-testid="xml-builder-moveup-button-{testPath}">&#9650;</button>
-            <button type="button" class="btn-icon" onclick={() => moveAt(path, idx, 1)} disabled={idx === nodeList.length - 1} aria-label="Descendre" title="Descendre" data-testid="xml-builder-movedown-button-{testPath}">&#9660;</button>
-            <button type="button" class="btn-icon btn-delete" onclick={() => removeAt(path, idx)} aria-label="Supprimer" data-testid="xml-builder-delete-button-{testPath}">&#10005;</button>
+            <button type="button" class="btn-icon" onclick={() => moveAt(path, idx, -1)} disabled={idx === 0} aria-label={t("Move up")} title={t("Move up")} data-testid="xml-builder-moveup-button-{testPath}">&#9650;</button>
+            <button type="button" class="btn-icon" onclick={() => moveAt(path, idx, 1)} disabled={idx === nodeList.length - 1} aria-label={t("Move down")} title={t("Move down")} data-testid="xml-builder-movedown-button-{testPath}">&#9660;</button>
+            <button type="button" class="btn-icon btn-delete" onclick={() => removeAt(path, idx)} aria-label={t("Delete")} data-testid="xml-builder-delete-button-{testPath}">&#10005;</button>
           </div>
         </div>
         {#if nt === 'parent'}
           <div class="nested-block" id="xml-builder-children-{testPath}" hidden={collapsed}>
             {@render renderNodes(field.children || [], [...path, idx, 'children'], depth + 1)}
-            <button type="button" class="btn btn-xs btn-outline" onclick={() => addNodeAt([...path, idx, 'children'])} data-testid="xml-builder-add-subnode-button-{testPath}">+ Sous-noeud</button>
+            <button type="button" class="btn btn-xs btn-outline" onclick={() => addNodeAt([...path, idx, 'children'])} data-testid="xml-builder-add-subnode-button-{testPath}">{t("+ Child node")}</button>
           </div>
         {/if}
       </div>
@@ -215,15 +216,15 @@
     {#each pipeOptions.filter(p => p.value) as p}<option value={p.value}>{p.label}</option>{/each}
   </datalist>
 
-  <button type="button" class="btn btn-sm btn-outline" onclick={() => addNodeAt([])} data-testid="xml-builder-add-node-button">+ Ajouter un noeud</button>
+  <button type="button" class="btn btn-sm btn-outline" onclick={() => addNodeAt([])} data-testid="xml-builder-add-node-button">{t("+ Add a node")}</button>
 
   {#if fields.length > 0}
     <details class="preview-section">
-      <summary>Apercu template</summary>
+      <summary>{t("Template preview")}</summary>
       <code class="preview-code">{toTemplate()}</code>
     </details>
     <details class="preview-section">
-      <summary>Apercu XML lisible</summary>
+      <summary>{t("Readable XML preview")}</summary>
       <code class="preview-code preview-readable">{templateToPreview(toTemplate())}</code>
     </details>
   {/if}

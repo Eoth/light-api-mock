@@ -35,7 +35,7 @@
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
-        { "action": "click", "target": "toggleSwitch.switch", "params": { "label": "Mock-e2e-svc" } }
+        { "action": "click", "target": "toggleSwitch.switch", "params": { "name": "mock-e2e-svc" } }
       ]
     },
     {
@@ -43,7 +43,7 @@
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
-        { "action": "click", "target": "toggleSwitch.switch", "params": { "label": "Mock-write-behind-svc" } }
+        { "action": "click", "target": "toggleSwitch.switch", "params": { "name": "mock-write-behind-svc" } }
       ]
     },
     {
@@ -84,7 +84,7 @@
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "app.addServiceButton" },
         { "action": "fill", "target": "serviceForm.nameInput", "value": "purely-mocked-svc" },
-        { "action": "click", "target": "toggleSwitch.switch", "params": { "label": "Service-purement-mocké" } },
+        { "action": "click", "target": "toggleSwitch.switch", "params": { "name": "purely-mocked" } },
         { "action": "assertHidden", "target": "serviceForm.targetInput" },
         { "action": "screenshot", "file": "service-purement-mocke-formulaire.png" },
         { "action": "click", "target": "serviceForm.submitButton" },
@@ -100,7 +100,7 @@
         { "action": "click", "target": "serviceCard.configureButton", "params": { "name": "purely-mocked-existing" } },
         { "action": "click", "target": "serviceDetail.editButton" },
         { "action": "assertHidden", "target": "serviceForm.targetInput" },
-        { "action": "click", "target": "toggleSwitch.switch", "params": { "label": "Service-purement-mocké" } },
+        { "action": "click", "target": "toggleSwitch.switch", "params": { "name": "purely-mocked" } },
         { "action": "assertVisible", "target": "serviceForm.targetInput" },
         { "action": "fill", "target": "serviceForm.targetInput", "value": "http://nouvelle-cible:8080" },
         { "action": "click", "target": "serviceForm.submitButton" },
@@ -114,7 +114,7 @@
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
         { "action": "click", "target": "serviceCard.configureButton", "params": { "name": "svc-with-proxy-rule" } },
         { "action": "click", "target": "serviceDetail.editButton" },
-        { "action": "click", "target": "toggleSwitch.switch", "params": { "label": "Service-purement-mocké" } },
+        { "action": "click", "target": "toggleSwitch.switch", "params": { "name": "purely-mocked" } },
         { "action": "click", "target": "serviceForm.submitButton" },
         { "action": "assertVisible", "target": "serviceForm.purelyMockedWarning" },
         { "action": "click", "target": "serviceForm.purelyMockedSaveAnywayButton" },

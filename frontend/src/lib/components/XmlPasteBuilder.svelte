@@ -23,6 +23,8 @@
   // detail de cette limite assumee.
   import { untrack } from 'svelte';
   import { buildExpr as sharedBuildExpr, xmlFieldsToTemplate, exampleXmlToFields } from '../tpl-utils.js';
+  import Sentence from './Sentence.svelte';
+  import { t, tCount } from '../i18n.svelte.js';
 
   // startParsed/initialRootTag/initialRootAttributes : seedent l'etat a la
   // restauration d'une regle existante (fields/rootTag/rootAttributes deja
@@ -44,18 +46,18 @@
   let rootAttributes = $state(untrack(() => initialRootAttributes));
 
   const valueSources = [
-    { value: 'fixed', label: 'Garder la valeur' },
-    { value: 'path', label: 'Parametre URL' },
-    { value: 'query', label: 'Query param' },
-    { value: 'header', label: 'Header HTTP' },
-    { value: 'body', label: 'Echo body (JSON pointer)' },
-    { value: 'xpath', label: 'XPath (XML/SOAP)' },
-    { value: 'fake', label: 'Donnee fictive' },
-    { value: 'uuid', label: 'UUID' },
-    { value: 'now_ms', label: 'Timestamp (ms)' },
-    { value: 'now_iso', label: 'Date ISO' },
-    { value: 'seq', label: 'Compteur' },
-    { value: 'script', label: 'Resultat du script' },
+    { value: 'fixed', get label() { return t("Keep the value"); } },
+    { value: 'path', get label() { return t("URL parameter"); } },
+    { value: 'query', get label() { return t("Query param"); } },
+    { value: 'header', get label() { return t("HTTP header"); } },
+    { value: 'body', get label() { return t("Echo of the body (JSON pointer)"); } },
+    { value: 'xpath', get label() { return t("XPath (XML/SOAP)"); } },
+    { value: 'fake', get label() { return t("Fake data"); } },
+    { value: 'uuid', get label() { return t("UUID"); } },
+    { value: 'now_ms', get label() { return t("Timestamp (ms)"); } },
+    { value: 'now_iso', get label() { return t("ISO date"); } },
+    { value: 'seq', get label() { return t("Counter"); } },
+    { value: 'script', get label() { return t("Script result"); } },
   ];
 
   const fakeOptions = [
@@ -125,7 +127,7 @@
   }
 
   function breadcrumbTrail(path) {
-    const trail = [{ label: 'racine', path: [] }];
+    const trail = [{ get label() { return t("root"); }, path: [] }];
     let current = fields;
     for (let i = 0; i < path.length; i += 2) {
       const idx = path[i];
@@ -142,7 +144,7 @@
   function handleParse() {
     parseError = '';
     const text = pasteInput.trim();
-    if (!text) { parseError = 'Collez un XML valide.'; return; }
+    if (!text) { parseError = t("Paste valid XML."); return; }
     try {
       const result = exampleXmlToFields(text);
       rootTag = result.rootTag;
@@ -215,12 +217,12 @@
   }
 
   function valuePlaceholder(src) {
-    if (src === 'fixed') return 'valeur fixe';
-    if (src === 'xpath') return 'ex: Envelope/Body/recherche/Siret';
+    if (src === 'fixed') return t("fixed value");
+    if (src === 'xpath') return t("e.g. Envelope/Body/search/Id");
     // Meme clarification que XmlResponseBuilder.svelte : un seul niveau de
     // cle plate est navigable ({{script.champ}}), jamais un chemin imbrique.
-    if (src === 'script') return 'ex: nom (vide = {{script}} entier ; 1 seul niveau — testez la regle pour voir les cles)';
-    return 'nom du parametre';
+    if (src === 'script') return t("e.g. name (empty = the whole {{script}}; one level only: test the rule to see the keys)");
+    return t("parameter name");
   }
 
   function buildExpr(f) { return sharedBuildExpr(f); }
@@ -230,44 +232,44 @@
   }
 </script>
 
-<div class="paste-builder" aria-label="Constructeur XML par exemple">
+<div class="paste-builder" aria-label={t("XML builder by example")}>
   {#if !parsed}
     <div class="paste-zone">
-      <label for="xml-paste-input">Collez un exemple de reponse XML</label>
+      <label for="xml-paste-input">{t("Paste an example of the XML response")}</label>
       <textarea
         id="xml-paste-input"
         bind:value={pasteInput}
         rows="6"
         class="paste-textarea"
-        placeholder={'<response>\n  <siret>44306184100047</siret>\n  <nom>ACME Corp</nom>\n</response>'}
+        placeholder={t("<response>\n  <id>42</id>\n  <name>ACME Corp</name>\n</response>")}
         data-testid="xml-paste-builder-textarea"
       ></textarea>
       {#if parseError}
         <div class="form-error" role="alert" data-testid="xml-paste-builder-error">{parseError}</div>
       {/if}
       <button type="button" class="btn btn-primary btn-sm" onclick={handleParse} data-testid="xml-paste-builder-analyze-button">
-        Analyser et variabiliser
+        {t("Analyze and make it variable")}
       </button>
     </div>
   {:else}
     <div class="paste-header">
-      <span class="field-hint">Racine <code>&lt;{rootTag}&gt;</code>, {fields.length} noeud{fields.length !== 1 ? 's' : ''} racine detecte{fields.length !== 1 ? 's' : ''} — choisissez la source de chaque valeur</span>
+      <span class="field-hint"><Sentence text={tCount(fields.length, "Root {1}, {0} root node detected: choose the source of each value", "Root {1}, {0} root nodes detected: choose the source of each value")} codes={['', `<${rootTag}>`]} /></span>
       <button type="button" class="btn btn-outline btn-sm" onclick={resetPaste} data-testid="xml-paste-builder-reset-button">
-        Recoller un XML
+        {t("Paste another XML")}
       </button>
     </div>
 
     {#snippet renderAttributes(attributes, testPathPrefix, onAttrUpdate)}
       {#if attributes && attributes.length > 0}
         <div class="paste-attrs">
-          <span class="paste-attrs-label">Attributs :</span>
+          <span class="paste-attrs-label">{t("Attributes:")}</span>
           {#each attributes as attr, aidx}
             <div class="paste-attr-row">
               <span class="paste-attr-name">@{attr.name}</span>
               <select
                 value={attr.source}
                 onchange={(e) => onAttrUpdate(aidx, 'source', e.target.value)}
-                aria-label="Source pour l'attribut {attr.name} ({testPathPrefix})"
+                aria-label={t("Source for the attribute {0} ({1})", attr.name, testPathPrefix)}
                 data-testid="xml-paste-builder-attr-source-select-{testPathPrefix}-{aidx}"
               >
                 {#each valueSources as vs}<option value={vs.value}>{vs.label}</option>{/each}
@@ -276,7 +278,7 @@
                 <select
                   value={attr.value}
                   onchange={(e) => onAttrUpdate(aidx, 'value', e.target.value)}
-                  aria-label="Type fictif pour l'attribut {attr.name} ({testPathPrefix})"
+                  aria-label={t("Fake data kind for the attribute {0} ({1})", attr.name, testPathPrefix)}
                   data-testid="xml-paste-builder-attr-fake-select-{testPathPrefix}-{aidx}"
                 >
                   {#each fakeOptions as fo}<option value={fo}>{fo}</option>{/each}
@@ -288,14 +290,14 @@
                   value={attr.value}
                   oninput={(e) => onAttrUpdate(aidx, 'value', e.target.value)}
                   placeholder={valuePlaceholder(attr.source)}
-                  aria-label="Valeur pour l'attribut {attr.name} ({testPathPrefix})"
+                  aria-label={t("Value for the attribute {0} ({1})", attr.name, testPathPrefix)}
                   data-testid="xml-paste-builder-attr-value-input-{testPathPrefix}-{aidx}"
                 />
               {/if}
               {#if attr.source === 'fixed'}
-                <span class="paste-preview-fixed">{attr.value}</span>
+                <span class="paste-preview-fixed" translate="no">{attr.value}</span>
               {:else}
-                <span class="paste-preview-var">{buildExpr(attr)}</span>
+                <span class="paste-preview-var" translate="no">{buildExpr(attr)}</span>
               {/if}
             </div>
           {/each}
@@ -306,7 +308,7 @@
     {@render renderAttributes(rootAttributes, 'root', (aidx, prop, val) => updateRootAttrProp(aidx, prop, val))}
 
     {#if focusPath.length > 0}
-      <nav class="data-breadcrumb" aria-label="Chemin des donnees">
+      <nav class="data-breadcrumb" aria-label={t("Data path")}>
         <ol>
           {#each breadcrumb as segment, i}
             <li aria-current={i === breadcrumb.length - 1 ? 'page' : undefined}>
@@ -336,32 +338,32 @@
                 onclick={() => toggleCollapse(testPath)}
                 aria-expanded={!collapsed}
                 aria-controls="xml-paste-builder-children-{testPath}"
-                aria-label={collapsed ? `Deplier ${field.tag || 'ce noeud'}` : `Replier ${field.tag || 'ce noeud'}`}
-                title={collapsed ? 'Deplier' : 'Replier'}
+                aria-label={collapsed ? t("Expand {0}", field.tag || t("this node")) : t("Collapse {0}", field.tag || t("this node"))}
+                title={collapsed ? t("Expand") : t("Collapse")}
                 data-testid="xml-paste-builder-collapse-button-{testPath}"
               >{collapsed ? '▶' : '▼'}</button>
             {/if}
             <span class="paste-key">{field.tag}</span>
             {#if hasChildren}
-              <span class="paste-type-badge">noeud parent ({(field.children || []).length})</span>
+              <span class="paste-type-badge">{t("parent node ({0})", (field.children || []).length)}</span>
               {#if collapsed}
-                <span class="collapsed-indicator" data-testid="xml-paste-builder-collapsed-indicator-{testPath}">({(field.children || []).length} masque{(field.children || []).length > 1 ? 's' : ''})</span>
+                <span class="collapsed-indicator" data-testid="xml-paste-builder-collapsed-indicator-{testPath}">{tCount((field.children || []).length, "({0} hidden item)", "({0} hidden items)")}</span>
               {/if}
               <button
                 type="button"
                 class="btn-icon"
                 onclick={() => focusPath = [...path, idx, 'children']}
-                aria-label="Naviguer dans {field.tag || 'ce noeud'}"
-                title="Naviguer dans ce noeud"
+                aria-label={t("Go into {0}", field.tag || t("this node"))}
+                title={t("Go into this node")}
                 data-testid="xml-paste-builder-navigate-button-{testPath}"
               >&#8594;</button>
             {:else}
               <div class="paste-controls">
-                <select value={field.source} onchange={(e) => updateNodeProp(path, idx, 'source', e.target.value)} aria-label="Source pour {field.tag}" data-testid="xml-paste-builder-source-select-{testPath}">
+                <select value={field.source} onchange={(e) => updateNodeProp(path, idx, 'source', e.target.value)} aria-label={t("Source for {0}", field.tag)} data-testid="xml-paste-builder-source-select-{testPath}">
                   {#each valueSources as vs}<option value={vs.value}>{vs.label}</option>{/each}
                 </select>
                 {#if field.source === 'fake'}
-                  <select value={field.value} onchange={(e) => updateNodeProp(path, idx, 'value', e.target.value)} aria-label="Type fictif pour {field.tag}" data-testid="xml-paste-builder-fake-select-{testPath}">
+                  <select value={field.value} onchange={(e) => updateNodeProp(path, idx, 'value', e.target.value)} aria-label={t("Fake data kind for {0}", field.tag)} data-testid="xml-paste-builder-fake-select-{testPath}">
                     {#each fakeOptions as fo}<option value={fo}>{fo}</option>{/each}
                   </select>
                 {:else if needsValueInput(field.source)}
@@ -371,7 +373,7 @@
                     value={field.value}
                     oninput={(e) => updateNodeProp(path, idx, 'value', e.target.value)}
                     placeholder={valuePlaceholder(field.source)}
-                    aria-label="Valeur pour {field.tag}"
+                    aria-label={t("Value for {0}", field.tag)}
                     data-testid="xml-paste-builder-value-input-{testPath}"
                   />
                 {/if}
@@ -381,17 +383,17 @@
                     class="pipe-input"
                     value={field.pipe || ''}
                     oninput={(e) => updateNodeProp(path, idx, 'pipe', e.target.value)}
-                    placeholder="ex: lower | first(5)"
-                    aria-label="Pipe de transformation pour {field.tag}"
+                    placeholder={t("e.g. {0}", "lower | first(5)")}
+                    aria-label={t("Transformation pipe for {0}", field.tag)}
                     list="dl-xml-paste-pipes"
                     autocomplete="off"
                     data-testid="xml-paste-builder-pipe-input-{testPath}"
                   />
                 {/if}
                 {#if field.source === 'fixed'}
-                  <span class="paste-preview-fixed">{field.value}</span>
+                  <span class="paste-preview-fixed" translate="no">{field.value}</span>
                 {:else}
-                  <span class="paste-preview-var">{buildExpr(field)}</span>
+                  <span class="paste-preview-var" translate="no">{buildExpr(field)}</span>
                 {/if}
               </div>
             {/if}
