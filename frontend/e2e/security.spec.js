@@ -112,7 +112,7 @@ test.describe('Uniqueness: service_key collision', () => {
     });
     expect(second.status()).toBe(409);
     const body = await second.json();
-    expect(body.error).toContain('existe deja');
+    expect(body.error).toContain('already exists');
   });
 
   test('updating an existing service succeeds (PUT)', async ({ request }) => {

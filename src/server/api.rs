@@ -275,11 +275,25 @@ async fn get_me(
 
 // --------------- Config ---------------
 
+/// With authentication, a user who is not a super-admin gets only the groups they belong to and the services they
+/// can access, as the list endpoints do: the full configuration exposed every other team's mocks and targets.
 async fn get_config(
     State(state): State<AppState>,
-    Extension(_user): Extension<AuthUser>,
+    Extension(user): Extension<AuthUser>,
 ) -> Json<Arc<MockConfig>> {
-    Json(state.store.snapshot().await)
+    let config = state.store.snapshot().await;
+    if !state.auth_config.enabled || user.is_super_admin {
+        return Json(config);
+    }
+    Json(Arc::new(MockConfig {
+        services: visible_services(&user.username, false, &config),
+        groups: config
+            .groups
+            .iter()
+            .filter(|g| g.admins.contains(&user.username) || g.members.contains(&user.username))
+            .cloned()
+            .collect(),
+    }))
 }
 
 async fn put_config(
@@ -378,12 +392,30 @@ fn default_log_limit() -> usize {
     50
 }
 
+/// Entries of the services the user can access only (all of them without authentication or for a super-admin):
+/// captured requests carry other teams' traffic.
 async fn get_logs(
     State(state): State<AppState>,
-    Extension(_user): Extension<AuthUser>,
+    Extension(user): Extension<AuthUser>,
     Query(q): Query<LogsQuery>,
 ) -> Json<Vec<LogEntry>> {
-    Json(state.request_log.recent(q.limit))
+    if !state.auth_config.enabled || user.is_super_admin {
+        return Json(state.request_log.recent(q.limit));
+    }
+    let config = state.store.snapshot().await;
+    let entries = state
+        .request_log
+        .recent(usize::MAX)
+        .into_iter()
+        .filter(|entry| {
+            config.services.iter().any(|s| {
+                service_matches(s, entry.group_name.as_deref(), &entry.service_name)
+                    && can_access_service(&user.username, false, s, &config.groups)
+            })
+        })
+        .take(q.limit)
+        .collect();
+    Json(entries)
 }
 
 // --------------- Observation de trafic (proxy niveau service) ---------------
@@ -796,63 +828,94 @@ async fn get_service_grouped(
     get_service_impl(state, user, Some(group), name).await
 }
 
+/// Whether `user` may put a service in `group`: anyone without authentication; with it, a super-admin anywhere
+/// and a group admin in that group only. The ungrouped scope belongs to super-admins.
+fn check_service_scope(
+    state: &AppState,
+    user: &AuthUser,
+    cfg: &MockConfig,
+    group: Option<&str>,
+) -> Result<(), AppError> {
+    if !state.auth_config.enabled || user.is_super_admin {
+        return Ok(());
+    }
+    let Some(group) = group else {
+        return Err(AppError::Forbidden);
+    };
+    match cfg.groups.iter().find(|g| g.name == group) {
+        Some(g) if can_manage_group(&user.username, false, g) => Ok(()),
+        Some(_) => Err(AppError::Forbidden),
+        None => Err(unknown_group(group)),
+    }
+}
+
+fn unknown_group(group: &str) -> AppError {
+    AppError::Validation(format!("The group \"{group}\" does not exist."))
+}
+
+/// Whether `service` can take its (group, name) slot in `cfg`, the service currently at `replacing` excepted:
+/// the group must exist, the name must be free in that group, and an ungrouped service cannot be named like a
+/// group code, since `/{code}/...` would then route to two places.
+fn check_service_slot(
+    cfg: &MockConfig,
+    service: &Service,
+    replacing: Option<(Option<&str>, &str)>,
+) -> Result<(), AppError> {
+    let group = service.group_name.as_deref();
+    if let Some(group) = group
+        && !cfg.groups.iter().any(|g| g.name == group)
+    {
+        return Err(unknown_group(group));
+    }
+    let taken = cfg.services.iter().any(|s| {
+        service_matches(s, group, &service.name)
+            && replacing.is_none_or(|(g, n)| !service_matches(s, g, n))
+    });
+    if taken {
+        return Err(AppError::Conflict(format!(
+            "A service named \"{}\" already exists in this group.",
+            service.name
+        )));
+    }
+    if group.is_none()
+        && let Some(g) = cfg
+            .groups
+            .iter()
+            .find(|g| g.code.eq_ignore_ascii_case(&service.name))
+    {
+        return Err(AppError::Conflict(format!(
+            "\"{}\" is the URL code of the group \"{}\": an ungrouped service cannot use it as its name.",
+            service.name, g.name
+        )));
+    }
+    Ok(())
+}
+
 async fn create_service(
     State(state): State<AppState>,
     Extension(user): Extension<AuthUser>,
     Json(service): Json<Service>,
 ) -> Result<(StatusCode, Json<Service>), AppError> {
-    if state.auth_config.enabled && !user.is_super_admin {
-        if let Some(ref gn) = service.group_name {
-            let config = state.store.snapshot().await;
-            let group = config.groups.iter().find(|g| &g.name == gn);
-            match group {
-                Some(g) if !can_manage_group(&user.username, false, g) => {
-                    return Err(AppError::Forbidden);
-                }
-                None => {
-                    return Err(AppError::Validation(format!(
-                        "Le groupe \"{gn}\" n'existe pas."
-                    )));
-                }
-                _ => {}
-            }
-        } else {
-            return Err(AppError::Forbidden);
-        }
-    }
-
     if let Err(e) = validate_service(&service) {
         tracing::warn!(service = %service.name, field = %e.field, reason = %e.message, "service rejected");
         return Err(AppError::Validation(e.message));
     }
 
-    {
-        let config = state.store.snapshot().await;
-        let same_group = config
-            .services
-            .iter()
-            .any(|s| s.name == service.name && s.group_name == service.group_name);
-        if same_group {
-            tracing::warn!(service = %service.name, "service creation refused: name already exists in group");
-            return Err(AppError::Conflict(format!(
-                "Un service avec le nom \"{}\" existe deja dans ce groupe.",
-                service.name
-            )));
-        }
-    }
-
     let updated = state
         .store
-        .update(|cfg| {
+        .try_update(|cfg| {
+            check_service_scope(&state, &user, cfg, service.group_name.as_deref())?;
+            check_service_slot(cfg, &service, None)?;
             cfg.services.push(service.clone());
+            Ok(())
         })
         .await
-        .map_err(AppError::Store)?;
+        .map_err(AppError::Store)??;
 
     updated
         .services
         .iter()
-        .find(|s| s.name == service.name)
+        .find(|s| service_matches(s, service.group_name.as_deref(), &service.name))
         .cloned()
         .map(|s| (StatusCode::CREATED, Json(s)))
         .ok_or(AppError::NotFound)
@@ -865,51 +928,48 @@ async fn update_service_impl(
     name: String,
     service: Service,
 ) -> Result<Json<Service>, AppError> {
-    {
-        let config = state.store.snapshot().await;
-        let existing = config
-            .services
-            .iter()
-            .find(|s| service_matches(s, group.as_deref(), &name))
-            .ok_or(AppError::NotFound)?;
-
-        if state.auth_config.enabled
-            && !can_access_service(
-                &user.username,
-                user.is_super_admin,
-                existing,
-                &config.groups,
-            )
-        {
-            return Err(AppError::Forbidden);
-        }
-    }
-
     if let Err(e) = validate_service(&service) {
         tracing::warn!(service = %name, field = %e.field, reason = %e.message, "service rejected");
         return Err(AppError::Validation(e.message));
     }
 
-    let new_group = service.group_name.clone();
-    let new_name = service.name.clone();
     let updated = state
         .store
-        .update(|cfg| {
-            if let Some(existing) = cfg
+        .try_update(|cfg| {
+            let index = cfg
                 .services
-                .iter_mut()
-                .find(|s| service_matches(s, group.as_deref(), &name))
+                .iter()
+                .position(|s| service_matches(s, group.as_deref(), &name))
+                .ok_or(AppError::NotFound)?;
+            if state.auth_config.enabled
+                && !can_access_service(
+                    &user.username,
+                    user.is_super_admin,
+                    &cfg.services[index],
+                    &cfg.groups,
+                )
             {
-                *existing = service.clone();
+                return Err(AppError::Forbidden);
             }
+            // Moving a service needs the right to create it where it goes, or a group member could push
+            // services into groups (and URL prefixes) they do not belong to.
+            if service.group_name != cfg.services[index].group_name {
+                check_service_scope(&state, &user, cfg, service.group_name.as_deref())?;
+            }
+            check_service_slot(cfg, &service, Some((group.as_deref(), &name)))?;
+            cfg.services[index] = service.clone();
+            Ok(())
         })
         .await
-        .map_err(AppError::Store)?;
+        .map_err(AppError::Store)??;
 
+    if service.group_name != group || service.name != name {
+        state.observation.toggle.disable(group.as_deref(), &name);
+    }
     updated
         .services
         .iter()
-        .find(|s| service_matches(s, new_group.as_deref(), &new_name))
+        .find(|s| service_matches(s, service.group_name.as_deref(), &service.name))
         .cloned()
         .map(Json)
         .ok_or(AppError::NotFound)
@@ -1076,22 +1136,18 @@ async fn ping_service_impl(
         svc.real_target_url.clone()
     };
 
-    // Cache clef par nom seul (pas par groupe) : deux services de meme nom
-    // dans des groupes differents auraient des cibles reseau distinctes
-    // partageant la meme cle de cache — limitation pre-existante mineure
-    // (le pire cas est un badge de disponibilite affichant un resultat en
-    // cache pour le mauvais service pendant la TTL de 2 min), non corrigee
-    // ici car hors perimetre de ce correctif (ambiguite d'IDENTIFICATION du
-    // service cible, pas de son statut de ping affiche).
+    // Keyed by group and name, like the services: two services of the same name in two groups have their own
+    // targets. The unit separator cannot appear in a group or service name.
+    let cache_key = format!("{}\u{1f}{name}", group.as_deref().unwrap_or(""));
     if let Some(cached) = state
         .ping_cache
-        .get_fresh(&name, crate::server::ping::PING_TTL_MS)
+        .get_fresh(&cache_key, crate::server::ping::PING_TTL_MS)
     {
         return Ok(Json(cached));
     }
 
     let status = state.proxy.ping(&target_url).await;
-    state.ping_cache.set(&name, status.clone());
+    state.ping_cache.set(&cache_key, status.clone());
     Ok(Json(status))
 }
 
@@ -1228,70 +1284,90 @@ async fn get_group(
     Ok(Json(group.clone()))
 }
 
+/// Normalizes `group` (trimmed name, lowercase code, a generated code when none is given) and checks that it fits
+/// in `cfg`, the group currently named `replacing` excepted: a non-empty name and a 5-character alphanumeric code,
+/// both unique, and a code that no ungrouped service uses as its name (`/{code}/...` would route to both).
+fn check_group_identity(
+    cfg: &MockConfig,
+    mut group: Group,
+    replacing: Option<&str>,
+) -> Result<Group, AppError> {
+    group.name = group.name.trim().to_string();
+    if group.name.is_empty() {
+        return Err(AppError::Validation("Le nom du groupe est requis.".into()));
+    }
+    let others: Vec<&Group> = cfg
+        .groups
+        .iter()
+        .filter(|g| Some(g.name.as_str()) != replacing)
+        .collect();
+    if others
+        .iter()
+        .any(|g| g.name.eq_ignore_ascii_case(&group.name))
+    {
+        return Err(AppError::Conflict(format!(
+            "Un groupe avec le nom \"{}\" existe deja.",
+            group.name
+        )));
+    }
+    group.code = if group.code.trim().is_empty() {
+        let existing: Vec<String> = cfg.groups.iter().map(|g| g.code.clone()).collect();
+        crate::server::codegen::generate_code(&group.name, &existing)
+    } else {
+        group.code.trim().to_lowercase()
+    };
+    if group.code.len() != 5 || !group.code.chars().all(|ch| ch.is_ascii_alphanumeric()) {
+        return Err(AppError::Validation(
+            "Le code groupe doit faire exactement 5 caracteres alphanumeriques.".into(),
+        ));
+    }
+    if others
+        .iter()
+        .any(|g| g.code.eq_ignore_ascii_case(&group.code))
+    {
+        return Err(AppError::Conflict(format!(
+            "Le code \"{}\" est deja utilise par un autre groupe.",
+            group.code
+        )));
+    }
+    if let Some(s) = cfg
+        .services
+        .iter()
+        .find(|s| s.group_name.is_none() && s.name.eq_ignore_ascii_case(&group.code))
+    {
+        return Err(AppError::Conflict(format!(
+            "The code \"{}\" is the name of the ungrouped service \"{}\": choose another code.",
+            group.code, s.name
+        )));
+    }
+    Ok(group)
+}
+
 async fn create_group(
     State(state): State<AppState>,
     Extension(user): Extension<AuthUser>,
     Json(mut group): Json<Group>,
 ) -> Result<(StatusCode, Json<Group>), AppError> {
-    let name = group.name.trim().to_string();
-    if name.is_empty() {
-        return Err(AppError::Validation("Le nom du groupe est requis.".into()));
-    }
-    group.name = name;
-
-    {
-        let config = state.store.snapshot().await;
-        if config
-            .groups
-            .iter()
-            .any(|g| g.name.eq_ignore_ascii_case(&group.name))
-        {
-            return Err(AppError::Conflict(format!(
-                "Un groupe avec le nom \"{}\" existe deja.",
-                group.name
-            )));
-        }
-
-        let existing_codes: Vec<String> = config.groups.iter().map(|g| g.code.clone()).collect();
-        let code = if group.code.trim().is_empty() {
-            crate::server::codegen::generate_code(&group.name, &existing_codes)
-        } else {
-            let c = group.code.trim().to_lowercase();
-            if c.len() != 5 || !c.chars().all(|ch| ch.is_ascii_alphanumeric()) {
-                return Err(AppError::Validation(
-                    "Le code groupe doit faire exactement 5 caracteres alphanumeriques.".into(),
-                ));
-            }
-            if config
-                .groups
-                .iter()
-                .any(|g| g.code.eq_ignore_ascii_case(&c))
-            {
-                return Err(AppError::Conflict(format!(
-                    "Le code \"{c}\" est deja utilise par un autre groupe."
-                )));
-            }
-            c
-        };
-        group.code = code;
-    }
-
     if !group.admins.contains(&user.username) {
         group.admins.push(user.username.clone());
     }
 
+    let mut created_name = String::new();
     let updated = state
         .store
-        .update(|cfg| {
-            cfg.groups.push(group.clone());
+        .try_update(|cfg| {
+            let group = check_group_identity(cfg, group, None)?;
+            created_name = group.name.clone();
+            cfg.groups.push(group);
+            Ok(())
         })
         .await
-        .map_err(AppError::Store)?;
+        .map_err(AppError::Store)??;
 
     updated
         .groups
         .iter()
-        .find(|g| g.name == group.name)
+        .find(|g| g.name == created_name)
         .cloned()
         .map(|g| (StatusCode::CREATED, Json(g)))
         .ok_or(AppError::NotFound)
@@ -1303,34 +1379,38 @@ async fn update_group(
     Path(name): Path<String>,
     Json(group): Json<Group>,
 ) -> Result<Json<Group>, AppError> {
-    {
-        let config = state.store.snapshot().await;
-        let existing = config
-            .groups
-            .iter()
-            .find(|g| g.name == name)
-            .ok_or(AppError::NotFound)?;
-        if state.auth_config.enabled
-            && !can_manage_group(&user.username, user.is_super_admin, existing)
-        {
-            return Err(AppError::Forbidden);
-        }
-    }
-
+    let mut new_name = String::new();
     let updated = state
         .store
-        .update(|cfg| {
-            if let Some(existing) = cfg.groups.iter_mut().find(|g| g.name == name) {
-                *existing = group.clone();
+        .try_update(|cfg| {
+            let index = cfg
+                .groups
+                .iter()
+                .position(|g| g.name == name)
+                .ok_or(AppError::NotFound)?;
+            if state.auth_config.enabled
+                && !can_manage_group(&user.username, user.is_super_admin, &cfg.groups[index])
+            {
+                return Err(AppError::Forbidden);
             }
+            let group = check_group_identity(cfg, group, Some(&name))?;
+            // Services point to their group by name: a rename left them in a group that no longer existed.
+            for service in cfg.services.iter_mut() {
+                if service.group_name.as_deref() == Some(name.as_str()) {
+                    service.group_name = Some(group.name.clone());
+                }
+            }
+            new_name = group.name.clone();
+            cfg.groups[index] = group;
+            Ok(())
         })
         .await
-        .map_err(AppError::Store)?;
+        .map_err(AppError::Store)??;
 
     updated
         .groups
         .iter()
-        .find(|g| g.name == group.name)
+        .find(|g| g.name == new_name)
         .cloned()
         .map(Json)
         .ok_or(AppError::NotFound)
@@ -1785,6 +1865,9 @@ impl IntoResponse for AppError {
         }
     }
 }
+
+#[cfg(test)]
+mod authz_tests;
 
 #[cfg(test)]
 mod tests {

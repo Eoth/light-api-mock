@@ -66,6 +66,8 @@ impl CapturedRequest {
 pub struct LogEntry {
     pub timestamp: u64,
     pub service_name: String,
+    /// The service's group, `None` when ungrouped: with the name, what identifies the service.
+    pub group_name: Option<String>,
     pub method: String,
     pub path: String,
     pub mode: String,
@@ -109,7 +111,7 @@ impl RequestLog {
 
     pub fn log_mock(
         &self,
-        service: &str,
+        service: &crate::models::Service,
         method: &str,
         path: &str,
         rule: &str,
@@ -118,7 +120,8 @@ impl RequestLog {
     ) {
         self.push(LogEntry {
             timestamp: Self::now_ms(),
-            service_name: service.into(),
+            service_name: service.name.clone(),
+            group_name: service.group_name.clone(),
             method: method.into(),
             path: path.into(),
             mode: "mock".into(),
@@ -131,7 +134,7 @@ impl RequestLog {
 
     pub fn log_proxy(
         &self,
-        service: &str,
+        service: &crate::models::Service,
         method: &str,
         path: &str,
         target: &str,
@@ -140,7 +143,8 @@ impl RequestLog {
     ) {
         self.push(LogEntry {
             timestamp: Self::now_ms(),
-            service_name: service.into(),
+            service_name: service.name.clone(),
+            group_name: service.group_name.clone(),
             method: method.into(),
             path: path.into(),
             mode: "proxy".into(),
@@ -153,14 +157,15 @@ impl RequestLog {
 
     pub fn log_no_rule(
         &self,
-        service: &str,
+        service: &crate::models::Service,
         method: &str,
         path: &str,
         captured: Option<CapturedRequest>,
     ) {
         self.push(LogEntry {
             timestamp: Self::now_ms(),
-            service_name: service.into(),
+            service_name: service.name.clone(),
+            group_name: service.group_name.clone(),
             method: method.into(),
             path: path.into(),
             mode: "no-rule".into(),
@@ -181,6 +186,10 @@ impl Default for RequestLog {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn svc() -> crate::models::Service {
+        crate::server::test_support::mock_service("svc", "")
+    }
     use crate::engine::matcher::RequestData;
 
     static ENV_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
@@ -242,7 +251,14 @@ mod tests {
         let _guard = ENV_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
         let log = RequestLog::new();
         let captured = CapturedRequest::from_request_data(&req_data(b"body"));
-        log.log_mock("svc", "GET", "/svc/orders/1", "rule-1", 200, Some(captured));
+        log.log_mock(
+            &svc(),
+            "GET",
+            "/svc/orders/1",
+            "rule-1",
+            200,
+            Some(captured),
+        );
         let entries = log.recent(1);
         assert!(entries[0].captured.is_some());
         assert_eq!(
@@ -256,7 +272,7 @@ mod tests {
         let _guard = ENV_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
         let log = RequestLog::new();
         log.log_proxy(
-            "svc",
+            &svc(),
             "GET",
             "/svc/orders/1",
             "http://backend/orders/1",
@@ -272,7 +288,7 @@ mod tests {
         let _guard = ENV_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
         let log = RequestLog::new();
         let captured = CapturedRequest::from_request_data(&req_data(b""));
-        log.log_no_rule("svc", "GET", "/svc/unknown", Some(captured));
+        log.log_no_rule(&svc(), "GET", "/svc/unknown", Some(captured));
         let entries = log.recent(1);
         assert!(entries[0].captured.is_some());
     }
@@ -282,7 +298,7 @@ mod tests {
         let _guard = ENV_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
         let log = RequestLog::new();
         for i in 0..(MAX_ENTRIES + 20) {
-            log.log_no_rule("svc", "GET", &format!("/svc/{i}"), None);
+            log.log_no_rule(&svc(), "GET", &format!("/svc/{i}"), None);
         }
         assert_eq!(log.recent(usize::MAX).len(), MAX_ENTRIES);
         let entries = log.recent(1);
@@ -293,8 +309,8 @@ mod tests {
     fn recent_returns_most_recent_first() {
         let _guard = ENV_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
         let log = RequestLog::new();
-        log.log_no_rule("svc", "GET", "/svc/first", None);
-        log.log_no_rule("svc", "GET", "/svc/second", None);
+        log.log_no_rule(&svc(), "GET", "/svc/first", None);
+        log.log_no_rule(&svc(), "GET", "/svc/second", None);
         let entries = log.recent(10);
         assert_eq!(entries[0].path, "/svc/second");
         assert_eq!(entries[1].path, "/svc/first");

@@ -288,6 +288,24 @@ impl MockStore {
         Ok(guard.clone())
     }
 
+    /// Like `update`, but `f` may refuse the change by returning an error, in which case nothing is written. The
+    /// check and the mutation run under the same write lock, so two concurrent requests cannot both pass a check
+    /// that only one of them should pass (two services created with the same name, for instance).
+    pub async fn try_update<F, E>(&self, f: F) -> Result<Result<Arc<MockConfig>, E>, StoreError>
+    where
+        F: FnOnce(&mut MockConfig) -> Result<(), E>,
+    {
+        let mut guard = self.config.write().await;
+        let mut cfg = (**guard).clone();
+        if let Err(refusal) = f(&mut cfg) {
+            return Ok(Err(refusal));
+        }
+        let yaml = Self::prepare_and_backup(&self.path, &cfg)?;
+        *guard = Arc::new(cfg);
+        self.writer.send_write(self.path.clone(), yaml).await;
+        Ok(Ok(guard.clone()))
+    }
+
     /// Attend que toutes les mutations deja soumises aient ete persistees
     /// sur disque (succes ou echec). A utiliser pour des assertions de test
     /// deterministes, ou a l'arret gracieux du serveur pour drainer la file

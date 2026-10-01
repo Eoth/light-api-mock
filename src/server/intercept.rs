@@ -134,7 +134,7 @@ async fn do_proxy(
         );
         let message = "Ce service est purement mocke (aucune cible configuree) : impossible de relayer cette requete.";
         state.request_log.log_proxy(
-            &service.name,
+            service,
             method_str,
             path,
             "(aucune cible configuree)",
@@ -179,12 +179,12 @@ async fn do_proxy(
             let status = resp.status().as_u16();
             state
                 .request_log
-                .log_proxy(&service.name, method_str, path, &target, status, captured);
+                .log_proxy(service, method_str, path, &target, status, captured);
             resp
         }
         Err(status) => {
             state.request_log.log_proxy(
-                &service.name,
+                service,
                 method_str,
                 path,
                 &target,
@@ -226,7 +226,7 @@ async fn do_proxy_observed(
             let status = resp.status().as_u16();
             state
                 .request_log
-                .log_proxy(&service.name, method_str, path, target, status, captured);
+                .log_proxy(service, method_str, path, target, status, captured);
             if let Some(raw) = capture {
                 // Keyed by group name, like the API that enables observation and lists suggestions (the
                 // group code only exists in service URLs).
@@ -252,7 +252,7 @@ async fn do_proxy_observed(
         }
         Err(status) => {
             state.request_log.log_proxy(
-                &service.name,
+                service,
                 method_str,
                 path,
                 target,
@@ -368,7 +368,7 @@ async fn handle_service(
         );
         state
             .request_log
-            .log_no_rule(&service.name, &method_str, path, captured);
+            .log_no_rule(service, &method_str, path, captured);
         // Un service "purement mocke" (aucune cible) n'a de toute facon jamais
         // tente de proxy de repli ici (is_mocked=true => uniquement les regles
         // sont evaluees, voir plus haut). Le message differencie ce cas d'un
@@ -464,7 +464,7 @@ async fn handle_service(
                 "request handled"
             );
             state.request_log.log_mock(
-                &service.name,
+                service,
                 &method_str,
                 path,
                 &rule.name,
@@ -483,7 +483,7 @@ async fn handle_service(
         }
         Err(status) => {
             state.request_log.log_mock(
-                &service.name,
+                service,
                 &method_str,
                 path,
                 &rule.name,
