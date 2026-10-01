@@ -21,6 +21,11 @@ spec:
         app.kubernetes.io/name: mimicway
         app.kubernetes.io/component: server
     spec:
+      # Many storage classes create the volume owned by root: fsGroup gives it to the container's group, or the
+      # non-root process could not write its configuration there.
+      securityContext:
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
       containers:
         - name: mimicway
           # Set your registry and version: kustomize edit set image mimicway=<registry>/mimicway:<version>
