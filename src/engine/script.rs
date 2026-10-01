@@ -1,18 +1,15 @@
-// Moteur de scripts utilisateur base sur Rhai (https://rhai.rs).
+// Rule scripts, written in Rhai (https://rhai.rs).
 // Sandbox: a rule script comes from whoever can edit the configuration and runs on every matching request, so it
 // gets bounded CPU and memory (operations, call depth, string/array/map sizes) and no way out of the process:
 // `import` cannot load files (Rhai's default resolver reads `.rhai` files from the disk), `eval` is disabled so that
 // validating a script really validates all the code it runs, and `print`/`debug` go to the debug log instead of
 // the server's stdout. The native functions registered below never panic, whatever their arguments.
-// Chaque regle peut avoir un champ `script` optionnel qui est execute
-// avant le rendu du template. Le resultat est accessible via {{script}}
-// (si string) ou {{script.champ}} (si l'objet retourne est un map #{}).
+// A rule has up to three script slots, run before its template is rendered; a script's result is available as
+// {{script}} when it is a string, or {{script.field}} when it is a map.
 //
-// parse_json/to_json/parse_xml_items/xml_element (voir plus bas) : ajoutees
-// pour le cas d'usage "la requete contient une liste d'objets, la reponse
-// doit contenir le meme nombre d'elements construits par position" (JSON et
-// XML/SOAP) — ni {{variable}} ni les conditions de regle ne peuvent boucler.
-// Cf docs/rhai-scripts.md pour deux exemples complets verifies bout-en-bout.
+// parse_json/to_json/parse_xml_items/xml_element exist for one need that neither template variables nor conditions
+// can meet, because they cannot loop: a request that holds a list of objects and a response that must hold as many
+// items, built position by position (JSON and XML/SOAP). docs/rhai-scripts.md has checked examples of both.
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -88,13 +85,8 @@ impl ScriptEngine {
             iso[..4].parse().unwrap_or(2026)
         });
 
-        // date_now/date_past/date_future : format configurable ("iso" par defaut,
-        // "fr" = JJ/MM/AAAA, "en" = MM/JJ/AAAA). Remplace les anciennes date()/
-        // date_past()/date_future() (sortie ISO figee, sans parametre) : pas de
-        // contrainte de retrocompatibilite sur ces fonctions (peu d'utilisateurs a
-        // date), l'occasion d'assainir plutot que d'empiler un 2e nom. days<=0 pour
-        // date_past/date_future est traite comme "aujourd'hui" (borne a 0), un choix
-        // deterministe plutot qu'une inversion silencieuse vers le futur/passe.
+        // Formats: "iso" (default), "fr" (DD/MM/YYYY), "en" (MM/DD/YYYY). A negative or zero number of days counts as
+        // today rather than silently moving the date the other way.
         engine.register_fn("date_now", || -> String { format_date_offset(0, "iso") });
         engine.register_fn("date_now", |format: &str| -> String {
             format_date_offset(0, format)
@@ -112,14 +104,10 @@ impl ScriptEngine {
             format_date_offset(days.max(0), format)
         });
 
-        // parse_date : sens inverse de date_now/date_past/date_future — parse une
-        // date SAISIE selon un pattern EXPLICITE (jamais de detection automatique
-        // du format : ambigu, ex. dd/MM vs MM/dd) et retourne le nombre de
-        // millisecondes depuis epoch. Pattern a jetons fixes (yyyy/MM/dd/HH/mm/ss,
-        // tout autre caractere est litteral) plutot qu'une syntaxe strftime, pour
-        // ne pas ajouter de dependance de formatage de date. Erreur d'execution
-        // Rhai (jamais un echec silencieux) si le texte ne correspond pas au
-        // pattern ou si la date est invalide (ex. 31 fevrier).
+        // The reverse of date_now: reads a date typed in an explicit pattern and returns milliseconds since the epoch. The
+        // pattern is never guessed (03/04 is ambiguous). Fixed-width tokens (yyyy, MM, dd, HH, mm, ss; anything else is
+        // literal) rather than strftime avoid a date formatting dependency. A text that does not fit, or a date that does
+        // not exist (February 31), is a runtime error, never a silent wrong value.
         engine.register_fn(
             "parse_date",
             |text: &str, pattern: &str| -> Result<i64, Box<rhai::EvalAltResult>> {
@@ -133,11 +121,8 @@ impl ScriptEngine {
             crate::engine::template::resolve_fake_public(kind)
         });
 
-        // seeded_int/seeded_pick : tirage deterministe pour un meme seed (ex. un
-        // meme SIRET en path param retourne toujours le meme resultat). Reutilise
-        // le hash FNV-1a deja en place pour Group.code (src/server/codegen.rs) au
-        // lieu d'ajouter une dependance de hashing dediee. `seed` accepte n'importe
-        // quel type Rhai (string, int, bool...) via Dynamic::to_string().
+        // The same seed always gives the same value (one SIRET, one company name), through the FNV-1a hash already used for
+        // group codes. The seed can be any Rhai value (string, integer, boolean...): its text form is hashed.
         engine.register_fn(
             "seeded_int",
             |seed: rhai::Dynamic, min: i64, max: i64| -> i64 {
@@ -151,14 +136,8 @@ impl ScriptEngine {
             },
         );
 
-        // parse_json/to_json : pont JSON <-> structure Rhai navigable (Array/Map),
-        // pour le pattern "boucler sur une liste d'objets de la requete et
-        // construire N elements de reponse" (aucun {{variable}}/condition de
-        // regle ne peut boucler). `parse_json(request.body)` retourne un Array/Map
-        // Rhai ; `to_json(valeur)` serialise en texte JSON, a inserer tel quel
-        // dans un champ du map retourne par le script (ex. `#{ items: to_json(out) }`
-        // puis `{{script.items}}` dans le template de reponse — simple substitution
-        // texte, deja geree par le moteur de template existant).
+        // JSON to navigable Rhai values (arrays, maps) and back. A script loops over `parse_json(request.body)` and returns,
+        // for instance, `#{ items: to_json(out) }`, which the template inserts as text with {{script.items}}.
         engine.register_fn("parse_json", |text: &str| -> rhai::Dynamic {
             serde_json::from_str::<serde_json::Value>(text)
                 .map(|v| json_value_to_dynamic(&v))
@@ -168,15 +147,10 @@ impl ScriptEngine {
             serde_json::to_string(&dynamic_to_json_value(&value)).unwrap_or_default()
         });
 
-        // parse_xml_items/xml_element : equivalent XML/SOAP de parse_json/to_json
-        // pour le meme cas d'usage. Pas d'analogue generique "XML <-> Dynamic"
-        // (l'XML n'a pas de mapping 1:1 evident objet/tableau, contrairement au
-        // JSON) : parse_xml_items() extrait directement les elements REPETES a un
-        // chemin donne (le besoin reel : une liste d'objets) en Array de Map (un
-        // niveau de champs enfants, cf limitation documentee sur la fonction),
-        // xml_element() construit un element (et ses enfants, recursivement) a
-        // partir d'une valeur Rhai. `path` reutilise la meme syntaxe segment/segment
-        // (prefixe de namespace ignore) que ConditionSource::XPath (§ matcher.rs).
+        // The XML counterparts. XML has no obvious mapping to arrays and maps, so instead of a generic conversion,
+        // parse_xml_items() extracts the elements repeated at a path (what the need is: a list of items), one level of
+        // children each, and xml_element() builds an element, recursively, from a Rhai value. Paths use the same syntax as
+        // XPath conditions: segments separated by "/", namespace prefixes ignored.
         engine.register_fn("parse_xml_items", |text: &str, path: &str| -> rhai::Array {
             parse_xml_items_impl(text, path)
         });
@@ -249,9 +223,8 @@ impl ScriptEngine {
     }
 }
 
-// Formate epoch_secs + days_delta*86400 selon "iso" (defaut/fallback)/"fr"/"en".
-// Reutilise civil_from_days (deja ecrit pour epoch_to_iso, algorithme de Howard
-// Hinnant) plutot que d'ajouter une dependance de formatage de date.
+// Formats epoch_secs + days_delta days as "iso" (default), "fr" or "en", with the same civil calendar conversion as
+// epoch_to_iso (Howard Hinnant's algorithm) instead of a date crate.
 fn format_date_offset(days_delta: i64, format: &str) -> String {
     // About ±10,000 years: beyond, no calendar date exists and the arithmetic below would overflow.
     const MAX_DAYS: i64 = 3_652_425;
@@ -269,15 +242,9 @@ fn format_date_offset(days_delta: i64, format: &str) -> String {
     }
 }
 
-// Parse `text` selon `pattern` (jetons fixes yyyy/MM/dd/HH/mm/ss, tout autre
-// caractere est litteral et doit matcher exactement) et retourne le nombre
-// de millisecondes depuis epoch (UTC, sans decalage horaire — coherent avec
-// now_ms()/epoch_to_iso() qui n'appliquent eux non plus aucun fuseau).
-// La largeur de chaque jeton (ex. "yyyy" = 4 chiffres, "dd" = 2 chiffres) fixe
-// le nombre de chiffres lus : pas de largeur variable, pour rester previsible
-// et symetrique avec les formats "iso"/"fr"/"en" deja a largeur fixe de
-// format_date_offset. HH/mm/ss sont optionnels (defaut 00:00:00 si absents du
-// pattern) ; yyyy/MM/dd sont obligatoires.
+// Reads `text` with `pattern` and returns milliseconds since the epoch, in UTC like now_ms() and epoch_to_iso().
+// Each token's width is the number of digits read ("yyyy" four, "dd" two): no variable width, so a pattern reads the
+// same way the fixed-width output formats write. yyyy, MM and dd are required; HH, mm and ss default to 00:00:00.
 fn parse_date_impl(text: &str, pattern: &str) -> Result<i64, Box<rhai::EvalAltResult>> {
     let text_chars: Vec<char> = text.chars().collect();
     let pattern_chars: Vec<char> = pattern.chars().collect();
@@ -407,11 +374,8 @@ fn parse_date_impl(text: &str, pattern: &str) -> Result<i64, Box<rhai::EvalAltRe
     }
 
     let days = crate::engine::template::days_from_civil(year, month, day);
-    // Round-trip via civil_from_days (deja existante) plutot que de dupliquer
-    // les regles de jours-par-mois/annees bissextiles : si (year,month,day)
-    // n'est pas une date calendaire reelle (ex. 31 fevrier), le decompte de
-    // jours ne re-convertit pas vers le meme triplet (cf commentaire de
-    // days_from_civil, template.rs).
+    // Converting the day count back with civil_from_days catches dates that do not exist (February 31) without
+    // repeating the month length and leap year rules: such a date does not come back as the same triple.
     if crate::engine::template::civil_from_days(days) != (year, month, day) {
         return Err(crate::i18n::tr(
             "parse_date: '{0}' is not a valid date (no such day in that month)",
@@ -443,17 +407,10 @@ fn seeded_pick_impl(seed: &str, list: &rhai::Array) -> rhai::Dynamic {
     list[idx].clone()
 }
 
-// Stringification d'un champ de map retourne par un script, pour
-// ScriptResult.fields (consomme par {{script.champ}}/{{pre_script.champ}}/
-// {{post_script.champ}}, cf template.rs::resolve_variable — une seule cle
-// plate, jamais de chemin imbrique). Un scalaire (string/int/float/bool/
-// unit) garde le comportement historique (`Dynamic::to_string()`, texte brut
-// jamais re-echappe). Une valeur Map/Array (typiquement un objet pioche via
-// seeded_pick puis imbrique sous une cle, ex. `#{ ville: pick, id: uuid() }`)
-// est serialisee en JSON valide (via dynamic_to_json_value, deja utilisee par
-// to_json()) plutot que la syntaxe Display native de Rhai (`#{"k": "v", ...}`),
-// qui n'est ni du JSON ni du XML exploitable une fois collee dans un template
-// de reponse.
+// Text form of a field of the map a script returns, for {{script.field}} (one flat key, never a nested path). A
+// scalar keeps its plain text. A map or an array (a picked object nested under a key, for instance
+// `#{ city: pick, id: uuid() }`) becomes JSON, because Rhai's own display form (`#{"k": "v"}`) is neither JSON
+// nor XML once pasted into a response.
 fn dynamic_field_to_string(value: &rhai::Dynamic) -> String {
     if value.is_map() || value.is_array() {
         serde_json::to_string(&dynamic_to_json_value(value)).unwrap_or_default()
@@ -512,25 +469,18 @@ fn dynamic_to_json_value(value: &rhai::Dynamic) -> serde_json::Value {
             .collect();
         serde_json::Value::Object(obj)
     } else {
-        // string (et tout type sans equivalent JSON direct) : fallback texte,
-        // coherent avec le reste du moteur (ScriptResult.fields fait deja
-        // system­atiquement `.to_string()` sur les valeurs de map, cf execute()).
+        // Strings, and any type without a JSON counterpart, as text, like the map fields above.
         serde_json::Value::String(value.to_string())
     }
 }
 
-// --- XML : extraction d'elements repetes + construction (parse_xml_items / xml_element) ---
+// --- XML: extracting repeated elements, building elements (parse_xml_items, xml_element) ---
 
-// Extrait TOUS les elements repetes au chemin `path` (segments separes par
-// "/", dernier segment = tag de l'element repete ; prefixes de namespace
-// ignores via MatchEngine::local_name, meme convention que ConditionSource::
-// XPath) en Array de Map Rhai (un champ Map par element, cle = tag de
-// l'enfant, valeur = son texte). Limitation assumee (cas d'usage cible :
-// items plats type SOAP `<product><sku>A</sku><qty>2</qty></product>`) :
-// seul le PREMIER niveau d'enfants de chaque item est capture ; une
-// structure imbriquee plus profonde a l'interieur d'un item n'est pas
-// supportee (ignoree silencieusement) — un vrai parseur XML->arbre generique
-// serait disproportionne pour ce besoin.
+// Extracts every element repeated at `path` (segments separated by "/", the last one being the repeated tag;
+// namespace prefixes ignored, as in XPath conditions) as an array of maps: one entry per child element, keyed by
+// its tag, valued by its text. Only the first level of children is read, which fits flat SOAP items such as
+// `<product><sku>A</sku><qty>2</qty></product>`; deeper structure inside an item is ignored, since a generic XML
+// tree would be out of proportion with this need.
 fn parse_xml_items_impl(xml: &str, path: &str) -> rhai::Array {
     use quick_xml::events::Event;
     use quick_xml::reader::Reader;
@@ -545,8 +495,7 @@ fn parse_xml_items_impl(xml: &str, path: &str) -> rhai::Array {
     let mut in_parent = parent_segments.is_empty();
     let mut items = rhai::Array::new();
 
-    // item_depth : 0 = hors item, 1 = a l'interieur de l'element item lui-meme,
-    // 2 = a l'interieur d'un champ enfant de l'item (feuille capturee).
+    // item_depth: 0 outside an item, 1 inside the item element, 2 inside one of its children (the captured text).
     let mut item_depth: u32 = 0;
     let mut current_item = rhai::Map::new();
     let mut current_field = String::new();
@@ -613,16 +562,12 @@ fn parse_xml_items_impl(xml: &str, path: &str) -> rhai::Array {
     items
 }
 
-// Construit un element XML `<tag>...</tag>` a partir d'une valeur Rhai :
-// - Map -> un element enfant par cle (recursif) ; une valeur Array sous une
-//   cle REPETE le tag de cette cle (une occurrence par element) plutot que de
-//   produire un tableau litteral (l'XML n'a pas de syntaxe de tableau) ;
-// - Array (au niveau racine de l'appel) -> le tag lui-meme repete une fois
-//   par element (usage : concatener `xml_element("item", it)` dans une
-//   boucle Rhai, ou passer directement le tableau si tous les items partagent
-//   un seul tag) ;
-// - scalaire (string/int/float/bool) -> texte echappe ;
-// - unit (absent/null) -> element auto-ferme `<tag/>`.
+// Builds `<tag>...</tag>` from a Rhai value:
+// - a map gives one child element per key, recursively; an array under a key repeats that key's tag once per item
+//   (XML has no array syntax);
+// - an array at the top repeats `tag` once per item (handy to build a list in one call);
+// - a scalar gives escaped text;
+// - unit (missing value) gives `<tag/>`.
 fn xml_element_impl(tag: &str, value: &rhai::Dynamic) -> String {
     if value.is_map() {
         let map = value.clone().cast::<rhai::Map>();
@@ -937,7 +882,7 @@ mod tests {
             )
             .unwrap()
             .value;
-        // 1773532800000 (minuit) + 8h30m45s en ms
+        // 1773532800000 (midnight) plus 8 h 30 min 45 s, in milliseconds
         assert_eq!(result, "1773563445000");
     }
 
@@ -964,7 +909,7 @@ mod tests {
         let result = engine.execute(r#"parse_date("29/02/2028", "dd/MM/yyyy")"#, &empty_ctx());
         assert!(
             result.is_ok(),
-            "29/02/2028 devrait etre valide (2028 est bissextile)"
+            "29/02/2028 must be valid (2028 is a leap year)"
         );
     }
 
@@ -974,7 +919,7 @@ mod tests {
         let result = engine.execute(r#"parse_date("29/02/2026", "dd/MM/yyyy")"#, &empty_ctx());
         assert!(
             result.is_err(),
-            "29/02/2026 ne devrait pas etre valide (2026 n'est pas bissextile)"
+            "29/02/2026 must be refused (2026 is not a leap year)"
         );
     }
 
@@ -1020,7 +965,7 @@ mod tests {
     #[test]
     fn parse_date_literal_separator_mismatch_is_invalid() {
         let engine = ScriptEngine::new();
-        // Le pattern attend des "/" mais le texte utilise des "-"
+        // The pattern expects "/" but the text uses "-"
         let result = engine.execute(r#"parse_date("15-03-2026", "dd/MM/yyyy")"#, &empty_ctx());
         assert!(result.is_err());
     }
@@ -1046,8 +991,7 @@ mod tests {
 
     #[test]
     fn parse_date_error_is_visible_not_silent() {
-        // Une date invalide doit produire une VRAIE erreur d'execution (Err),
-        // jamais une valeur vide/silencieuse comme le ferait une cle de map absente.
+        // A date that does not exist is a real runtime error (Err), never an empty value as a missing map key would give.
         let engine = ScriptEngine::new();
         let result = engine.execute(r#"parse_date("31/02/2026", "dd/MM/yyyy")"#, &empty_ctx());
         assert!(result.is_err());
@@ -1317,14 +1261,9 @@ mod tests {
 
     #[test]
     fn parse_xml_items_extracts_single_soap_operation_value_with_header_sibling() {
-        // Cas d'usage : extraire UNE valeur (pas une liste) du corps d'une requete
-        // SOAP realiste, avec un <Header></Header> non-autoferme sibling de <Body>
-        // (structure SOAP typique) et plusieurs champs enfants (Nom + Siret) dans
-        // l'element d'operation.
-        // Pattern retenu : parse_xml_items() sur le chemin qui mene a l'element
-        // d'operation lui-meme (pas jusqu'a la feuille), puis `[0].Champ` — l'element
-        // d'operation n'a qu'UNE occurrence sous Body, donc l'array a toujours une
-        // longueur de 1 dans ce cas d'usage.
+        // Extracting ONE value from a realistic SOAP body: an empty <Header></Header> written in full next to <Body>, and
+        // several children (Nom, Siret) in the operation element. parse_xml_items() goes down to the operation element,
+        // not to the leaf, then `[0].Field`: the operation appears once under Body, so the array always has one item.
         let engine = ScriptEngine::new();
         let ctx = ScriptContext {
             body: r#"<SOAP:Envelope><SOAP-ENV:Header></SOAP-ENV:Header><SOAP-ENV:Body><ns3:recherche><ns3:Nom>Test</ns3:Nom><ns3:Siret>12345678901234</ns3:Siret></ns3:recherche></SOAP-ENV:Body></SOAP:Envelope>"#.into(),
@@ -1416,12 +1355,9 @@ mod tests {
         assert!(result.value.contains("<doubledQty>18</doubledQty>"));
     }
 
-    // --- Scripts "complexes" representatifs (cf docs/rhai-scripts.md) :
-    // map/lookup, boucle avec condition, acces combine a plusieurs sources de
-    // contexte. Couvre la VRAIE syntaxe correcte : indexation de map `#{}` par
-    // cle, `.contains()`, `in`, `.get()`, `switch` fonctionnent tous sans
-    // erreur, y compris sur une cle absente qui renvoie simplement une valeur
-    // vide plutot que de lever une exception.
+    // --- Representative scripts (see docs/rhai-scripts.md): lookup tables, loops with conditions, every request source
+    // in one script. Map indexing, `.contains()`, `in`, `.get()` and `switch` all work, and a missing key gives an
+    // empty value rather than an error.
 
     #[test]
     fn map_lookup_returns_mapped_value_for_known_key() {
@@ -1461,9 +1397,7 @@ mod tests {
 
     #[test]
     fn map_lookup_via_switch_expression() {
-        // Variante avec `switch`, alternative valide au if/mapping.contains
-        // ci-dessus — les deux syntaxes sont documentees dans
-        // docs/rhai-scripts.md.
+        // `switch`, the other documented form of the lookup above.
         let engine = ScriptEngine::new();
         let script = r#"
             let key = request.path.name;
@@ -1485,8 +1419,7 @@ mod tests {
 
     #[test]
     fn loop_with_condition_counts_matching_items() {
-        // Boucle avec condition : compte les lignes d'une liste JSON dont la
-        // quantite depasse un seuil, construit un resume dans un map.
+        // A loop with a condition: counts the JSON lines above a quantity threshold and returns a summary map.
         let engine = ScriptEngine::new();
         let ctx = ScriptContext {
             body: r#"[{"sku":"A","qty":1},{"sku":"B","qty":5},{"sku":"C","qty":12}]"#.into(),
@@ -1513,11 +1446,8 @@ mod tests {
 
     #[test]
     fn combines_path_query_headers_and_body_in_one_script() {
-        // Acces combine a toutes les sources de contexte disponibles dans un
-        // seul script (path/query/headers/body), avec un fallback via
-        // if/else sur une en-tete absente. Rhai n'a PAS d'operateur
-        // ternaire `?:` (verifie : "Unknown operator: '?'") — if/else est la
-        // seule forme valide ici.
+        // Every request source in one script (path, query, headers, body), with an if/else fallback for a missing header.
+        // Rhai has no ternary operator (`?:` is "Unknown operator: '?'"): if/else is the only form.
         let engine = ScriptEngine::new();
         let mut path = HashMap::new();
         path.insert("id".into(), "42".into());
@@ -1547,42 +1477,29 @@ mod tests {
         assert_eq!(result.fields.get("note").unwrap(), "hello");
     }
 
-    // Appeler une fonction Rhai inexistante EST une vraie erreur d'execution
-    // (contrairement a un acces a une cle de map absente, qui renvoie
-    // silencieusement une valeur vide sans jamais lever d'erreur, cf tests
-    // ci-dessus). engine.execute() remonte cette classe d'erreur via Err(...),
-    // que run_rule_script (intercept.rs) avale en soft-fail et que
-    // /api/rule-test (server/api.rs) rend visible au testeur de regle.
+    // Calling a function that does not exist IS a runtime error, unlike reading a missing map key, which silently gives
+    // an empty value (tests above). execute() returns it as Err; run_rule_script (intercept.rs) swallows it, and the
+    // rule tester (/api/rule-test) shows it.
 
     #[test]
     fn calling_undefined_function_is_a_real_execution_error() {
         let engine = ScriptEngine::new();
         let result = engine.execute("totally_undefined_fn(1, 2)", &empty_ctx());
         let err =
-            result.expect_err("un appel de fonction inexistante doit etre une erreur d'execution");
+            result.expect_err("calling a function that does not exist must be a runtime error");
         assert!(err.contains("totally_undefined_fn"));
     }
 
-    // --- Pattern "liste d'objets + seeded_pick + reutilisation des champs" :
-    // le script s'execute TOUJOURS sans erreur dans les variantes ci-dessous
-    // (pas un trou de detection d'erreur, il n'y a jamais d'Err ici).
-    // (a) retourner l'objet pioche DIRECTEMENT au niveau racine du script
-    //     fonctionne parfaitement (fields = tous les champs scalaires de
-    //     l'objet, directement adressables via {{script.champ}}) ;
-    // (b) mais des qu'un script combine l'objet pioche avec autre chose
-    //     (ex. `#{ ville: pick, id: uuid() }`), la valeur de "ville" redevient
-    //     un Map imbrique, serialise en JSON valide par dynamic_field_to_string
-    //     (voir plus haut) plutot que via le Display natif de Rhai ;
-    // (c) un champ absent (typo, ou chemin imbrique `{{script.ville.name}}`,
-    //     non supporte — un seul niveau) ne leve jamais d'erreur non plus (cf
-    //     test missing_map_key_access_is_not_an_error_unlike_undefined_function),
-    //     meme constat que pour les maps CONSTRUITES PAR L'UTILISATEUR (pas
-    //     seulement `request.*`).
+    // --- An object picked from a list, then its fields reused. The script never fails in the cases below:
+    // (a) returning the picked object itself gives every scalar field, each available as {{script.field}};
+    // (b) once the picked object is combined with something else (`#{ city: pick, id: uuid() }`), "city" is a nested
+    //     map, rendered as valid JSON by dynamic_field_to_string rather than with Rhai's display form;
+    // (c) a missing field (a typo, or a nested path such as {{script.city.name}}: only one level exists) is no error
+    //     either, for maps built by the script as for `request.*`.
 
     #[test]
     fn seeded_pick_on_object_list_returned_directly_exposes_all_scalar_fields() {
-        // Le pattern qui fonctionne deja sans aucun changement : retourner
-        // l'objet pioche tel quel comme expression finale du script.
+        // Case (a): the picked object is the script's last expression.
         let engine = ScriptEngine::new();
         let script = r#"
             let villes = [
@@ -1605,12 +1522,8 @@ mod tests {
 
     #[test]
     fn seeded_pick_wrapped_in_a_map_field_serializes_to_valid_json_not_rhai_debug_syntax() {
-        // Regression du vrai defaut trouve : quand l'objet pioche est
-        // imbrique sous une cle d'un map retourne (`#{ ville: pick, ... }`,
-        // necessaire des qu'on veut combiner plusieurs informations dans un
-        // seul script), la valeur de ce champ doit etre du JSON valide
-        // (utilisable dans un fragment "Template avance"), jamais la syntaxe
-        // de Debug/Display native de Rhai (`#{"k": "v", ...}`).
+        // Case (b), the defect found: an object nested under a key of the returned map must render as valid JSON, usable in
+        // an advanced template, never as Rhai's display form (`#{"k": "v", ...}`).
         let engine = ScriptEngine::new();
         let script = r#"
             let villes = [
@@ -1631,11 +1544,10 @@ mod tests {
         let raw = result.fields.get("ville").unwrap();
         assert!(
             !raw.starts_with('#'),
-            "le champ imbrique ne doit plus utiliser la syntaxe Rhai #{{...}}: {raw}"
+            "the nested field must not use the Rhai #{{...}} syntax: {raw}"
         );
-        let parsed: serde_json::Value = serde_json::from_str(raw).unwrap_or_else(|e| {
-            panic!("le champ imbrique doit etre du JSON valide, obtenu {raw:?}: {e}")
-        });
+        let parsed: serde_json::Value = serde_json::from_str(raw)
+            .unwrap_or_else(|e| panic!("the nested field must be valid JSON, got {raw:?}: {e}"));
         assert_eq!(parsed["name"], "Lyon");
         assert_eq!(parsed["cp"], "69000");
         assert_eq!(parsed["insee"], "69123");
@@ -1643,8 +1555,7 @@ mod tests {
 
     #[test]
     fn seeded_pick_wrapped_array_of_objects_also_serializes_to_valid_json() {
-        // Meme correctif pour un tableau d'objets (pas seulement un objet
-        // seul) sous une cle de map retournee.
+        // The same for an array of objects under a key.
         let engine = ScriptEngine::new();
         let script = r#"
             #{ items: [#{ sku: "A1", qty: 2 }, #{ sku: "B2", qty: 5 }] }
@@ -1659,12 +1570,8 @@ mod tests {
 
     #[test]
     fn scalar_map_field_stringification_is_unchanged_by_the_json_fix() {
-        // Non-regression : un champ SCALAIRE (string/int/bool) d'un map
-        // retourne continue de produire du texte brut non-echappe (pas de
-        // guillemets JSON ajoutes autour d'une simple string) — seul le cas
-        // Map/Array imbrique change de comportement. Sans cette garantie,
-        // le correctif casserait {{script.champ}} pour l'immense majorite
-        // des scripts existants (scalaires).
+        // A scalar field (string, integer, boolean) still renders as plain text, without JSON quotes: only nested maps and
+        // arrays changed, or {{script.field}} would break for nearly every existing script.
         let engine = ScriptEngine::new();
         let result = engine
             .execute(
@@ -1679,13 +1586,8 @@ mod tests {
 
     #[test]
     fn accessing_a_typo_field_or_unsupported_nested_path_never_errors_but_stays_empty() {
-        // Cause (c) : ni un typo (`ville.nom` au lieu de `ville.name`) ni une
-        // tentative de chemin imbrique cote template ({{script.ville.name}},
-        // hors du perimetre de ce test mais du meme ressort, cf
-        // resolve_variable qui ne gere qu'un seul niveau) ne produisent
-        // d'erreur — generalisation de missing_map_key_access_is_not_an_error
-        // (deja verifiee pour `request.*`) a une map CONSTRUITE PAR
-        // L'UTILISATEUR.
+        // Case (c): neither a typo (`city.nom` for `city.name`) nor a nested template path raises an error, for a map built
+        // by the script just as for `request.*`.
         let engine = ScriptEngine::new();
         let script = r#"
             let villes = [ #{ name: "Paris", cp: "75000", insee: "75056" } ];
@@ -1701,26 +1603,18 @@ mod tests {
         let result = engine.execute(script, &ctx);
         assert!(
             result.is_ok(),
-            "un champ absent sur une map utilisateur ne doit jamais lever d'erreur"
+            "a missing field of a map built by the script must never be an error"
         );
         assert_eq!(result.unwrap().value, "");
     }
 
     #[test]
     fn missing_map_key_access_is_not_an_error_unlike_undefined_function() {
-        // Documente la difference exacte diagnostiquee : contrairement a une
-        // fonction inexistante (test ci-dessus), une cle de map absente
-        // n'est PAS une erreur — c'est la raison pour laquelle une
-        // validation "a vide" (dry-run avec un contexte synthetique) ne
-        // suffirait pas a detecter un mauvais nom de cle, et pourquoi le
-        // testeur de regle (contre une VRAIE requete capturee) reste le bon
-        // outil pour ce cas — cf commentaire sur /api/rule-test.
+        // Unlike a missing function (test above), a missing map key is not an error. That is why a dry run with a made-up
+        // request could not catch a wrong key name, and why the rule tester replays a real captured request.
         let engine = ScriptEngine::new();
         let result = engine.execute("request.path.this_key_does_not_exist", &empty_ctx());
-        assert!(
-            result.is_ok(),
-            "une cle absente ne doit jamais lever d'erreur"
-        );
+        assert!(result.is_ok(), "a missing key must never be an error");
         assert_eq!(result.unwrap().value, "");
     }
 
