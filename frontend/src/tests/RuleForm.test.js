@@ -874,3 +874,17 @@ describe('RuleForm: the response survives the builders being unmounted', () => {
     expect(await savedTemplate(container, onSave)).toBe('[{"id":"{{path.id}}"}]');
   });
 });
+
+describe('RuleForm: the traffic of its own service', () => {
+  const captured = { remaining_path: '/1', path_params: {}, query_params: {}, headers: {}, body: '', body_truncated: false, content_type: null };
+  const log = (group_name, path) => ({ timestamp: 1, service_name: 'users', group_name, method: 'GET', path, mode: 'mock', captured });
+
+  it('offers the rule tester the requests of its service only, not those of a namesake in another group', async () => {
+    getLogs.mockResolvedValue([log('team-a', '/a/users/1'), log('team-b', '/b/users/2'), log(null, '/users/3')]);
+    const { container } = render(RuleForm, { props: { serviceName: 'users', groupName: 'team-a' } });
+
+    await waitFor(() => expect(container.querySelector('[data-testid="rule-tester-log-select"]')).not.toBeNull());
+    const options = [...container.querySelectorAll('[data-testid="rule-tester-log-select"] option:not([disabled])')];
+    expect(options.map((o) => o.textContent)).toEqual([expect.stringContaining('/a/users/1')]);
+  });
+});

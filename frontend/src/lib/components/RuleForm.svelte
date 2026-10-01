@@ -64,7 +64,8 @@
     if (!serviceName) return;
     try {
       const logs = await getLogs(200);
-      serviceLogs = logs.filter((l) => l.service_name === serviceName);
+      // A name alone does not identify a service: another group may hold one of the same name.
+      serviceLogs = logs.filter((l) => l.service_name === serviceName && (l.group_name ?? null) === (groupName ?? null));
     } catch {
       serviceLogs = [];
     }
