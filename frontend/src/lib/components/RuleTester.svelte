@@ -155,8 +155,8 @@
         </ul>
 
         {#if result.script_errors?.length > 0}
-          <div class="script-error-banner" role="alert" data-testid="rule-tester-script-errors">
-            <p class="script-error-title">
+          <div class="callout callout-danger" role="alert" data-testid="rule-tester-script-errors">
+            <p class="callout-title">
               {tCount(result.script_errors.length, "⚠ A script failed to run: the response would be rendered with an empty result for this script (no error is returned to the client, as in production).", "⚠ Scripts failed to run: the response would be rendered with an empty result for these scripts (no error is returned to the client, as in production).")}
             </p>
             <ul class="script-error-list">
@@ -196,7 +196,7 @@
         {/if}
 
         {#if showBodyTruncationWarning}
-          <p class="body-truncation-warning">
+          <p class="callout callout-warning">
             {t("⚠ The body of this request was truncated in the log: comparisons on the body may be wrong.")}
           </p>
         {/if}
@@ -272,29 +272,6 @@
     flex-direction: column;
     gap: var(--space-1);
     font-size: var(--text-m);
-  }
-
-  .body-truncation-warning {
-    font-size: var(--text-m);
-    color: var(--color-warning-text);
-    background: var(--color-warning-bg);
-    padding: var(--space-2) var(--space-3);
-    border-radius: var(--radius-m);
-  }
-
-  .script-error-banner {
-    margin: var(--space-2) 0;
-    padding: var(--space-2) var(--space-3);
-    border-radius: var(--radius-m);
-    background: var(--color-danger-bg);
-    border: var(--line-thin) solid var(--color-danger);
-  }
-
-  .script-error-title {
-    margin: 0 0 var(--space-1-5);
-    font-size: var(--text-m);
-    font-weight: var(--weight-strong);
-    color: var(--color-danger-text);
   }
 
   .script-error-list {

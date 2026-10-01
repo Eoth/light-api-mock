@@ -203,7 +203,7 @@
           />
         {/snippet}
       </FormField>
-      <div class="form-actions">
+      <div class="create-actions">
         <button type="submit" class="btn btn-primary btn-sm" data-testid="group-manager-create-submit-button">{t("Create")}</button>
       </div>
     </form>
@@ -315,7 +315,7 @@
   .header-actions { display: flex; gap: var(--space-2); }
 
   .group-create-form { margin-bottom: var(--space-4); max-width: 24rem; }
-  .group-create-form .form-actions { margin-top: 0; justify-content: flex-start; }
+  .create-actions { display: flex; gap: var(--space-3); }
   .inline-form { display: flex; gap: var(--space-2); align-items: center; }
   .inline-form input { flex: 1; padding: var(--space-1-5) var(--space-3); border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); font-size: var(--text-m); background: var(--color-bg); color: var(--color-text); }
 

@@ -117,7 +117,7 @@
           <div class="rule-content">
             <span class="rule-index" aria-hidden="true">{idx + 1}</span>
             <span class="method-badge" data-method={rule.method}>{rule.method}</span>
-            <span class="rule-action-badge" class:proxy={rule.action === 'proxy'}>{rule.action === 'proxy' ? t("PROXY") : t("MOCK")}</span>
+            <span class="badge rule-action-badge {rule.action === 'proxy' ? 'badge-proxy' : 'badge-mock'}">{rule.action === 'proxy' ? t("PROXY") : t("MOCK")}</span>
             <span class="rule-name">{rule.name}</span>
             <span class="rule-meta">
               {#if rule.conditions?.all_of?.length || rule.conditions?.any_of?.length}
@@ -179,15 +179,9 @@
 
   .rule-content { flex: 1; display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
   .rule-index { display: inline-flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; border-radius: var(--radius-round); background: var(--color-bg); font-size: var(--text-xs); font-weight: var(--weight-heavy); flex-shrink: 0; }
-  .rule-action-badge { display: inline-block; padding: var(--space-0-5) var(--space-1-5); border-radius: var(--radius-m); font-size: var(--text-xs); font-weight: var(--weight-heavy); letter-spacing: 0.04em; background: var(--color-mock-bg); color: var(--color-mock-text); border: var(--line-thin) dashed var(--color-mock); flex-shrink: 0; }
-  .rule-action-badge.proxy { background: var(--color-proxy-bg); color: var(--color-proxy-text); border-style: solid; border-color: var(--color-proxy); }
+  .rule-action-badge { flex-shrink: 0; }
   .rule-name { font-weight: var(--weight-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .rule-meta { font-size: var(--text-s); color: var(--color-text-muted); white-space: nowrap; }
 
   .rule-actions { display: flex; gap: var(--space-1); flex-shrink: 0; }
-  .btn-icon { width: 2rem; height: 2rem; display: inline-flex; align-items: center; justify-content: center; border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); background: var(--color-surface); color: var(--color-text-muted); font-size: var(--text-m); cursor: pointer; transition: background-color var(--duration-quick), color var(--duration-quick); }
-  .btn-icon:hover:not(:disabled) { background: var(--color-bg); color: var(--color-text); }
-  .btn-icon:disabled { opacity: 0.35; cursor: not-allowed; }
-  .btn-icon.btn-delete:hover:not(:disabled) { color: var(--color-danger); border-color: var(--color-danger); }
-  .btn-icon.btn-edit:hover:not(:disabled) { color: var(--color-primary); border-color: var(--color-primary); }
 </style>

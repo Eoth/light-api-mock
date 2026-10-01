@@ -4,8 +4,7 @@
 </script>
 
 <span
-  class="badge"
-  class:active
+  class="badge-pill {active ? 'badge-mock' : 'badge-proxy'}"
   role="status"
   aria-label={active ? t("Mock mode on") : t("Proxy mode on")}
   data-testid="status-badge"
@@ -13,26 +12,3 @@
   {active ? t("MOCK") : t("PROXY")}
 </span>
 
-<style>
-  .badge {
-    display: inline-flex;
-    align-items: center;
-    padding: var(--space-1) var(--space-3);
-    border-radius: var(--radius-m);
-    font-size: var(--text-xs);
-    font-weight: var(--weight-heavy);
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    background: var(--color-proxy-bg);
-    color: var(--color-proxy-text);
-    border: var(--line-thin) solid var(--color-proxy);
-  }
-
-  /* Dashed: the mode that imitates (app.css, badges). */
-  .badge.active {
-    background: var(--color-mock-bg);
-    color: var(--color-mock-text);
-    border-style: dashed;
-    border-color: var(--color-mock);
-  }
-</style>

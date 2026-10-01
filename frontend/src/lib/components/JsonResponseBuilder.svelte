@@ -292,7 +292,7 @@
           {#if hasNested}
             <button
               type="button"
-              class="btn-icon collapse-toggle"
+              class="btn-icon btn-icon-xs collapse-toggle"
               onclick={() => toggleCollapse(testPath)}
               aria-expanded={!collapsed}
               aria-controls="json-builder-children-{testPath}"
@@ -331,16 +331,16 @@
             {#if ft === 'object' || ft === 'array-objects'}
               <button
                 type="button"
-                class="btn-icon"
+                class="btn-icon btn-icon-xs"
                 onclick={() => focusPath = [...path, idx, ft === 'object' ? 'children' : 'template']}
                 aria-label={t("Go into {0}", field.key || t("this field"))}
                 title={t("Go into this field")}
                 data-testid="json-builder-navigate-button-{testPath}"
               >&#8594;</button>
             {/if}
-            <button type="button" class="btn-icon" onclick={() => moveAt(path, idx, -1)} disabled={idx === 0} aria-label={t("Move up")} title={t("Move up")} data-testid="json-builder-moveup-button-{testPath}">&#9650;</button>
-            <button type="button" class="btn-icon" onclick={() => moveAt(path, idx, 1)} disabled={idx === fieldList.length - 1} aria-label={t("Move down")} title={t("Move down")} data-testid="json-builder-movedown-button-{testPath}">&#9660;</button>
-            <button type="button" class="btn-icon btn-delete" onclick={() => removeAt(path, idx)} aria-label={t("Delete the field {0}", field.key || idx + 1)} data-testid="json-builder-delete-button-{testPath}">&#10005;</button>
+            <button type="button" class="btn-icon btn-icon-xs" onclick={() => moveAt(path, idx, -1)} disabled={idx === 0} aria-label={t("Move up")} title={t("Move up")} data-testid="json-builder-moveup-button-{testPath}">&#9650;</button>
+            <button type="button" class="btn-icon btn-icon-xs" onclick={() => moveAt(path, idx, 1)} disabled={idx === fieldList.length - 1} aria-label={t("Move down")} title={t("Move down")} data-testid="json-builder-movedown-button-{testPath}">&#9660;</button>
+            <button type="button" class="btn-icon btn-icon-xs btn-delete" onclick={() => removeAt(path, idx)} aria-label={t("Delete the field {0}", field.key || idx + 1)} data-testid="json-builder-delete-button-{testPath}">&#10005;</button>
           </div>
         </div>
 
@@ -355,7 +355,7 @@
               <div class="array-item">
                 <span class="item-index">{iidx + 1}</span>
                 {@render renderValueControls(item, [...path, idx, 'items'], iidx)}
-                <button type="button" class="btn-icon btn-delete" onclick={() => removeAt([...path, idx, 'items'], iidx)} aria-label={t("Delete the item {0}", iidx + 1)} data-testid="json-builder-delete-item-button-{testPath}-{iidx}">&#10005;</button>
+                <button type="button" class="btn-icon btn-icon-xs btn-delete" onclick={() => removeAt([...path, idx, 'items'], iidx)} aria-label={t("Delete the item {0}", iidx + 1)} data-testid="json-builder-delete-item-button-{testPath}-{iidx}">&#10005;</button>
               </div>
             {/each}
             <button type="button" class="btn btn-xs btn-outline" onclick={() => addArrayItem([...path, idx, 'items'])} data-testid="json-builder-add-item-button-{testPath}">{t("+ Item")}</button>
@@ -432,32 +432,20 @@
   .number-label { font-size: var(--text-xs); font-weight: var(--weight-heavy); color: var(--color-text-muted); }
 
   .field-actions { display: flex; gap: var(--space-1); margin-left: auto; }
-  .btn-icon { width: 1.5rem; height: 1.5rem; display: inline-flex; align-items: center; justify-content: center; border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); background: var(--color-surface); color: var(--color-text-muted); font-size: var(--text-xs); cursor: pointer; }
-  .btn-icon:hover:not(:disabled) { background: var(--color-bg); color: var(--color-text); }
-  .btn-icon:disabled { opacity: 0.35; cursor: not-allowed; }
-  .btn-icon.btn-delete:hover:not(:disabled) { color: var(--color-danger); border-color: var(--color-danger); }
 
   .nested-block { margin-top: var(--space-1-5); padding-left: var(--space-3); border-left: var(--line-thick) solid var(--color-primary); }
   .nested-hint { font-size: var(--text-s); color: var(--color-text-muted); font-style: italic; display: block; margin-bottom: var(--space-1); }
 
   .collapse-toggle { flex-shrink: 0; }
-  .collapsed-indicator { font-size: var(--text-s); color: var(--color-text-muted); font-style: italic; white-space: nowrap; }
 
   .array-item { display: flex; gap: var(--space-1-5); align-items: center; flex-wrap: wrap; padding: var(--space-1) 0; }
   .item-index { display: inline-flex; align-items: center; justify-content: center; width: 1.25rem; height: 1.25rem; border-radius: var(--radius-round); background: var(--color-text-muted); color: var(--color-surface); font-size: var(--text-xs); font-weight: var(--weight-heavy); flex-shrink: 0; }
 
-  .btn-xs { padding: var(--space-0-5) var(--space-2); font-size: var(--text-s); border-radius: var(--radius-m); border: var(--line-thin) solid transparent; font-weight: var(--weight-strong); }
 
-  .data-breadcrumb { margin: var(--space-1) 0; }
-  .data-breadcrumb ol { list-style: none; display: flex; align-items: center; gap: var(--space-1-5); flex-wrap: wrap; margin: 0; padding: 0; font-size: var(--text-s); }
-  .data-breadcrumb li { display: flex; align-items: center; gap: var(--space-1-5); color: var(--color-text-muted); }
-  .data-breadcrumb li:not(:last-child)::after { content: ">"; color: var(--color-text-muted); }
-  .data-breadcrumb li[aria-current="page"] { color: var(--color-text); font-weight: var(--weight-strong); }
   .breadcrumb-link { background: none; border: none; padding: 0; color: var(--color-primary); cursor: pointer; font: inherit; text-decoration: underline; text-underline-offset: 2px; }
   .breadcrumb-link:hover { color: var(--color-primary-hover); }
 
   .preview-section { margin-top: var(--space-1-5); }
   .preview-section summary { font-size: var(--text-s); cursor: pointer; color: var(--color-text-muted); }
-  .preview-code { display: block; margin-top: var(--space-1); padding: var(--space-2); background: var(--color-bg); border-radius: var(--radius-m); font-size: var(--text-s); word-break: break-all; white-space: pre-wrap; }
   .preview-readable { color: var(--color-primary); }
 </style>

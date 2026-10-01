@@ -5,7 +5,7 @@
 import { describe, expect, test } from 'vitest';
 import {
   TOKENS_FILE, block, contrast, definedProperties, inlineStyles, literalColors, primitives, readProperties, resolve,
-  styleSources, unscaledValues,
+  selectorClasses, styleSources, unscaledValues,
 } from './design-rules.js';
 
 const { tokens, sources } = styleSources();
@@ -79,6 +79,22 @@ describe('a font, a size of text, a spacing, a radius, a layer or a shadow that 
 
   test('appears in no component and no style sheet', () => {
     expect(everywhere(unscaledValues)).toEqual([]);
+  });
+});
+
+describe('a class of app.css styled again by a component', () => {
+  const shared = selectorClasses(sources.find(({ file }) => file === 'app.css').css);
+
+  test('is caught', () => {
+    const component = '.card { padding: 0; }\n.card .btn-icon { width: 1rem; }\n.btn-xs:hover { color: inherit; }';
+    expect([...selectorClasses(component)].filter((name) => shared.has(name))).toEqual(['btn-icon', 'btn-xs']);
+  });
+
+  test('appears in no component: a class two components need lives in app.css, once', () => {
+    expect(shared.size).toBeGreaterThan(40);
+    const restyled = sources.filter(({ file }) => file.endsWith('.svelte')).flatMap(({ file, css }) =>
+      [...selectorClasses(css)].filter((name) => shared.has(name)).map((name) => `${file}: .${name}`));
+    expect(restyled).toEqual([]);
   });
 });
 

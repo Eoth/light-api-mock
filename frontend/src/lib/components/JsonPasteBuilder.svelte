@@ -177,7 +177,7 @@
             {#if isObject}
               <button
                 type="button"
-                class="btn-icon collapse-toggle"
+                class="btn-icon btn-icon-xs collapse-toggle"
                 onclick={() => toggleCollapse(testPath)}
                 aria-expanded={!collapsed}
                 aria-controls="json-paste-builder-children-{testPath}"
@@ -296,9 +296,6 @@
   }
 
   .collapse-toggle { flex-shrink: 0; }
-  .btn-icon { width: 1.5rem; height: 1.5rem; display: inline-flex; align-items: center; justify-content: center; border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); background: var(--color-surface); color: var(--color-text-muted); font-size: var(--text-xs); cursor: pointer; }
-  .btn-icon:hover { background: var(--color-bg); color: var(--color-text); }
-  .collapsed-indicator { font-size: var(--text-s); color: var(--color-text-muted); font-style: italic; white-space: nowrap; }
 
   .nested-block { margin-top: var(--space-1); padding-left: var(--space-3); border-left: var(--line-thick) solid var(--color-primary); }
 

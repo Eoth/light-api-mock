@@ -120,6 +120,7 @@
   /* Sizes shared by several components. */
   --size-control: 2rem;
   --size-control-s: 1.75rem;
+  --size-control-xs: 1.5rem;
   --size-content: 60rem;
 }
 

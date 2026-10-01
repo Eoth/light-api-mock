@@ -199,11 +199,11 @@
   {/if}
 
   {#if pendingPurelyMockedWarning}
-    <div class="mode-warning" role="alert" data-testid="service-form-purely-mocked-warning">
+    <div class="callout callout-warning" role="alert" data-testid="service-form-purely-mocked-warning">
       <p>
         {tCount(proxyRulesAffected.length, "⚠ This rule of the service uses the \"Proxy\" action and will stop working once the service is purely mocked (it will return a clear error instead of forwarding to a target): {1}.", "⚠ These rules of the service use the \"Proxy\" action and will stop working once the service is purely mocked (they will return a clear error instead of forwarding to a target): {1}.", proxyRulesAffected.map(r => r.name).join(', '))}
       </p>
-      <div class="mode-warning-actions">
+      <div class="callout-actions">
         <button type="button" class="btn btn-sm btn-primary" onclick={confirmSaveDespitePurelyMockedWarning} data-testid="service-form-purely-mocked-save-anyway-button">{t("Save anyway")}</button>
         <button type="button" class="btn btn-sm btn-secondary" onclick={cancelPurelyMockedWarning} data-testid="service-form-purely-mocked-cancel-button">{t("Go back")}</button>
       </div>
@@ -255,12 +255,6 @@
     border-radius: var(--radius-m);
     padding: var(--space-6);
   }
-
-  /* The same non-blocking warning style as RuleWarnings.svelte: component styles are scoped, and app.css has no
-     shared warning class. */
-  .mode-warning { background: var(--color-warning-bg); border: var(--line-thin) solid var(--color-warning); color: var(--color-warning-text); padding: var(--space-3); border-radius: var(--radius-m); margin-bottom: var(--space-3); }
-  .mode-warning p { margin: 0 0 var(--space-2); font-size: var(--text-m); }
-  .mode-warning-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
 
   .url-preview {
     background: var(--color-bg);

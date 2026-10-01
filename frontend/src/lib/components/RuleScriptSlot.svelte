@@ -46,7 +46,6 @@
 </div>
 
 <style>
-  .sub-section { margin-top: var(--space-3); padding-top: var(--space-3); border-top: var(--line-thin) solid var(--color-border); }
   .script-section { border-top-color: var(--color-primary); }
   .script-editor { margin-top: var(--space-3); }
   .script-editor label { display: block; font-weight: var(--weight-strong); font-size: var(--text-m); margin-bottom: var(--space-1); }

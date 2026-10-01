@@ -176,44 +176,10 @@
     margin: var(--space-2) 0;
   }
 
-  .form-row {
-    display: flex;
-    gap: var(--space-3);
-    margin-bottom: var(--space-3);
-    flex-wrap: wrap;
-  }
-
-  .form-field {
-    flex: 1;
-    min-width: 12rem;
-  }
-
-  .form-field label {
-    display: block;
-    font-weight: var(--weight-strong);
-    font-size: var(--text-m);
-    margin-bottom: var(--space-1);
-  }
-
-  .form-field input,
-  .form-field select {
-    width: 100%;
-    padding: var(--space-1-5) var(--space-2);
-    border: var(--line-thin) solid var(--color-control);
-    border-radius: var(--radius-m);
-    font-size: var(--text-m);
-    font-family: inherit;
-  }
-
-  .form-actions {
-    display: flex;
-    gap: var(--space-2);
-  }
-
   .path-param-badge {
     display: block;
     margin-bottom: var(--space-1-5);
     font-weight: var(--weight-strong);
-    color: var(--color-primary, inherit);
+    color: var(--color-primary);
   }
 </style>

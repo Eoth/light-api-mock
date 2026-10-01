@@ -181,7 +181,7 @@
           {#if nt === 'parent'}
             <button
               type="button"
-              class="btn-icon collapse-toggle"
+              class="btn-icon btn-icon-xs collapse-toggle"
               onclick={() => toggleCollapse(testPath)}
               aria-expanded={!collapsed}
               aria-controls="xml-builder-children-{testPath}"
@@ -201,9 +201,9 @@
             <span class="collapsed-indicator" data-testid="xml-builder-collapsed-indicator-{testPath}">{tCount((field.children || []).length, "({0} hidden item)", "({0} hidden items)")}</span>
           {/if}
           <div class="field-actions">
-            <button type="button" class="btn-icon" onclick={() => moveAt(path, idx, -1)} disabled={idx === 0} aria-label={t("Move up")} title={t("Move up")} data-testid="xml-builder-moveup-button-{testPath}">&#9650;</button>
-            <button type="button" class="btn-icon" onclick={() => moveAt(path, idx, 1)} disabled={idx === nodeList.length - 1} aria-label={t("Move down")} title={t("Move down")} data-testid="xml-builder-movedown-button-{testPath}">&#9660;</button>
-            <button type="button" class="btn-icon btn-delete" onclick={() => removeAt(path, idx)} aria-label={t("Delete")} data-testid="xml-builder-delete-button-{testPath}">&#10005;</button>
+            <button type="button" class="btn-icon btn-icon-xs" onclick={() => moveAt(path, idx, -1)} disabled={idx === 0} aria-label={t("Move up")} title={t("Move up")} data-testid="xml-builder-moveup-button-{testPath}">&#9650;</button>
+            <button type="button" class="btn-icon btn-icon-xs" onclick={() => moveAt(path, idx, 1)} disabled={idx === nodeList.length - 1} aria-label={t("Move down")} title={t("Move down")} data-testid="xml-builder-movedown-button-{testPath}">&#9660;</button>
+            <button type="button" class="btn-icon btn-icon-xs btn-delete" onclick={() => removeAt(path, idx)} aria-label={t("Delete")} data-testid="xml-builder-delete-button-{testPath}">&#10005;</button>
           </div>
         </div>
         {#if nt === 'parent'}
@@ -251,20 +251,13 @@
   select { padding: var(--space-1) var(--space-2); border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); font-size: var(--text-s); }
 
   .field-actions { display: flex; gap: var(--space-1); margin-left: auto; }
-  .btn-icon { width: 1.5rem; height: 1.5rem; display: inline-flex; align-items: center; justify-content: center; border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); background: var(--color-surface); color: var(--color-text-muted); font-size: var(--text-xs); cursor: pointer; }
-  .btn-icon:hover:not(:disabled) { background: var(--color-bg); color: var(--color-text); }
-  .btn-icon:disabled { opacity: 0.35; cursor: not-allowed; }
-  .btn-icon.btn-delete:hover:not(:disabled) { color: var(--color-danger); border-color: var(--color-danger); }
 
   .nested-block { margin-top: var(--space-1-5); padding-left: var(--space-3); border-left: var(--line-thick) solid var(--color-primary); }
   .collapse-toggle { flex-shrink: 0; }
-  .collapsed-indicator { font-size: var(--text-s); color: var(--color-text-muted); font-style: italic; white-space: nowrap; }
 
-  .btn-xs { padding: var(--space-0-5) var(--space-2); font-size: var(--text-s); border-radius: var(--radius-m); border: var(--line-thin) solid transparent; font-weight: var(--weight-strong); }
 
   .preview-section { margin-top: var(--space-2); }
   .preview-section summary { font-size: var(--text-s); cursor: pointer; color: var(--color-text-muted); }
-  .preview-code { display: block; margin-top: var(--space-1); padding: var(--space-2); background: var(--color-bg); border-radius: var(--radius-m); font-size: var(--text-s); word-break: break-all; white-space: pre-wrap; }
   .preview-readable { color: var(--color-primary); }
   .pipe-input { min-width: 8rem; max-width: 14rem; padding: var(--space-1) var(--space-2); border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); font-size: var(--text-s); font-family: var(--font-code); color: var(--color-primary); }
 </style>

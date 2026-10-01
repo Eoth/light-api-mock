@@ -76,6 +76,15 @@ export function literalColors(css) {
 export const definedProperties = (text) => new Set(Array.from(text.matchAll(/(--[\w-]+)\s*:/g), (m) => m[1]));
 export const readProperties = (text) => new Set(Array.from(text.matchAll(/var\(\s*(--[\w-]+)/g), (m) => m[1]));
 
+/** Classes named in the selectors of a style text. */
+export function selectorClasses(css) {
+  const classes = new Set();
+  for (const [, selector] of css.matchAll(/([^{}]+)\{[^{}]*\}/g)) {
+    for (const [, name] of selector.matchAll(/\.(-?[_a-zA-Z][\w-]*)/g)) classes.add(name);
+  }
+  return classes;
+}
+
 /** Primitives: the tokens whose value is a literal (a color, or a color with transparency). */
 export function primitives(tokens) {
   return new Set(

@@ -320,7 +320,7 @@
             {#if hasChildren}
               <button
                 type="button"
-                class="btn-icon collapse-toggle"
+                class="btn-icon btn-icon-xs collapse-toggle"
                 onclick={() => toggleCollapse(testPath)}
                 aria-expanded={!collapsed}
                 aria-controls="xml-paste-builder-children-{testPath}"
@@ -337,7 +337,7 @@
               {/if}
               <button
                 type="button"
-                class="btn-icon"
+                class="btn-icon btn-icon-xs"
                 onclick={() => focusPath = [...path, idx, 'children']}
                 aria-label={t("Go into {0}", field.tag || t("this node"))}
                 title={t("Go into this node")}
@@ -480,17 +480,9 @@
   .paste-attr-row select { padding: var(--space-1) var(--space-2); border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); font-size: var(--text-s); background: var(--color-surface); color: var(--color-text); }
 
   .collapse-toggle { flex-shrink: 0; }
-  .btn-icon { width: 1.5rem; height: 1.5rem; display: inline-flex; align-items: center; justify-content: center; border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); background: var(--color-surface); color: var(--color-text-muted); font-size: var(--text-xs); cursor: pointer; }
-  .btn-icon:hover { background: var(--color-bg); color: var(--color-text); }
-  .collapsed-indicator { font-size: var(--text-s); color: var(--color-text-muted); font-style: italic; white-space: nowrap; }
 
   .nested-block { margin-top: var(--space-1); padding-left: var(--space-3); border-left: var(--line-thick) solid var(--color-primary); }
 
-  .data-breadcrumb { margin: var(--space-1) 0; }
-  .data-breadcrumb ol { list-style: none; display: flex; align-items: center; gap: var(--space-1-5); flex-wrap: wrap; margin: 0; padding: 0; font-size: var(--text-s); }
-  .data-breadcrumb li { display: flex; align-items: center; gap: var(--space-1-5); color: var(--color-text-muted); }
-  .data-breadcrumb li:not(:last-child)::after { content: ">"; color: var(--color-text-muted); }
-  .data-breadcrumb li[aria-current="page"] { color: var(--color-text); font-weight: var(--weight-strong); }
   .breadcrumb-link { background: none; border: none; padding: 0; color: var(--color-primary); cursor: pointer; font: inherit; text-decoration: underline; text-underline-offset: 2px; }
   .breadcrumb-link:hover { color: var(--color-primary-hover); }
 </style>

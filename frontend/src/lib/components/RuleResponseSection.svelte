@@ -603,9 +603,9 @@
     {/key}
 
     {#if pendingMode}
-      <div class="mode-warning" role="alert">
+      <div class="callout callout-warning" role="alert">
         <p>{pendingConvMessage || t("Switching to the \"{0}\" mode may lose data.", pendingMode)}</p>
-        <div class="mode-warning-actions">
+        <div class="callout-actions">
           <button type="button" class="btn btn-sm btn-primary" onclick={confirmModeSwitch} data-testid="rule-form-mode-switch-confirm-button">{t("Switch anyway")}</button>
           <button type="button" class="btn btn-sm btn-secondary" onclick={cancelModeSwitch} data-testid="rule-form-mode-switch-cancel-button">{t("Cancel")}</button>
         </div>
@@ -626,7 +626,7 @@
           <div class="header-row">
             <input type="text" bind:value={hdr.name} placeholder="Content-Type" aria-label={t("Name of the header {0}", idx + 1)} list="dl-header-names" autocomplete="off" data-testid="rule-form-header-name-input-{idx}" />
             <input type="text" bind:value={hdr.value} placeholder="application/json" aria-label={t("Value of the header {0}", idx + 1)} list={hdr.name?.toLowerCase() === 'content-type' ? 'dl-content-types' : undefined} autocomplete="off" data-testid="rule-form-header-value-input-{idx}" />
-            <button type="button" class="btn-icon btn-delete" onclick={() => removeHeader(idx)} aria-label={t("Delete the header")} data-testid="rule-form-remove-header-button-{idx}">&#10005;</button>
+            <button type="button" class="btn-icon btn-icon-s btn-delete" onclick={() => removeHeader(idx)} aria-label={t("Delete the header")} data-testid="rule-form-remove-header-button-{idx}">&#10005;</button>
           </div>
         {/each}
         <datalist id="dl-header-names">
@@ -695,9 +695,9 @@
                 {/each}
               </select>
               <div class="fragment-actions">
-                <button type="button" class="btn-icon" onclick={() => moveFragment(idx, -1)} disabled={idx === 0} aria-label={t("Move up")} title={t("Move up")} data-testid="rule-form-fragment-moveup-button-{idx}">&#9650;</button>
-                <button type="button" class="btn-icon" onclick={() => moveFragment(idx, 1)} disabled={idx === fragments.length - 1} aria-label={t("Move down")} title={t("Move down")} data-testid="rule-form-fragment-movedown-button-{idx}">&#9660;</button>
-                <button type="button" class="btn-icon btn-delete" onclick={() => removeFragment(idx)} aria-label={t("Delete")} title={t("Delete")} data-testid="rule-form-fragment-delete-button-{idx}">&#10005;</button>
+                <button type="button" class="btn-icon btn-icon-s" onclick={() => moveFragment(idx, -1)} disabled={idx === 0} aria-label={t("Move up")} title={t("Move up")} data-testid="rule-form-fragment-moveup-button-{idx}">&#9650;</button>
+                <button type="button" class="btn-icon btn-icon-s" onclick={() => moveFragment(idx, 1)} disabled={idx === fragments.length - 1} aria-label={t("Move down")} title={t("Move down")} data-testid="rule-form-fragment-movedown-button-{idx}">&#9660;</button>
+                <button type="button" class="btn-icon btn-icon-s btn-delete" onclick={() => removeFragment(idx)} aria-label={t("Delete")} title={t("Delete")} data-testid="rule-form-fragment-delete-button-{idx}">&#10005;</button>
               </div>
             </div>
             <div class="fragment-body">
@@ -709,7 +709,7 @@
                 {#each frag.values as val, vi}
                   <div class="pick-row">
                     <input type="text" bind:value={frag.values[vi]} placeholder={t("Value {0}", vi + 1)} aria-label={t("Value {0}", vi + 1)} data-testid="rule-form-fragment-pick-input-{idx}-{vi}" />
-                    <button type="button" class="btn-icon btn-delete" onclick={() => removePickValue(idx, vi)} aria-label={t("Delete")} data-testid="rule-form-fragment-pick-remove-button-{idx}-{vi}">&#10005;</button>
+                    <button type="button" class="btn-icon btn-icon-s btn-delete" onclick={() => removePickValue(idx, vi)} aria-label={t("Delete")} data-testid="rule-form-fragment-pick-remove-button-{idx}-{vi}">&#10005;</button>
                   </div>
                 {/each}
                 <button type="button" class="btn btn-sm btn-outline" onclick={() => addPickValue(idx)} data-testid="rule-form-fragment-pick-add-button-{idx}">{t("+ Value")}</button>
@@ -803,7 +803,6 @@
 <style>
   .legend-toggle { background: none; border: none; font: inherit; font-weight: var(--weight-strong); font-size: var(--text-m); cursor: pointer; padding: 0; color: var(--color-text); }
 
-  .section-help { font-size: var(--text-s); color: var(--color-text-muted); margin: 0 0 var(--space-2); }
 
   .mode-selector { display: flex; gap: var(--space-2); margin-bottom: var(--space-3); flex-wrap: wrap; }
   .mode-btn { font-size: var(--text-m); font-weight: var(--weight-medium); cursor: pointer; padding: var(--space-1-5) var(--space-3); border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); background: var(--color-bg); color: var(--color-text); font-family: inherit; }
@@ -812,12 +811,7 @@
 
   .open-detail-button, .back-to-paste-button { margin-top: var(--space-2); }
 
-  .mode-warning { background: var(--color-warning-bg); border: var(--line-thin) solid var(--color-warning); color: var(--color-warning-text); padding: var(--space-3); border-radius: var(--radius-m); margin-bottom: var(--space-3); }
-  .mode-warning p { margin: 0 0 var(--space-2); font-size: var(--text-m); }
-  .mode-warning-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
 
-  .sub-section { margin-top: var(--space-3); padding-top: var(--space-3); border-top: var(--line-thin) solid var(--color-border); }
-  .sub-section strong { display: block; margin-bottom: var(--space-1-5); font-size: var(--text-m); }
 
   .advanced-options-section { border-top-color: var(--color-border); }
   .advanced-options-panel { margin-top: var(--space-2); }
@@ -851,14 +845,5 @@
   .chaos-fields label { display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--text-m); min-width: 8rem; }
   .chaos-fields input { padding: var(--space-1-5) var(--space-2); border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); font-size: var(--text-m); }
 
-  .btn-icon { width: 1.75rem; height: 1.75rem; display: inline-flex; align-items: center; justify-content: center; border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); background: var(--color-surface); color: var(--color-text-muted); font-size: var(--text-s); cursor: pointer; }
-  .btn-icon:hover:not(:disabled) { background: var(--color-bg); color: var(--color-text); }
-  .btn-icon:disabled { opacity: 0.35; cursor: not-allowed; }
-  .btn-icon.btn-delete:hover:not(:disabled) { color: var(--color-danger); border-color: var(--color-danger); }
 
-  /* .section styles the fieldset itself (.section-response above refines it). RuleActionSelector.svelte and
-     RuleConditionsEditor.svelte repeat the same rules: component styles are scoped, and app.css has no shared
-     fieldset class. */
-  .section { border: var(--line-thin) solid var(--color-border); border-radius: var(--radius-m); padding: var(--space-3); margin-bottom: var(--space-4); }
-  .section legend { font-weight: var(--weight-strong); font-size: var(--text-m); padding: 0 var(--space-1-5); }
 </style>

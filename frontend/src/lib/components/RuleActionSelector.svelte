@@ -32,9 +32,6 @@
 </fieldset>
 
 <style>
-  .section { border: var(--line-thin) solid var(--color-border); border-radius: var(--radius-m); padding: var(--space-3); margin-bottom: var(--space-4); }
-  .section legend { font-weight: var(--weight-strong); font-size: var(--text-m); padding: 0 var(--space-1-5); }
-  .section-help { font-size: var(--text-s); color: var(--color-text-muted); margin: 0 0 var(--space-2); }
 
   .action-selector { display: flex; gap: var(--space-3); flex-wrap: wrap; }
   .action-option { position: relative; display: flex; flex-direction: column; gap: var(--space-0-5); padding: var(--space-3) var(--space-4); border: var(--line-thick) solid var(--color-control); border-radius: var(--radius-m); cursor: pointer; min-width: 10rem; background: var(--color-surface); }
