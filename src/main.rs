@@ -147,9 +147,33 @@ async fn main() {
     store_for_shutdown.flush().await;
 }
 
+// Kubernetes, Docker and systemd stop a process with SIGTERM, not SIGINT: listening to Ctrl+C alone let every
+// pod stop kill the process before the write-behind drain above, losing the last queued configuration writes.
 async fn shutdown_signal() {
-    tokio::signal::ctrl_c()
-        .await
-        .expect("failed to listen for ctrl+c");
+    let ctrl_c = async {
+        if let Err(e) = tokio::signal::ctrl_c().await {
+            tracing::error!(error = %e, "cannot listen for Ctrl+C");
+            std::future::pending::<()>().await;
+        }
+    };
+    #[cfg(unix)]
+    let terminate = async {
+        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+            Ok(mut sigterm) => {
+                sigterm.recv().await;
+            }
+            Err(e) => {
+                tracing::error!(error = %e, "cannot listen for SIGTERM");
+                std::future::pending::<()>().await;
+            }
+        }
+    };
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {}
+        _ = terminate => {}
+    }
     tracing::info!("shutdown signal received");
 }
