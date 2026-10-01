@@ -34,7 +34,7 @@ cd frontend && npm test                # unit tests, including translation check
 cd frontend && npm run test:e2e        # with lightMock running, see frontend/e2e/README.md
 ```
 
-The Kafka feature needs cmake and a C toolchain: `cargo test --features messaging-kafka`.
+The Kafka feature builds librdkafka from source: it needs cmake, a C toolchain and, on Linux, the libcurl headers (`libcurl4-openssl-dev` on Debian and Ubuntu). Then `cargo test --features messaging-kafka`.
 
 ## What a good change looks like
 
