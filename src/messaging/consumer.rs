@@ -1,17 +1,11 @@
-// Consumer + publisher Kafka fonctionnels (feature "messaging-kafka").
+// Kafka consumer and publisher ("messaging-kafka" feature).
 //
-// Boucle event-driven pure : `StreamConsumer::recv().await` bloque jusqu'au
-// prochain message — rdkafka gere nativement l'attente sur le socket, il n'y
-// a AUCUN polling/sleep dans cette boucle (coherent avec le reste du projet,
-// qui evite systematiquement les taches de fond de type "poll periodique").
+// The loop waits on `StreamConsumer::recv().await` for the next message: rdkafka waits on the socket, and there is
+// no polling or sleeping here.
 //
-// `process_message()` concentre toute la logique metier (match -> rendu ->
-// journal -> publication eventuelle) independamment de la source du message :
-// elle est appelee a la fois par la vraie boucle Kafka (`run()`) ET par le
-// handler HTTP `POST /api/messaging/simulate` (src/server/api.rs), qui permet
-// de tester une regle de messaging ou de piloter les tests E2E sans dependre
-// d'un vrai broker Kafka/producteur externe — zero duplication de la logique
-// de matching/rendu entre les deux chemins.
+// `process_message()` holds the whole handling (match, render, log, publish), whatever the message's origin: the
+// Kafka loop (`run()`) and `POST /api/messaging/simulate` both call it, so a simulated message goes exactly where a
+// real one would, and end-to-end tests need no broker.
 use crate::engine::TemplateRenderer;
 use crate::engine::template::TemplateContext;
 use crate::messaging::KafkaConfig;
@@ -29,15 +23,12 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::Duration;
 
-/// Abstraction de publication sur un topic Kafka. `Kafka` est le chemin reel
-/// (production) ; `Fake` (tests uniquement) enregistre les appels en memoire
-/// pour verifier le comportement "publication sur reply_topic" sans broker
-/// reel — impossible a exercer autrement dans cet environnement de
-/// developpement (pas de Kafka/Docker disponible).
 /// (topic, payload) of each message a fake publisher received.
 #[cfg(test)]
 pub type PublishedMessages = Arc<Mutex<Vec<(String, Vec<u8>)>>>;
 
+/// Publishing to a Kafka topic. `Kafka` is the real one; `Fake`, for tests, records the calls in memory so that
+/// publishing to the reply topic can be checked without a broker.
 #[derive(Clone)]
 pub enum Publisher {
     Kafka(Arc<FutureProducer>),
@@ -85,8 +76,7 @@ fn build_publisher(config: &KafkaConfig) -> Publisher {
     }
 }
 
-/// Coeur metier, independant de la source du message (vrai consumer Kafka ou
-/// simulation HTTP) : match -> rendu template -> journal -> publication.
+/// Handles one message, whatever its origin (Kafka or the simulation route): match, render, log, publish.
 pub async fn process_message(
     store: &MockStore,
     message_log: &MessageLog,
@@ -123,13 +113,9 @@ pub async fn process_message(
         query_params: &empty_params,
         headers: &headers,
         request_body: payload,
-        // Pas de notion de sequence par regle definie pour le messaging dans
-        // cette passe (perimetre minimal, non demande) : {{seq}} vaut
-        // toujours 0 pour un message.
+        // Messaging has no per-rule counter: {{seq}} is always 0 for a message.
         seq_counter: 0,
-        // Les scripts pre_script/script/post_script ne sont pas executes
-        // pour les messages Kafka dans cette passe (perimetre minimal, non
-        // demande) : {{script}}/{{pre_script}}/{{post_script}} rendent vide.
+        // Scripts do not run for Kafka messages: {{script}}, {{pre_script}} and {{post_script}} render empty.
         script_result: None,
         pre_script_result: None,
         post_script_result: None,
@@ -167,10 +153,8 @@ fn extract_headers(msg: &rdkafka::message::BorrowedMessage<'_>) -> HashMap<Strin
     map
 }
 
-/// Demarre le consumer Kafka dans une tache de fond dediee et retourne le
-/// `Publisher` qu'il utilise, pour que le handler HTTP `/api/messaging/simulate`
-/// puisse publier via le MEME producteur (comportement identique qu'un message
-/// arrive reellement par Kafka ou soit simule via l'API).
+/// Starts the Kafka consumer in a background task and returns its `Publisher`, so that the simulation route
+/// publishes through the same producer: a simulated message behaves like a real one.
 pub fn spawn(config: KafkaConfig, store: MockStore, message_log: MessageLog) -> Publisher {
     let publisher = build_publisher(&config);
     let publisher_for_task = publisher.clone();
@@ -206,8 +190,7 @@ async fn run(config: KafkaConfig, store: MockStore, message_log: MessageLog, pub
 
     let reply_topic = config.reply_topic.clone();
 
-    // Event-driven : recv().await attend le prochain message sur le socket,
-    // rdkafka ne fait aucun polling actif ici (cf commentaire en tete de fichier).
+    // recv().await waits for the next message; nothing polls.
     loop {
         match consumer.recv().await {
             Ok(borrowed) => {
@@ -272,9 +255,8 @@ mod tests {
             }],
             groups: vec![],
         };
-        // replace() applique la mutation en memoire de facon synchrone (le
-        // write-behind ne retarde que l'ecriture DISQUE) : pas besoin de
-        // flush()/sleep pour que snapshot() la voie juste apres.
+        // replace() applies the change in memory at once (only the disk write is deferred): snapshot() sees it right away,
+        // no flush or sleep needed.
         store.replace(config).await.unwrap();
         store
     }

@@ -1,26 +1,14 @@
-// Adaptation de MatchEngine (src/engine/matcher.rs) pour matcher un message
-// Kafka (payload + headers) au lieu d'une requete HTTP.
+// Matches a Kafka message (payload and headers) against the HTTP rules.
 //
-// Reutilisation : `MatchEngine::matches_group()` (rendue pub(crate)
-// specifiquement pour cet usage, voir son commentaire) evalue les conditions
-// all_of/any_of d'une regle avec les MEMES extracteurs que le HTTP
-// (QueryParam, Header, JsonPointer, XPath, FormField, PathParam, BodyRaw) —
-// aucune logique d'extraction/evaluation n'est dupliquee ici.
+// `MatchEngine::matches_group()` evaluates the rule's all_of/any_of conditions with the same extractors as HTTP, so
+// no extraction or evaluation logic is duplicated here.
 //
-// Adaptation : on saute deliberement `matches_method`/`matches_sub_path`. Un
-// message Kafka n'a ni verbe HTTP ni chemin — `Rule.method`/`Rule.sub_path`
-// restent des champs obligatoires du modele (partage avec les regles HTTP,
-// pas de champ optionnel a la legere), mais ils sont
-// simplement ignores lors du matching de message : seules `Rule.conditions`
-// comptent. `query_params`/`path_params` sont toujours vides dans le
-// `RequestData` synthetique construit ici (pas d'equivalent Kafka), donc une
-// condition qui en depend ne matchera jamais un message — attendu.
+// A message has no HTTP method and no path, so `Rule.method` and `Rule.sub_path` (required by the shared model) are
+// ignored: only `Rule.conditions` count. Query and path parameters are always empty in the request built from a
+// message, so a condition on them never matches a message, as expected.
 //
-// Perimetre de service : KafkaConfig ne modelise qu'UN topic d'ecoute global
-// (pas de scoping par service comme listen_path pour HTTP), donc "le service
-// concerne" est determine en parcourant TOUS les services dans l'ordre de
-// la config, premiere regle matchee (first-match, meme philosophie que HTTP)
-// — pas de nouveau champ obligatoire ajoute a Service pour cette passe.
+// One listening topic serves all services (there is no per-service scope like HTTP paths): every service is tried in
+// configuration order, and the first matching rule wins, as for HTTP.
 use crate::engine::{MatchEngine, RequestData};
 use crate::models::{Rule, Service};
 use std::collections::HashMap;

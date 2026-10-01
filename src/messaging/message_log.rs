@@ -1,25 +1,13 @@
-// Journal en memoire des messages Kafka traites (entrants et, le cas echeant,
-// les reponses publiees sur reply_topic) — meme principe que RequestLog
-// (src/server/request_log.rs, FIFO en memoire), adapte au domaine messaging.
+// In-memory log of the Kafka messages handled (incoming ones, and the replies published to the reply topic), a FIFO
+// like RequestLog.
 //
-// DOUBLE BORNE : nombre d'entrees (MAX_ENTRIES, comme les 200 de RequestLog)
-// ET age (TTL, defaut 24h via MESSAGE_LOG_TTL_MS). Une seule des deux bornes
-// ne suffit pas : un
-// flux Kafka peut produire des messages plus vite que le TTL ne les expire
-// (la seule age ne bornerait pas la memoire dans ce cas), et inversement un
-// flux tres calme laisserait un vieux message dormir des jours sans purge de
-// taille (la seule taille ne respecterait pas la contrainte de retention
-// courte demandee). Les deux cohabitent : `push()` purge d'abord les entrees
-// expirees par age, PUIS applique la borne de taille si necessaire.
+// Bounded twice: by count (MAX_ENTRIES, like RequestLog's 200) and by age (MESSAGE_LOG_TTL_MS, 24 hours by default).
+// Age alone would not bound memory when messages arrive faster than they expire; count alone would keep an old
+// message for days on a quiet topic, beyond the short retention wanted. `push()` drops expired entries first, then
+// applies the count limit. The purge happens on writes, never in a background task.
 //
-// Purge opportuniste a l'ecriture (event-driven), jamais de tache de fond —
-// meme pattern que purge_expired_protected_backups (src/store/mod.rs) et
-// coherent avec le reste du projet (pas de polling/cron).
-//
-// Troncature du corps : au-dela de MESSAGE_LOG_MAX_BODY_SIZE (defaut 16Ko,
-// configurable), le corps stocke est tronque, mais les metadonnees (topic,
-// timestamp, taille reelle, statut match/no-match) restent toujours
-// completes — seul le contenu potentiellement volumineux est coupe.
+// Bodies longer than MESSAGE_LOG_MAX_BODY_SIZE (16 KiB by default) are truncated; the metadata (topic, time, real
+// size, match result) is always complete.
 use serde::Serialize;
 use std::collections::VecDeque;
 use std::sync::{Arc, RwLock};
@@ -45,7 +33,7 @@ pub fn max_body_size() -> usize {
 #[derive(Debug, Clone, Serialize)]
 pub struct MessageLogEntry {
     pub timestamp: u64,
-    /// "in" (message recu depuis listen_topic) ou "out" (reponse publiee sur reply_topic).
+    /// "in" (received on the listening topic) or "out" (published on the reply topic).
     pub direction: String,
     pub topic: String,
     pub service_name: Option<String>,
@@ -205,11 +193,7 @@ mod tests {
 
     #[test]
     fn record_in_matched_entry() {
-        // Meme si ce test ne touche pas lui-meme MESSAGE_LOG_MAX_BODY_SIZE,
-        // record_in() lit max_body_size() en interne : sans le meme mutex, un
-        // test concurrent qui positionne temporairement cette variable peut
-        // fausser la troncature observee ici (race inter-threads sur un env
-        // var process-wide, meme pitfall que documente en tete de module).
+        // record_in() reads max_body_size(), a process-wide variable another test may set: hold the same lock.
         let _guard = ENV_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
         let log = MessageLog::new();
         log.record_in("orders.in", Some("svc-a"), Some("rule-1"), true, b"hello");

@@ -1,22 +1,15 @@
-// Support Kafka fonctionnel (feature-gated par "messaging-kafka", desactivee
-// par defaut : ce module ne compile meme pas sans la feature, donc zero
-// impact sur le binaire/tests par defaut). `KafkaConfig` + parsing env restent
-// ici ; le consumer/publisher et le journal des messages sont dans des
-// sous-modules dedies. Voir la section "Messaging Kafka" de README.md pour
-// le design complet (adaptation du matcher, choix TTL/troncature, JMS non
-// supporte, SMTP phase 2).
+// Kafka messaging, compiled only with the "messaging-kafka" feature: without it, this module and its dependency do
+// not exist in the binary. The configuration (`KafkaConfig`, read from the environment) lives here; the consumer
+// and publisher, and the message log, have their own modules. docs/kafka-messaging.md describes the behavior.
 pub mod consumer;
 pub mod matcher;
 pub mod message_log;
 
 use message_log::MessageLog;
 
-/// Regroupe l'etat messaging expose a la couche HTTP (AppState) : le journal
-/// des messages (toujours present quand la feature est compilee, meme si
-/// Kafka est desactive a l'execution — un GET renvoie simplement une liste
-/// vide) + le reply_topic/publisher utilises par `POST /api/messaging/simulate`
-/// pour emprunter exactement le meme chemin de publication que le vrai
-/// consumer (voir consumer::process_message).
+/// The messaging state the HTTP layer needs: the message log (present whenever the feature is compiled, empty when
+/// Kafka is off at run time) and the reply topic and publisher, so that `POST /api/messaging/simulate` publishes
+/// exactly as the consumer does (see consumer::process_message).
 #[derive(Clone)]
 pub struct MessagingState {
     pub message_log: MessageLog,
@@ -67,12 +60,8 @@ impl KafkaConfig {
 mod tests {
     use super::*;
 
-    // Process-wide env vars (KAFKA_*) mutees par ces tests : cargo test lance
-    // les fns de test en parallele (threads OS), donc sans serialisation deux
-    // tests qui touchent les memes variables peuvent se marcher dessus de
-    // facon intermittente (meme pitfall que BACKUP_MAX_COUNT/DATA_PATH/
-    // SHOW_RESET_BUTTON, cf src/store/mod.rs et src/auth/mod.rs). Chaque
-    // test tient cette variable pour tout son corps.
+    // KAFKA_* are process-wide and test functions run in parallel: every test that sets them holds this lock for its
+    // whole body.
     static ENV_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
     fn clear_env() {
