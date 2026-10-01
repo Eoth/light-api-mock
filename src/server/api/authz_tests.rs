@@ -291,3 +291,22 @@ async fn creating_returns_the_service_of_the_requested_group() {
     assert_eq!(status, StatusCode::CREATED);
     assert_eq!(created["group_name"], "team-a", "not the team-b namesake");
 }
+
+#[cfg(feature = "messaging-kafka")]
+#[tokio::test]
+async fn kafka_log_and_simulation_are_reserved_to_super_admins() {
+    let app = start().await;
+    let message = json!({"topic": "orders", "payload": "{}", "headers": {}});
+    for user in ["alice", "bob"] {
+        assert_eq!(
+            app.get(user, "/messaging/logs").await.0,
+            StatusCode::FORBIDDEN,
+            "{user}"
+        );
+        let (status, _) = app.post(user, "/messaging/simulate", message.clone()).await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{user}");
+    }
+    assert_eq!(app.get("root", "/messaging/logs").await.0, StatusCode::OK);
+    let (status, _) = app.post("root", "/messaging/simulate", message).await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+}
