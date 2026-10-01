@@ -45,9 +45,9 @@ Size L, to split by module
 
 **What.** Module by module, in reading order of the [reviewer guide](REVIEWING.md), rewrite comments in English and keep only what explains *why* (an invariant, a pitfall, a specification reference); history stays in Git. Translate test names and test messages at the same time.
 
-**Progress.** Done: the Rust code (`src/`, `tests/`, `build.rs`, with every test message and log line), the scripts, and in the UI `main.js`, `App.svelte` and every module of `frontend/src/lib/`. CI fails on a French comment in any of them: `scripts/check-french-comments.mjs` reads comments only (interface strings, fixtures and example data are never reported) and lists the covered paths, which grow with each translated folder.
+**Progress.** Done: the Rust code (`src/`, `tests/`, `build.rs`, with every test message and log line), the scripts, and the whole UI outside its tests: `main.js`, `App.svelte`, every module of `frontend/src/lib/`, every component of `frontend/src/lib/components/` (473 French lines of 528 before) and the two style sheets of `frontend/src/` (9 lines before). CI fails on a French comment in any of them: `scripts/check-french-comments.mjs` reads comments only (interface strings, fixtures and example data are never reported) and lists the covered paths, which grow with each translated folder. Checking each comment against the code found 14 wrong claims (a wrong file, access rules stated wrongly, a lossless round trip that lost data, styles called shared that are not), corrected rather than translated, and 11 defects, fixed in 9 commits, each with a test that failed first (see the changelog).
 
-**Left**, counted in French comment lines by that script: `frontend/src/lib/components/` 473 of its 528 comment lines (rule editor: `RuleResponseSection.svelte` 107, `RuleForm.svelte` 70, `XmlPasteBuilder.svelte` 35, `JsonResponseBuilder.svelte` 26, `JsonPasteBuilder.svelte` 24, `RuleTester.svelte` 22, `RhaiScriptEditor.svelte` 19, `RuleConditionsEditor.svelte` 18, `RuleScriptSlot.svelte` 13, `ConditionForm.svelte` 12, `XmlResponseBuilder.svelte` 11, `RuleWarnings.svelte` 9, `RuleActionSelector.svelte` 5; others 102, `ServiceForm.svelte` 25 the largest), the two style sheets of `frontend/src/` 9, `frontend/e2e/` 422 of 558 (`scenario-runner.spec.js` 187), `frontend/src/tests/` 140 of 188; and the French test titles, which are strings, not comments, so the check does not see them.
+**Left**, counted in French comment lines by that script, all in the tests that R11 rewrites: `frontend/e2e/` 422 of its 560 comment lines (`scenario-runner.spec.js` 187), `frontend/src/tests/` 140 of 198 (136 of 194 in the test files, 4 of 4 in `helpers/`); and the French test titles, which are strings, not comments, so the check does not see them.
 
 **Done when.** No French comment left in `frontend/`, and the CI check covers it.
 
@@ -397,6 +397,8 @@ Size M
 
 **What.** Move them into shared tokens and classes in `app.css`, components keep only what is specific to them; the look stays identical.
 
+**Measured (2026-10-01).** The tokens file defines 53 tokens of the former design system; `app.css` is the only file that reads them, 35 times, always with a fallback equal to the token's value, and 30 tokens are never read (nor is its `.custom-dt` selector): removing the file would change no rendered color or size. Whether the UI keeps that design system as its base, and so this file, is the maintainers' choice to make before the work starts. Components still define their own `.section`, `.btn-icon`, `.btn-xs` and warning boxes (`RuleResponseSection`, `RuleActionSelector`, `RuleConditionsEditor`, `RuleWarnings`, `ServiceForm`, the builders), and `ConditionForm` its own `.form-field`.
+
 **Done when.** No component redefines `.btn` or `.form-field`, and screenshots are unchanged.
 
 ### E2. Response builder leftovers
@@ -418,6 +420,16 @@ Size S
 **What.** Give the value field a minimum width that fits a usual XPath, letting the line wrap before the value instead of shrinking it, and check the JSON builder's rows the same way.
 
 **Done when.** The XPath of `response-xml-xpath-source.png` shows whole in both languages, the image's subject includes the value field, and the screenshot guard fails on an input whose value overflows it.
+
+### E9. The WSDL mode in the service form
+
+Size S. **Decision needed** (what a REST service does with `?wsdl`).
+
+**Why.** The guide says a SOAP service either relays WSDL requests to the real backend (`Proxy`/`Auto`) or answers them with its rules (`Mock`), but the service form offers no such choice: `Mock` can only be set through the API or the configuration file (saving the form now keeps it instead of resetting it to `auto`). And a REST service, which the guide describes as having "no SOAP-specific handling", still sends `?wsdl` requests to the backend past its rules (`auto`, the default), which on a purely mocked service ends in a 502. `Auto` and `Proxy` behave the same.
+
+**What.** Offer the WSDL mode in the form for a SOAP service; decide what a REST service does with `?wsdl` (its rules, like any request, or the current relay) and make the guide say it in both languages; give `Auto` a meaning of its own or drop one of the two values.
+
+**Done when.** A SOAP service's WSDL mode can be set and read back in the form, the guide describes what REST and SOAP services do with `?wsdl`, and end-to-end tests cover each mode.
 
 ### E3. Kafka parity
 
