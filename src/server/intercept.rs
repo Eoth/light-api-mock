@@ -43,7 +43,6 @@ pub async fn intercept_layer(
     next: Next,
 ) -> Response {
     let path = req.uri().path().to_string();
-    let method = req.method().clone();
 
     if is_internal_route(&path) {
         tracing::trace!(path = %path, "internal route protected, skipping intercept");
@@ -75,7 +74,6 @@ pub async fn intercept_layer(
                 path_params,
                 remaining,
                 group_code,
-                &method,
                 req,
             )
             .await
@@ -265,10 +263,9 @@ async fn handle_service(
     path_params: HashMap<String, String>,
     remaining: String,
     group_code: Option<String>,
-    method: &axum::http::Method,
     req: Request<Body>,
 ) -> Response {
-    let method_str = method.to_string();
+    let method_str = req.method().to_string();
     let gc = group_code.as_deref();
 
     if !service.is_mocked {

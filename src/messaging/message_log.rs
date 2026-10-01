@@ -236,7 +236,12 @@ mod tests {
     fn record_out_entry() {
         let _guard = ENV_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
         let log = MessageLog::new();
-        log.record_out("orders.reply", Some("svc-a"), Some("rule-1"), b"response body");
+        log.record_out(
+            "orders.reply",
+            Some("svc-a"),
+            Some("rule-1"),
+            b"response body",
+        );
         let entries = log.recent(10);
         assert_eq!(entries[0].direction, "out");
         assert_eq!(entries[0].topic, "orders.reply");
@@ -251,7 +256,10 @@ mod tests {
         let entries = log.recent(10);
         assert!(entries[0].body_truncated);
         assert_eq!(entries[0].body_preview, "01234");
-        assert_eq!(entries[0].body_size_bytes, 10, "real size must be preserved even when body is truncated");
+        assert_eq!(
+            entries[0].body_size_bytes, 10,
+            "real size must be preserved even when body is truncated"
+        );
         unsafe { std::env::remove_var("MESSAGE_LOG_MAX_BODY_SIZE") };
     }
 
@@ -273,7 +281,11 @@ mod tests {
         for i in 0..(MAX_ENTRIES + 50) {
             log.record_in("t", None, None, false, format!("msg-{i}").as_bytes());
         }
-        assert_eq!(log.len(), MAX_ENTRIES, "entry count must never exceed MAX_ENTRIES");
+        assert_eq!(
+            log.len(),
+            MAX_ENTRIES,
+            "entry count must never exceed MAX_ENTRIES"
+        );
         let entries = log.recent(1);
         assert_eq!(entries[0].body_preview, format!("msg-{}", MAX_ENTRIES + 49));
     }
@@ -298,7 +310,11 @@ mod tests {
 
         // Any subsequent write is the purge trigger (event-driven, no timer).
         log.record_in("t", None, None, false, b"new");
-        assert_eq!(log.len(), 1, "expired entry must be purged, only the fresh one remains");
+        assert_eq!(
+            log.len(),
+            1,
+            "expired entry must be purged, only the fresh one remains"
+        );
         assert_eq!(log.recent(1)[0].body_preview, "new");
         unsafe { std::env::remove_var("MESSAGE_LOG_TTL_MS") };
     }

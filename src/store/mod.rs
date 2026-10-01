@@ -33,8 +33,8 @@
 // comptage d'activite plus fin que ca.
 use crate::models::MockConfig;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::sync::{RwLock, mpsc, oneshot};
 
 static BACKUP_SEQ: AtomicU64 = AtomicU64::new(0);
@@ -159,12 +159,7 @@ impl WriterHandle {
     /// ne devrait pas arriver en fonctionnement normal), on logue au lieu de
     /// paniquer : la mutation reste appliquee en memoire.
     async fn send_write(&self, path: PathBuf, yaml: String) {
-        if self
-            .tx
-            .send(WriteJob::Write { path, yaml })
-            .await
-            .is_err()
-        {
+        if self.tx.send(WriteJob::Write { path, yaml }).await.is_err() {
             tracing::error!(
                 "write-behind: tache d'ecriture indisponible, mutation appliquee en memoire uniquement (pas persistee)"
             );
@@ -246,7 +241,8 @@ impl MockStore {
             serde_yaml::from_str(&content).map_err(|e| StoreError::Yaml(e.to_string()))?
         } else {
             let empty = MockConfig::empty();
-            let yaml = serde_yaml::to_string(&empty).map_err(|e| StoreError::Yaml(e.to_string()))?;
+            let yaml =
+                serde_yaml::to_string(&empty).map_err(|e| StoreError::Yaml(e.to_string()))?;
             Self::write_to_disk(&file, &yaml)?;
             empty
         };
@@ -312,16 +308,17 @@ impl MockStore {
     /// uniquement (nom, taille, mtime via DirEntry::metadata()) — le contenu
     /// YAML n'est jamais charge pour construire cette liste.
     pub async fn list_backups(&self) -> Result<Vec<BackupInfo>, StoreError> {
-        let parent = self.path.parent().ok_or_else(|| {
-            StoreError::Io("config path has no parent directory".into())
-        })?;
+        let parent = self
+            .path
+            .parent()
+            .ok_or_else(|| StoreError::Io("config path has no parent directory".into()))?;
 
         let backups_dir = parent.join("backups");
         let mut result = Vec::new();
         Self::collect_backups_dir(&backups_dir, false, &mut result)?;
         Self::collect_backups_dir(&backups_dir.join("protected"), true, &mut result)?;
 
-        result.sort_by(|a, b| b.created_at_ms.cmp(&a.created_at_ms));
+        result.sort_by_key(|b| std::cmp::Reverse(b.created_at_ms));
         Ok(result)
     }
 
@@ -341,10 +338,12 @@ impl MockStore {
                 continue;
             }
             let Ok(meta) = entry.metadata() else { continue };
-            let Some(filename) = path.file_name().and_then(|n| n.to_str()) else { continue };
+            let Some(filename) = path.file_name().and_then(|n| n.to_str()) else {
+                continue;
+            };
 
-            let created_at_ms = Self::extract_backup_timestamp(&path, protected)
-                .unwrap_or_else(|| {
+            let created_at_ms =
+                Self::extract_backup_timestamp(&path, protected).unwrap_or_else(|| {
                     meta.modified()
                         .ok()
                         .and_then(|m| m.duration_since(std::time::UNIX_EPOCH).ok())
@@ -385,9 +384,10 @@ impl MockStore {
     /// automatiquement un backup de l'etat courant AVANT d'ecraser avec le
     /// contenu restaure, sans logique dupliquee.
     pub async fn restore_from_backup(&self, filename: &str) -> Result<(), StoreError> {
-        let parent = self.path.parent().ok_or_else(|| {
-            StoreError::Io("config path has no parent directory".into())
-        })?;
+        let parent = self
+            .path
+            .parent()
+            .ok_or_else(|| StoreError::Io("config path has no parent directory".into()))?;
 
         let backups_dir = parent.join("backups");
         let candidate = backups_dir.join(filename);
@@ -420,9 +420,10 @@ impl MockStore {
         if !self.path.exists() {
             return Ok(());
         }
-        let parent = self.path.parent().ok_or_else(|| {
-            StoreError::Io("config path has no parent directory".into())
-        })?;
+        let parent = self
+            .path
+            .parent()
+            .ok_or_else(|| StoreError::Io("config path has no parent directory".into()))?;
 
         let protected_dir = parent.join("backups").join("protected");
         std::fs::create_dir_all(&protected_dir).map_err(|e| StoreError::Io(e.to_string()))?;
@@ -441,9 +442,9 @@ impl MockStore {
     fn prepare_and_backup(path: &Path, config: &MockConfig) -> Result<String, StoreError> {
         let yaml = serde_yaml::to_string(config).map_err(|e| StoreError::Yaml(e.to_string()))?;
 
-        let parent = path.parent().ok_or_else(|| {
-            StoreError::Io("config path has no parent directory".into())
-        })?;
+        let parent = path
+            .parent()
+            .ok_or_else(|| StoreError::Io("config path has no parent directory".into()))?;
 
         Self::purge_expired_protected_backups(parent)?;
         Self::backup_before_overwrite(path, parent)?;
@@ -457,9 +458,9 @@ impl MockStore {
     /// dans load_or_init(), qui reste volontairement synchrone (cf commentaire
     /// sur load_or_init).
     fn write_to_disk(path: &Path, yaml: &str) -> Result<(), StoreError> {
-        let parent = path.parent().ok_or_else(|| {
-            StoreError::Io("config path has no parent directory".into())
-        })?;
+        let parent = path
+            .parent()
+            .ok_or_else(|| StoreError::Io("config path has no parent directory".into()))?;
 
         let tmp_path = parent.join(".mock-config.yaml.tmp");
         std::fs::write(&tmp_path, yaml.as_bytes()).map_err(|e| StoreError::Io(e.to_string()))?;
@@ -503,11 +504,11 @@ impl MockStore {
                 continue;
             }
             let path = entry.path();
-            if let Some(ts) = Self::extract_protected_timestamp(&path) {
-                if now.saturating_sub(ts) >= PROTECTED_BACKUP_MAX_AGE_MS {
-                    std::fs::remove_file(&path).map_err(|e| StoreError::Io(e.to_string()))?;
-                    tracing::info!(path = %path.display(), "expired pre-reset backup purged");
-                }
+            if let Some(ts) = Self::extract_protected_timestamp(&path)
+                && now.saturating_sub(ts) >= PROTECTED_BACKUP_MAX_AGE_MS
+            {
+                std::fs::remove_file(&path).map_err(|e| StoreError::Io(e.to_string()))?;
+                tracing::info!(path = %path.display(), "expired pre-reset backup purged");
             }
         }
         Ok(())
@@ -600,10 +601,13 @@ impl std::fmt::Display for StoreError {
 
 impl std::error::Error for StoreError {}
 
+// ENV_MUTEX guards are held across awaits on purpose: they serialize the tests that mutate process-wide
+// environment variables, and each #[tokio::test] owns its runtime, so holding one cannot deadlock.
 #[cfg(test)]
+#[allow(clippy::await_holding_lock)]
 mod tests {
     use super::*;
-    use crate::models::{*, WsdlMode};
+    use crate::models::{WsdlMode, *};
 
     // Process-wide env vars (BACKUP_MAX_COUNT, DATA_PATH) are mutated by
     // several tests below; cargo test runs test fns in parallel OS threads,
@@ -643,9 +647,7 @@ mod tests {
                     response: MockResponse {
                         status: 200,
                         headers: vec![],
-                        body: vec![BodyFragment::Literal {
-                            value: "ok".into(),
-                        }],
+                        body: vec![BodyFragment::Literal { value: "ok".into() }],
                         chaos: None,
                     },
                 }],
@@ -689,10 +691,9 @@ mod tests {
         // write-behind: wait for the queued disk write before reading the file.
         store.flush().await;
 
-        let on_disk: MockConfig = serde_yaml::from_str(
-            &std::fs::read_to_string(MockStore::config_file(&dir)).unwrap(),
-        )
-        .unwrap();
+        let on_disk: MockConfig =
+            serde_yaml::from_str(&std::fs::read_to_string(MockStore::config_file(&dir)).unwrap())
+                .unwrap();
         assert_eq!(on_disk.services.len(), 1);
 
         let in_mem = store.snapshot().await;
@@ -711,7 +712,7 @@ mod tests {
                 cfg.services[0].is_mocked = false;
                 cfg.services.push(Service {
                     name: "svc-b".into(),
-    
+
                     listen_path: "/svc-b/*".into(),
                     real_target_url: "http://svc-b:9090".into(),
                     is_mocked: false,
@@ -730,10 +731,9 @@ mod tests {
 
         // write-behind: wait for the queued disk write before reading the file.
         store.flush().await;
-        let on_disk: MockConfig = serde_yaml::from_str(
-            &std::fs::read_to_string(MockStore::config_file(&dir)).unwrap(),
-        )
-        .unwrap();
+        let on_disk: MockConfig =
+            serde_yaml::from_str(&std::fs::read_to_string(MockStore::config_file(&dir)).unwrap())
+                .unwrap();
         assert_eq!(on_disk, *updated);
         std::fs::remove_dir_all(&dir).ok();
     }
@@ -746,7 +746,10 @@ mod tests {
         store.flush().await;
 
         let tmp_path = dir.join(".mock-config.yaml.tmp");
-        assert!(!tmp_path.exists(), "temp file should be cleaned up after rename");
+        assert!(
+            !tmp_path.exists(),
+            "temp file should be cleaned up after rename"
+        );
         std::fs::remove_dir_all(&dir).ok();
     }
 
@@ -759,7 +762,10 @@ mod tests {
 
         let backups_dir = dir.join("backups");
         let count = std::fs::read_dir(&backups_dir).unwrap().count();
-        assert!(count >= 1, "expected at least one backup after overwriting an existing config");
+        assert!(
+            count >= 1,
+            "expected at least one backup after overwriting an existing config"
+        );
         std::fs::remove_dir_all(&dir).ok();
     }
 
@@ -819,14 +825,20 @@ mod tests {
 
         let protected_dir = dir.join("backups").join("protected");
         let count = std::fs::read_dir(&protected_dir).unwrap().count();
-        assert_eq!(count, 1, "pre-reset backup must not be rotated away by normal quota");
+        assert_eq!(
+            count, 1,
+            "pre-reset backup must not be rotated away by normal quota"
+        );
 
         let backups_dir = dir.join("backups");
         let normal_count = std::fs::read_dir(&backups_dir)
             .unwrap()
             .filter(|e| e.as_ref().unwrap().path().is_file())
             .count();
-        assert_eq!(normal_count, 2, "normal backups still capped at BACKUP_MAX_COUNT");
+        assert_eq!(
+            normal_count, 2,
+            "normal backups still capped at BACKUP_MAX_COUNT"
+        );
 
         unsafe { std::env::remove_var("BACKUP_MAX_COUNT") };
         std::fs::remove_dir_all(&dir).ok();
@@ -851,7 +863,10 @@ mod tests {
         store.replace(MockConfig::empty()).await.unwrap();
 
         let count = std::fs::read_dir(&protected_dir).unwrap().count();
-        assert_eq!(count, 0, "pre-reset backup older than 30 days should be purged");
+        assert_eq!(
+            count, 0,
+            "pre-reset backup older than 30 days should be purged"
+        );
         std::fs::remove_dir_all(&dir).ok();
     }
 
@@ -921,9 +936,14 @@ mod tests {
         store.replace(MockConfig::empty()).await.unwrap();
 
         let remaining = std::fs::read_dir(&protected_dir).unwrap().count();
-        assert_eq!(remaining, 1500, "only the single expired entry should be purged out of 1501");
+        assert_eq!(
+            remaining, 1500,
+            "only the single expired entry should be purged out of 1501"
+        );
         assert!(
-            !protected_dir.join(format!("pre-reset-{old_ts}.yaml")).exists(),
+            !protected_dir
+                .join(format!("pre-reset-{old_ts}.yaml"))
+                .exists(),
             "the expired entry itself must be gone"
         );
         std::fs::remove_dir_all(&dir).ok();
@@ -1020,7 +1040,10 @@ mod tests {
             .find(|b| !b.protected)
             .expect("expected at least one normal backup");
 
-        store.restore_from_backup(&first_backup.filename).await.unwrap();
+        store
+            .restore_from_backup(&first_backup.filename)
+            .await
+            .unwrap();
 
         let restored = store.snapshot().await;
         assert_eq!(restored.services[0].name, "svc-a");
@@ -1046,7 +1069,10 @@ mod tests {
             .find(|b| b.protected)
             .expect("expected a protected backup");
 
-        store.restore_from_backup(&protected.filename).await.unwrap();
+        store
+            .restore_from_backup(&protected.filename)
+            .await
+            .unwrap();
 
         let restored = store.snapshot().await;
         assert_eq!(restored.services.len(), 1);
@@ -1102,7 +1128,10 @@ mod tests {
         // up "before-restore" (the state overwritten by the restore) before queuing
         // the restored content for write-behind — never lose the pre-restore state.
         let backups_after = store.list_backups().await.unwrap();
-        assert!(backups_after.iter().filter(|b| !b.protected).count() > backups_before.iter().filter(|b| !b.protected).count());
+        assert!(
+            backups_after.iter().filter(|b| !b.protected).count()
+                > backups_before.iter().filter(|b| !b.protected).count()
+        );
         std::fs::remove_dir_all(&dir).ok();
     }
 
@@ -1146,10 +1175,9 @@ mod tests {
         store.replace(sample_config()).await.unwrap();
         store.flush().await;
 
-        let on_disk: MockConfig = serde_yaml::from_str(
-            &std::fs::read_to_string(MockStore::config_file(&dir)).unwrap(),
-        )
-        .unwrap();
+        let on_disk: MockConfig =
+            serde_yaml::from_str(&std::fs::read_to_string(MockStore::config_file(&dir)).unwrap())
+                .unwrap();
         assert_eq!(on_disk.services.len(), 1);
         let status = store.writer_status();
         assert!(status.last_write_ok_ms.is_some());
@@ -1211,13 +1239,16 @@ mod tests {
         }
         store.flush().await;
 
-        let on_disk: MockConfig = serde_yaml::from_str(
-            &std::fs::read_to_string(MockStore::config_file(&dir)).unwrap(),
-        )
-        .unwrap();
+        let on_disk: MockConfig =
+            serde_yaml::from_str(&std::fs::read_to_string(MockStore::config_file(&dir)).unwrap())
+                .unwrap();
         let in_mem = store.snapshot().await;
         assert_eq!(*in_mem, on_disk, "disk must match memory once flushed");
-        assert_eq!(on_disk.services.len(), 11, "the original service + all 10 concurrent updates");
+        assert_eq!(
+            on_disk.services.len(),
+            11,
+            "the original service + all 10 concurrent updates"
+        );
         std::fs::remove_dir_all(&dir).ok();
     }
 
@@ -1253,7 +1284,10 @@ mod tests {
         store.flush().await;
 
         let status = store.writer_status();
-        assert!(status.last_error.is_some(), "write to a missing directory must be reported as an error");
+        assert!(
+            status.last_error.is_some(),
+            "write to a missing directory must be reported as an error"
+        );
         assert!(status.last_write_ok_ms.is_none());
 
         std::fs::create_dir_all(bogus_path.parent().unwrap()).unwrap();
@@ -1261,7 +1295,10 @@ mod tests {
         store.flush().await;
 
         let status2 = store.writer_status();
-        assert!(status2.last_write_ok_ms.is_some(), "task must keep processing jobs after a prior write error");
+        assert!(
+            status2.last_write_ok_ms.is_some(),
+            "task must keep processing jobs after a prior write error"
+        );
         assert!(bogus_path.exists());
         std::fs::remove_dir_all(&dir).ok();
     }

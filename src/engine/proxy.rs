@@ -32,6 +32,12 @@ pub struct ProxyClient {
     client: Client,
 }
 
+impl Default for ProxyClient {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ProxyClient {
     pub fn new() -> Self {
         Self {
@@ -133,7 +139,7 @@ impl ProxyClient {
         let req_stream = http_body_util::BodyStream::new(body).filter_map(|result| async move {
             match result {
                 Ok(frame) => frame.into_data().ok().map(Ok),
-                Err(e) => Some(Err(std::io::Error::new(std::io::ErrorKind::Other, e))),
+                Err(e) => Some(Err(std::io::Error::other(e))),
             }
         });
         builder = builder.body(reqwest::Body::wrap_stream(req_stream));

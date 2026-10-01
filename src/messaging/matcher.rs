@@ -153,7 +153,11 @@ mod tests {
 
     #[test]
     fn empty_conditions_always_match() {
-        let services = vec![service_with_rule("catch-all", ConditionGroup::default(), "ok")];
+        let services = vec![service_with_rule(
+            "catch-all",
+            ConditionGroup::default(),
+            "ok",
+        )];
         let m = match_message(&services, b"anything", &HashMap::new()).unwrap();
         assert_eq!(m.service_name, "catch-all");
     }
@@ -185,7 +189,10 @@ mod tests {
         svc.rules[0].sub_path = Some("/never/matches/a/message".into());
         let services = [svc];
         let m = match_message(&services, b"{}", &HashMap::new());
-        assert!(m.is_some(), "method/sub_path must not gate message matching");
+        assert!(
+            m.is_some(),
+            "method/sub_path must not gate message matching"
+        );
     }
 
     #[test]

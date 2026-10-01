@@ -12,11 +12,11 @@
 // de tester une regle de messaging ou de piloter les tests E2E sans dependre
 // d'un vrai broker Kafka/producteur externe — zero duplication de la logique
 // de matching/rendu entre les deux chemins.
-use crate::engine::template::TemplateContext;
 use crate::engine::TemplateRenderer;
+use crate::engine::template::TemplateContext;
+use crate::messaging::KafkaConfig;
 use crate::messaging::matcher::match_message;
 use crate::messaging::message_log::MessageLog;
-use crate::messaging::KafkaConfig;
 use crate::store::MockStore;
 use rdkafka::config::ClientConfig;
 use rdkafka::consumer::{Consumer, StreamConsumer};
@@ -55,7 +55,9 @@ impl Publisher {
             }
             #[cfg(test)]
             Publisher::Fake(log) => {
-                log.lock().unwrap().push((topic.to_string(), payload.to_vec()));
+                log.lock()
+                    .unwrap()
+                    .push((topic.to_string(), payload.to_vec()));
                 Ok(())
             }
             Publisher::None => Err("no reply publisher configured".into()),
@@ -328,8 +330,16 @@ mod tests {
         assert_eq!(published[0].1, b"pong-body");
 
         let entries = message_log.recent(10);
-        assert_eq!(entries.len(), 2, "expected one 'in' entry and one 'out' entry");
-        assert!(entries.iter().any(|e| e.direction == "out" && e.topic == "orders.reply"));
+        assert_eq!(
+            entries.len(),
+            2,
+            "expected one 'in' entry and one 'out' entry"
+        );
+        assert!(
+            entries
+                .iter()
+                .any(|e| e.direction == "out" && e.topic == "orders.reply")
+        );
     }
 
     #[tokio::test]
@@ -361,7 +371,10 @@ mod tests {
         )
         .await;
 
-        assert!(calls.lock().unwrap().is_empty(), "unmatched message must not trigger a reply publish");
+        assert!(
+            calls.lock().unwrap().is_empty(),
+            "unmatched message must not trigger a reply publish"
+        );
         let entries = message_log.recent(10);
         assert_eq!(entries.len(), 1);
         assert!(!entries[0].matched);

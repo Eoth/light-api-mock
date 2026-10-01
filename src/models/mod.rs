@@ -377,7 +377,10 @@ groups: []
         let yaml = serde_yaml::to_string(&config).expect("serialize");
         assert!(yaml.contains("response_mode: json-paste"));
         let parsed: MockConfig = serde_yaml::from_str(&yaml).expect("deserialize");
-        assert_eq!(parsed.services[0].rules[0].response_mode, Some(ResponseEditorMode::JsonPaste));
+        assert_eq!(
+            parsed.services[0].rules[0].response_mode,
+            Some(ResponseEditorMode::JsonPaste)
+        );
     }
 
     #[test]
@@ -696,5 +699,4 @@ groups: []
         let re_parsed: MockConfig = serde_yaml::from_str(&re_yaml).expect("re-deserialize");
         assert_eq!(re_parsed.services[0].wsdl_mode, WsdlMode::Mock);
     }
-
 }

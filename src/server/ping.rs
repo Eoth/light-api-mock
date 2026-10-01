@@ -27,6 +27,12 @@ pub struct PingCache {
     entries: Arc<RwLock<HashMap<String, PingStatus>>>,
 }
 
+impl Default for PingCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PingCache {
     pub fn new() -> Self {
         Self {
@@ -57,7 +63,14 @@ mod tests {
     #[test]
     fn fresh_entry_is_returned() {
         let cache = PingCache::new();
-        cache.set("svc-a", PingStatus { reachable: true, checked_at: now_ms(), error: None });
+        cache.set(
+            "svc-a",
+            PingStatus {
+                reachable: true,
+                checked_at: now_ms(),
+                error: None,
+            },
+        );
         let got = cache.get_fresh("svc-a", PING_TTL_MS);
         assert!(got.is_some());
         assert!(got.unwrap().reachable);
@@ -66,7 +79,14 @@ mod tests {
     #[test]
     fn expired_entry_returns_none() {
         let cache = PingCache::new();
-        cache.set("svc-a", PingStatus { reachable: true, checked_at: now_ms() - 500, error: None });
+        cache.set(
+            "svc-a",
+            PingStatus {
+                reachable: true,
+                checked_at: now_ms() - 500,
+                error: None,
+            },
+        );
         assert!(cache.get_fresh("svc-a", 100).is_none());
     }
 
@@ -79,8 +99,22 @@ mod tests {
     #[test]
     fn set_overwrites_previous_entry() {
         let cache = PingCache::new();
-        cache.set("svc-a", PingStatus { reachable: false, checked_at: now_ms(), error: Some("boom".into()) });
-        cache.set("svc-a", PingStatus { reachable: true, checked_at: now_ms(), error: None });
+        cache.set(
+            "svc-a",
+            PingStatus {
+                reachable: false,
+                checked_at: now_ms(),
+                error: Some("boom".into()),
+            },
+        );
+        cache.set(
+            "svc-a",
+            PingStatus {
+                reachable: true,
+                checked_at: now_ms(),
+                error: None,
+            },
+        );
         let got = cache.get_fresh("svc-a", PING_TTL_MS).unwrap();
         assert!(got.reachable);
         assert!(got.error.is_none());

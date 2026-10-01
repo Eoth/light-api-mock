@@ -1,5 +1,5 @@
 use crate::auth::AuthConfig;
-use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
+use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode};
 use serde::Deserialize;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -137,7 +137,7 @@ impl KeycloakClient {
 
         let res = self
             .http
-            .post(&self.token_url())
+            .post(self.token_url())
             .form(&params)
             .send()
             .await
@@ -152,9 +152,7 @@ impl KeycloakClient {
         if !res.status().is_success() {
             let status = res.status();
             let body = res.text().await.unwrap_or_default();
-            return Err(AuthError::KeycloakUnavailable(format!(
-                "{status}: {body}"
-            )));
+            return Err(AuthError::KeycloakUnavailable(format!("{status}: {body}")));
         }
 
         res.json::<TokenResponse>()
@@ -171,7 +169,7 @@ impl KeycloakClient {
 
         let res = self
             .http
-            .post(&self.token_url())
+            .post(self.token_url())
             .form(&params)
             .send()
             .await
@@ -228,10 +226,12 @@ impl KeycloakClient {
         validation.set_issuer(&[self.issuer()]);
         validation.set_audience(&[&self.config.client_id]);
 
-        let token_data = decode::<KeycloakClaims>(token, &decoding_key, &validation)
-            .map_err(|e| match e.kind() {
-                jsonwebtoken::errors::ErrorKind::ExpiredSignature => AuthError::TokenExpired,
-                _ => AuthError::TokenInvalid(e.to_string()),
+        let token_data =
+            decode::<KeycloakClaims>(token, &decoding_key, &validation).map_err(|e| {
+                match e.kind() {
+                    jsonwebtoken::errors::ErrorKind::ExpiredSignature => AuthError::TokenExpired,
+                    _ => AuthError::TokenInvalid(e.to_string()),
+                }
             })?;
 
         Ok(token_data.claims.preferred_username)
@@ -240,7 +240,7 @@ impl KeycloakClient {
     async fn validate_via_userinfo(&self, token: &str) -> Result<String, AuthError> {
         let res = self
             .http
-            .get(&self.userinfo_url())
+            .get(self.userinfo_url())
             .bearer_auth(token)
             .send()
             .await
@@ -261,7 +261,8 @@ impl KeycloakClient {
     async fn refresh_jwks_if_stale(&self) -> Result<(), AuthError> {
         {
             let cached = self.jwks.read().await;
-            let is_fresh = cached.fetched_at
+            let is_fresh = cached
+                .fetched_at
                 .map(|t| t.elapsed().as_secs() < JWKS_TTL_SECS)
                 .unwrap_or(false);
             if is_fresh && !cached.keys.is_empty() {
@@ -271,7 +272,7 @@ impl KeycloakClient {
 
         let res = self
             .http
-            .get(&self.certs_url())
+            .get(self.certs_url())
             .send()
             .await
             .map_err(|e| AuthError::KeycloakUnavailable(e.to_string()))?;
