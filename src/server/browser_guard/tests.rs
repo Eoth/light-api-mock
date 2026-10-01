@@ -13,6 +13,10 @@ fn headers(pairs: &[(&'static str, &str)]) -> HeaderMap {
     map
 }
 
+fn refuses(guard: &BrowserGuard, method: &Method, path: &str, headers: &HeaderMap) -> bool {
+    guard.refusal(method, path, headers).is_some()
+}
+
 #[test]
 fn parses_a_comma_separated_list_and_ignores_blanks_and_trailing_slashes() {
     let guard = BrowserGuard::new(" https://ui.example.com/ , ,http://localhost:5173");
@@ -26,25 +30,37 @@ fn parses_a_comma_separated_list_and_ignores_blanks_and_trailing_slashes() {
 fn refuses_cross_site_writes_to_the_api_only() {
     let guard = BrowserGuard::new(UI);
     let cross = headers(&[("sec-fetch-site", "cross-site"), ("origin", EVIL)]);
-    assert!(guard.refuses(&Method::POST, "/api/services", &cross));
-    assert!(guard.refuses(&Method::DELETE, "/api/config/reset", &cross));
-    assert!(guard.refuses(
+    assert!(refuses(&guard, &Method::POST, "/api/services", &cross));
+    assert!(refuses(
+        &guard,
+        &Method::DELETE,
+        "/api/config/reset",
+        &cross
+    ));
+    assert!(refuses(
+        &guard,
         &Method::PUT,
         "/api/config",
         &headers(&[("sec-fetch-site", "same-site")])
     ));
     // Reads, service traffic, same-origin calls and non-browser clients go through.
-    assert!(!guard.refuses(&Method::GET, "/api/config", &cross));
-    assert!(!guard.refuses(&Method::POST, "/orders/42", &cross));
-    assert!(!guard.refuses(
+    assert!(!refuses(&guard, &Method::GET, "/api/config", &cross));
+    assert!(!refuses(&guard, &Method::POST, "/orders/42", &cross));
+    assert!(!refuses(
+        &guard,
         &Method::POST,
         "/api/services",
         &headers(&[("sec-fetch-site", "same-origin")])
     ));
-    assert!(!guard.refuses(&Method::POST, "/api/services", &HeaderMap::new()));
+    assert!(!refuses(
+        &guard,
+        &Method::POST,
+        "/api/services",
+        &HeaderMap::new()
+    ));
     // A listed origin may write from another site.
     let listed = headers(&[("sec-fetch-site", "cross-site"), ("origin", UI)]);
-    assert!(!guard.refuses(&Method::POST, "/api/services", &listed));
+    assert!(!refuses(&guard, &Method::POST, "/api/services", &listed));
 }
 
 async fn spawn_app() -> String {
@@ -131,4 +147,50 @@ async fn a_cross_site_page_cannot_change_the_configuration() {
         .await
         .unwrap();
     assert_eq!(mocked.text().await.unwrap(), "mocked");
+}
+
+#[test]
+fn recognizes_loopback_host_headers() {
+    for host in [
+        "localhost",
+        "localhost:7342",
+        "LOCALHOST:7342",
+        "app.localhost:5173",
+        "127.0.0.1:7342",
+        "127.1.2.3",
+        "[::1]:7342",
+        "[::1]",
+    ] {
+        assert!(is_loopback_host(host), "{host}");
+    }
+    for host in [
+        "evil.example:7342",
+        "localhost.evil.example",
+        "10.0.0.5:7342",
+        "[::2]:7342",
+        "",
+    ] {
+        assert!(!is_loopback_host(host), "{host}");
+    }
+}
+
+#[test]
+fn a_loopback_only_server_answers_the_api_through_loopback_names_only() {
+    let guard = BrowserGuard::new("").with_loopback_hosts_only(true);
+    let rebound = headers(&[("host", "evil.example:7342")]);
+    assert!(refuses(&guard, &Method::GET, "/api/config", &rebound));
+    assert!(!refuses(&guard, &Method::GET, "/orders/42", &rebound));
+    assert!(!refuses(
+        &guard,
+        &Method::GET,
+        "/api/config",
+        &headers(&[("host", "localhost:7342")])
+    ));
+    // Listening on every interface: the operator chose the names, nothing to check.
+    assert!(!refuses(
+        &BrowserGuard::new(""),
+        &Method::GET,
+        "/api/config",
+        &rebound
+    ));
 }

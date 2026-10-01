@@ -21,9 +21,10 @@ use crate::auth::AuthConfig;
 use crate::auth::keycloak::KeycloakClient;
 use crate::engine::ProxyClient;
 use crate::engine::script::ScriptEngine;
+use crate::server::browser_guard::BrowserGuard;
 use crate::server::ping::PingCache;
 use crate::server::request_log::RequestLog;
-use crate::server::{AppState, build_router};
+use crate::server::{AppState, build_router_with};
 use crate::store::MockStore;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -40,6 +41,14 @@ async fn main() {
                 .unwrap_or_else(|_| "light_mock=info".parse().unwrap()),
         )
         .init();
+
+    let bind_ip = match bind_address() {
+        Ok(ip) => ip,
+        Err(message) => {
+            eprintln!("{message}");
+            std::process::exit(2);
+        }
+    };
 
     let data_dir = MockStore::data_path();
     let store = MockStore::load_or_init(&data_dir)
@@ -125,10 +134,18 @@ async fn main() {
     };
 
     let store_for_shutdown = state.store.clone();
-    let app = build_router(state, &static_dir);
-    let addr = format!("0.0.0.0:{port}");
+    let guard = BrowserGuard::from_env().with_loopback_hosts_only(bind_ip.is_loopback());
+    let app = build_router_with(state, &static_dir, guard);
+    let addr = std::net::SocketAddr::new(bind_ip, port);
 
-    tracing::info!(addr = %addr, "lightMock listening");
+    if bind_ip.is_loopback() {
+        tracing::info!(
+            addr = %addr,
+            "lightMock listening on this machine only (set BIND_ADDRESS=0.0.0.0 to accept remote connections)"
+        );
+    } else {
+        tracing::info!(addr = %addr, "lightMock listening");
+    }
 
     let listener = tokio::net::TcpListener::bind(&addr)
         .await
@@ -145,6 +162,21 @@ async fn main() {
     // contre un SIGKILL/crash brutal.
     tracing::info!("draining pending config writes before exit");
     store_for_shutdown.flush().await;
+}
+
+// Loopback by default: without authentication (the default), a server reachable from the network lets anyone on it
+// rewrite the mocks and use the proxy rules. Containers set BIND_ADDRESS=0.0.0.0, the network being theirs.
+fn bind_address() -> Result<std::net::IpAddr, String> {
+    let raw = std::env::var("BIND_ADDRESS").unwrap_or_default();
+    let raw = raw.trim();
+    if raw.is_empty() {
+        return Ok(std::net::Ipv4Addr::LOCALHOST.into());
+    }
+    raw.parse().map_err(|_| {
+        format!(
+            "BIND_ADDRESS must be an IP address such as 127.0.0.1, 0.0.0.0 or ::, got \"{raw}\""
+        )
+    })
 }
 
 // Kubernetes, Docker and systemd stop a process with SIGTERM, not SIGINT: listening to Ctrl+C alone let every

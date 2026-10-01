@@ -105,8 +105,11 @@ async fn runtime_config_handler() -> axum::Json<RuntimeConfig> {
     axum::Json(RuntimeConfig { api_base_url })
 }
 
+/// The production router with the default browser guard (no extra CORS origin, all host names accepted), for
+/// tests; `main` builds its guard from the configuration.
+#[cfg(test)]
 pub fn build_router(state: AppState, static_dir: &Path) -> Router {
-    build_router_with(state, static_dir, browser_guard::BrowserGuard::from_env())
+    build_router_with(state, static_dir, browser_guard::BrowserGuard::new(""))
 }
 
 pub fn build_router_with(
@@ -141,7 +144,7 @@ pub fn build_router_with(
         }))
         .layer(axum::middleware::from_fn_with_state(
             guard,
-            browser_guard::cross_site_write_guard,
+            browser_guard::management_api_guard,
         ))
         .with_state(state)
         .layer(cors)

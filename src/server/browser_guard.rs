@@ -8,6 +8,10 @@
 //! - Cross-site writes: a state-changing API request that the browser itself marks as coming from another site
 //!   (`Sec-Fetch-Site`) is refused unless its `Origin` is listed. This also covers the requests that a browser
 //!   sends without a CORS preflight (a form `POST`, for instance).
+//! - DNS rebinding: when lightMock only listens on the loopback interface (the default of the binary), a page can
+//!   still reach it by making its own domain name resolve to 127.0.0.1; the browser then treats the calls as
+//!   same-origin. The management API therefore answers only requests addressed to a loopback name (`localhost`,
+//!   `127.0.0.1`, `[::1]`) in that case.
 use crate::server::validation::is_management_api_route;
 use axum::body::Body;
 use axum::extract::{Request, State};
@@ -17,10 +21,12 @@ use axum::response::{IntoResponse, Response};
 use std::sync::Arc;
 use tower_http::cors::{AllowOrigin, Any, CorsLayer};
 
-/// Origins allowed to call the management API from a browser, besides the UI's own origin.
 #[derive(Debug, Clone, Default)]
 pub struct BrowserGuard {
+    /// Origins allowed to call the management API from a browser, besides the UI's own origin.
     allowed_origins: Arc<Vec<HeaderValue>>,
+    /// Set when the server only listens on a loopback address.
+    loopback_hosts_only: bool,
 }
 
 impl BrowserGuard {
@@ -48,7 +54,13 @@ impl BrowserGuard {
             .collect();
         Self {
             allowed_origins: Arc::new(origins),
+            loopback_hosts_only: false,
         }
+    }
+
+    pub fn with_loopback_hosts_only(mut self, enabled: bool) -> Self {
+        self.loopback_hosts_only = enabled;
+        self
     }
 
     fn allows(&self, origin: &HeaderValue) -> bool {
@@ -65,15 +77,34 @@ impl BrowserGuard {
             .allow_headers(Any)
     }
 
-    fn refuses(&self, method: &Method, path: &str, headers: &HeaderMap) -> bool {
-        if !is_management_api_route(path) || is_safe_method(method) {
-            return false;
+    /// Why the request must be refused, if it must.
+    fn refusal(&self, method: &Method, path: &str, headers: &HeaderMap) -> Option<&'static str> {
+        if !is_management_api_route(path) {
+            return None;
+        }
+        if self.loopback_hosts_only
+            && headers
+                .get("host")
+                .and_then(|h| h.to_str().ok())
+                .is_some_and(|h| !is_loopback_host(h))
+        {
+            return Some(
+                "Request refused: this lightMock only listens on the local machine; call it through localhost.",
+            );
         }
         let cross_site = matches!(
             headers.get("sec-fetch-site").and_then(|v| v.to_str().ok()),
             Some("cross-site") | Some("same-site")
         );
-        cross_site && !headers.get("origin").is_some_and(|o| self.allows(o))
+        if !is_safe_method(method)
+            && cross_site
+            && !headers.get("origin").is_some_and(|o| self.allows(o))
+        {
+            return Some(
+                "Cross-site request refused: add this origin to CORS_ALLOWED_ORIGINS to allow it.",
+            );
+        }
+        None
     }
 }
 
@@ -81,23 +112,36 @@ fn is_safe_method(method: &Method) -> bool {
     matches!(*method, Method::GET | Method::HEAD | Method::OPTIONS)
 }
 
-pub async fn cross_site_write_guard(
+/// `host` is a `Host` header value: a name or an IP address, with an optional port (`[::1]:7342`).
+fn is_loopback_host(host: &str) -> bool {
+    let name = match host.strip_prefix('[') {
+        Some(rest) => rest.split(']').next().unwrap_or(""),
+        None => host.rsplit_once(':').map_or(host, |(name, _port)| name),
+    }
+    .to_ascii_lowercase();
+    name == "localhost"
+        || name.ends_with(".localhost")
+        || name
+            .parse::<std::net::IpAddr>()
+            .is_ok_and(|ip| ip.is_loopback())
+}
+
+pub async fn management_api_guard(
     State(guard): State<BrowserGuard>,
     req: Request<Body>,
     next: Next,
 ) -> Response {
-    if guard.refuses(req.method(), req.uri().path(), req.headers()) {
+    if let Some(reason) = guard.refusal(req.method(), req.uri().path(), req.headers()) {
         tracing::warn!(
             method = %req.method(),
             path = %req.uri().path(),
             origin = ?req.headers().get("origin"),
-            "cross-site write to the management API refused"
+            host = ?req.headers().get("host"),
+            "management API request refused by the browser guard"
         );
         return (
             StatusCode::FORBIDDEN,
-            axum::Json(serde_json::json!({
-                "error": "Cross-site request refused: add this origin to CORS_ALLOWED_ORIGINS to allow it."
-            })),
+            axum::Json(serde_json::json!({ "error": reason })),
         )
             .into_response();
     }
