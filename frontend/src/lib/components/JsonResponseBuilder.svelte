@@ -91,7 +91,7 @@
   }
 
   function breadcrumbTrail(path) {
-    const trail = [{ label: 'racine', path: [] }];
+    const trail = [{ get label() { return t("root"); }, path: [] }];
     let current = fields;
     for (let i = 0; i < path.length; i += 2) {
       const idx = path[i];
