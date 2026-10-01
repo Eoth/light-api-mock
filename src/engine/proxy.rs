@@ -38,11 +38,30 @@ impl Default for ProxyClient {
     }
 }
 
+/// Longest silence accepted from a proxied backend between two reads (`PROXY_READ_TIMEOUT_SECS`, default 120 s).
+/// An idle limit rather than a total one, so that long downloads and event streams that keep sending still work.
+fn read_timeout_from_env() -> Duration {
+    let secs = std::env::var("PROXY_READ_TIMEOUT_SECS")
+        .ok()
+        .and_then(|v| v.trim().parse::<u64>().ok())
+        .filter(|s| *s > 0)
+        .unwrap_or(120);
+    Duration::from_secs(secs)
+}
+
 impl ProxyClient {
     pub fn new() -> Self {
+        Self::with_timeouts(Duration::from_secs(10), read_timeout_from_env())
+    }
+
+    /// Without these bounds, a backend that accepts the connection and never answers held the client's request
+    /// (and a task) open forever.
+    pub fn with_timeouts(connect: Duration, read: Duration) -> Self {
         Self {
             client: Client::builder()
                 .redirect(reqwest::redirect::Policy::none())
+                .connect_timeout(connect)
+                .read_timeout(read)
                 .build()
                 .expect("reqwest client"),
         }
@@ -145,12 +164,13 @@ impl ProxyClient {
         builder = builder.body(reqwest::Body::wrap_stream(req_stream));
 
         let upstream_resp = builder.send().await.map_err(|e| {
+            let status = upstream_error_status(&e);
             tracing::error!(
                 error = %e.without_url(),
                 url = %crate::server::redaction::redact_url_credentials(&url),
                 "proxy forward failed"
             );
-            StatusCode::BAD_GATEWAY
+            status
         })?;
 
         let status = StatusCode::from_u16(upstream_resp.status().as_u16())
@@ -294,12 +314,13 @@ impl ProxyClient {
         builder = builder.body(body_bytes.to_vec());
 
         let upstream_resp = builder.send().await.map_err(|e| {
+            let status = upstream_error_status(&e);
             tracing::error!(
                 error = %e.without_url(),
                 url = %crate::server::redaction::redact_url_credentials(&url),
                 "proxy forward (observed) failed"
             );
-            StatusCode::BAD_GATEWAY
+            status
         })?;
 
         let status = StatusCode::from_u16(upstream_resp.status().as_u16())
@@ -333,12 +354,13 @@ impl ProxyClient {
         }
 
         let response_bytes = upstream_resp.bytes().await.map_err(|e| {
+            let status = upstream_error_status(&e);
             tracing::error!(
                 error = %e.without_url(),
                 url = %crate::server::redaction::redact_url_credentials(&url),
                 "reading observed response body failed"
             );
-            StatusCode::BAD_GATEWAY
+            status
         })?;
         let resp = response_builder
             .body(Body::from(response_bytes.clone()))
@@ -388,6 +410,15 @@ fn parse_host_port(url: &str) -> Result<(String, u16), String> {
         .port()
         .unwrap_or(if parsed.scheme() == "https" { 443 } else { 80 });
     Ok((host, port))
+}
+
+/// 504 when the backend did not answer in time, 502 for any other failure to reach it.
+fn upstream_error_status(e: &reqwest::Error) -> StatusCode {
+    if e.is_timeout() {
+        StatusCode::GATEWAY_TIMEOUT
+    } else {
+        StatusCode::BAD_GATEWAY
+    }
 }
 
 fn is_hop_by_hop(name: &str) -> bool {
@@ -726,5 +757,27 @@ mod tests {
         // Mais le trafic doit rester relaye correctement au client.
         let body = axum::body::to_bytes(resp.into_body(), 1024).await.unwrap();
         assert_eq!(&body[..], br#"{"id":1}"#);
+    }
+
+    #[tokio::test]
+    async fn a_backend_that_never_answers_gets_a_gateway_timeout() {
+        let silent = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = silent.local_addr().unwrap();
+        tokio::spawn(async move {
+            let mut held = Vec::new();
+            while let Ok((socket, _)) = silent.accept().await {
+                held.push(socket);
+            }
+        });
+        let client = ProxyClient::with_timeouts(
+            std::time::Duration::from_secs(2),
+            std::time::Duration::from_millis(300),
+        );
+        let started = std::time::Instant::now();
+        let result = client
+            .forward(&format!("http://{addr}"), "/x", Request::new(Body::empty()))
+            .await;
+        assert_eq!(result.err(), Some(StatusCode::GATEWAY_TIMEOUT));
+        assert!(started.elapsed() < std::time::Duration::from_secs(5));
     }
 }

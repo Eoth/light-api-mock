@@ -52,6 +52,16 @@ pub fn is_management_api_route(path: &str) -> bool {
     lower == "/api" || lower.starts_with("/api/")
 }
 
+/// True when a segment of `path` is `.` or `..`, literally or percent-encoded (`%2e`, any case). Such a request
+/// is refused before any proxying: URL parsing resolves those segments, so `/svc/../admin` would reach a path of
+/// the real backend outside the base path configured for the service.
+pub fn has_dot_segment(path: &str) -> bool {
+    path.split('/').any(|segment| {
+        let decoded = segment.to_ascii_lowercase().replace("%2e", ".");
+        decoded == "." || decoded == ".."
+    })
+}
+
 fn is_dangerous_listen_path(_listen_path: &str) -> bool {
     false
 }
@@ -364,6 +374,30 @@ mod tests {
         assert!(is_internal_route("/runtime-config.json"));
         assert!(!is_internal_route("/my-svc/foo"));
         assert!(!is_internal_route("/insee/v4/sirene/123"));
+    }
+
+    #[test]
+    fn dot_segments_are_detected_literal_or_encoded() {
+        for path in [
+            "/svc/../admin",
+            "/svc/./x",
+            "/svc/%2e%2e/admin",
+            "/svc/%2E./admin",
+            "/svc/.%2e",
+            "/svc/..",
+        ] {
+            assert!(has_dot_segment(path), "{path}");
+        }
+        for path in [
+            "/svc/...",
+            "/svc/a..b",
+            "/svc/.hidden",
+            "/svc/v1.2/x",
+            "/svc/%2e%2e%2e",
+            "/",
+        ] {
+            assert!(!has_dot_segment(path), "{path}");
+        }
     }
 
     #[test]
