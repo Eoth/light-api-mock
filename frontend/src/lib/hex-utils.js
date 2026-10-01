@@ -9,12 +9,11 @@ export function textToHex(text) {
 // null when `hex` is not valid hexadecimal (odd length, or a character outside [0-9a-fA-F]): the caller decides what
 // to fall back to.
 export function hexToBytes(hex) {
-  if (hex.length % 2 !== 0) return null;
+  // Checked as a whole first: parseInt reads a pair up to its first non-digit, so "1z" would decode as 1.
+  if (!isValidHex(hex)) return null;
   const bytes = new Uint8Array(hex.length / 2);
   for (let i = 0; i < hex.length; i += 2) {
-    const byte = Number.parseInt(hex.slice(i, i + 2), 16);
-    if (Number.isNaN(byte)) return null;
-    bytes[i / 2] = byte;
+    bytes[i / 2] = Number.parseInt(hex.slice(i, i + 2), 16);
   }
   return bytes;
 }

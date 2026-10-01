@@ -47,6 +47,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - With `AUTH_ENABLED=true`, only the management API (`/api/...`) requires a token, as documented. The mocked and proxied service routes required one too, which broke every mock for the applications under test and forwarded the Mimicway token to the real backends on proxied rules.
 
 ### Fixed
+- The raw TCP mock form opens a response or a prefix that is not valid hexadecimal (possible in a hand-written `tcp-config.yaml`) in hexadecimal mode; a value such as `1z` read as the text of byte `01`, which saving the rule then wrote back as `01`.
 - The page of a service shows the URL to call it, with its group's code, as the guide said it did; only the service card and the service form showed it, so after creating a service one had to go back to the list to find it.
 - The breadcrumb of the detailed JSON builder named its first level "racine" in every language; it reads "root" in English. The translation test now also renders the breadcrumbs of the JSON and XML builders.
 - The Kubernetes Deployment sets `fsGroup: 1000`: on storage classes that create volumes owned by root, the non-root process could not write its configuration and the pod failed to start.
