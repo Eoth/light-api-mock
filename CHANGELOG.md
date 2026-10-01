@@ -10,6 +10,7 @@ entre versions mineures.
 ## [Unreleased]
 
 ### Security
+- The management API no longer answers cross-origin requests from any website (`Access-Control-Allow-Origin: *`), and refuses state-changing requests that the browser marks as cross-site: any page open in a developer's browser could read and rewrite a local lightMock's configuration. Allowed origins are listed in `CORS_ALLOWED_ORIGINS` (needed only when the UI is served from another origin than the API, see `API_BASE_URL`). Mocked and proxied services still accept every origin. **Breaking** for split deployments that relied on the open CORS policy: set `CORS_ALLOWED_ORIGINS` on the API.
 - With `AUTH_ENABLED=true`, only the management API (`/api/...`) requires a token, as documented. The mocked and proxied service routes required one too, which broke every mock for the applications under test and forwarded the lightMock token to the real backends on proxied rules.
 
 ### Fixed
