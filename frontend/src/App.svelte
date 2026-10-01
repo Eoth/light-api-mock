@@ -307,6 +307,8 @@
   }
 
   let canShowReset = $derived(auth.enabled ? auth.isSuperAdmin : auth.showResetButton);
+  // The server restores a backup for a super-admin only (anyone, as an anonymous super-admin, without authentication).
+  let canRestoreBackups = $derived(!auth.enabled || auth.isSuperAdmin);
 
   $effect(() => { init(); });
 
@@ -338,7 +340,9 @@
         <button type="button" class="btn btn-sm btn-outline" onclick={() => view = 'groups'} title={t("Group management")} data-testid="app-nav-groups-button">{t("Groups")}</button>
         <button type="button" class="btn btn-sm btn-outline" onclick={exportConfig} title={t("Download the configuration")} data-testid="app-export-button">{t("Export")}</button>
         <button type="button" class="btn btn-sm btn-outline" onclick={importConfig} title={t("Load a configuration")} data-testid="app-import-button">{t("Import")}</button>
-        <button type="button" class="btn btn-sm btn-outline" onclick={() => view = 'backups'} title={t("Restore a configuration backup")} data-testid="app-nav-backups-button">{t("Backups")}</button>
+        {#if canRestoreBackups}
+          <button type="button" class="btn btn-sm btn-outline" onclick={() => view = 'backups'} title={t("Restore a configuration backup")} data-testid="app-nav-backups-button">{t("Backups")}</button>
+        {/if}
         {#if canShowReset}
           <button type="button" class="btn btn-sm btn-outline btn-danger-outline" onclick={() => resetPending = true} title={t("Remove every service")} data-testid="app-reset-button">{t("Reset")}</button>
         {/if}

@@ -38,3 +38,42 @@ describe('App — visibilite du bouton Reset (SHOW_RESET_BUTTON)', () => {
     await waitFor(() => expect(queryByTitle('Supprimer tous les services')).toBeInTheDocument());
   });
 });
+
+// Restoring a backup is for super-admins only on the server (require_super_admin): the view must not be offered to
+// a user it would refuse.
+describe('App: the backups view is offered to whoever may restore one', () => {
+  const backupsButton = (container) => container.querySelector('[data-testid="app-nav-backups-button"]');
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    api.getServices.mockResolvedValue([]);
+    api.getGroups.mockResolvedValue([]);
+    window.matchMedia = window.matchMedia || vi.fn().mockReturnValue({ matches: false });
+  });
+
+  async function renderSignedIn(isSuperAdmin) {
+    localStorage.setItem('mimicway-auth', JSON.stringify({ token: 't', username: 'u', isSuperAdmin }));
+    api.getAuthStatus.mockResolvedValue({ enabled: true, show_reset_button: false });
+    const view = render(App);
+    await waitFor(() => expect(api.getServices).toHaveBeenCalled());
+    return view;
+  }
+
+  it('hides it from a signed-in user who is not a super-admin', async () => {
+    const { container } = await renderSignedIn(false);
+    expect(backupsButton(container)).toBeNull();
+  });
+
+  it('shows it to a super-admin', async () => {
+    const { container } = await renderSignedIn(true);
+    expect(backupsButton(container)).not.toBeNull();
+  });
+
+  it('shows it when authentication is off, even with the reset button hidden', async () => {
+    api.getAuthStatus.mockResolvedValue({ enabled: false, show_reset_button: false });
+    const { container } = render(App);
+    await waitFor(() => expect(api.getServices).toHaveBeenCalled());
+    expect(backupsButton(container)).not.toBeNull();
+  });
+});
