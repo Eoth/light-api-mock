@@ -17,13 +17,13 @@
   {/if}
   <div class="action-selector">
     <label class="action-option" class:selected={action === 'mock'} data-testid="rule-form-action-mock-option">
-      <input type="radio" checked={action === 'mock'} onchange={() => onChange('mock')} data-testid="rule-form-action-mock-radio" />
+      <input type="radio" name="rule-action" checked={action === 'mock'} onchange={() => onChange('mock')} data-testid="rule-form-action-mock-radio" />
       <span class="action-label">{t("Mock")}</span>
       <span class="action-desc">{t("Return the simulated response below")}</span>
     </label>
     {#if !isPurelyMocked}
       <label class="action-option" class:selected={action === 'proxy'} data-testid="rule-form-action-proxy-option">
-        <input type="radio" checked={action === 'proxy'} onchange={() => onChange('proxy')} data-testid="rule-form-action-proxy-radio" />
+        <input type="radio" name="rule-action" checked={action === 'proxy'} onchange={() => onChange('proxy')} data-testid="rule-form-action-proxy-radio" />
         <span class="action-label">{t("Proxy")}</span>
         <span class="action-desc">{t("Forward to the real target of the service")}</span>
       </label>
@@ -38,9 +38,12 @@
 
   .action-section { border-color: var(--color-success); }
   .action-selector { display: flex; gap: 0.75rem; flex-wrap: wrap; }
-  .action-option { display: flex; flex-direction: column; gap: 0.125rem; padding: 0.625rem 1rem; border: 2px solid var(--color-border); border-radius: var(--radius); cursor: pointer; min-width: 10rem; background: var(--color-bg); }
+  .action-option { position: relative; display: flex; flex-direction: column; gap: 0.125rem; padding: 0.625rem 1rem; border: 2px solid var(--color-border); border-radius: var(--radius); cursor: pointer; min-width: 10rem; background: var(--color-bg); }
   .action-option.selected { border-color: var(--color-primary); background: var(--color-surface); }
-  .action-option input { display: none; }
+  /* The card shows the choice, so the radio button itself is hidden, but only visually: `display: none` would take it
+     out of the keyboard's reach. The card shows its focus instead. */
+  .action-option input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; pointer-events: none; }
+  .action-option:has(input:focus-visible) { outline: 2px dashed var(--color-text); outline-offset: 2px; }
   .action-label { font-weight: 700; font-size: 0.9375rem; }
   .action-desc { font-size: 0.8125rem; color: var(--color-text-muted); }
 </style>
