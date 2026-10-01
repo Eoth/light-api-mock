@@ -16,12 +16,14 @@ npm run build         # dist/, embedded by the next cargo build (or served with 
 npm test              # Vitest unit tests, including the translation checks
 npm run test:e2e      # Playwright, against a Mimicway running on :7342 (see e2e/README.md)
 npm run docs:screenshots   # regenerates the images of docs/en/ and docs/fr/ from the end-to-end suite
+npm run design:preview     # every token and shared class of the design system, light and dark
 ```
 
 ## Layout
 
 | Path | Role |
 |---|---|
+| `src/tokens.css`, `src/app.css` | Phasme, the design system ([design-system.md](design-system.md)): its tokens (colors per theme, scales), then the classes components share |
 | `src/App.svelte` | Layout, navigation, import and export, reset, theme and language switches, log view |
 | `src/lib/components/` | One component per screen or block: service list, card, form and detail; rule list, form and its sections (conditions, response, scripts, warnings); JSON and XML response builders, by example and in detail; rule tester; request and Kafka logs; backups; groups; traffic observation; raw TCP mocks; shared pieces (`FormField`, `ConfirmDialog`, `ToggleSwitch`, `Notification`, `Sentence`…) |
 | `src/lib/api.js` | Management API client; sends the UI language as `Accept-Language` |

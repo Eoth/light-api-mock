@@ -16,7 +16,8 @@ export function styleSources() {
   const sources = readdirSync(SRC)
     .filter((file) => file.endsWith('.css') && file !== TOKENS_FILE)
     .map((file) => ({ file, css: stripComments(read(file)), markup: '' }));
-  const components = ['App.svelte', ...readdirSync(path.join(SRC, 'lib/components')).map((f) => `lib/components/${f}`)];
+  const inDir = (dir) => readdirSync(path.join(SRC, dir)).map((f) => `${dir}/${f}`);
+  const components = ['App.svelte', ...inDir('lib/components'), ...inDir('preview')];
   // Both views keep the file's lines, the other part blanked out, so that a problem is reported at its real line.
   const blank = (text) => text.replace(/[^\n]/g, ' ');
   for (const file of components.filter((f) => f.endsWith('.svelte'))) {

@@ -13,7 +13,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "npx playwright test",
-    "docs:screenshots": "npx playwright test --config=playwright.docs-screenshots.config.js"
+    "docs:screenshots": "npx playwright test --config=playwright.docs-screenshots.config.js",
+    "design:preview": "vite --open /design-preview.html"
   },
   "dependencies": {
     "svelte": "^5.56.3"
