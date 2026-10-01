@@ -1,20 +1,11 @@
-// Etat d'affichage UI (groupes de services deplies/replies dans ServiceList).
-// Volontairement en dehors du cycle de vie de ServiceList.svelte : ce module
-// n'est charge/initialise qu'une seule fois par le navigateur, donc l'etat
-// qu'il porte survit au demontage/remontage du composant (navigation vers
-// l'edition d'un service puis retour a la liste), contrairement a un $state
-// local au composant qui serait recree a chaque montage.
+// Which service groups are expanded in ServiceList. Kept in a module rather than in the component: a module is loaded
+// once per page, so the state survives leaving the list (to edit a service) and coming back, where a $state of the
+// component would start over at each mount.
 //
-// Niveau 1 assume : cet etat est un Set en memoire uniquement,
-// jamais ecrit dans localStorage/sessionStorage. Un rechargement complet de
-// la page (F5) recharge ce module a zero et reinitialise donc l'etat -- c'est
-// le comportement voulu, pas une limitation a corriger. Un futur "niveau 2"
-// (persistance across F5) etendrait ce fichier avec une lecture/ecriture
-// localStorage, sans toucher a ServiceList.svelte.
+// In memory only, on purpose: a reload of the page forgets it. Keeping it across reloads would take a localStorage
+// read and write here, and no change to ServiceList.svelte.
 //
-// Cout ressources : le contenu est une poignee de cles de groupe (des
-// chaines), jamais une copie des services eux-memes -- negligeable en
-// memoire/CPU meme avec des dizaines de groupes.
+// The set holds group keys, never copies of services: negligible even with dozens of groups.
 
 let expandedGroups = $state(new Set());
 
@@ -41,8 +32,7 @@ export function toggleGroupExpanded(key) {
   setGroupExpanded(key, !expandedGroups.has(key));
 }
 
-// Reinitialise l'etat. Utilise par les tests (isolation entre cas) ; peut
-// aussi servir a un futur flux de deconnexion s'il faut purger l'UI.
+// Forgets every expanded group; tests call it so that each case starts with none.
 export function resetGroupExpansionState() {
   expandedGroups = new Set();
 }

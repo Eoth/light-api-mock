@@ -1,9 +1,6 @@
-// Source unique de verite pour la construction de l'URL de test d'un
-// service (meme principe que tpl-utils.js pour le format template : cette
-// logique ne doit jamais etre dupliquee/recopiee dans un composant). Deux
-// points d'usage : ServiceCard.svelte (vue liste) et ServiceForm.svelte
-// (ajout/edition) — les deux doivent afficher la meme URL pour un meme
-// service, prefixee par le code du groupe (5 caracteres) quand il en a un.
+// The URL to call a service, built here only, so that the list (ServiceCard.svelte), the page of a service
+// (ServiceDetail.svelte) and its form (ServiceForm.svelte) show the same one: prefixed with the short code of the
+// service's group when it has one.
 export function buildServiceTestUrl({ name, listenPath = '', groupCode = '', baseUrl = '' }) {
   const n = (name || '').trim() || '...';
   const prefix = groupCode ? `/${groupCode}/${n}` : `/${n}`;

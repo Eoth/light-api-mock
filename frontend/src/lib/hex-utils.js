@@ -1,15 +1,13 @@
-// Codec hexadecimal cote frontend, miroir de src/tcp/hex.rs (encode/decode).
-// Sert a offrir une saisie "texte" pour les champs qui sont stockes en
-// hexadecimal cote backend (TcpRule.response_hex, TcpMatcher::Prefix) :
-// l'utilisateur tape "pong", le formulaire envoie "706f6e67" a l'API.
+// Hexadecimal encoding, the UI's counterpart of src/tcp/hex.rs. It lets the user type text in the fields the server
+// stores as hexadecimal (TcpRule.response_hex, TcpMatcher::Prefix): the user types "pong", the form sends "706f6e67".
 
 export function textToHex(text) {
   const bytes = new TextEncoder().encode(text);
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-// Retourne null si `hex` n'est pas de l'hexadecimal valide (longueur impaire
-// ou caractere hors [0-9a-fA-F]) — a l'appelant de decider du repli.
+// null when `hex` is not valid hexadecimal (odd length, or a character outside [0-9a-fA-F]): the caller decides what
+// to fall back to.
 export function hexToBytes(hex) {
   if (hex.length % 2 !== 0) return null;
   const bytes = new Uint8Array(hex.length / 2);
@@ -21,9 +19,8 @@ export function hexToBytes(hex) {
   return bytes;
 }
 
-// Decodage "best effort" pour l'affichage en mode texte : hex invalide ou
-// UTF-8 invalide -> null (l'appelant bascule alors sur le mode hexadecimal
-// plutot que d'afficher du texte corrompu).
+// The text that hexadecimal stands for, to show it in text mode; null when the hexadecimal or the UTF-8 is invalid, and
+// the caller then shows hexadecimal rather than garbled text.
 export function hexToTextOrNull(hex) {
   const bytes = hexToBytes(hex);
   if (bytes === null) return null;
