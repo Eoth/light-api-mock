@@ -74,7 +74,7 @@ pub async fn intercept_layer(
 
     match matched {
         Some((service, path_params, remaining, group_code)) => {
-            handle_service(
+            let mut response = handle_service(
                 &state,
                 &service,
                 &path,
@@ -83,7 +83,11 @@ pub async fn intercept_layer(
                 group_code,
                 req,
             )
-            .await
+            .await;
+            response
+                .extensions_mut()
+                .insert(crate::server::browser_guard::ServiceResponse);
+            response
         }
         None => next.run(req).await,
     }

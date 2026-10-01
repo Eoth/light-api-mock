@@ -194,3 +194,51 @@ fn a_loopback_only_server_answers_the_api_through_loopback_names_only() {
         &rebound
     ));
 }
+
+#[tokio::test]
+async fn lightmock_pages_carry_security_headers_but_mock_responses_stay_untouched() {
+    let root = spawn_app().await;
+    let client = reqwest::Client::new();
+    for path in ["/api/health", "/runtime-config.json", "/index.html"] {
+        let resp = client.get(format!("{root}{path}")).send().await.unwrap();
+        let headers = resp.headers();
+        let csp = headers["content-security-policy"].to_str().unwrap();
+        assert!(csp.contains("frame-ancestors 'none'"), "{path}: {csp}");
+        assert!(csp.contains("script-src 'self'"), "{path}: {csp}");
+        assert_eq!(headers["x-content-type-options"], "nosniff", "{path}");
+        assert_eq!(headers["x-frame-options"], "DENY", "{path}");
+    }
+    let mocked = client
+        .get(format!("{root}/orders/42"))
+        .send()
+        .await
+        .unwrap();
+    for name in [
+        "content-security-policy",
+        "x-frame-options",
+        "x-content-type-options",
+    ] {
+        assert!(
+            mocked.headers().get(name).is_none(),
+            "{name} added to a mock response"
+        );
+    }
+}
+
+#[test]
+fn the_ui_may_call_the_configured_api_origin() {
+    let guard = BrowserGuard {
+        api_origin: Some("https://api.example.com".into()),
+        ..BrowserGuard::new("")
+    };
+    assert!(
+        guard
+            .content_security_policy()
+            .contains("connect-src 'self' https://api.example.com;")
+    );
+    assert!(
+        BrowserGuard::new("")
+            .content_security_policy()
+            .contains("connect-src 'self';")
+    );
+}
