@@ -5,7 +5,7 @@
 //
 // Each file is scanned with the comment and string syntax of its language (Rust, JavaScript, Svelte, CSS), so that a
 // "//" inside a URL, a regular expression or a string is not taken for a comment. A comment line is French when it
-// holds one of FRENCH_WORDS.
+// holds one of FRENCH_WORDS or an elision, outside code quoted with backticks.
 // Usage: node scripts/check-french-comments.mjs [repository root] (defaults to this script's repository).
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
@@ -16,15 +16,28 @@ import { fileURLToPath } from 'node:url';
 // A path joins the list once its comments are translated, so that it cannot slip back.
 export const COVERED = ['src/**/*.rs', 'tests/**/*.rs', 'build.rs', 'scripts/*.mjs'];
 
-// Frequent French words that English comments do not use.
+// Frequent French words that English comments do not use, with and without their accents (comments are often typed
+// without them). Words that English shares are left out: "en" (a language code), "est" (a time zone), "par", "cas"
+// (compare-and-swap), "aux", "sans", "tout", "encore".
 export const FRENCH_WORDS = [
-  'les', 'pour', 'avec', 'une', 'sont', 'dans', 'qui', 'deja', 'regle', 'requete', 'meme', 'donc', 'sinon', 'aussi',
-  'mais', 'etre', 'cette', 'cela', 'lorsque', 'puis', 'chaque',
+  'les', 'pour', 'avec', 'une', 'sont', 'dans', 'qui', 'deja', 'déjà', 'regle', 'règle', 'requete', 'requête', 'meme',
+  'même', 'donc', 'sinon', 'aussi', 'mais', 'etre', 'être', 'cette', 'cela', 'lorsque', 'puis', 'chaque', 'des', 'du',
+  'de', 'le', 'la', 'un', 'et', 'ou', 'au', 'ce', 'ces', 'il', 'ne', 'pas', 'si', 'sur', 'à', 'où', 'quand', 'comme',
+  'doit', 'peut', 'fait', 'tous', 'toujours', 'jamais', 'rien', 'avant', 'apres', 'après', 'selon', 'entre', 'ici',
+  'voir', 'cote', 'côté', 'plutot', 'plutôt', 'seul', 'seule', 'deux', 'reste', 'etat', 'état', 'defaut', 'défaut',
+  'parce',
 ];
 
-// A letter, a digit or "_" next to a listed word makes it part of another word.
-const WORD_CHAR = String.raw`[\p{L}\p{N}_]`;
-const FRENCH = new RegExp(String.raw`(?<!${WORD_CHAR})(?:${FRENCH_WORDS.join('|')})(?!${WORD_CHAR})`, 'iu');
+// A letter, a digit, "_" or "-" next to a listed word makes it part of another word ("de-duplicate", "en-AU").
+const WORD_CHAR = String.raw`[\p{L}\p{N}_-]`;
+// An elided article or pronoun: `l'état`, `d'un`, `qu'il`, `n'est`.
+const ELISION = String.raw`(?:[cdjlmnst]|qu)['’]\p{L}`;
+const FRENCH = new RegExp(
+  String.raw`(?<!${WORD_CHAR})(?:(?:${FRENCH_WORDS.join('|')})(?!${WORD_CHAR})|${ELISION})`,
+  'iu',
+);
+// Code quoted in a comment (`de`, `la`) is not prose.
+const QUOTED_CODE = /`[^`]*`/g;
 
 const SYNTAX_BY_EXTENSION = { '.rs': 'rust', '.js': 'js', '.mjs': 'js', '.svelte': 'svelte', '.css': 'css' };
 
@@ -288,7 +301,7 @@ export function commentLines(text, syntax) {
 }
 
 export function isFrench(commentText) {
-  return FRENCH.test(commentText);
+  return FRENCH.test(commentText.replace(QUOTED_CODE, ''));
 }
 
 /**

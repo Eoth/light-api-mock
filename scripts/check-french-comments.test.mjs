@@ -21,6 +21,31 @@ test('English comments pass, a French line comment is reported with its line', (
   assert.deepEqual(check({ 'a.js': js }), ['a.js:3: // Garde les regles dans leur ordre.']);
 });
 
+test('short French comments are recognised, with or without accents, by their words or their elisions', () => {
+  const french = [
+    "// Réinitialise l'état.",
+    '// Valeur par defaut',
+    '// Voir plus haut',
+    '// Le serveur ne répond pas',
+    "// qu'il soit vide",
+  ];
+  const js = french.join('\nx();\n');
+  assert.deepEqual(
+    check({ 'a.js': js }).map((p) => p.split(': ')[0]),
+    ['a.js:1', 'a.js:3', 'a.js:5', 'a.js:7', 'a.js:9'],
+  );
+});
+
+test('English that shares letters with French words is not reported', () => {
+  const english = [
+    '// De-duplicate the en-AU and fr-CA entries.',
+    "// It's the user's choice: don't retry, and don't tout it.",
+    '// The `de` and `la` fields, `si` and `ou` flags.',
+    '// A CAS loop, times in EST, on par with sans-serif fonts, an encore.',
+  ].join('\n');
+  assert.deepEqual(check({ 'a.js': english }), []);
+});
+
 test('strings, templates, regular expressions and URLs are not comments', () => {
   const js = [
     't("Les règles sont appliquées dans cet ordre");',
