@@ -2,7 +2,8 @@
   import { fieldsToTemplate, buildExpr as sharedBuildExpr, templateToPreview } from '../tpl-utils.js';
   import { t, tCount } from '../i18n.svelte.js';
 
-  let { fields = [], onUpdate = () => {} } = $props();
+  // arrayRoot: the sample pasted by example was an array; these fields then shape its item.
+  let { fields = [], arrayRoot = false, onUpdate = () => {} } = $props();
 
   const fieldTypes = [
     { value: 'value', get label() { return t("Value"); } },
@@ -199,7 +200,8 @@
   function buildExpr(f) { return sharedBuildExpr(f); }
 
   export function toTemplate() {
-    return fieldsToTemplate(fields);
+    const object = fieldsToTemplate(fields);
+    return arrayRoot ? `[${object}]` : object;
   }
 
   function previewJson() {
@@ -212,6 +214,9 @@
   <div class="builder-header">
     <strong>{t("Fields of the JSON response")}</strong>
     <span class="field-hint">{t("Build the JSON structure: values, nested objects, arrays.")}</span>
+    {#if arrayRoot}
+      <span class="field-hint" data-testid="json-builder-array-root-hint">{t("The response is an array: these fields shape its item.")}</span>
+    {/if}
   </div>
 
   {#if fields.length === 0}

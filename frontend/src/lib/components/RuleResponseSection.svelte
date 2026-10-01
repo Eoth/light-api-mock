@@ -16,7 +16,14 @@
   import XmlPasteBuilder from './XmlPasteBuilder.svelte';
   import RuleScriptSlot from './RuleScriptSlot.svelte';
   import ToggleSwitch from './ToggleSwitch.svelte';
-  import { templateToFields, templateToXmlFields, validateTemplateAsJson, validateTemplateAsXml } from '../tpl-utils.js';
+  import {
+    fieldsToTemplate,
+    templateToFields,
+    templateToXmlFields,
+    validateTemplateAsJson,
+    validateTemplateAsXml,
+    xmlFieldsToTemplate,
+  } from '../tpl-utils.js';
   import { validateScript as apiValidateScript } from '../api.js';
   import { RHAI_FUNCTIONS } from '../rhai-functions.js';
   import Sentence from './Sentence.svelte';
@@ -40,12 +47,14 @@
   // {#if} that would unmount it): nothing typed is lost.
   let advancedOpen = $state(!!init?.pre_script?.trim() || !!init?.post_script?.trim());
 
+  const STRUCTURED_MODES = ['json-paste', 'json-guided', 'xml-paste', 'xml-guided'];
+
   // Reopening a rule shows the view that built it. The four structured views (json-paste, json-guided, xml-paste,
   // xml-guided) all save a single Template fragment, which tells neither them apart nor from a hand-written advanced
   // template: `Rule.response_mode` (src/models/mod.rs, read by the editor only) records the view. Without it (a rule
   // saved before that field existed), the view is guessed from the body's shape. A body that cannot be read back into
-  // fields (invalid JSON or XML, or the JSON array root that only the by-example view saves, which the fields cannot
-  // hold) opens on the advanced template instead of failing.
+  // fields (invalid JSON or XML, a JSON array this editor did not write) opens on the advanced template instead of
+  // failing.
   function computeInitialEditorState() {
     const body = init?.response?.body ?? [];
     const singleTemplate = body.length === 1 && body[0].type === 'Template' ? body[0].template : null;
@@ -60,11 +69,9 @@
     }
 
     let mode = init?.response_mode ?? fallbackMode();
-
-    const structuredModes = ['json-paste', 'json-guided', 'xml-paste', 'xml-guided'];
     const structured = {};
 
-    if (structuredModes.includes(mode)) {
+    if (STRUCTURED_MODES.includes(mode)) {
       if (body.length === 0) {
         // An empty body (a new rule, or a rule whose response was never set) has nothing to restore: the view opens
         // empty. Treating it as a mismatch would open every new rule on the advanced template instead of JSON.
@@ -73,12 +80,11 @@
         // than fail.
         mode = 'advanced';
       } else if (mode === 'json-paste' || mode === 'json-guided') {
-        if (singleTemplate.trim().startsWith('[')) {
-          mode = 'advanced';
-        } else {
-          try { structured.fields = templateToFields(singleTemplate); }
-          catch { mode = 'advanced'; }
-        }
+        try {
+          const r = readJsonTemplate(singleTemplate);
+          structured.fields = r.fields;
+          structured.arrayRoot = r.arrayRoot;
+        } catch { mode = 'advanced'; }
       } else if (mode === 'xml-paste' || mode === 'xml-guided') {
         try {
           const r = templateToXmlFields(singleTemplate);
@@ -94,6 +100,19 @@
     return { mode, structured };
   }
 
+  // A JSON template read back into fields. The by-example view saves an array sample as `[<item>]`, its item built by
+  // fieldsToTemplate: without the brackets, the item must rebuild the template exactly, or the array is not one this
+  // editor wrote (several items, hand-written text) and the error lets the caller keep the advanced template.
+  function readJsonTemplate(tpl) {
+    const text = tpl.trim();
+    if (!text.startsWith('[')) return { fields: templateToFields(text), arrayRoot: false };
+    try {
+      const fields = templateToFields(text.slice(1, -1));
+      if (`[${fieldsToTemplate(fields)}]` === text) return { fields, arrayRoot: true };
+    } catch { /* reported below */ }
+    throw new TypeError(t("The JSON must be an object to be shown in the guided view."));
+  }
+
   const { mode: initialMode, structured: initialStructured } = computeInitialEditorState();
 
   let responseMode = $state(initialMode);
@@ -104,16 +123,25 @@
   // (revealDetailMode, backToPasteMode), because Svelte mounts the builder again each time its {:else if} branch is
   // entered, and reads `startParsed` then.
   let jsonFields = $state(initialMode === 'json-guided' ? (initialStructured.fields ?? []) : []);
-  let jsonBuilderRef = $state(null);
   let jsonPasteFields = $state(initialMode === 'json-paste' ? (initialStructured.fields ?? []) : []);
-  let jsonPasteRef = $state(null);
+  // Both JSON views share the array root, and both XML views share the root tag and its attributes.
+  let jsonArrayRoot = $state(initialStructured.arrayRoot ?? false);
   let xmlFields = $state(initialMode === 'xml-guided' ? (initialStructured.fields ?? []) : []);
-  let xmlBuilderRef = $state(null);
   let xmlPasteFields = $state(initialMode === 'xml-paste' ? (initialStructured.fields ?? []) : []);
-  let xmlPasteRef = $state(null);
   let xmlRootTag = $state(initialStructured.rootTag ?? 'response');
   let xmlRootAttributes = $state(initialStructured.rootAttributes ?? []);
   let textContent = $state(initialStructured.textContent ?? '');
+
+  // The template of a structured view, built from the state held here and never through the builders: they are
+  // unmounted whenever the fieldset is folded or hidden (a proxy rule), or the other view of the format shows, and the
+  // body must not depend on which one is mounted.
+  function structuredTemplate(mode) {
+    if (mode === 'json-paste' || mode === 'json-guided') {
+      const object = fieldsToTemplate(mode === 'json-paste' ? jsonPasteFields : jsonFields);
+      return jsonArrayRoot ? `[${object}]` : object;
+    }
+    return xmlFieldsToTemplate(mode === 'xml-paste' ? xmlPasteFields : xmlFields, xmlRootTag, xmlRootAttributes);
+  }
 
   // pre_script, script and post_script run independently (same request context, no chaining between them); one
   // validation endpoint serves the three slots.
@@ -160,17 +188,8 @@
 
   function buildFragmentsFromMode() {
     if (responseMode === 'empty') return [];
-    if (responseMode === 'json-guided' && jsonBuilderRef) {
-      return [{ type: 'Template', template: jsonBuilderRef.toTemplate() }];
-    }
-    if (responseMode === 'json-paste' && jsonPasteRef) {
-      return [{ type: 'Template', template: jsonPasteRef.toTemplate() }];
-    }
-    if (responseMode === 'xml-guided' && xmlBuilderRef) {
-      return [{ type: 'Template', template: xmlBuilderRef.toTemplate() }];
-    }
-    if (responseMode === 'xml-paste' && xmlPasteRef) {
-      return [{ type: 'Template', template: xmlPasteRef.toTemplate() }];
+    if (STRUCTURED_MODES.includes(responseMode)) {
+      return [{ type: 'Template', template: structuredTemplate(responseMode) }];
     }
     if (responseMode === 'text') {
       return [{ type: 'Literal', value: textContent }];
@@ -248,6 +267,7 @@
   function applyModeSwitch(newMode, convResult) {
     if (convResult?.jsonFields) jsonFields = convResult.jsonFields;
     if (convResult?.jsonPasteFields) jsonPasteFields = convResult.jsonPasteFields;
+    if (convResult?.jsonArrayRoot !== undefined) jsonArrayRoot = convResult.jsonArrayRoot;
     if (convResult?.xmlFields) xmlFields = convResult.xmlFields;
     if (convResult?.xmlPasteFields) xmlPasteFields = convResult.xmlPasteFields;
     if (convResult?.xmlRootTag !== undefined) xmlRootTag = convResult.xmlRootTag;
@@ -335,7 +355,7 @@
       // The JSON button opens 'json-paste' (selectFormat): the same conversion as towards 'json-guided', stored in
       // jsonPasteFields.
       const r = tryAdvancedToJsonGuided();
-      return r.ok ? { ok: true, jsonPasteFields: r.jsonFields ?? [] } : r;
+      return r.ok ? { ok: true, jsonPasteFields: r.jsonFields, jsonArrayRoot: r.jsonArrayRoot } : r;
     }
     if (from === 'advanced' && to === 'xml-guided') {
       return tryAdvancedToXmlGuided();
@@ -346,17 +366,8 @@
         ? { ok: true, xmlPasteFields: r.xmlFields ?? [], xmlRootTag: r.xmlRootTag, xmlRootAttributes: r.xmlRootAttributes }
         : r;
     }
-    if (from === 'json-guided' && to === 'advanced') {
-      if (jsonBuilderRef) {
-        return { ok: true, fragments: [{ type: 'Template', template: jsonBuilderRef.toTemplate() }] };
-      }
-      return { ok: true };
-    }
-    if (from === 'xml-guided' && to === 'advanced') {
-      if (xmlBuilderRef) {
-        return { ok: true, fragments: [{ type: 'Template', template: xmlBuilderRef.toTemplate() }] };
-      }
-      return { ok: true };
+    if ((from === 'json-guided' || from === 'xml-guided') && to === 'advanced') {
+      return { ok: true, fragments: [{ type: 'Template', template: structuredTemplate(from) }] };
     }
     if (from === 'json-guided' && to === 'xml-guided') {
       return tryJsonFieldsToXmlFields(jsonFields);
@@ -381,14 +392,14 @@
 
   function tryAdvancedToJsonGuided() {
     const tpl = getAdvancedTemplate();
-    if (!tpl.trim()) return { ok: true, jsonFields: [] };
+    if (!tpl.trim()) return { ok: true, jsonFields: [], jsonArrayRoot: false };
     const jsonErr = validateTemplateAsJson(tpl);
     if (jsonErr) {
       return { ok: false, reason: t("Cannot convert: {0}. Check the braces: { and } are literal, {{ and }} enclose a variable.", jsonErr) };
     }
     try {
-      const fields = templateToFields(tpl);
-      return { ok: true, jsonFields: fields };
+      const r = readJsonTemplate(tpl);
+      return { ok: true, jsonFields: r.fields, jsonArrayRoot: r.arrayRoot };
     } catch (e) {
       return { ok: false, reason: t("Cannot convert: {0}", e.message) };
     }
@@ -484,20 +495,16 @@
   function removeHeader(idx) { respHeaders = respHeaders.filter((_, i) => i !== idx); }
 
   export function validate() {
-    if (responseMode === 'json-paste' && jsonPasteRef) {
-      const err = validateTemplateAsJson(jsonPasteRef.toTemplate());
+    if (responseMode === 'json-paste') {
+      const err = validateTemplateAsJson(structuredTemplate(responseMode));
       if (err) return t("Invalid example JSON: {0}", err);
     }
-    if (responseMode === 'json-guided' && jsonBuilderRef) {
-      const err = validateTemplateAsJson(jsonBuilderRef.toTemplate());
+    if (responseMode === 'json-guided') {
+      const err = validateTemplateAsJson(structuredTemplate(responseMode));
       if (err) return t("Invalid guided JSON: {0}", err);
     }
-    if (responseMode === 'xml-guided' && xmlBuilderRef) {
-      const err = validateTemplateAsXml(xmlBuilderRef.toTemplate());
-      if (err) return err;
-    }
-    if (responseMode === 'xml-paste' && xmlPasteRef) {
-      const err = validateTemplateAsXml(xmlPasteRef.toTemplate());
+    if (responseMode === 'xml-paste' || responseMode === 'xml-guided') {
+      const err = validateTemplateAsXml(structuredTemplate(responseMode));
       if (err) return err;
     }
     if (responseMode === 'advanced') {
@@ -636,7 +643,7 @@
 
     {#if responseMode === 'json-paste'}
       <div class="sub-section">
-        <JsonPasteBuilder bind:this={jsonPasteRef} fields={jsonPasteFields} startParsed={jsonPasteFields.length > 0} onUpdate={(f) => jsonPasteFields = f} />
+        <JsonPasteBuilder fields={jsonPasteFields} startParsed={jsonPasteFields.length > 0} arrayRoot={jsonArrayRoot} onUpdate={(f) => jsonPasteFields = f} onArrayRootChange={(v) => jsonArrayRoot = v} />
         <button type="button" class="btn btn-sm btn-outline open-detail-button" onclick={revealDetailMode} data-testid="rule-form-open-detail-button">
           {t("Edit in detail (full structure) →")}
         </button>
@@ -644,7 +651,7 @@
 
     {:else if responseMode === 'json-guided'}
       <div class="sub-section">
-        <JsonResponseBuilder bind:this={jsonBuilderRef} fields={jsonFields} onUpdate={(f) => jsonFields = f} />
+        <JsonResponseBuilder fields={jsonFields} arrayRoot={jsonArrayRoot} onUpdate={(f) => jsonFields = f} />
         <button type="button" class="btn btn-sm btn-outline back-to-paste-button" onclick={backToPasteMode} data-testid="rule-form-back-to-paste-button">
           {t("← Back to the “by example” view")}
         </button>
@@ -652,7 +659,7 @@
 
     {:else if responseMode === 'xml-paste'}
       <div class="sub-section">
-        <XmlPasteBuilder bind:this={xmlPasteRef} fields={xmlPasteFields} rootTag={xmlRootTag} rootAttributes={xmlRootAttributes} startParsed={xmlPasteFields.length > 0} onUpdate={(f) => xmlPasteFields = f} />
+        <XmlPasteBuilder fields={xmlPasteFields} rootTag={xmlRootTag} rootAttributes={xmlRootAttributes} startParsed={xmlPasteFields.length > 0} onUpdate={(f) => xmlPasteFields = f} onRootChange={(root) => { xmlRootTag = root.rootTag; xmlRootAttributes = root.rootAttributes; }} />
         <button type="button" class="btn btn-sm btn-outline open-detail-button" onclick={revealDetailMode} data-testid="rule-form-open-detail-button">
           {t("Edit in detail (full structure) →")}
         </button>
@@ -660,7 +667,7 @@
 
     {:else if responseMode === 'xml-guided'}
       <div class="sub-section">
-        <XmlResponseBuilder bind:this={xmlBuilderRef} fields={xmlFields} rootTag={xmlRootTag} onUpdate={(f) => xmlFields = f} />
+        <XmlResponseBuilder fields={xmlFields} rootTag={xmlRootTag} rootAttributes={xmlRootAttributes} onUpdate={(f) => xmlFields = f} onRootTagChange={(tag) => xmlRootTag = tag} />
         <button type="button" class="btn btn-sm btn-outline back-to-paste-button" onclick={backToPasteMode} data-testid="rule-form-back-to-paste-button">
           {t("← Back to the “by example” view")}
         </button>

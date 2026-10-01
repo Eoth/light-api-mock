@@ -336,6 +336,7 @@ describe('pseudo-locale: no visible word escapes t', () => {
     await expectFullyTranslated(JsonResponseBuilder, { fields: jsonFields });
     // Inside a nested field, the breadcrumb names the root.
     await expectFullyTranslated(JsonResponseBuilder, { fields: jsonFields }, (c) => click(c, 'json-builder-navigate-button-1'));
+    await expectFullyTranslated(JsonResponseBuilder, { fields: jsonFields, arrayRoot: true });
     await expectFullyTranslated(JsonPasteBuilder, { fields: jsonFields.slice(0, 2), startParsed: true });
     const xmlFields = [
       { tag: 'k1', nodeType: 'value', source: 'query', value: 'q', pipe: '', attributes: [{ name: 'k6', source: 'fixed', value: '1' }] },

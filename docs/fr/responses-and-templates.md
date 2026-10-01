@@ -54,7 +54,7 @@ Vous pouvez changer de format (de « Template avancé » à « XML », par exemp
 
 Quand vous rouvrez une règle enregistrée, Mimicway se souvient de **la vue** qui l'a construite (par l'exemple ou en détail, JSON ou XML) et ouvre celle-là. Une règle construite par l'exemple se rouvre par l'exemple (avec « Modifier en détail » toujours à portée de main), une règle construite en détail se rouvre en détail. « Texte » et « Template avancé » sont restaurés aussi.
 
-**Limite** : si la réponse a été modifiée hors de l'interface (fichier de configuration édité à la main, ancienne sauvegarde restaurée) et ne correspond plus à la forme qu'attend la vue retenue, Mimicway se rabat sur « Template avancé » au lieu d'afficher une erreur : votre contenu reste visible et modifiable, seule la vue structurée n'est pas restaurée. De même, un corps JSON dont la racine est un **tableau** (possible seulement par l'exemple) ne peut pas être restauré dans une vue structurée à la réouverture : « Template avancé » prend le relais.
+**Limite** : si la réponse a été modifiée hors de l'interface (fichier de configuration édité à la main, ancienne sauvegarde restaurée) et ne correspond plus à la forme qu'attend la vue retenue, Mimicway se rabat sur « Template avancé » au lieu d'afficher une erreur : votre contenu reste visible et modifiable, seule la vue structurée n'est pas restaurée. Un corps JSON collé par l'exemple sous forme de **tableau** se rouvre en tableau, dans sa vue ; en détail, les champs forment l'élément du tableau. Un tableau modifié à la main pour contenir plusieurs éléments se rabat sur « Template avancé », comme ci-dessus.
 
 ## Syntaxe des templates : `{{ }}`
 

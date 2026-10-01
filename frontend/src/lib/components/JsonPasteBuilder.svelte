@@ -10,13 +10,20 @@
   // startParsed: the parent already holds fields (rebuilt from a saved template by computeInitialEditorState in
   // RuleResponseSection.svelte, or kept from the other view), so the list of fields shows instead of the paste area.
   // Read once, when the component is created (untrack): a later change of this prop must not open or close the paste
-  // area behind the user's back.
-  let { fields = [], startParsed = false, onUpdate = () => {} } = $props();
+  // area behind the user's back. `arrayRoot` likewise: the parent keeps whether the sample was an array, since this
+  // component is unmounted whenever the response section is folded or the view changes.
+  let {
+    fields = [],
+    startParsed = false,
+    arrayRoot = false,
+    onUpdate = () => {},
+    onArrayRootChange = () => {},
+  } = $props();
 
   let pasteInput = $state('');
   let parseError = $state('');
   let parsed = $state(untrack(() => startParsed));
-  let isArrayRoot = $state(false);
+  let isArrayRoot = $state(untrack(() => arrayRoot));
 
   // Folding of 'object' fields, the only nested type this view renders (an array field shows an "array" badge only).
   // As in XmlPasteBuilder.svelte and JsonResponseBuilder.svelte: an in-memory Set keyed by the positional test path,
@@ -89,6 +96,7 @@
         return;
       }
       parsed = true;
+      onArrayRootChange(isArrayRoot);
       emit();
     } catch (e) {
       parseError = `JSON invalide : ${e.message}`;

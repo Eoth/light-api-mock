@@ -15,15 +15,17 @@
   import Sentence from './Sentence.svelte';
   import { t, tCount } from '../i18n.svelte.js';
 
-  // startParsed, rootTag and rootAttributes: when a saved rule is reopened, the parent has rebuilt the fields, root tag
-  // and root attributes from the template (templateToXmlFields, in RuleResponseSection.svelte). Read once, when the
-  // component is created (untrack), as in JsonPasteBuilder.svelte.
+  // startParsed, rootTag and rootAttributes: the parent holds them (rebuilt from a saved template by
+  // templateToXmlFields in RuleResponseSection.svelte, or kept from the other view). Read once, when the component is
+  // created (untrack), as in JsonPasteBuilder.svelte; each change of the root goes back through onRootChange, since
+  // this component is unmounted whenever the response section is folded or the view changes.
   let {
     fields = [],
     startParsed = false,
     rootTag: initialRootTag = 'response',
     rootAttributes: initialRootAttributes = [],
     onUpdate = () => {},
+    onRootChange = () => {},
   } = $props();
 
   let pasteInput = $state('');
@@ -136,6 +138,7 @@
       focusPath = [];
       collapsedPaths = new Set();
       parsed = true;
+      onRootChange({ rootTag, rootAttributes });
       emit();
     } catch (e) {
       parseError = e.message;
@@ -190,6 +193,7 @@
     applySourceDefaults(attr, prop, val);
     clone[attrIdx] = attr;
     rootAttributes = clone;
+    onRootChange({ rootTag, rootAttributes });
     emit();
   }
 

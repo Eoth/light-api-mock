@@ -755,3 +755,122 @@ describe('RuleForm: pipes en mode "par exemple" (retour 2)', () => {
     expect(payload.response_mode).toBe('json-paste');
   });
 });
+
+// The response must not depend on which builder is mounted: folding the section, switching the action or the view
+// unmounts the builders, and what they showed has to be saved all the same.
+describe('RuleForm: the response survives the builders being unmounted', () => {
+  const byId = (container, id) => container.querySelector(`[data-testid="${id}"]`);
+
+  async function renderNamed() {
+    checkRuleConflicts.mockResolvedValue({ conflicts: [] });
+    const onSave = vi.fn();
+    const view = render(RuleForm, { props: { onSave } });
+    await setInput(byId(view.container, 'rule-form-name-input'), 'kept');
+    return { ...view, onSave };
+  }
+
+  async function pasteJson(container, json) {
+    await setInput(byId(container, 'json-paste-builder-textarea'), json);
+    await fireEvent.click(byId(container, 'json-paste-builder-analyze-button'));
+  }
+
+  async function pasteXml(container, xml) {
+    await fireEvent.click(byId(container, 'rule-form-mode-button-xml'));
+    await setInput(byId(container, 'xml-paste-builder-textarea'), xml);
+    await fireEvent.click(byId(container, 'xml-paste-builder-analyze-button'));
+  }
+
+  async function savedTemplate(container, onSave) {
+    const calls = onSave.mock.calls.length;
+    await submitForm(container);
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(calls + 1));
+    const [payload] = onSave.mock.calls.at(-1);
+    return payload.response.body.map((f) => f.template ?? f.value).join('');
+  }
+
+  async function toggleResponseSection(container) {
+    await fireEvent.click(byId(container, 'rule-form-response-toggle-button'));
+  }
+
+  it('saves the pasted JSON while the response section is folded', async () => {
+    const { container, onSave } = await renderNamed();
+    await pasteJson(container, '{"id":"42"}');
+    await toggleResponseSection(container);
+
+    expect(await savedTemplate(container, onSave)).toBe('{"id":"42"}');
+  });
+
+  it('saves the response edited before the rule was switched to proxy', async () => {
+    const { container, onSave } = await renderNamed();
+    await pasteJson(container, '{"id":"42"}');
+    await fireEvent.change(byId(container, 'rule-form-action-proxy-radio'));
+
+    expect(await savedTemplate(container, onSave)).toBe('{"id":"42"}');
+  });
+
+  it('keeps the root tag and attributes of pasted XML in the detailed view and back', async () => {
+    const { container, onSave } = await renderNamed();
+    await pasteXml(container, '<order id="7"><a>x</a></order>');
+    await fireEvent.click(byId(container, 'rule-form-open-detail-button'));
+
+    expect(byId(container, 'xml-builder-root-tag-input').value).toBe('order');
+    expect(await savedTemplate(container, onSave)).toBe('<order id="7"><a>x</a></order>');
+
+    await fireEvent.click(byId(container, 'rule-form-back-to-paste-button'));
+    expect(await savedTemplate(container, onSave)).toBe('<order id="7"><a>x</a></order>');
+  });
+
+  it('keeps a root tag renamed in the detailed view when going back to the example', async () => {
+    const { container, onSave } = await renderNamed();
+    await pasteXml(container, '<order><a>x</a></order>');
+    await fireEvent.click(byId(container, 'rule-form-open-detail-button'));
+    await setInput(byId(container, 'xml-builder-root-tag-input'), 'reply');
+    await fireEvent.click(byId(container, 'rule-form-back-to-paste-button'));
+
+    expect(await savedTemplate(container, onSave)).toBe('<reply><a>x</a></reply>');
+  });
+
+  it('keeps the root tag of pasted XML when the section is folded and opened again', async () => {
+    const { container, onSave } = await renderNamed();
+    await pasteXml(container, '<order id="7"><a>x</a></order>');
+    await toggleResponseSection(container);
+    await toggleResponseSection(container);
+
+    expect(await savedTemplate(container, onSave)).toBe('<order id="7"><a>x</a></order>');
+  });
+
+  it('keeps a JSON array pasted by example when the section is folded and opened again', async () => {
+    const { container, onSave } = await renderNamed();
+    await pasteJson(container, '[{"id":"1"}]');
+    await toggleResponseSection(container);
+    await toggleResponseSection(container);
+
+    expect(await savedTemplate(container, onSave)).toBe('[{"id":"1"}]');
+  });
+
+  it('keeps a JSON array pasted by example in the detailed view, and says so', async () => {
+    const { container, onSave } = await renderNamed();
+    await pasteJson(container, '[{"id":"1"}]');
+    await fireEvent.click(byId(container, 'rule-form-open-detail-button'));
+
+    expect(byId(container, 'json-builder-array-root-hint')).toBeInTheDocument();
+    expect(await savedTemplate(container, onSave)).toBe('[{"id":"1"}]');
+  });
+
+  it('reopens a rule whose JSON body by example is an array in that view, and saves it unchanged', async () => {
+    checkRuleConflicts.mockResolvedValue({ conflicts: [] });
+    const onSave = vi.fn();
+    const rule = {
+      name: 'list',
+      method: 'GET',
+      action: 'mock',
+      response_mode: 'json-paste',
+      conditions: { all_of: [], any_of: [] },
+      response: { status: 200, headers: [], body: [{ type: 'Template', template: '[{"id":"{{path.id}}"}]' }], chaos: null },
+    };
+    const { container } = render(RuleForm, { props: { rule, onSave } });
+
+    expect(byId(container, 'json-paste-builder-source-select-0')).toBeInTheDocument();
+    expect(await savedTemplate(container, onSave)).toBe('[{"id":"{{path.id}}"}]');
+  });
+});

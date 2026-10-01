@@ -54,7 +54,7 @@ You can change format (from "Advanced template" to "XML", for instance) after yo
 
 When you reopen a saved rule, Mimicway remembers **which view** built it (by example or in detail, JSON or XML) and opens that one. A rule built by example reopens by example (with "Edit in detail" still at hand), a rule built in detail reopens in detail. "Text" and "Advanced template" are restored too.
 
-**Limit**: if the response was changed outside the interface (configuration file edited by hand, old backup restored) and no longer fits the shape the remembered view expects, Mimicway falls back to "Advanced template" instead of showing an error: your content stays visible and editable, only the structured view is not restored. Likewise, a JSON body whose root is an **array** (only possible by example) cannot be restored in a structured view when reopened: "Advanced template" takes over.
+**Limit**: if the response was changed outside the interface (configuration file edited by hand, old backup restored) and no longer fits the shape the remembered view expects, Mimicway falls back to "Advanced template" instead of showing an error: your content stays visible and editable, only the structured view is not restored. A JSON body pasted by example as an **array** reopens as an array, in its view; in detail, the fields shape the item of the array. An array edited by hand into several items falls back to "Advanced template", as above.
 
 ## Template syntax: `{{ }}`
 

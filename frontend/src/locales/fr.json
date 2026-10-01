@@ -638,6 +638,7 @@
   "JSON response builder": "Constructeur de reponse JSON",
   "Fields of the JSON response": "Champs de la reponse JSON",
   "Build the JSON structure: values, nested objects, arrays.": "Construisez la structure JSON : valeurs, objets imbriques, tableaux.",
+  "The response is an array: these fields shape its item.": "La réponse est un tableau : ces champs forment son élément.",
   "No field. Click “+ Add a field” to start.": "Aucun champ. Cliquez \"+ Ajouter un champ\" pour commencer.",
   "Source of the value": "Source de la valeur",
   "Fake data kind": "Type de donnee fictive",

@@ -2,7 +2,15 @@
   import { buildExpr as sharedBuildExpr, templateToPreview, xmlFieldsToTemplate } from '../tpl-utils.js';
   import { t, tCount } from '../i18n.svelte.js';
 
-  let { fields = [], rootTag = 'response', onUpdate = () => {} } = $props();
+  // rootAttributes come from a pasted sample: this view does not edit them, but keeps them in the template. A renamed
+  // root goes back through onRootTagChange, since the parent outlives this component.
+  let {
+    fields = [],
+    rootTag = 'response',
+    rootAttributes = [],
+    onUpdate = () => {},
+    onRootTagChange = () => {},
+  } = $props();
 
   const nodeTypes = [
     { value: 'value', get label() { return t("Content"); } },
@@ -132,14 +140,14 @@
   }
 
   export function toTemplate() {
-    return xmlFieldsToTemplate(fields, rootTag);
+    return xmlFieldsToTemplate(fields, rootTag, rootAttributes);
   }
 </script>
 
 <div class="xml-builder" aria-label={t("XML response builder")}>
   <div class="builder-header">
     <strong>{t("XML nodes")}</strong>
-    <label class="inline-label">{t("Root tag:")} <input type="text" bind:value={rootTag} class="root-input" data-testid="xml-builder-root-tag-input" /></label>
+    <label class="inline-label">{t("Root tag:")} <input type="text" value={rootTag} oninput={(e) => { rootTag = e.target.value; onRootTagChange(rootTag); }} class="root-input" data-testid="xml-builder-root-tag-input" /></label>
   </div>
 
   {#snippet renderValueControls(field, path, idx)}
