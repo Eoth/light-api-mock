@@ -161,21 +161,37 @@ async fn login(
         .as_ref()
         .ok_or(AppError::Validation("Auth non configuree".into()))?;
 
-    let tokens = kc.login(&req.username, &req.password).await.map_err(|e| {
-        use crate::auth::keycloak::AuthError;
-        match e {
+    use crate::auth::keycloak::AuthError;
+    let tokens = kc
+        .login(&req.username, &req.password)
+        .await
+        .map_err(|e| match e {
             AuthError::InvalidCredentials => AppError::Unauthorized,
-            _ => AppError::Validation(format!("{e}")),
-        }
-    })?;
+            other => {
+                tracing::warn!(error = %other, "login: Keycloak unavailable");
+                AppError::Unavailable
+            }
+        })?;
+    // The identity is the one Keycloak put in the token (it normalizes user names), checked the way every API
+    // call will check it: a token refused here (wrong KEYCLOAK_ISSUER or client) would be refused right after.
+    let username = kc
+        .validate_token(&tokens.access_token)
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, "login: Keycloak issued a token that lightMock refuses (check KEYCLOAK_ISSUER and KEYCLOAK_CLIENT_ID)");
+            match e {
+                AuthError::KeycloakUnavailable(_) => AppError::Unavailable,
+                _ => AppError::Unauthorized,
+            }
+        })?;
 
-    let is_super_admin = state.auth_config.is_super_admin(&req.username);
+    let is_super_admin = state.auth_config.is_super_admin(&username);
 
     Ok(Json(LoginResponse {
         access_token: tokens.access_token,
         refresh_token: tokens.refresh_token,
         expires_in: tokens.expires_in,
-        username: req.username,
+        username,
         is_super_admin,
     }))
 }
@@ -200,10 +216,10 @@ async fn validate_token(
         .as_ref()
         .ok_or(AppError::Validation("Auth non configuree".into()))?;
 
-    let username = kc
-        .validate_token(&req.token)
-        .await
-        .map_err(|_| AppError::Unauthorized)?;
+    let username = kc.validate_token(&req.token).await.map_err(|e| match e {
+        crate::auth::keycloak::AuthError::KeycloakUnavailable(_) => AppError::Unavailable,
+        _ => AppError::Unauthorized,
+    })?;
 
     let is_super_admin = state.auth_config.is_super_admin(&username);
 
@@ -1724,6 +1740,7 @@ enum AppError {
     Conflict(String),
     Unauthorized,
     Forbidden,
+    Unavailable,
 }
 
 impl IntoResponse for AppError {
@@ -1752,6 +1769,11 @@ impl IntoResponse for AppError {
             AppError::Forbidden => (
                 StatusCode::FORBIDDEN,
                 Json(serde_json::json!({ "error": "Acces refuse" })),
+            )
+                .into_response(),
+            AppError::Unavailable => (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(serde_json::json!({ "error": "Service d'authentification indisponible" })),
             )
                 .into_response(),
         }
@@ -1864,6 +1886,7 @@ mod tests {
                 realm: String::new(),
                 client_id: String::new(),
                 super_admins: vec![],
+                issuer: String::new(),
                 show_reset_button: false,
             },
             keycloak: None,
@@ -2044,6 +2067,7 @@ mod tests {
                 realm: String::new(),
                 client_id: String::new(),
                 super_admins: vec![],
+                issuer: String::new(),
                 show_reset_button: false,
             },
             keycloak: None,

@@ -80,11 +80,21 @@ pub async fn auth_middleware(
             });
             next.run(req).await
         }
+        // The details stay in the log: they would tell a caller how its token was judged, and expose
+        // Keycloak's internal address when it is unreachable.
+        Err(crate::auth::keycloak::AuthError::KeycloakUnavailable(detail)) => {
+            tracing::warn!(error = %detail, "token not checked: Keycloak unavailable");
+            (
+                StatusCode::SERVICE_UNAVAILABLE,
+                axum::Json(serde_json::json!({"error": "Service d'authentification indisponible"})),
+            )
+                .into_response()
+        }
         Err(e) => {
             tracing::debug!(error = %e, "token validation failed");
             (
                 StatusCode::UNAUTHORIZED,
-                axum::Json(serde_json::json!({"error": format!("{e}")})),
+                axum::Json(serde_json::json!({"error": "Token invalide ou expire"})),
             )
                 .into_response()
         }
@@ -106,18 +116,12 @@ pub fn extract_user(extensions: &axum::http::Extensions) -> AuthUser {
 // Axum via server::build_router + vrai listener TCP + reqwest::Client),
 // plutot qu'un style tower::oneshot inexistant dans ce projet.
 //
-// Pour le cas "token valide", un faux serveur Keycloak minimal
-// (spawn_fake_keycloak) sert uniquement l'endpoint userinfo : l'endpoint
-// certs n'est volontairement pas enregistre (404 naturel d'axum), ce qui
-// fait echouer validate_jwt_local() des le fetch JWKS et declenche
-// systematiquement le repli vers validate_via_userinfo() — suffisant pour
-// exercer reellement le chemin "token accepte par Keycloak" sans avoir a
-// signer un vrai JWT RS256 dans les tests.
+// Valid tokens are real JWTs signed by the fake realm of `auth::test_realm`, which publishes its keys like
+// Keycloak does.
 #[cfg(test)]
 mod tests {
     use super::*;
-    use axum::extract::State;
-    use axum::http::HeaderMap;
+    use crate::auth::test_realm::FakeRealm;
 
     fn enabled_auth_config(keycloak_url: String, super_admins: Vec<String>) -> AuthConfig {
         AuthConfig {
@@ -126,6 +130,7 @@ mod tests {
             realm: "test-realm".into(),
             client_id: "lightmock".into(),
             super_admins,
+            issuer: String::new(),
             show_reset_button: false,
         }
     }
@@ -137,6 +142,7 @@ mod tests {
             realm: String::new(),
             client_id: String::new(),
             super_admins: vec![],
+            issuer: String::new(),
             show_reset_button: false,
         }
     }
@@ -196,58 +202,13 @@ mod tests {
         format!("http://127.0.0.1:{port}/api")
     }
 
-    #[derive(Clone)]
-    struct FakeKcState {
-        valid_token: String,
-        valid_username: String,
-    }
-
-    async fn fake_userinfo(State(fake): State<FakeKcState>, headers: HeaderMap) -> Response {
-        let expected = format!("Bearer {}", fake.valid_token);
-        let actual = headers
-            .get(axum::http::header::AUTHORIZATION)
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("");
-        if actual == expected {
-            (
-                StatusCode::OK,
-                axum::Json(serde_json::json!({ "preferred_username": fake.valid_username })),
-            )
-                .into_response()
-        } else {
-            StatusCode::UNAUTHORIZED.into_response()
-        }
-    }
-
-    // Ne sert QUE /realms/test-realm/.../userinfo (pas de route /certs : 404
-    // naturel, cf commentaire au-dessus du mod tests) — suffisant pour
-    // exercer validate_token() via son repli userinfo.
-    async fn spawn_fake_keycloak(valid_token: &str, valid_username: &str) -> String {
-        let fake_state = FakeKcState {
-            valid_token: valid_token.to_string(),
-            valid_username: valid_username.to_string(),
-        };
-        let app = axum::Router::new()
-            .route(
-                "/realms/test-realm/protocol/openid-connect/userinfo",
-                axum::routing::get(fake_userinfo),
-            )
-            .with_state(fake_state);
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let port = listener.local_addr().unwrap().port();
-        tokio::spawn(async move {
-            axum::serve(listener, app).await.unwrap();
-        });
-        format!("http://127.0.0.1:{port}")
-    }
-
     #[tokio::test]
     async fn missing_token_rejected_on_protected_route() {
         // Branche: aucun header Authorization sur une route protegee (hors
         // liste de bypass) -> rejet 401 "Token manquant", sans meme
         // contacter Keycloak.
-        let kc_url = spawn_fake_keycloak("good-token", "alice").await;
-        let auth_config = enabled_auth_config(kc_url, vec![]);
+        let realm = FakeRealm::start().await;
+        let auth_config = realm.auth_config(vec![]);
         let keycloak = Some(KeycloakClient::new(auth_config.clone()));
         let base = spawn_test_app(auth_config, keycloak).await;
 
@@ -263,8 +224,8 @@ mod tests {
         // Branche: header Authorization present mais sans le prefixe
         // "Bearer " (ex. schema Basic) -> strip_prefix() echoue, traite
         // exactement comme une absence de token -> 401.
-        let kc_url = spawn_fake_keycloak("good-token", "alice").await;
-        let auth_config = enabled_auth_config(kc_url, vec![]);
+        let realm = FakeRealm::start().await;
+        let auth_config = realm.auth_config(vec![]);
         let keycloak = Some(KeycloakClient::new(auth_config.clone()));
         let base = spawn_test_app(auth_config, keycloak).await;
 
@@ -282,11 +243,10 @@ mod tests {
 
     #[tokio::test]
     async fn invalid_token_rejected() {
-        // Branche: token present mais invalide/rejete par Keycloak (ici via
-        // le repli userinfo, qui renvoie 401 pour un token qui ne
-        // correspond pas) -> 401.
-        let kc_url = spawn_fake_keycloak("good-token", "alice").await;
-        let auth_config = enabled_auth_config(kc_url, vec![]);
+        // Branche: token present mais invalide -> 401, sans detail sur la
+        // raison du refus.
+        let realm = FakeRealm::start().await;
+        let auth_config = realm.auth_config(vec![]);
         let keycloak = Some(KeycloakClient::new(auth_config.clone()));
         let base = spawn_test_app(auth_config, keycloak).await;
 
@@ -298,6 +258,25 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(resp.status().as_u16(), 401);
+        let body: serde_json::Value = resp.json().await.unwrap();
+        assert_eq!(body["error"], "Token invalide ou expire");
+    }
+
+    #[tokio::test]
+    async fn unreachable_keycloak_answers_503_without_internal_details() {
+        let auth_config = enabled_auth_config("http://127.0.0.1:1".into(), vec![]);
+        let keycloak = Some(KeycloakClient::new(auth_config.clone()));
+        let base = spawn_test_app(auth_config, keycloak).await;
+        let token = crate::auth::test_realm::SigningKey::generate("k1")
+            .sign(&serde_json::json!({"preferred_username": "alice"}));
+        let resp = reqwest::Client::new()
+            .get(format!("{base}/services"))
+            .header("authorization", format!("Bearer {token}"))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(resp.status().as_u16(), 503);
+        assert!(!resp.text().await.unwrap().contains("127.0.0.1"));
     }
 
     #[tokio::test]
@@ -307,15 +286,18 @@ mod tests {
         // GET /api/auth/me (Extension<AuthUser>, hors liste de bypass) sert
         // de sonde directe pour verifier le contenu exact de l'AuthUser
         // injecte par le middleware (username + is_super_admin).
-        let kc_url = spawn_fake_keycloak("good-token", "alice").await;
-        let auth_config = enabled_auth_config(kc_url, vec!["alice".into()]);
+        let realm = FakeRealm::start().await;
+        let auth_config = realm.auth_config(vec!["alice".into()]);
         let keycloak = Some(KeycloakClient::new(auth_config.clone()));
         let base = spawn_test_app(auth_config, keycloak).await;
 
         let client = reqwest::Client::new();
         let resp = client
             .get(format!("{base}/auth/me"))
-            .header("authorization", "Bearer good-token")
+            .header(
+                "authorization",
+                format!("Bearer {}", realm.token_for("alice")),
+            )
             .send()
             .await
             .unwrap();
@@ -417,8 +399,8 @@ mod tests {
         // routes deja exemptees). Prouve au niveau du vrai routeur Axum, pas
         // seulement au niveau unitaire de is_management_api_route
         // (validation.rs), que le comportement bout-en-bout reste correct.
-        let kc_url = spawn_fake_keycloak("good-token", "alice").await;
-        let auth_config = enabled_auth_config(kc_url, vec![]);
+        let realm = FakeRealm::start().await;
+        let auth_config = realm.auth_config(vec![]);
         let keycloak = Some(KeycloakClient::new(auth_config.clone()));
         let base = spawn_test_app(auth_config, keycloak).await;
         let client = reqwest::Client::new();
@@ -476,8 +458,8 @@ mod tests {
             }]
         }))
         .unwrap();
-        let kc_url = spawn_fake_keycloak("good-token", "alice").await;
-        let auth_config = enabled_auth_config(kc_url, vec![]);
+        let realm = FakeRealm::start().await;
+        let auth_config = realm.auth_config(vec![]);
         let keycloak = Some(KeycloakClient::new(auth_config.clone()));
         let config = crate::models::MockConfig {
             services: vec![service],

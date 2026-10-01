@@ -1,5 +1,7 @@
 pub mod keycloak;
 pub mod middleware;
+#[cfg(test)]
+pub(crate) mod test_realm;
 
 use crate::models::{Group, MockConfig};
 
@@ -9,6 +11,8 @@ pub struct AuthConfig {
     pub keycloak_url: String,
     pub realm: String,
     pub client_id: String,
+    /// Expected `iss` of the tokens; empty means the realm URL derived from `keycloak_url` (`KEYCLOAK_ISSUER`).
+    pub issuer: String,
     pub super_admins: Vec<String>,
     /// Controle uniquement l'AFFICHAGE du bouton "Reset complet" cote UI quand
     /// AUTH_ENABLED=false (quand l'auth est active, la visibilite est deja
@@ -29,6 +33,11 @@ impl AuthConfig {
         let keycloak_url = std::env::var("KEYCLOAK_URL").unwrap_or_default();
         let realm = std::env::var("KEYCLOAK_REALM").unwrap_or_default();
         let client_id = std::env::var("KEYCLOAK_CLIENT_ID").unwrap_or_default();
+        let issuer = std::env::var("KEYCLOAK_ISSUER")
+            .unwrap_or_default()
+            .trim()
+            .trim_end_matches('/')
+            .to_string();
         let super_admins: Vec<String> = std::env::var("SUPER_ADMINS")
             .unwrap_or_default()
             .split(',')
@@ -50,6 +59,7 @@ impl AuthConfig {
             keycloak_url,
             realm,
             client_id,
+            issuer,
             super_admins,
             show_reset_button,
         }
@@ -117,6 +127,7 @@ mod tests {
             realm: "test".into(),
             client_id: "lightmock".into(),
             super_admins: vec!["admin1".into()],
+            issuer: String::new(),
             show_reset_button: false,
         }
     }

@@ -687,6 +687,7 @@ name = "light-mock"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "base64",
  "fastrand",
  "futures-util",
  "http",
@@ -698,6 +699,7 @@ dependencies = [
  "regex",
  "reqwest",
  "rhai",
+ "ring",
  "serde",
  "serde_json",
  "serde_yaml",

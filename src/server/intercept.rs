@@ -878,6 +878,7 @@ mod tests {
             realm: String::new(),
             client_id: String::new(),
             super_admins: vec![],
+            issuer: String::new(),
             show_reset_button: false,
         }
     }
