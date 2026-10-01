@@ -234,7 +234,7 @@ A rule can also run up to three [Rhai](https://rhai.rs) scripts (`pre_script`, `
 
 ### Container
 
-The [Dockerfile](Dockerfile) builds the UI, embeds it in the binary, and copies that single file into a minimal Alpine image running as an unprivileged user (uid 1000). The image listens on every interface (`BIND_ADDRESS=0.0.0.0`) and keeps its data in `/data`: mount a volume there.
+The [Dockerfile](Dockerfile) builds the UI, embeds it in the binary, and copies that single file into an otherwise empty image (`scratch`: no operating system, no shell), running as an unprivileged user (uid 1000). The image listens on every interface (`BIND_ADDRESS=0.0.0.0`) and keeps its data in `/data`: mount a volume there.
 
 ```yaml
 # compose.yaml

@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
 # The release image, assembled by .github/workflows/release.yml from the static Linux binaries it built and attested,
-# on the same base and with the same settings as the Dockerfile. There is no RUN step, so the arm64 image needs no
-# emulation to build.
-FROM alpine:3.21@sha256:ce64758a109eb420d874a118f87920e625e12d3634e03b4a5573fd9f6e5d3507
+# with the same content and settings as the Dockerfile: the binary and an empty data directory, no operating system.
+# There is no RUN step, so the arm64 image needs no emulation to build.
+FROM scratch
 ARG TARGETARCH
 COPY --chown=1000:1000 data /data
 COPY --chmod=0755 linux-${TARGETARCH}/mimicway /app/mimicway
