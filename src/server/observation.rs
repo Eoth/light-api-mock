@@ -1,22 +1,11 @@
-// Observation de trafic proxy niveau service (is_mocked=false), pour armer
-// une future suggestion automatique de regles de mock (cf commentaire en tete
-// de `intercept.rs::do_proxy` pour le branchement complet). Deux etats
-// distincts, tous deux ephemeres (jamais persistes, jamais dans MockConfig/
-// YAML) :
+// Observation of service-level proxy traffic (is_mocked=false), the input of rule suggestions
+// (`server::suggestion`; see `intercept.rs::do_proxy` for where it plugs in). Two states, both in memory only,
+// never in the configuration:
 //
-// - `ObservationToggle` : quel service l'utilisateur observe ACTIVEMENT en ce
-//   moment (active/desactive explicitement via l'API, PAS automatique — le
-//   proxy niveau service reste 100% streame sans aucun cout ajoute tant que
-//   personne ne l'a active pour ce service precis). Meme genre d'etat
-//   transitoire que `ping::PingCache`, jamais dans Service/YAML.
-// - `ObservationStore` : les echanges (requete + reponse cible) captures
-//   pendant qu'un service est observe, groupes par (service, method,
-//   sub_path litteral) pour permettre une future correlation/detection de
-//   variance. Borne en memoire sur deux axes (nombre de cles ET
-//   d'echantillons par cle) — jamais de croissance non bornee.
-//
-// Ne construit PAS encore de suggestion de regle : ce module est le
-// prerequis (capture + stockage borne), pas l'algorithme de correlation.
+// - `ObservationToggle`: which services a user is observing right now, turned on and off through the API, never
+//   automatically. Until someone turns it on for a service, its proxy stays pure streaming, at no extra cost.
+// - `ObservationStore`: the exchanges (request and backend response) captured meanwhile, grouped by service, method
+//   and literal path, bounded twice (number of endpoints, exchanges per endpoint) so memory never grows unbounded.
 use serde::Serialize;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{Arc, RwLock};
@@ -26,9 +15,8 @@ const DEFAULT_MAX_BUFFER_SIZE: usize = 10 * 1024 * 1024;
 const DEFAULT_SAMPLES_PER_KEY: usize = 8;
 const DEFAULT_MAX_KEYS: usize = 200;
 
-/// Taille max (octets) du corps RETENU dans un `ObservedExchange` (requete et
-/// reponse tronquees independamment a cette limite). Meme idiome que
-/// `request_log::max_body_size` / `message_log::max_body_size`.
+/// Largest body kept in an `ObservedExchange`, in bytes (request and response truncated separately), like
+/// `request_log::max_body_size` and `message_log::max_body_size`.
 pub fn max_body_size() -> usize {
     std::env::var("TRAFFIC_OBSERVATION_MAX_BODY_SIZE")
         .ok()
@@ -36,12 +24,9 @@ pub fn max_body_size() -> usize {
         .unwrap_or(DEFAULT_MAX_BODY_SIZE)
 }
 
-/// Taille max (octets) qu'un corps (requete ou reponse) peut atteindre pour
-/// etre EFFECTIVEMENT capture (via Content-Length declare) : au-dela, ou en
-/// l'absence de Content-Length, l'echange n'est pas mis en buffer pour la
-/// capture et repasse par le chemin de streaming habituel, jamais observe.
-/// Meme plafond que le cap deja applique cote requete mock (`intercept.rs`,
-/// `axum::body::to_bytes(..., 10 * 1024 * 1024)`), pour cohérence.
+/// Largest body, in bytes, that an exchange may have to be captured, judged on its Content-Length: a larger body, or
+/// one of unknown size, is streamed as usual and the exchange is not observed. The same cap as the request body that
+/// matching buffers (`intercept.rs`, 10 MiB).
 pub fn max_buffer_size() -> usize {
     std::env::var("TRAFFIC_OBSERVATION_MAX_BUFFER_SIZE")
         .ok()
@@ -49,8 +34,7 @@ pub fn max_buffer_size() -> usize {
         .unwrap_or(DEFAULT_MAX_BUFFER_SIZE)
 }
 
-/// Nombre max d'echanges retenus par cle (service, method, sub_path). Au-dela,
-/// le plus ancien est evince (FIFO), meme principe que `RequestLog`.
+/// Exchanges kept per endpoint (service, method, path); beyond that, the oldest goes first, as in `RequestLog`.
 pub fn samples_per_key() -> usize {
     std::env::var("TRAFFIC_OBSERVATION_SAMPLES_PER_KEY")
         .ok()
@@ -58,9 +42,8 @@ pub fn samples_per_key() -> usize {
         .unwrap_or(DEFAULT_SAMPLES_PER_KEY)
 }
 
-/// Nombre max de cles (endpoints distincts) suivies simultanement, tous
-/// services observes confondus. Au-dela, la cle la moins recemment mise a
-/// jour est evincee pour faire de la place a une nouvelle cle.
+/// Endpoints followed at once, across all observed services; beyond that, the endpoint updated least recently makes
+/// room for the new one.
 pub fn max_keys() -> usize {
     std::env::var("TRAFFIC_OBSERVATION_MAX_KEYS")
         .ok()
@@ -87,19 +70,13 @@ pub struct ObservationKey {
     pub group_name: Option<String>,
     pub service_name: String,
     pub method: String,
-    /// Chemin restant litteral relatif au service (PAS un pattern de regle :
-    /// le proxy niveau service n'a pas de `sub_path` templatise, seulement le
-    /// chemin reel de chaque appel). Deux chemins qui ne different que par un
-    /// segment variable (ex. `/orders/1` vs `/orders/2`) forment aujourd'hui
-    /// DEUX cles distinctes — pas d'inference de path param en v1, cf note
-    /// de conception.
+    /// The literal path after the service prefix. A service-level proxy has no rule patterns, so `/orders/1` and
+    /// `/orders/2` are two endpoints for now (path parameters are not inferred).
     pub sub_path: String,
 }
 
-/// Un echange requete/reponse REELLEMENT capture (les deux cotes bufferises
-/// avec succes sous `max_buffer_size()`). Un exchange partiel (reponse trop
-/// grosse/streamee, Content-Length absent...) n'est jamais pousse dans le
-/// store — voir `ProxyClient::forward_with_capture`.
+/// An exchange whose two sides were both buffered within `max_buffer_size()`. A partial one (a response too large
+/// or of unknown size) is never stored (see `ProxyClient::forward_with_capture`).
 #[derive(Debug, Clone, Serialize)]
 pub struct ObservedExchange {
     pub timestamp: u64,
@@ -148,14 +125,12 @@ impl ObservedExchange {
 #[derive(Default)]
 struct ObservationInner {
     buckets: HashMap<ObservationKey, VecDeque<ObservedExchange>>,
-    // Ordre de derniere mise a jour des cles (front = la moins recente),
-    // pour eviction quand `max_keys()` est atteint. Une cle deja connue est
-    // deplacee en fin de liste a chaque `record()`.
+    // Endpoints by last update (front = least recent), to evict when `max_keys()` is reached; recording an exchange
+    // moves its endpoint to the back.
     key_order: VecDeque<ObservationKey>,
 }
 
-/// Buffer borne des echanges observes, indexe par (service, method,
-/// sub_path). Cf commentaire de module pour les deux axes de bornage.
+/// The bounded store of observed exchanges, by service, method and path (see the top of this file for both bounds).
 #[derive(Clone)]
 pub struct ObservationStore {
     inner: Arc<RwLock<ObservationInner>>,
@@ -192,8 +167,7 @@ impl ObservationStore {
         bucket.push_back(exchange);
     }
 
-    /// Copie des echanges retenus pour une cle donnee, plus ancien en
-    /// premier. Vide si la cle est inconnue.
+    /// The exchanges kept for an endpoint, oldest first; empty for an unknown endpoint.
     pub fn observations(&self, key: &ObservationKey) -> Vec<ObservedExchange> {
         let inner = self.inner.read().unwrap();
         inner
@@ -203,15 +177,13 @@ impl ObservationStore {
             .unwrap_or_default()
     }
 
-    /// Nombre de cles distinctes suivies actuellement (diagnostic/tests).
+    /// How many endpoints are followed (diagnosis, tests).
     pub fn key_count(&self) -> usize {
         self.inner.read().unwrap().buckets.len()
     }
 
-    /// Toutes les cles (endpoints distincts) suivies pour un service donne,
-    /// utilisee par le calcul de suggestions (`server::suggestion`) pour
-    /// savoir quels (method, sub_path) examiner sans que l'appelant ait deja
-    /// besoin de les connaitre a l'avance.
+    /// Every endpoint followed for a service, so that suggestions (`server::suggestion`) know which method and path to
+    /// examine.
     pub fn keys_for_service(&self, group: Option<&str>, service_name: &str) -> Vec<ObservationKey> {
         let inner = self.inner.read().unwrap();
         inner
@@ -229,12 +201,10 @@ impl Default for ObservationStore {
     }
 }
 
-/// Identifiant (group_name, name) d'un service, coherent avec
-/// `service_matches` (server/api.rs).
+/// A service's identity (group name, name), as `service_matches` in api.rs defines it.
 type ServiceKey = (Option<String>, String);
 
-/// Quels services sont actuellement observes, active/desactive explicitement
-/// par l'utilisateur (jamais automatique).
+/// The services under observation, turned on and off by a user, never automatically.
 #[derive(Clone)]
 pub struct ObservationToggle {
     active: Arc<RwLock<HashSet<ServiceKey>>>,
@@ -259,13 +229,9 @@ impl ObservationToggle {
         self.active.write().unwrap().remove(&Self::key(group, name));
     }
 
-    /// Verifie le statut d'observation SANS allouer : appelee sur le chemin
-    /// chaud du proxy niveau service (`handle_service`), a chaque requete,
-    /// meme quand l'observation est desactivee. Balayage lineaire plutot
-    /// qu'un `HashSet::contains` (qui exigerait de construire une cle
-    /// `(Option<String>, String)` a chaque appel) — negligeable en pratique,
-    /// le nombre de services observes simultanement restant du ressort de
-    /// choix explicites de l'utilisateur (quelques unites au plus).
+    /// Whether a service is observed, without allocating: called on every request of a service-level proxy, observed or
+    /// not. A linear scan rather than `HashSet::contains`, which would need a `(Option<String>, String)` key built per
+    /// call; users observe a handful of services at most.
     pub fn is_enabled(&self, group: Option<&str>, name: &str) -> bool {
         self.active
             .read()
@@ -274,14 +240,13 @@ impl ObservationToggle {
             .any(|(g, n)| g.as_deref() == group && n == name)
     }
 
-    /// Liste des services actuellement observes (diagnostic/API de statut).
+    /// The services under observation (status API, diagnosis).
     pub fn active_services(&self) -> Vec<ServiceKey> {
         self.active.read().unwrap().iter().cloned().collect()
     }
 
-    /// Utilisee uniquement par `reset_config` (suppression de TOUS les
-    /// services) : sans ca, un service recree apres coup heriterait
-    /// silencieusement du statut "observe" d'un service disparu.
+    /// Only for `reset_config`, which deletes every service: otherwise a service created again afterwards would start
+    /// out observed.
     pub fn clear_all(&self) {
         self.active.write().unwrap().clear();
     }
@@ -293,8 +258,7 @@ impl Default for ObservationToggle {
     }
 }
 
-/// Regroupe les deux etats d'observation dans un seul champ `AppState`, meme
-/// convention que `messaging::MessagingState`.
+/// Both observation states in one `AppState` field, like `messaging::MessagingState`.
 #[derive(Clone)]
 pub struct ObservationState {
     pub toggle: ObservationToggle,
@@ -397,9 +361,8 @@ mod tests {
 
     #[test]
     fn store_records_and_returns_observations_in_order() {
-        // sample_exchange() lit max_body_size() (env partagee entre tests) :
-        // meme garde que les tests qui la fixent explicitement, sinon course
-        // possible avec exchange_truncates_bodies_beyond_max_size en parallele.
+        // sample_exchange() reads max_body_size(), a process-wide environment variable: hold the same lock as the tests that
+        // set it, or this would race with exchange_truncates_bodies_beyond_max_size.
         let _guard = ENV_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
         let store = ObservationStore::new();
         let key = sample_key("/orders/1");
@@ -445,7 +408,7 @@ mod tests {
         assert_eq!(store.key_count(), 2, "borne au nombre de cles max");
         assert!(
             store.observations(&sample_key("/a")).is_empty(),
-            "la cle la moins recemment mise a jour doit etre evincee"
+            "the endpoint updated least recently must be evicted"
         );
         assert!(!store.observations(&sample_key("/c")).is_empty());
         unsafe { std::env::remove_var("TRAFFIC_OBSERVATION_MAX_KEYS") };
@@ -458,8 +421,7 @@ mod tests {
         let store = ObservationStore::new();
         store.record(sample_key("/a"), sample_exchange(b"a"));
         store.record(sample_key("/b"), sample_exchange(b"b"));
-        // Retouche /a : elle devient la plus recente, /b devient la plus
-        // ancienne et doit etre evincee au lieu de /a.
+        // Touch /a again: it becomes the most recent, so /b is the oldest and goes instead of /a.
         store.record(sample_key("/a"), sample_exchange(b"a2"));
         store.record(sample_key("/c"), sample_exchange(b"c"));
         assert!(!store.observations(&sample_key("/a")).is_empty());
