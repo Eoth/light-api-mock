@@ -1,3 +1,5 @@
+[Français](../fr/kafka-messaging.md)
+
 # Kafka messaging (optional)
 
 Beyond HTTP requests, Mimicway can also answer **Kafka messages** (Kafka is a messaging system that lets applications talk asynchronously, as opposed to a direct HTTP call). This feature is **optional** and not part of every Mimicway build.

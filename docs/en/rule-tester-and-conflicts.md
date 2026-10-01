@@ -1,3 +1,5 @@
+[Français](../fr/rule-tester-and-conflicts.md)
+
 # Rule tester and conflict detection
 
 Two quality aids built into the [rule](matching-rules.md) editor, against the two most frequent traps when configuring rules: "why does my rule not match?" and "why does another rule answer instead of mine?".

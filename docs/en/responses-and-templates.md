@@ -1,3 +1,5 @@
+[Français](../fr/responses-and-templates.md)
+
 # Responses and templates
 
 Once a [rule](matching-rules.md) matches, Mimicway produces a response: an HTTP status, headers and a body (JSON, XML or text) that can be **static** or **dynamic** (holding values computed for each request).

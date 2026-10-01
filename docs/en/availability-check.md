@@ -1,3 +1,5 @@
+[Français](../fr/availability-check.md)
+
 # Availability check
 
 On a [service](services.md)'s card and page, the **"Test the target (network only)"** button checks whether the real backend (`real_target_url`) can be reached over the network.

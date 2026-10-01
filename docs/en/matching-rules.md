@@ -1,3 +1,5 @@
+[Français](../fr/matching-rules.md)
+
 # Matching rules
 
 A [service](services.md) in mock mode can hold **several rules**. Each rule says "for which request" to send "which response". Rules are the heart of mocking: without one, a mocked service has nothing specific to answer.

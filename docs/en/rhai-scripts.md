@@ -1,3 +1,5 @@
+[Français](../fr/rhai-scripts.md)
+
 # Rhai scripts (computed values in a rule)
 
 For what the [response builder](responses-and-templates.md) does not cover directly (calculations, values that depend on each other, data that is "always the same for the same input"…), each rule can run a short script written in a simple language called **Rhai**. The script's result then becomes a variable of the response body.

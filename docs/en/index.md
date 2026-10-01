@@ -1,3 +1,5 @@
+[Français](../fr/index.md)
+
 # Mimicway user guide
 
 Mimicway mocks or relays ("proxies") HTTP calls to a real service: test an application without depending on a real backend, or replay precise scenarios (errors, slowness, particular data) on demand. Everything is driven from a web interface, without restarts.

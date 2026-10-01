@@ -1,3 +1,5 @@
+[Français](../fr/groups.md)
+
 # Service groups
 
 As the number of mocked services grows, groups keep the interface readable and let you manage access per team or per functional area.

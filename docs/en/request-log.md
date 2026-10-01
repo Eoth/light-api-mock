@@ -1,3 +1,5 @@
+[Français](../fr/request-log.md)
+
 # Request log
 
 **"Logs"** in the navigation bar opens the history of the latest requests Mimicway received, across all services. It shows what the application under test really sent, and helps diagnose a rule that does not trigger as expected.

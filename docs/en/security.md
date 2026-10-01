@@ -1,3 +1,5 @@
+[Français](../fr/security.md)
+
 # Security model
 
 This page is meant for whoever has to decide whether Mimicway may run in their environment: what it exposes, what it talks to, what it trusts, what it protects and what it leaves to the deployment. Every statement below is enforced by code and covered by tests; the file and test names are given so that each one can be checked.
