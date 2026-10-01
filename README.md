@@ -29,7 +29,7 @@ Mimicway is meant for corporate networks where every outbound flow has to be jus
 | Does it keep secrets from the traffic? | No. `Authorization`, cookies and API-key headers are replaced by `[redacted]` in logs, observation and suggestions; URLs lose their credentials. |
 | Can a script escape? | Rhai scripts have no file, network or `eval` access and are bounded in operations, string size and depth. |
 | Unsafe code? | `#![forbid(unsafe_code)]` outside tests. |
-| Supply chain? | `Cargo.lock` and `package-lock.json` committed; `cargo-deny` (advisories, licenses, sources), `npm audit`, Trivy and gitleaks run in CI. |
+| Supply chain? | `Cargo.lock` and `package-lock.json` committed, CI actions and base images pinned by digest; `cargo-deny` (advisories, licenses, sources), `npm audit`, Trivy and gitleaks run in CI. Releases ship SBOMs, build provenance attestations and a signed image. |
 
 Details, with the code that backs each claim: [security model](docs/security.md). A guided path through the code for a reviewer, with commands to check the claims yourself: [REVIEWING.md](REVIEWING.md). Reporting a vulnerability: [SECURITY.md](SECURITY.md).
 
@@ -38,9 +38,14 @@ Details, with the code that backs each claim: [security model](docs/security.md)
 ### With Docker
 
 ```bash
-docker build -t mimicway .
-docker run --rm -p 7342:7342 -v mimicway-data:/data mimicway
+docker run --rm -p 7342:7342 -v mimicway-data:/data ghcr.io/eoth/mimicway
 ```
+
+The image is published for amd64 and arm64 with each release, signed and with its build provenance ([verifying a release](SECURITY.md#verifying-a-release)). To build it yourself instead: `docker build -t mimicway .`.
+
+### Binary
+
+Each [release](https://github.com/Eoth/mimicway/releases) has a single-file binary for Linux (x86_64 and arm64, static), macOS (Intel and Apple Silicon) and Windows, with the UI inside. Unpack it and run `./mimicway`.
 
 Open <http://localhost:7342>.
 

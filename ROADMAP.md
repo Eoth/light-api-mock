@@ -18,7 +18,7 @@ Each item has an identifier that never changes, a size (S: a day or less, M: a f
 
 ## Order of work
 
-1. [Ready for an international launch](#1-ready-for-an-international-launch): R1 to R11 (R11 before R9).
+1. [Ready for an international launch](#1-ready-for-an-international-launch): R2, R10, R5, R6, R11, R9.
 2. [Trust and operations](#2-trust-and-operations): T1 to T11.
 3. [Make it indispensable](#3-make-it-indispensable): U1 to U16, in the listed order.
 4. [Engineering backlog](#4-engineering-backlog): taken alongside, when they unblock an item above.
@@ -27,13 +27,15 @@ Each item has an identifier that never changes, a size (S: a day or less, M: a f
 
 ### R2. Publish signed releases
 
-**Decision needed** (registry and signing identity) · Size M
+Size S (what is left)
 
-**Why.** Today every user builds from source, which is exactly the long review companies refused. A signed, reproducible artifact with its bill of materials can be approved once and reused.
+**Why.** Today every user builds from source, which is exactly the long review companies refused. A signed artifact with its bill of materials can be approved once and reused.
 
-**What.** A release workflow on tags: binaries for Linux (x86_64, aarch64, static musl), macOS (universal) and Windows; a multi-architecture image on GHCR; a CycloneDX SBOM for each; build provenance (SLSA level 3 through GitHub's attestations) and keyless signatures (cosign); checksums. The release notes come from the changelog.
+**Progress.** `.github/workflows/release.yml` (checked with actionlint) builds, on a `vX.Y.Z` tag, static Linux binaries (x86_64, arm64), macOS (Intel, Apple Silicon) and Windows binaries with the UI inside, a multi-architecture image on GHCR assembled from those binaries, CycloneDX SBOMs for the crates and the shipped UI packages, checksums, build provenance attestations for everything, and a keyless cosign signature of the image. The release procedure is in CONTRIBUTING.md and the verification commands in SECURITY.md.
 
-**Done when.** `cosign verify` and `gh attestation verify` succeed on the published image and binaries, and the README quick start uses the published image instead of `docker build`.
+**What.** Cut the first release (0.2.0) with it, make the GHCR package public, and fix whatever the first run reveals.
+
+**Done when.** `cosign verify` and `gh attestation verify` succeed on the published image and binaries, and the README quick start runs as written.
 
 ### R5. Complete the documentation screenshots
 
@@ -79,7 +81,7 @@ Size S
 
 ### R10. Public supply-chain score
 
-**Decision needed** (the repository must be public, and results are published to the OpenSSF) · Size S
+**Decision needed** (the repository must be public, and results are published to the OpenSSF) Â· Size S
 
 **Why.** Reviewers increasingly start from the OpenSSF Scorecard: it checks pinned dependencies, branch protection, signed releases, CI tests and more, and shows the result as a badge.
 
