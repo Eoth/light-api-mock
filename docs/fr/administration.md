@@ -15,7 +15,11 @@ Quelques fonctionnalités qui portent sur l'ensemble, depuis la barre de navigat
 **« Import »** charge un fichier exporté auparavant (ou un exemple comme [examples/devops-toolchain.json](../../examples/devops-toolchain.json)). Deux modes sont proposés :
 
 - **Remplacer tout** : la configuration importée remplace entièrement la configuration actuelle.
-- **Fusionner (ajouter les manquants)** : les services et groupes importés s'ajoutent à ceux qui existent, sans rien supprimer.
+- **Fusionner (ajouter les manquants)** : les services et groupes importés s'ajoutent à ceux qui existent, sans rien supprimer ; un groupe qui existe déjà sous le même nom, ou un service qui existe déjà sous le même nom dans le même groupe, reste tel quel.
+
+Avant tout changement, la fenêtre indique combien de services et de groupes contient le fichier ; « Annuler » laisse la configuration intacte.
+
+![La fenêtre d'import pour un fichier qui contient 1 service et 1 groupe : Remplacer tout, Fusionner (ajouter les manquants) ou Annuler](screenshots/administration-import-dialog.png)
 
 > Comme pour tout changement, une [sauvegarde automatique](backups-and-restore.md) de l'état précédent est écrite avant l'import : une erreur reste réversible.
 
@@ -25,6 +29,10 @@ Quelques fonctionnalités qui portent sur l'ensemble, depuis la barre de navigat
 
 - Une **confirmation explicite** est exigée : le bouton de confirmation ne se déverrouille qu'une fois un mot-clé exact saisi, si bien qu'on ne peut pas le cliquer par accident.
 - Une [sauvegarde spéciale](backups-and-restore.md), hors de portée de la rotation normale pendant 30 jours, est écrite juste avant, pour permettre un retour en arrière.
+
+Le mot-clé est `RESET` : le bouton de confirmation reste grisé tant qu'il n'est pas saisi exactement, en majuscules.
+
+![La confirmation de réinitialisation avec le mot-clé RESET saisi : le bouton « Réinitialiser » est déverrouillé](screenshots/administration-reset-confirmation.png)
 
 ## Mode sombre
 

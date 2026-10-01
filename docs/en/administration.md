@@ -15,7 +15,11 @@ A few features that apply to everything, from the navigation bar at the top of t
 **"Import"** loads a file exported earlier (or an example such as [examples/devops-toolchain.json](../../examples/devops-toolchain.json)). Two modes are offered:
 
 - **Replace everything**: the imported configuration replaces the current one entirely.
-- **Merge (add what is missing)**: the imported services and groups are added to the existing ones, without removing anything.
+- **Merge (add what is missing)**: the imported services and groups are added to the existing ones, without removing anything; a group that already exists under the same name, or a service that already exists under the same name in the same group, is left as it is.
+
+Before anything changes, the dialog says how many services and groups the file holds; "Cancel" leaves the configuration untouched.
+
+![The import dialog for a file holding 1 service and 1 group: Replace everything, Merge (add what is missing) or Cancel](screenshots/administration-import-dialog.png)
 
 > As for any change, an [automatic backup](backups-and-restore.md) of the previous state is written before the import: a mistake can be undone.
 
@@ -25,6 +29,10 @@ A few features that apply to everything, from the navigation bar at the top of t
 
 - An **explicit confirmation** is required: the confirm button only unlocks once you type an exact keyword, so it cannot be clicked by accident.
 - A [special backup](backups-and-restore.md), out of reach of the normal rotation for 30 days, is written right before, to allow going back.
+
+The keyword is `RESET`: the confirm button stays greyed out until it is typed exactly, in capitals.
+
+![The reset confirmation with the keyword RESET typed: the "Reset everything" button is unlocked](screenshots/administration-reset-confirmation.png)
 
 ## Dark mode
 

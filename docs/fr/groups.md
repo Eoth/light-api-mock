@@ -31,7 +31,11 @@ Chaque groupe a deux catégories d'utilisateurs :
 
 Un **super-admin**, quand il y en a un de configuré, peut gérer tous les groupes.
 
-> Quand l'authentification est désactivée sur votre Mimicway, tout le monde peut tout faire : administrateurs et membres de groupe ne sont alors qu'indicatifs.
+**« Gérer »** sur un groupe ouvre ses listes d'administrateurs et de membres : saisissez un nom d'utilisateur puis cliquez sur **+** pour l'ajouter, ou sur **×** pour le retirer. Chaque changement est enregistré aussitôt.
+
+![Un groupe ouvert avec « Gérer » : son administratrice (alice) et ses membres (bob, carol), chaque liste avec un champ pour en ajouter](screenshots/group-members.png)
+
+> Quand l'authentification est désactivée sur votre Mimicway, tout le monde peut tout faire : l'interface masque alors les listes d'administrateurs et de membres, qui ne protégeraient rien.
 
 ## L'état déplié ou replié est conservé pendant la navigation
 

@@ -31,7 +31,11 @@ Each group has two kinds of users:
 
 A **super-admin**, when one is configured, can manage every group.
 
-> When authentication is off on your Mimicway, everyone can do everything: group admins and members are then informative only.
+**"Manage"** on a group opens its lists of admins and members: type a user name and click **+** to add it, or **×** to remove it. Each change is saved at once.
+
+![A group opened with "Manage": its admin (alice) and its members (bob, carol), each list with a field to add more](screenshots/group-members.png)
+
+> When authentication is off on your Mimicway, everyone can do everything: the interface then hides the lists of admins and members, which would protect nothing.
 
 ## The expanded or collapsed state is kept while you navigate
 
