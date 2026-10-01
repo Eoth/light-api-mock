@@ -14,7 +14,18 @@ import { fileURLToPath } from 'node:url';
 
 // Git pathspecs of the files whose comments must stay in English ("*" stays within a directory, "**" crosses them).
 // A path joins the list once its comments are translated, so that it cannot slip back.
-export const COVERED = ['src/**/*.rs', 'tests/**/*.rs', 'build.rs', 'scripts/*.mjs'];
+export const COVERED = [
+  'src/**/*.rs',
+  'tests/**/*.rs',
+  'build.rs',
+  'scripts/*.mjs',
+  'frontend/src/main.js',
+  'frontend/src/lib/api.js',
+  'frontend/src/lib/auth.svelte.js',
+  'frontend/src/lib/i18n.svelte.js',
+  'frontend/src/lib/legacy-storage.js',
+  'frontend/src/lib/runtime-config.js',
+];
 
 // Frequent French words that English comments do not use, with and without their accents (comments are often typed
 // without them). Words that English shares are left out: "en" (a language code), "est" (a time zone), "par", "cas"

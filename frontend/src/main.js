@@ -6,12 +6,9 @@ import { migrateLegacyStorage } from './lib/legacy-storage.js';
 import './tokens-aurora.css';
 import './app.css';
 
-// Charge la configuration runtime (URL de base de l'API, cf
-// lib/runtime-config.js) AVANT le montage de l'app : tout appel API declenche
-// par le montage (ex. GET /api/auth/status) doit deja connaitre la bonne
-// cible. IIFE plutot qu'un top-level await : la cible de build esbuild
-// configuree par Vite ne le supporte pas (ecrase silencieusement en
-// production sinon).
+// The runtime configuration (base URL of the API, lib/runtime-config.js) is loaded before the app is mounted: the API
+// calls the mount makes (GET /api/auth/status...) need the right target. An async function rather than a top-level
+// await, which Vite's default build target (Chrome 87, Firefox 78, Safari 14) does not support: the build would fail.
 (async () => {
   // Before anything reads the saved language, theme or session.
   migrateLegacyStorage();

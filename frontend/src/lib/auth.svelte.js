@@ -1,13 +1,9 @@
-// Etat d'authentification global (Svelte 5 $state).
-// Quand auth.enabled=false, pas de login requis — tout est accessible.
-// Quand auth.enabled=true, le token Keycloak est stocke ici et envoye
-// automatiquement dans les headers HTTP par api.js.
+// Authentication state of the whole UI. With authentication off, nothing asks for a login. With it on, the access
+// token is kept here, sent by api.js with every request and saved in localStorage so that a reload keeps the session.
 export const auth = $state({
   enabled: false,
-  // Pilote uniquement l'affichage du bouton "Reset complet" quand enabled=false
-  // (quand enabled=true, la visibilite suit isSuperAdmin). Ce n'est pas une
-  // mesure de securite : le backend reste seul autoritaire sur le droit reel
-  // d'executer le reset (require_super_admin cote serveur).
+  // Whether the reset button shows when authentication is off; with it on, the button follows isSuperAdmin. Display
+  // only: the server alone decides who may reset (require_super_admin).
   showResetButton: false,
   token: null,
   refreshToken: null,
