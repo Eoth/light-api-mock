@@ -40,6 +40,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - With `AUTH_ENABLED=true`, only the management API (`/api/...`) requires a token, as documented. The mocked and proxied service routes required one too, which broke every mock for the applications under test and forwarded the Mimicway token to the real backends on proxied rules.
 
 ### Fixed
+- `index.html` pointed to a `/favicon.svg` that was never shipped, so every page load ended with a 404: the UI now has its icon, and a unit test fails when the page refers to a public file that does not exist.
 - Building the Kafka feature on Linux needs the libcurl headers, which librdkafka links; the CI job installs them and the README and contribution guide list them.
 - In the request log, long paths and target URLs widened the table past its container and hid the status column: the cells never truncated, since a table cell ignores `max-width` in automatic table layout.
 - The Gloo Edge example served Mimicway under `/mimicway`, where its UI could not load its assets nor reach the API (they are requested from the root); it now routes the whole host. The Deployment used a rolling update, which ran the new pod next to the old one on the same volume, both writing the configuration: it now recreates the pod. The memory limit (64 MiB) left no room for the 10 MiB request bodies Mimicway buffers; it is 256 MiB. The volume no longer names a storage class that most clusters lack.
