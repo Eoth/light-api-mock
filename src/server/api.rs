@@ -296,6 +296,12 @@ async fn put_config(
         }
     }
 
+    if let Some((service, group)) = config.unknown_group_references().first() {
+        return Err(AppError::Validation(format!(
+            "Service \"{service}\" refers to the group \"{group}\", which is not defined in this configuration."
+        )));
+    }
+
     ensure_group_codes(&mut config.groups);
 
     state.store.replace(config).await.map_err(AppError::Store)?;
@@ -2685,6 +2691,24 @@ mod tests {
             .unwrap();
         assert_eq!(status.len(), 1);
         assert_eq!(status[0].group_name.as_deref(), Some("team-a"));
+    }
+
+    #[tokio::test]
+    async fn put_config_refuses_a_service_in_an_undefined_group() {
+        let base = spawn_test_app(MockConfig::empty()).await;
+        let config = MockConfig {
+            services: vec![svc_named("orphan", Some("ghost"))],
+            groups: vec![],
+        };
+        let resp = reqwest::Client::new()
+            .put(format!("{base}/config"))
+            .json(&config)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        let body: serde_json::Value = resp.json().await.unwrap();
+        assert!(body["error"].as_str().unwrap().contains("ghost"));
     }
 
     #[tokio::test]

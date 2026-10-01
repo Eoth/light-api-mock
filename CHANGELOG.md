@@ -19,6 +19,7 @@ entre versions mineures.
 - With `AUTH_ENABLED=true`, only the management API (`/api/...`) requires a token, as documented. The mocked and proxied service routes required one too, which broke every mock for the applications under test and forwarded the lightMock token to the real backends on proxied rules.
 
 ### Fixed
+- `PUT /api/config` (and the UI import) refuses a service that refers to a group the configuration does not define; such a service silently lost its group URL prefix and permissions.
 - Traffic observation and rule suggestions now work for services that belong to a group; they never started for them (the group was looked up by code instead of name).
 - Non-ASCII path parameters are decoded as UTF-8: `/users/%C3%A9t%C3%A9` gives `été` (it gave `Ã©tÃ©`), in any script; patterns written with non-ASCII characters match their percent-encoded requests. `%` followed by anything but two hex digits is kept as is.
 - SIGTERM (Kubernetes, Docker, systemd) now triggers the graceful shutdown that drains pending configuration writes; only Ctrl+C did, so a pod stop could lose the last changes.
