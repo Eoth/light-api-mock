@@ -9,6 +9,9 @@ entre versions mineures.
 
 ## [Unreleased]
 
+### Security
+- With `AUTH_ENABLED=true`, only the management API (`/api/...`) requires a token, as documented. The mocked and proxied service routes required one too, which broke every mock for the applications under test and forwarded the lightMock token to the real backends on proxied rules.
+
 ### Fixed
 - SIGTERM (Kubernetes, Docker, systemd) now triggers the graceful shutdown that drains pending configuration writes; only Ctrl+C did, so a pod stop could lose the last changes.
 

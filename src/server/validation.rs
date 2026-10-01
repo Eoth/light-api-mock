@@ -44,34 +44,12 @@ pub fn is_internal_route(path: &str) -> bool {
         .any(|prefix| lower == *prefix || lower.starts_with(prefix))
 }
 
-// Sous-ensemble volontairement RESTREINT de `is_internal_route` : les memes
-// prefixes SAUF "/api"/"/api/". Utilise exclusivement par `auth_middleware`
-// (src/auth/middleware.rs) pour laisser un navigateur SANS token charger la
-// coquille de la SPA (index.html + bundle JS/CSS + favicon) quand
-// AUTH_ENABLED=true — sans quoi le JS qui affiche l'ecran de connexion
-// (LoginForm.svelte) ne peut lui-meme jamais etre telecharge (probleme de
-// poule et l'oeuf). Aucun `/api/*` ne doit JAMAIS apparaitre ici : ce serait
-// exactement l'affaiblissement de la protection API que ce bypass doit
-// eviter. Les 4 routes /api/auth/* deja exemptees dans auth_middleware
-// restent gerees separement, par egalite stricte de chemin (pas par ce
-// prefixe). `/runtime-config.json` est inclus ici pour la meme raison que
-// les assets statiques : le frontend doit pouvoir le lire AVANT de savoir
-// s'il est authentifie (c'est ce fichier qui lui indique ou se trouve l'API).
-const STATIC_ASSET_PATH_PREFIXES: &[&str] = &[
-    "/index.html",
-    "/assets/",
-    "/favicon.ico",
-    "/runtime-config.json",
-];
-
-pub fn is_static_asset_route(path: &str) -> bool {
-    if path == "/" || path.is_empty() {
-        return true;
-    }
-    let lower = path.to_lowercase();
-    STATIC_ASSET_PATH_PREFIXES
-        .iter()
-        .any(|prefix| lower == *prefix || lower.starts_with(prefix))
+/// True for the management API (`/api` and everything under it, whatever the case), the only surface that
+/// requires a token when authentication is enabled. Matched by path segment, so a service named `apis` or
+/// `api-gateway` is not mistaken for it.
+pub fn is_management_api_route(path: &str) -> bool {
+    let lower = path.to_ascii_lowercase();
+    lower == "/api" || lower.starts_with("/api/")
 }
 
 fn is_dangerous_listen_path(_listen_path: &str) -> bool {
@@ -389,32 +367,30 @@ mod tests {
     }
 
     #[test]
-    fn is_static_asset_route_covers_spa_shell() {
-        assert!(is_static_asset_route("/"));
-        assert!(is_static_asset_route(""));
-        assert!(is_static_asset_route("/index.html"));
-        assert!(is_static_asset_route("/assets/main.js"));
-        assert!(is_static_asset_route("/assets/index-B2Cp0FJn.css"));
-        assert!(is_static_asset_route("/favicon.ico"));
-        assert!(is_static_asset_route("/runtime-config.json"));
+    fn management_api_route_covers_the_api_whatever_the_case() {
+        assert!(is_management_api_route("/api"));
+        assert!(is_management_api_route("/api/services"));
+        assert!(is_management_api_route("/api/auth/me"));
+        assert!(is_management_api_route("/API/services"));
+        assert!(is_management_api_route("/api/../api/config"));
     }
 
     #[test]
-    fn is_static_asset_route_never_matches_api_routes() {
-        // Regression cible : ce bypass ne doit JAMAIS s'etendre a /api/*,
-        // sans quoi auth_middleware laisserait passer des routes protegees.
-        assert!(!is_static_asset_route("/api"));
-        assert!(!is_static_asset_route("/api/services"));
-        assert!(!is_static_asset_route("/api/auth/me"));
-        // Piege de prefixe potentiel : "/api/assets/x" NE commence PAS par
-        // "/assets/", donc aucune collision malgre le nom partage "assets".
-        assert!(!is_static_asset_route("/api/assets/x"));
-    }
-
-    #[test]
-    fn is_static_asset_route_does_not_match_user_service_routes() {
-        assert!(!is_static_asset_route("/my-svc/foo"));
-        assert!(!is_static_asset_route("/insee/v4/sirene/123"));
+    fn management_api_route_excludes_the_spa_shell_and_service_traffic() {
+        for path in [
+            "/",
+            "",
+            "/index.html",
+            "/assets/main.js",
+            "/favicon.ico",
+            "/runtime-config.json",
+            "/my-svc/foo",
+            "/abcde/my-svc/foo",
+            "/apis/x",
+            "/api-gateway/x",
+        ] {
+            assert!(!is_management_api_route(path), "{path}");
+        }
     }
 
     #[test]
