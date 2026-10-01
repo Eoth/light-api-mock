@@ -85,7 +85,7 @@ pub fn validate_service(service: &Service) -> Result<(), ValidationError> {
         return error(
             "name",
             tr(
-                "The name \"{0}\" is reserved by lightMock (forbidden names: {1}).",
+                "The name \"{0}\" is reserved by Mimicway (forbidden names: {1}).",
                 &[&name, &RESERVED_NAMES.join(", ")],
             ),
         );
@@ -118,7 +118,7 @@ pub fn validate_service(service: &Service) -> Result<(), ValidationError> {
         return error(
             "listen_path",
             tr(
-                "The resulting pattern \"{0}\" would conflict with an internal route of lightMock.",
+                "The resulting pattern \"{0}\" would conflict with an internal route of Mimicway.",
                 &[&effective],
             ),
         );

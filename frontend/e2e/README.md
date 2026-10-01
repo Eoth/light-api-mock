@@ -1,6 +1,6 @@
 # End-to-end tests
 
-Playwright tests that drive a real lightMock binary through a real browser. Two styles live side by side:
+Playwright tests that drive a real Mimicway binary through a real browser. Two styles live side by side:
 
 - **Scenarios** (`scenarios/*.scenarios.json`), replayed by `scenario-runner.js`: readable lists of UI steps that target elements by logical names, never by hard-coded selectors.
 - **Classic specs** (`*.spec.js`, `*.spec.mjs`): for what scenarios do not express (API-only checks, dedicated server instances, complex assertions).
@@ -8,16 +8,16 @@ Playwright tests that drive a real lightMock binary through a real browser. Two 
 ## Run
 
 ```bash
-# From the repository root: a lightMock on :7342 with an empty data directory
+# From the repository root: a Mimicway on :7342 with an empty data directory
 mkdir -p data
-DATA_PATH=./data STATIC_DIR=./frontend/dist ./target/debug/light-mock &
+DATA_PATH=./data STATIC_DIR=./frontend/dist ./target/debug/mimicway &
 
 cd frontend
 npx playwright install chromium   # once
 npm run test:e2e
 ```
 
-The suite reads the interface in English, its source language (`playwright.config.js`); `i18n.spec.js` checks the French interface and the language switch. A few specs start their own lightMock (authentication, API base URL); they need `cargo build` first. The Kafka specs are skipped unless the binary was built with `--features messaging-kafka`.
+The suite reads the interface in English, its source language (`playwright.config.js`); `i18n.spec.js` checks the French interface and the language switch. A few specs start their own Mimicway (authentication, API base URL); they need `cargo build` first. The Kafka specs are skipped unless the binary was built with `--features messaging-kafka`.
 
 ## Layout
 
@@ -100,7 +100,7 @@ The images of `docs/` are taken by this suite, so they follow the interface inst
 - `playwright.docs-screenshots.config.js` sets `DOCS_SCREENSHOTS` and runs only the files that take screenshots.
 
 ```bash
-npm run docs:screenshots   # from frontend/, with lightMock running on :7342
+npm run docs:screenshots   # from frontend/, with Mimicway running on :7342
 ```
 
 Images are written to `docs/screenshots/` under the names the pages reference; `node scripts/check-doc-links.mjs` (run by CI) fails when a page references an image that does not exist. The three Kafka images need a binary built with `--features messaging-kafka`. States that no test reaches yet have no image; covering them is roadmap item R5.

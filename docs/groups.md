@@ -29,7 +29,7 @@ Each group has two kinds of users:
 
 A **super-admin**, when one is configured, can manage every group.
 
-> When authentication is off on your lightMock, everyone can do everything: group admins and members are then informative only.
+> When authentication is off on your Mimicway, everyone can do everything: group admins and members are then informative only.
 
 ## The expanded or collapsed state is kept while you navigate
 

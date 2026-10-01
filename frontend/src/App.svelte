@@ -33,14 +33,14 @@
   let view = $state('list');
   let loading = $state(true);
   let darkMode = $state(
-    typeof localStorage !== 'undefined' && localStorage.getItem('lightmock-theme') !== null
-      ? localStorage.getItem('lightmock-theme') === 'dark'
+    typeof localStorage !== 'undefined' && localStorage.getItem('mimicway-theme') !== null
+      ? localStorage.getItem('mimicway-theme') === 'dark'
       : typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches
   );
 
   $effect(() => {
     document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');
-    localStorage.setItem('lightmock-theme', darkMode ? 'dark' : 'light');
+    localStorage.setItem('mimicway-theme', darkMode ? 'dark' : 'light');
   });
 
   const demoService = {
@@ -219,7 +219,7 @@
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `lightmock-config-${new Date().toISOString().slice(0,10)}.json`;
+      a.download = `mimicway-config-${new Date().toISOString().slice(0,10)}.json`;
       a.click();
       URL.revokeObjectURL(url);
       showNotification(t("Configuration exported"), 'success');
@@ -332,7 +332,7 @@
   <header class="app-header">
     <div class="header-content">
       <button type="button" class="app-title-btn" onclick={handleBack} data-testid="app-title-button">
-        <h1 class="app-title">lightMock</h1>
+        <h1 class="app-title">Mimicway</h1>
       </button>
       <p class="app-subtitle">{t("Smart mock & proxy")}</p>
       <div class="header-actions">

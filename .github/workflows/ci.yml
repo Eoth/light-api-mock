@@ -112,12 +112,12 @@ jobs:
       - run: cargo build
       - working-directory: frontend
         run: npm ci --ignore-scripts && npm run build && npx playwright install --with-deps chromium
-      - name: Start lightMock
+      - name: Start Mimicway
         run: |
           mkdir -p data
-          DATA_PATH=./data STATIC_DIR=./frontend/dist ./target/debug/light-mock > lightmock.log 2>&1 &
+          DATA_PATH=./data STATIC_DIR=./frontend/dist ./target/debug/mimicway > mimicway.log 2>&1 &
           for i in $(seq 1 50); do curl -sf http://localhost:7342/api/health && exit 0; sleep 0.2; done
-          cat lightmock.log; exit 1
+          cat mimicway.log; exit 1
       - working-directory: frontend
         run: npx playwright test
       - if: failure()
@@ -126,17 +126,17 @@ jobs:
           name: e2e-report
           path: |
             frontend/test-results
-            lightmock.log
+            mimicway.log
 
   docker:
     name: Container image (build, vulnerability scan)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - run: docker build -t lightmock:ci .
+      - run: docker build -t mimicway:ci .
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: lightmock:ci
+          image-ref: mimicway:ci
           severity: CRITICAL,HIGH
           ignore-unfixed: true
           exit-code: "1"

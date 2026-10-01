@@ -24,7 +24,7 @@ export const LOCALES = [
   { code: 'fr', label: 'Français' },
 ];
 
-const STORAGE_KEY = 'lightmock-locale';
+const STORAGE_KEY = 'mimicway-locale';
 
 function detectLocale() {
   try {

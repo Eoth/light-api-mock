@@ -170,7 +170,7 @@ vi.mock('../lib/api.js', () => ({
 
 // Words that are the same in every language: product name, protocol and data-format identifiers, and examples of
 // code. Anything else visible must come from t.
-const UNTRANSLATED = new Set(['lightMock', 'GET', 'POST', 'mock', 'proxy', 'no-rule', 'Content-Type', 'application/json',
+const UNTRANSLATED = new Set(['Mimicway', 'GET', 'POST', 'mock', 'proxy', 'no-rule', 'Content-Type', 'application/json',
   'orders.in', '/user/role', 'Envelope/Body/id', 'English', 'Français']);
 
 const marked = (text) => `⟦${text}⟧`;

@@ -14,10 +14,10 @@ fn free_port() -> u16 {
 
 #[tokio::test]
 async fn sigterm_drains_pending_writes_and_exits_cleanly() {
-    let data_dir = std::env::temp_dir().join(format!("lightmock-sigterm-{}", fastrand::u64(..)));
+    let data_dir = std::env::temp_dir().join(format!("mimicway-sigterm-{}", fastrand::u64(..)));
     std::fs::create_dir_all(&data_dir).unwrap();
     let port = free_port();
-    let mut child = Command::new(env!("CARGO_BIN_EXE_light-mock"))
+    let mut child = Command::new(env!("CARGO_BIN_EXE_mimicway"))
         .env("DATA_PATH", &data_dir)
         .env("STATIC_DIR", &data_dir)
         .env("PORT", port.to_string())

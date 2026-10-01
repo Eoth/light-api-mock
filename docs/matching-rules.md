@@ -12,7 +12,7 @@ A [service](services.md) in mock mode can hold **several rules**. Each rule says
 
 ![Form to create a rule (method, sub-path, action)](screenshots/rule-create-form.png)
 
-**Opening a `proxy` rule on a service that has since become purely mocked**: the form shows it as `mock`, the only action left. Nothing changes until you save; if you do save the rule, even for another change such as a condition, lightMock first warns that saving will really turn the rule from `proxy` into `mock`, and lets you confirm ("Save anyway") or go back.
+**Opening a `proxy` rule on a service that has since become purely mocked**: the form shows it as `mock`, the only action left. Nothing changes until you save; if you do save the rule, even for another change such as a condition, Mimicway first warns that saving will really turn the rule from `proxy` into `mock`, and lets you confirm ("Save anyway") or go back.
 
 ## Conditions: targeting a request precisely
 

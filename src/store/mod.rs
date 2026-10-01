@@ -1061,9 +1061,9 @@ mod tests {
     #[test]
     fn data_path_from_env() {
         let _guard = ENV_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
-        unsafe { std::env::set_var("DATA_PATH", "/mnt/pvc/lightmock") };
+        unsafe { std::env::set_var("DATA_PATH", "/mnt/pvc/mimicway") };
         let p = MockStore::data_path();
-        assert_eq!(p, PathBuf::from("/mnt/pvc/lightmock"));
+        assert_eq!(p, PathBuf::from("/mnt/pvc/mimicway"));
         unsafe { std::env::remove_var("DATA_PATH") };
     }
 

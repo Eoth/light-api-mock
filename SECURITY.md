@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-lightMock follows [semantic versioning](https://semver.org) (see [CHANGELOG.md](CHANGELOG.md)). While the version is `0.x`, only the **latest release** receives security fixes; maintenance branches will exist from `1.0.0` on.
+Mimicway follows [semantic versioning](https://semver.org) (see [CHANGELOG.md](CHANGELOG.md)). While the version is `0.x`, only the **latest release** receives security fixes; maintenance branches will exist from `1.0.0` on.
 
 | Version | Supported |
 |---|---|
@@ -13,16 +13,16 @@ lightMock follows [semantic versioning](https://semver.org) (see [CHANGELOG.md](
 
 **Please do not open a public issue** for a potential vulnerability (information leak, authentication bypass, injection, path traversal, denial of service, sandbox escape...).
 
-Report it privately through [GitHub Security Advisories](https://github.com/eoth/light-api-mock/security/advisories/new). If that channel is not available to you, write to **etokan.devs@gmail.com**.
+Report it privately through [GitHub Security Advisories](https://github.com/Eoth/mimicway/security/advisories/new). If that channel is not available to you, write to **etokan.devs@gmail.com**.
 
 Please include, as far as possible:
 - a description of the issue and its impact;
-- steps to reproduce (lightMock version, relevant configuration such as `AUTH_ENABLED`, `BIND_ADDRESS`, the requests involved);
+- steps to reproduce (Mimicway version, relevant configuration such as `AUTH_ENABLED`, `BIND_ADDRESS`, the requests involved);
 - a fix or mitigation, if you have one.
 
 ### Response times
 
-lightMock is maintained on a best-effort basis: these are targets, not a contractual SLA.
+Mimicway is maintained on a best-effort basis: these are targets, not a contractual SLA.
 
 | Step | Target |
 |---|---|
@@ -40,10 +40,10 @@ In scope:
 - the provided `Dockerfile` and Kubernetes manifests (`k8s/`).
 
 Out of scope:
-- the services that users choose to mock or proxy (`real_target_url`): lightMock does not control their security;
+- the services that users choose to mock or proxy (`real_target_url`): Mimicway does not control their security;
 - Keycloak or Kafka deployments provided by the user;
-- vulnerabilities of third-party dependencies with no demonstrated impact on lightMock: please report them upstream. Dependencies are checked continuously in CI (`cargo deny`, `npm audit`, image scan).
+- vulnerabilities of third-party dependencies with no demonstrated impact on Mimicway: please report them upstream. Dependencies are checked continuously in CI (`cargo deny`, `npm audit`, image scan).
 
-## How lightMock is secured
+## How Mimicway is secured
 
 [docs/security.md](docs/security.md) describes the threat model, every outbound network flow, the defaults and how to harden a deployment. [REVIEWING.md](REVIEWING.md) is a guide for a security or code review of the project.

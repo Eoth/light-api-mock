@@ -1,4 +1,4 @@
-# lightMock - build from source on Windows (PowerShell).
+# Mimicway - build from source on Windows (PowerShell).
 # Usage: .\scripts\bootstrap-windows.ps1
 # Safe to run several times: installed tools are kept.
 
@@ -79,7 +79,7 @@ Write-Ok "Server built in target\release\"
 
 Write-Host "`n" -NoNewline
 Write-Host "================================================================" -ForegroundColor Green
-Write-Host "  lightMock is ready. Start it with:" -ForegroundColor Green
-Write-Host '  .\target\release\light-mock.exe' -ForegroundColor White
+Write-Host "  Mimicway is ready. Start it with:" -ForegroundColor Green
+Write-Host '  .\target\release\mimicway.exe' -ForegroundColor White
 Write-Host "  then open http://localhost:7342" -ForegroundColor Green
 Write-Host "================================================================" -ForegroundColor Green

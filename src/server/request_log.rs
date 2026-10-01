@@ -15,7 +15,7 @@ pub fn max_body_size() -> usize {
         .unwrap_or(DEFAULT_MAX_BODY_SIZE)
 }
 
-/// A request lightMock really received, kept so that the rule tester can replay a rule being edited against real
+/// A request Mimicway really received, kept so that the rule tester can replay a rule being edited against real
 /// traffic, read-only. `path_params` holds the service-level parameters only, before the matching rule's sub-path
 /// added its own: the tester recomputes the sub-path parameters for the draft rule, which may differ from the rule
 /// that matched then.

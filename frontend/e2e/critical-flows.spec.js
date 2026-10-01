@@ -405,7 +405,7 @@ test.describe('UI critical paths', () => {
   });
 
   // "homepage loads with breadcrumb navigation" migre vers frontend/e2e/scenario-runner.spec.js
-  // (scenario "La page d'accueil se charge avec le titre lightMock" dans
+  // (scenario "La page d'accueil se charge avec le titre Mimicway" dans
   // frontend/e2e/scenarios/home.scenarios.json).
 
   // "service list shows created services in group" migre vers frontend/e2e/scenario-runner.spec.js

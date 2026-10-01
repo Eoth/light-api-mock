@@ -2,6 +2,7 @@ import { mount } from 'svelte';
 import App from './App.svelte';
 import { loadRuntimeConfig } from './lib/runtime-config.js';
 import { initLocale } from './lib/i18n.svelte.js';
+import { migrateLegacyStorage } from './lib/legacy-storage.js';
 import './tokens-aurora.css';
 import './app.css';
 
@@ -12,6 +13,8 @@ import './app.css';
 // configuree par Vite ne le supporte pas (ecrase silencieusement en
 // production sinon).
 (async () => {
+  // Before anything reads the saved language, theme or session.
+  migrateLegacyStorage();
   await Promise.all([loadRuntimeConfig(), initLocale()]);
   mount(App, { target: document.getElementById('app') });
 })();

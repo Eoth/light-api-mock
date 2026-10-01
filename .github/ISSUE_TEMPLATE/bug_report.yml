@@ -18,7 +18,7 @@ body:
   - type: dropdown
     id: deployment
     attributes:
-      label: How lightMock runs
+      label: How Mimicway runs
       options:
         - Binary on a workstation
         - Container (Docker, Podman, Compose)
@@ -44,7 +44,7 @@ body:
     id: logs
     attributes:
       label: Server log
-      description: The lines around the problem; RUST_LOG=light_mock=debug gives more detail.
+      description: The lines around the problem; RUST_LOG=mimicway=debug gives more detail.
       render: text
   - type: input
     id: settings

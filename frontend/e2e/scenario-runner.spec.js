@@ -127,7 +127,7 @@ test.describe('Runner data-driven (scenarios JSON) - lot 2', () => {
   });
 
   test('page d accueil affiche le titre (scenario JSON)', async ({ page }) => {
-    await runScenario(page, loadScenario('home.scenarios.json', "La page d'accueil se charge avec le titre lightMock"));
+    await runScenario(page, loadScenario('home.scenarios.json', "La page d'accueil se charge avec le titre Mimicway"));
   });
 
   test('liste affiche un service cree via l API (scenario JSON)', async ({ page, request }) => {
@@ -207,12 +207,12 @@ test.describe('Runner data-driven (scenarios JSON) - lot 3', () => {
   });
 
   test('UI servie sans aucun service (scenario JSON)', async ({ page }) => {
-    await runScenario(page, loadScenario('home.scenarios.json', "La page d'accueil se charge avec le titre lightMock"));
+    await runScenario(page, loadScenario('home.scenarios.json', "La page d'accueil se charge avec le titre Mimicway"));
   });
 
   test('UI accessible apres creation d un service (scenario JSON)', async ({ page, request }) => {
     await request.post(`${API}/services`, { data: validService('security-svc') });
-    await runScenario(page, loadScenario('home.scenarios.json', "La page d'accueil se charge avec le titre lightMock"));
+    await runScenario(page, loadScenario('home.scenarios.json', "La page d'accueil se charge avec le titre Mimicway"));
   });
 });
 

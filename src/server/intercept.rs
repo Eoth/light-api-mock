@@ -927,7 +927,7 @@ mod tests {
             axum::serve(listener, app).await.unwrap();
         });
 
-        // 4. A POST with query parameters, a custom header and a body, sent to lightMock (not to the target).
+        // 4. A POST with query parameters, a custom header and a body, sent to Mimicway (not to the target).
         let client = reqwest::Client::new();
         let resp = client
             .post(format!(

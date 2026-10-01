@@ -1,6 +1,6 @@
 <script>
   // Editeur de script Rhai avec autocompletion legere des fonctions natives
-  // lightMock. Liste des fonctions : source unique dans ../rhai-functions.js
+  // Mimicway. Liste des fonctions : source unique dans ../rhai-functions.js
   // (partagee avec la doc contextuelle affichee sous chaque editeur dans
   // RuleForm.svelte — ne pas dupliquer cette liste ici).
   //

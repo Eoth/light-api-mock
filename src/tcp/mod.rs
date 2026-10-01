@@ -3,7 +3,7 @@
 // without it, this module does not exist in the binary. Its schema and behavior live here, apart from
 // `models::MockConfig` (see `config.rs` for why).
 //
-// No relay mode: a TCP relay without matching adds nothing a mock is for, and only puts lightMock between a client
+// No relay mode: a TCP relay without matching adds nothing a mock is for, and only puts Mimicway between a client
 // and a server it could reach directly. So `TcpService` has no target, `TcpRule` has no proxy action, and a
 // connection that matches no rule is simply closed: a TCP mock never connects anywhere.
 //

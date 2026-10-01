@@ -22,7 +22,7 @@ test.describe('Security: route protection', () => {
   });
 
   // "UI is served on / even with no services" migre vers frontend/e2e/scenario-runner.spec.js
-  // (reutilise le scenario "La page d'accueil se charge avec le titre lightMock" de
+  // (reutilise le scenario "La page d'accueil se charge avec le titre Mimicway" de
   // frontend/e2e/scenarios/home.scenarios.json).
 
   test('API accepts service with empty listen_path (catch-all)', async ({ request }) => {
@@ -47,7 +47,7 @@ test.describe('Security: route protection', () => {
   });
 
   // "UI remains accessible after creating a valid service" migre vers frontend/e2e/scenario-runner.spec.js
-  // (reutilise le scenario "La page d'accueil se charge avec le titre lightMock" de
+  // (reutilise le scenario "La page d'accueil se charge avec le titre Mimicway" de
   // frontend/e2e/scenarios/home.scenarios.json).
 
   test('internal API routes remain accessible with services registered', async ({ request }) => {

@@ -1,7 +1,7 @@
 /* Tokens Aurora/ZAC — palette de couleurs, espacements, radius, typographie.
  * Source : design system ZAC Orion (zac-orion-scss@1.4.1)
  * Ce fichier contient uniquement les custom properties CSS.
- * Le framework Aurora complet (composants Angular) n'est PAS charge — lightMock
+ * Le framework Aurora complet (composants Angular) n'est PAS charge — Mimicway
  * utilise ses propres composants Svelte avec les tokens ZAC comme base. */
 
 .custom-dt, :root {

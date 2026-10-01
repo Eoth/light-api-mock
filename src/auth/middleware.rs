@@ -38,7 +38,7 @@ pub async fn auth_middleware(
     ];
     // Only the management API is protected. Every other path is either the SPA shell, which must load without a
     // token to show the login screen, or traffic of the mocked/proxied services: that traffic comes from the
-    // applications under test, which hold no lightMock token, and a token required here would then be forwarded
+    // applications under test, which hold no Mimicway token, and a token required here would then be forwarded
     // to the real backend by the proxy.
     if !crate::server::validation::is_management_api_route(&path)
         || no_auth_paths.iter().any(|p| path == *p)
@@ -124,7 +124,7 @@ mod tests {
             enabled: true,
             keycloak_url,
             realm: "test-realm".into(),
-            client_id: "lightmock".into(),
+            client_id: "mimicway".into(),
             super_admins,
             issuer: String::new(),
             show_reset_button: false,
@@ -403,7 +403,7 @@ mod tests {
 
     #[tokio::test]
     async fn mocked_service_traffic_needs_no_token_while_the_api_still_does() {
-        // The applications under test call the mocks with their own credentials (or none): requiring a lightMock
+        // The applications under test call the mocks with their own credentials (or none): requiring a Mimicway
         // token there broke every mock as soon as authentication was enabled, and would have forwarded that token
         // to the real backend on proxied rules.
         let service: crate::models::Service = serde_json::from_value(serde_json::json!({

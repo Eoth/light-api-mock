@@ -180,7 +180,7 @@ async fn login(
         .validate_token(&tokens.access_token)
         .await
         .map_err(|e| {
-            tracing::error!(error = %e, "login: Keycloak issued a token that lightMock refuses (check KEYCLOAK_ISSUER and KEYCLOAK_CLIENT_ID)");
+            tracing::error!(error = %e, "login: Keycloak issued a token that Mimicway refuses (check KEYCLOAK_ISSUER and KEYCLOAK_CLIENT_ID)");
             match e {
                 AuthError::KeycloakUnavailable(_) => AppError::Unavailable,
                 _ => AppError::Unauthorized,

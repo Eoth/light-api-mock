@@ -38,12 +38,18 @@ use std::sync::{Arc, RwLock};
 // authentication is on) and the script engine, then serves HTTP until SIGTERM or Ctrl+C.
 #[tokio::main]
 async fn main() {
+    let (filter, legacy_log_filter) = log_filter(std::env::var("RUST_LOG").ok().as_deref());
     tracing_subscriber::fmt()
         .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "light_mock=info".parse().unwrap()),
+            tracing_subscriber::EnvFilter::try_new(&filter)
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new(DEFAULT_LOG_FILTER)),
         )
         .init();
+    if legacy_log_filter {
+        tracing::warn!(
+            "RUST_LOG names light_mock, the former name of this program: read as mimicway, please update it"
+        );
+    }
 
     let bind_ip = bind_address().unwrap_or_else(|message| exit_with(&message));
 
@@ -136,10 +142,10 @@ async fn main() {
     if bind_ip.is_loopback() {
         tracing::info!(
             addr = %addr,
-            "lightMock listening on this machine only (set BIND_ADDRESS=0.0.0.0 to accept remote connections)"
+            "Mimicway listening on this machine only (set BIND_ADDRESS=0.0.0.0 to accept remote connections)"
         );
     } else {
-        tracing::info!(addr = %addr, "lightMock listening");
+        tracing::info!(addr = %addr, "Mimicway listening");
     }
 
     let listener = tokio::net::TcpListener::bind(&addr)
@@ -163,9 +169,23 @@ async fn main() {
     store_for_shutdown.flush().await;
 }
 
+const DEFAULT_LOG_FILTER: &str = "mimicway=info";
+
+/// The log filter: `RUST_LOG`, else Mimicway's informational messages. A filter written for the former name of the
+/// program (`light_mock=debug`) keeps working after the rename; the flag says it was translated, to report it.
+fn log_filter(rust_log: Option<&str>) -> (String, bool) {
+    match rust_log.map(str::trim).filter(|value| !value.is_empty()) {
+        Some(value) if value.contains("light_mock") => {
+            (value.replace("light_mock", "mimicway"), true)
+        }
+        Some(value) => (value.to_string(), false),
+        None => (DEFAULT_LOG_FILTER.to_string(), false),
+    }
+}
+
 /// Stops the start with a message meant for whoever configures the process, instead of a panic and its trace.
 fn exit_with(message: &str) -> ! {
-    eprintln!("lightMock cannot start: {message}");
+    eprintln!("Mimicway cannot start: {message}");
     std::process::exit(2)
 }
 
@@ -214,3 +234,8 @@ async fn shutdown_signal() {
     }
     tracing::info!("shutdown signal received");
 }
+
+// The crate root resolves `mod tests;` to src/tests.rs; the tests of this file sit next to it instead.
+#[cfg(test)]
+#[path = "main/tests.rs"]
+mod tests;

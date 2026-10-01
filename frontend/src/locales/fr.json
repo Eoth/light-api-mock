@@ -115,7 +115,7 @@
   "Signing in...": "Connexion...",
   "Sign in": "Se connecter",
   "The service name is required.": "Le nom du service est requis.",
-  "The name \"{0}\" is reserved by lightMock (forbidden names: {1}).": "Le nom \"{0}\" est reserve par lightMock (noms interdits : {1}).",
+  "The name \"{0}\" is reserved by Mimicway (forbidden names: {1}).": "Le nom \"{0}\" est reserve par Mimicway (noms interdits : {1}).",
   "A service name cannot contain a path separator (/ or \\).": "Le nom du service ne peut pas contenir de separateur de chemin (/ ou \\).",
   "A service name can only contain letters, digits, dashes (-) and underscores (_).": "Le nom du service ne peut contenir que des lettres, chiffres, tirets (-) et underscores (_).",
   "The target URL is required.": "L'URL cible est requise.",

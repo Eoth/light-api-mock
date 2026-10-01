@@ -19,10 +19,10 @@ import { fileURLToPath } from 'node:url';
 // celle qui sert la page elle-meme.
 //
 // Meme cas particulier que auth-static-assets.spec.js : ce spec demarre SES
-// PROPRES instances de lightMock (jamais l'instance partagee sur
+// PROPRES instances de Mimicway (jamais l'instance partagee sur
 // http://localhost:7342, cf frontend/e2e/README.md), car le test 2 a
 // justement besoin de DEUX instances sur deux ports distincts. Necessite le
-// binaire deja compile (`cargo build`, target/debug/light-mock(.exe)) et
+// binaire deja compile (`cargo build`, target/debug/mimicway(.exe)) et
 // frontend/dist deja buildee, comme le reste de la suite E2E qui suppose un
 // environnement pret.
 
@@ -31,7 +31,7 @@ const binaryPath = path.join(
   repoRoot,
   'target',
   'debug',
-  process.platform === 'win32' ? 'light-mock.exe' : 'light-mock',
+  process.platform === 'win32' ? 'mimicway.exe' : 'mimicway',
 );
 const staticDir = path.join(repoRoot, 'frontend', 'dist');
 
@@ -59,11 +59,11 @@ async function waitForHealth(baseUrl, timeoutMs = 15000) {
     await new Promise((r) => setTimeout(r, 150));
   }
   throw new Error(
-    `lightMock (instance dediee a ce spec) n'a pas demarre a temps sur ${baseUrl}: ${lastError}`,
+    `Mimicway (instance dediee a ce spec) n'a pas demarre a temps sur ${baseUrl}: ${lastError}`,
   );
 }
 
-async function spawnLightMock({ port, dataDir, extraEnv = {} }) {
+async function spawnMimicway({ port, dataDir, extraEnv = {} }) {
   const baseUrl = `http://127.0.0.1:${port}`;
   const child = spawn(binaryPath, [], {
     cwd: repoRoot,
@@ -83,11 +83,11 @@ async function spawnLightMock({ port, dataDir, extraEnv = {} }) {
 
 test.describe('URL de l API configurable independamment du Host du frontend', () => {
   test('comportement par defaut : /runtime-config.json renvoie une URL vide et l app fonctionne (co-localise)', async ({ page }) => {
-    const dataDir = mkdtempSync(path.join(tmpdir(), 'lightmock-apibase-default-'));
+    const dataDir = mkdtempSync(path.join(tmpdir(), 'mimicway-apibase-default-'));
     const port = await getFreePort();
     let child;
     try {
-      ({ child } = await spawnLightMock({ port, dataDir }));
+      ({ child } = await spawnMimicway({ port, dataDir }));
       const baseUrl = `http://127.0.0.1:${port}`;
 
       const configRes = await page.request.get(`${baseUrl}/runtime-config.json`);
@@ -98,7 +98,7 @@ test.describe('URL de l API configurable independamment du Host du frontend', ()
       // Preuve que l'app a bien appele /api/... en chemin relatif (comme
       // avant cette passe) et affiche la liste de services : le titre de la
       // page d'accueil est visible une fois le chargement initial termine.
-      await expect(page.getByText('lightMock')).toBeVisible();
+      await expect(page.getByText('Mimicway')).toBeVisible();
       await expect(page.locator('[data-testid="app-add-service-button"]')).toBeVisible();
     } finally {
       if (child) child.kill();
@@ -107,8 +107,8 @@ test.describe('URL de l API configurable independamment du Host du frontend', ()
   });
 
   test('front et back sur des origines distinctes : la SPA appelle l API sur l URL configuree via API_BASE_URL', async ({ page }) => {
-    const backDataDir = mkdtempSync(path.join(tmpdir(), 'lightmock-apibase-back-'));
-    const frontDataDir = mkdtempSync(path.join(tmpdir(), 'lightmock-apibase-front-'));
+    const backDataDir = mkdtempSync(path.join(tmpdir(), 'mimicway-apibase-back-'));
+    const frontDataDir = mkdtempSync(path.join(tmpdir(), 'mimicway-apibase-front-'));
     const backPort = await getFreePort();
     let frontPort = await getFreePort();
     if (frontPort === backPort) frontPort = await getFreePort();
@@ -117,7 +117,7 @@ test.describe('URL de l API configurable independamment du Host du frontend', ()
     let frontChild;
     try {
       // The API answers a browser on another origin only if that origin is listed.
-      ({ child: backChild } = await spawnLightMock({
+      ({ child: backChild } = await spawnMimicway({
         port: backPort,
         dataDir: backDataDir,
         extraEnv: { CORS_ALLOWED_ORIGINS: `http://127.0.0.1:${frontPort}` },
@@ -142,7 +142,7 @@ test.describe('URL de l API configurable independamment du Host du frontend', ()
       });
       expect(createRes.status()).toBe(201);
 
-      ({ child: frontChild } = await spawnLightMock({
+      ({ child: frontChild } = await spawnMimicway({
         port: frontPort,
         dataDir: frontDataDir,
         extraEnv: { API_BASE_URL: backBaseUrl },
@@ -176,8 +176,8 @@ test.describe('URL de l API configurable independamment du Host du frontend', ()
   });
 
   test('an origin missing from CORS_ALLOWED_ORIGINS cannot call the management API from a browser', async ({ page }) => {
-    const backDataDir = mkdtempSync(path.join(tmpdir(), 'lightmock-apibase-cors-back-'));
-    const frontDataDir = mkdtempSync(path.join(tmpdir(), 'lightmock-apibase-cors-front-'));
+    const backDataDir = mkdtempSync(path.join(tmpdir(), 'mimicway-apibase-cors-back-'));
+    const frontDataDir = mkdtempSync(path.join(tmpdir(), 'mimicway-apibase-cors-front-'));
     const backPort = await getFreePort();
     let frontPort = await getFreePort();
     if (frontPort === backPort) frontPort = await getFreePort();
@@ -185,9 +185,9 @@ test.describe('URL de l API configurable independamment du Host du frontend', ()
     let backChild;
     let frontChild;
     try {
-      ({ child: backChild } = await spawnLightMock({ port: backPort, dataDir: backDataDir }));
+      ({ child: backChild } = await spawnMimicway({ port: backPort, dataDir: backDataDir }));
       const backBaseUrl = `http://127.0.0.1:${backPort}`;
-      ({ child: frontChild } = await spawnLightMock({ port: frontPort, dataDir: frontDataDir }));
+      ({ child: frontChild } = await spawnMimicway({ port: frontPort, dataDir: frontDataDir }));
       await page.goto(`http://127.0.0.1:${frontPort}/`);
 
       const outcome = await page.evaluate(async (url) => {

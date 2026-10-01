@@ -2,10 +2,10 @@
   "domain": "home",
   "scenarios": [
     {
-      "scenario": "La page d'accueil se charge avec le titre lightMock",
+      "scenario": "La page d'accueil se charge avec le titre Mimicway",
       "steps": [
         { "action": "goto", "page": "services" },
-        { "action": "assertText", "target": "app.titleButton", "value": "lightMock" }
+        { "action": "assertText", "target": "app.titleButton", "value": "Mimicway" }
       ]
     },
     {

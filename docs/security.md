@@ -1,10 +1,10 @@
 # Security model
 
-This page is meant for whoever has to decide whether lightMock may run in their environment: what it exposes, what it talks to, what it trusts, what it protects and what it leaves to the deployment. Every statement below is enforced by code and covered by tests; the file and test names are given so that each one can be checked.
+This page is meant for whoever has to decide whether Mimicway may run in their environment: what it exposes, what it talks to, what it trusts, what it protects and what it leaves to the deployment. Every statement below is enforced by code and covered by tests; the file and test names are given so that each one can be checked.
 
 ## In one paragraph
 
-lightMock is a single process with no database, no telemetry and no outbound traffic of its own. It listens on one HTTP port (and optionally on raw TCP ports you configure), serves its UI and management API there, and answers the traffic of the services you define: from rules (mock) or by forwarding to the backend you configured (proxy). It only calls out to that backend, to Keycloak if you enable authentication, and to Kafka if you build and enable it.
+Mimicway is a single process with no database, no telemetry and no outbound traffic of its own. It listens on one HTTP port (and optionally on raw TCP ports you configure), serves its UI and management API there, and answers the traffic of the services you define: from rules (mock) or by forwarding to the backend you configured (proxy). It only calls out to that backend, to Keycloak if you enable authentication, and to Kafka if you build and enable it.
 
 ## What it exposes
 
@@ -12,7 +12,7 @@ lightMock is a single process with no database, no telemetry and no outbound tra
 |---|---|---|
 | Management API | `/api/...` | The UI and your automation. Protected by Keycloak tokens when `AUTH_ENABLED=true`. |
 | UI shell | `/`, `/index.html`, `/assets/...`, `/runtime-config.json` | Browsers. Public on purpose: it shows the login screen. |
-| Service traffic | `/{service}/...`, `/{group code}/{service}/...` | The applications under test. Never requires a lightMock token: it carries the applications' own credentials. |
+| Service traffic | `/{service}/...`, `/{group code}/{service}/...` | The applications under test. Never requires a Mimicway token: it carries the applications' own credentials. |
 | Raw TCP mocks | ports you configure, on the `BIND_ADDRESS` interface (`tcp-mock` feature, off by default) | Clients of binary protocols. |
 
 By default the binary listens on `127.0.0.1` only (`BIND_ADDRESS`). The container image sets `0.0.0.0`, the container network being the boundary there.
@@ -34,7 +34,7 @@ There is no other one: no telemetry, no update check, no hard-coded host. Outbou
 
 **Configuration editors** (UI and API users) define responses, proxy targets and scripts. Without authentication, anyone who can reach the management API is an editor with every right: that is the intended mode for a developer's machine, which is why the binary only listens on loopback by default. With `AUTH_ENABLED=true`, editors are Keycloak users and rights follow groups: a group admin manages the group's services and members, a member edits its services, and only super-admins (`SUPER_ADMINS`) manage ungrouped services, reset the configuration or restore backups. These boundaries are checked on every endpoint, including moves between groups, the full configuration export and the request log (`src/server/api.rs`, tests in `src/server/api/authz_tests.rs`).
 
-Because an editor chooses proxy targets, lightMock will send HTTP requests to any host an editor configures: that is what a proxy is. Decide who may edit (authentication) and restrict where the process may connect (network policy) accordingly.
+Because an editor chooses proxy targets, Mimicway will send HTTP requests to any host an editor configures: that is what a proxy is. Decide who may edit (authentication) and restrict where the process may connect (network policy) accordingly.
 
 **Rule scripts** (Rhai) are written by editors and run on every matching request, in a sandbox: at most 10,000 operations, bounded call depth, string, array and map sizes, no file access (`import` resolves nothing), no `eval`, no network, and output of `print`/`debug` sent to the debug log. The native functions never panic, whatever their arguments (`src/engine/script.rs`, tests next to it).
 
@@ -42,7 +42,7 @@ Because an editor chooses proxy targets, lightMock will send HTTP requests to an
 
 **Proxied backends** are untrusted too: their responses are streamed back as they come; only traffic observation, when a user enables it for a service, buffers bounded copies.
 
-**Other websites open in a browser** must not be able to drive a lightMock reachable from that browser (`src/server/browser_guard.rs`):
+**Other websites open in a browser** must not be able to drive a Mimicway reachable from that browser (`src/server/browser_guard.rs`):
 - the management API answers cross-origin calls only for the origins listed in `CORS_ALLOWED_ORIGINS` (none by default);
 - state-changing API requests that the browser marks as cross-site are refused unless their origin is listed;
 - when listening on loopback only, the API answers only requests addressed to `localhost`, `*.localhost`, `127.0.0.0/8` or `::1`, which defeats DNS rebinding;
@@ -50,7 +50,7 @@ Because an editor chooses proxy targets, lightMock will send HTTP requests to an
 
 ## Authentication
 
-When enabled, lightMock validates Keycloak access tokens locally against the realm's published keys: asymmetric signature (RSA, RSA-PSS, ECDSA, EdDSA; never HMAC or `none`), issuer (`KEYCLOAK_ISSUER` if tokens carry another URL than `KEYCLOAK_URL`), expiry, and the client the token was issued to (`azp` or `aud` must name `KEYCLOAK_CLIENT_ID`). Keycloak is never asked to validate a token on lightMock's behalf. An unknown key id refreshes the key set at most once every 30 seconds. Error responses carry no internal detail. Tests run against a fake realm signing real tokens (`src/auth/keycloak/tests.rs`).
+When enabled, Mimicway validates Keycloak access tokens locally against the realm's published keys: asymmetric signature (RSA, RSA-PSS, ECDSA, EdDSA; never HMAC or `none`), issuer (`KEYCLOAK_ISSUER` if tokens carry another URL than `KEYCLOAK_URL`), expiry, and the client the token was issued to (`azp` or `aud` must name `KEYCLOAK_CLIENT_ID`). Keycloak is never asked to validate a token on Mimicway's behalf. An unknown key id refreshes the key set at most once every 30 seconds. Error responses carry no internal detail. Tests run against a fake realm signing real tokens (`src/auth/keycloak/tests.rs`).
 
 The login form uses Keycloak's password grant. Replacing it with the authorization code flow with PKCE, and supporting any OpenID Connect provider, are planned (see [ROADMAP.md](../ROADMAP.md)).
 
@@ -72,7 +72,7 @@ The login form uses Keycloak's password grant. Replacing it with the authorizati
 ## Hardening checklist
 
 1. Shared instance: set `AUTH_ENABLED=true` with Keycloak and list `SUPER_ADMINS`.
-2. Keep the default loopback binding on workstations; in a cluster, expose lightMock through your ingress with TLS (lightMock itself serves plain HTTP).
+2. Keep the default loopback binding on workstations; in a cluster, expose Mimicway through your ingress with TLS (Mimicway itself serves plain HTTP).
 3. Restrict egress (Kubernetes `NetworkPolicy`, firewall) to the backends you actually proxy and to Keycloak.
 4. Set `CORS_ALLOWED_ORIGINS` only if the UI is served from another origin than the API.
 5. Add your own credential header names to `REDACT_HEADERS`.

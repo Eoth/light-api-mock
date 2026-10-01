@@ -1,8 +1,8 @@
-# lightMock
+# Mimicway
 
 Mock or proxy any HTTP API, one rule at a time, from a web UI. A single self-contained binary: no database, no agent, no cloud account.
 
-lightMock sits between the application you test and the services it calls. Each service you declare gets its own URL namespace on lightMock; every request that reaches it is either answered by a rule you wrote (fixed, templated or scripted response, optional latency and errors) or forwarded to the real backend. Everything is changed live from the UI or the REST API, without restarting anything.
+Mimicway sits between the application you test and the services it calls. Each service you declare gets its own URL namespace on Mimicway; every request that reaches it is either answered by a rule you wrote (fixed, templated or scripted response, optional latency and errors) or forwarded to the real backend. Everything is changed live from the UI or the REST API, without restarting anything.
 
 - **Mock and proxy side by side**: a whole service, or a single rule, can switch between a mocked answer and the real backend. Mock only the calls you need; let the rest through.
 - **Rules that read the request**: conditions on path parameters, query, headers, JSON body, XML body (XPath, SOAP) and form fields, combined with AND/OR.
@@ -10,13 +10,15 @@ lightMock sits between the application you test and the services it calls. Each 
 - **From real traffic to mocks**: observe what a proxied service actually returns and accept suggested rules instead of writing them by hand.
 - **Built to be audited**: no telemetry, four documented outbound flows, local-only by default, no `unsafe` code, dependencies checked in CI. See [Trust at a glance](#trust-at-a-glance).
 
+> Mimicway was called lightMock until version 0.1. Upgrading keeps your data, URLs and settings; [MIGRATING.md](MIGRATING.md) lists the few names to update.
+
 The interface is available in English and French; adding a language is one file (see [Translations](#translations)).
 
-![The list of services in the lightMock UI](docs/screenshots/home-service-list.png)
+![The list of services in the Mimicway UI](docs/screenshots/home-service-list.png)
 
 ## Trust at a glance
 
-lightMock is meant for corporate networks where every outbound flow has to be justified. The short version:
+Mimicway is meant for corporate networks where every outbound flow has to be justified. The short version:
 
 | Question | Answer |
 |---|---|
@@ -36,8 +38,8 @@ Details, with the code that backs each claim: [security model](docs/security.md)
 ### With Docker
 
 ```bash
-docker build -t lightmock .
-docker run --rm -p 7342:7342 -v lightmock-data:/data lightmock
+docker build -t mimicway .
+docker run --rm -p 7342:7342 -v mimicway-data:/data mimicway
 ```
 
 Open <http://localhost:7342>.
@@ -49,7 +51,7 @@ Requirements: Rust 1.85+ (edition 2024), Node.js 20+ with npm. Bootstrap scripts
 ```bash
 cd frontend && npm ci && npm run build && cd ..
 cargo build --release
-./target/release/light-mock          # light-mock.exe on Windows
+./target/release/mimicway          # mimicway.exe on Windows
 ```
 
 The binary reads its UI from `./frontend/dist` and its data from `./data` by default; see [Configuration](#configuration).
@@ -93,7 +95,7 @@ The same service can be built in the UI in a minute; on an empty instance, the h
 
 **Service.** A named entry point. It is exposed under `/{name}/{listen_path}`, or `/{group_code}/{name}/{listen_path}` when it belongs to a group. An empty `listen_path` catches everything under `/{name}/`. When a request is forwarded, the `/{group_code}/{name}` prefix is removed and the rest is appended to `real_target_url`.
 
-**Rule.** A service holds an ordered list of rules. Each rule has its own HTTP method, an optional `sub_path`, conditions, and an action: answer with a mock, or forward to the backend. The first matching rule wins; when none matches, lightMock answers 404 and the request log records it.
+**Rule.** A service holds an ordered list of rules. Each rule has its own HTTP method, an optional `sub_path`, conditions, and an action: answer with a mock, or forward to the backend. The first matching rule wins; when none matches, Mimicway answers 404 and the request log records it.
 
 **Mock / proxy switch.** With `is_mocked` off, a service forwards every request to `real_target_url` and its rules wait. With it on, the rules answer; `action: proxy` on a rule forwards only the requests that rule matches (partial mock). A service without a target is purely mocked.
 
@@ -136,7 +138,7 @@ Everything is set through environment variables; none is required.
 | `BIND_ADDRESS` | `127.0.0.1` | Interface to listen on. `0.0.0.0` (or `::`) accepts remote connections; the container image sets it. |
 | `DATA_PATH` | `./data` | Directory of `mock-config.yaml` and its `backups/`. |
 | `STATIC_DIR` | `./frontend/dist` | Built UI served at `/`. |
-| `RUST_LOG` | `light_mock=info` | Log filter, for example `light_mock=debug`. |
+| `RUST_LOG` | `mimicway=info` | Log filter, for example `mimicway=debug`. |
 | `BACKUP_MAX_COUNT` | `5` | Backups kept in `{DATA_PATH}/backups/` before rotation. |
 | `API_BASE_URL` | *(empty)* | Where the UI calls the API when they are served from different origins; see [Split UI and API](#split-ui-and-api). |
 | `CORS_ALLOWED_ORIGINS` | *(empty)* | Comma-separated origins allowed to call the management API from a browser, besides the UI's own origin. Needed only with `API_BASE_URL`. Mocked services always answer any origin. |
@@ -149,7 +151,7 @@ Everything is set through environment variables; none is required.
 | `TRAFFIC_OBSERVATION_SAMPLES_PER_KEY` | `8` | Exchanges kept per request shape. |
 | `TRAFFIC_OBSERVATION_MIN_SAMPLES` | `3` | Exchanges needed before a rule is suggested. |
 | `AUTH_ENABLED` | `false` | Turns Keycloak authentication on. `KEYCLOAK_URL`, `KEYCLOAK_REALM` and `KEYCLOAK_CLIENT_ID` then become required; the server refuses to start without them. |
-| `KEYCLOAK_URL` | *(empty)* | Base URL lightMock uses to reach Keycloak. |
+| `KEYCLOAK_URL` | *(empty)* | Base URL Mimicway uses to reach Keycloak. |
 | `KEYCLOAK_REALM` | *(empty)* | Realm. |
 | `KEYCLOAK_CLIENT_ID` | *(empty)* | Client the tokens must be issued for (`azp` or `aud`). |
 | `KEYCLOAK_ISSUER` | *(realm URL)* | Expected `iss` of tokens, when Keycloak issues them under another URL than `KEYCLOAK_URL` (behind a proxy, for instance). |
@@ -157,7 +159,7 @@ Everything is set through environment variables; none is required.
 | `SHOW_RESET_BUTTON` | `false` | Shows the reset button when authentication is off. Display only: the server decides who may reset. |
 | `KAFKA_ENABLED` | `false` | Starts the Kafka consumer (binary built with `messaging-kafka`). |
 | `KAFKA_BROKERS` | *(empty)* | Comma-separated brokers. |
-| `KAFKA_CONSUMER_GROUP` | `lightmock` | Consumer group. |
+| `KAFKA_CONSUMER_GROUP` | `mimicway` | Consumer group. |
 | `KAFKA_LISTEN_TOPIC` | *(empty)* | Topic consumed. |
 | `KAFKA_REPLY_TOPIC` | *(empty)* | Topic the mocked reply is published to; nothing is published when empty. |
 | `MESSAGE_LOG_TTL_MS` | `86400000` | Retention of the Kafka message log. |
@@ -228,12 +230,12 @@ The [Dockerfile](Dockerfile) builds the UI and the binary, then copies them into
 ```yaml
 # compose.yaml
 services:
-  lightmock:
+  mimicway:
     build: .
     ports: ["7342:7342"]
-    volumes: ["lightmock-data:/data"]
+    volumes: ["mimicway-data:/data"]
 volumes:
-  lightmock-data:
+  mimicway-data:
 ```
 
 ### Kubernetes
@@ -242,38 +244,38 @@ volumes:
 
 ```bash
 cd k8s/ingress
-kustomize edit set image lightmock=<registry>/lightmock:<version>
-kubectl create namespace lightmock
+kustomize edit set image mimicway=<registry>/mimicway:<version>
+kubectl create namespace mimicway
 kubectl apply -k .
 ```
 
-lightMock must be served from the root of a host, and by a single replica: the configuration lives in one file on one volume.
+Mimicway must be served from the root of a host, and by a single replica: the configuration lives in one file on one volume.
 
 ### Split UI and API
 
-By default the UI calls the API on its own origin (`/api/...`), which works whenever one lightMock serves both. If your ingress routes the API to another origin, set on the instance that serves the UI:
+By default the UI calls the API on its own origin (`/api/...`), which works whenever one Mimicway serves both. If your ingress routes the API to another origin, set on the instance that serves the UI:
 
 ```bash
-API_BASE_URL=https://lightmock-api.example.com
+API_BASE_URL=https://mimicway-api.example.com
 ```
 
 and on the instance that serves the API:
 
 ```bash
-CORS_ALLOWED_ORIGINS=https://lightmock.example.com
+CORS_ALLOWED_ORIGINS=https://mimicway.example.com
 ```
 
-The UI reads `API_BASE_URL` at startup from `GET /runtime-config.json`, so one image serves every environment without a rebuild. Check it with `curl https://lightmock.example.com/runtime-config.json`.
+The UI reads `API_BASE_URL` at startup from `GET /runtime-config.json`, so one image serves every environment without a rebuild. Check it with `curl https://mimicway.example.com/runtime-config.json`.
 
 ### Behind a proxy
 
-lightMock does not terminate TLS; put it behind your usual reverse proxy or ingress. When authentication is on, use HTTPS end to end for the UI, since it sends passwords to `/api/auth/login`.
+Mimicway does not terminate TLS; put it behind your usual reverse proxy or ingress. When authentication is on, use HTTPS end to end for the UI, since it sends passwords to `/api/auth/login`.
 
 ## Backups
 
 Before each change, the previous `mock-config.yaml` is copied to `{DATA_PATH}/backups/` (the last `BACKUP_MAX_COUNT` are kept). A reset also writes a copy to `backups/protected/`, kept 30 days whatever the rotation. Changes apply in memory at once and reach the disk in the background; on `SIGTERM` or Ctrl+C the server finishes writing before it exits.
 
-Restore from the UI (Backups button, super-admins), or by hand: stop lightMock, copy a backup over `mock-config.yaml`, start it again.
+Restore from the UI (Backups button, super-admins), or by hand: stop Mimicway, copy a backup over `mock-config.yaml`, start it again.
 
 ## Optional features
 
@@ -289,7 +291,7 @@ cargo test                               # Rust unit and integration tests
 cargo test --features tcp-mock
 cargo clippy --all-targets -- -D warnings
 cd frontend && npm test                  # Vitest
-cd frontend && npm run test:e2e          # Playwright, against a running lightMock on :7342
+cd frontend && npm run test:e2e          # Playwright, against a running Mimicway on :7342
 ```
 
 For UI work with hot reload, run the binary, then `cd frontend && npm run dev` and open <http://localhost:5173>.
@@ -326,9 +328,9 @@ English is the source language: every message is written once, in English, in th
 | A method or sub-path is not mocked | Methods belong to rules: add a rule for that method and sub-path. |
 | The UI shows a blank page | `STATIC_DIR` must point to the built UI (`frontend/dist`); use an absolute path on Windows. |
 | Port 7342 already in use | Set `PORT`, or stop the other process. |
-| Other machines cannot reach lightMock | It listens on `127.0.0.1` by default: set `BIND_ADDRESS=0.0.0.0`. |
+| Other machines cannot reach Mimicway | It listens on `127.0.0.1` by default: set `BIND_ADDRESS=0.0.0.0`. |
 | 403 "Cross-site request refused" | The UI is served from another origin: add it to `CORS_ALLOWED_ORIGINS`. |
-| 403 "this lightMock only listens on the local machine" | Call it through `localhost` or `127.0.0.1`, or listen on another interface. |
+| 403 "this Mimicway only listens on the local machine" | Call it through `localhost` or `127.0.0.1`, or listen on another interface. |
 | Login refused although the password is right | Keycloak issues tokens under another URL than `KEYCLOAK_URL`, or for another client: set `KEYCLOAK_ISSUER`, check `KEYCLOAK_CLIENT_ID` (the server log names the cause). |
 | `link.exe not found` on Windows | Install the Visual Studio Build Tools with the C++ workload. |
 | Kafka build fails on Windows with a path length error | Set `CARGO_TARGET_DIR` to a short path such as `C:\lm-target`. |
@@ -336,6 +338,7 @@ English is the source language: every message is written once, in English, in th
 ## Project
 
 - [ROADMAP.md](ROADMAP.md): what is planned, and in which order.
+- [MIGRATING.md](MIGRATING.md): upgrading an installation from lightMock.
 - [CHANGELOG.md](CHANGELOG.md): changes by release.
 - [SECURITY.md](SECURITY.md): supported versions and private vulnerability reporting.
 - [CONTRIBUTING.md](CONTRIBUTING.md): how to propose a change, run the checks and add a language; [code of conduct](CODE_OF_CONDUCT.md).

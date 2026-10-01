@@ -10,7 +10,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, RwLock};
 
 pub(crate) const REALM: &str = "test-realm";
-pub(crate) const CLIENT_ID: &str = "lightmock";
+pub(crate) const CLIENT_ID: &str = "mimicway";
 
 pub(crate) struct SigningKey {
     kid: String,
@@ -89,7 +89,7 @@ impl FakeRealm {
         format!("{}/realms/{REALM}", self.url)
     }
 
-    /// Claims of a valid token issued by this realm to lightMock's client, as Keycloak shapes them by default.
+    /// Claims of a valid token issued by this realm to Mimicway's client, as Keycloak shapes them by default.
     pub(crate) fn claims(&self, username: &str) -> serde_json::Value {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)

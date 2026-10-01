@@ -1,4 +1,4 @@
-// Client REST pour l'API backend lightMock.
+// Client REST pour l'API backend Mimicway.
 // Toutes les fonctions exportees appellent le backend via fetch().
 // Le token Keycloak (si auth activee) est injecte automatiquement.
 // En dev, le proxy Vite redirige /api vers http://localhost:7342.

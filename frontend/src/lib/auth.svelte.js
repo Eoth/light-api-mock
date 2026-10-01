@@ -34,11 +34,11 @@ export function logout() {
   auth.username = null;
   auth.isSuperAdmin = false;
   auth.groups = [];
-  localStorage.removeItem('lightmock-auth');
+  localStorage.removeItem('mimicway-auth');
 }
 
 export function persistAuth() {
-  localStorage.setItem('lightmock-auth', JSON.stringify({
+  localStorage.setItem('mimicway-auth', JSON.stringify({
     token: auth.token,
     refreshToken: auth.refreshToken,
     username: auth.username,
@@ -48,7 +48,7 @@ export function persistAuth() {
 
 export function restoreAuth() {
   try {
-    const saved = localStorage.getItem('lightmock-auth');
+    const saved = localStorage.getItem('mimicway-auth');
     if (saved) {
       const data = JSON.parse(saved);
       auth.token = data.token || null;

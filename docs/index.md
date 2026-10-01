@@ -1,12 +1,12 @@
-# lightMock user guide
+# Mimicway user guide
 
-lightMock mocks or relays ("proxies") HTTP calls to a real service: test an application without depending on a real backend, or replay precise scenarios (errors, slowness, particular data) on demand. Everything is driven from a web interface, without restarts.
+Mimicway mocks or relays ("proxies") HTTP calls to a real service: test an application without depending on a real backend, or replay precise scenarios (errors, slowness, particular data) on demand. Everything is driven from a web interface, without restarts.
 
-This page is a **quick overview**: a line or two per feature, with a link to the page that explains how to use it. If you are new to lightMock, read this list once to know what exists, then come back to the detailed pages when needed.
+This page is a **quick overview**: a line or two per feature, with a link to the page that explains how to use it. If you are new to Mimicway, read this list once to know what exists, then come back to the detailed pages when needed.
 
-> These pages are for the people who use and test with lightMock (QA, developers, business analysts). Installation, configuration and architecture are in the [README](../README.md); the security model is in [security.md](security.md).
+> These pages are for the people who use and test with Mimicway (QA, developers, business analysts). Installation, configuration and architecture are in the [README](../README.md); the security model is in [security.md](security.md).
 
-![The lightMock home screen with the list of services](screenshots/home-service-list.png)
+![The Mimicway home screen with the list of services](screenshots/home-service-list.png)
 
 ## Services and routing
 
@@ -29,7 +29,7 @@ This page is a **quick overview**: a line or two per feature, with a link to the
 
 | Feature | In short |
 |---|---|
-| [Request log](request-log.md) | The latest requests lightMock received, in the interface: see why a rule matched, or did not. |
+| [Request log](request-log.md) | The latest requests Mimicway received, in the interface: see why a rule matched, or did not. |
 | [Traffic observation and rule suggestions](traffic-observation.md) | For a service in pure proxy mode: observe real traffic (on demand) and get mock rules suggested from the calls actually seen. |
 
 ## Backups and administration
@@ -43,6 +43,6 @@ This page is a **quick overview**: a line or two per feature, with a link to the
 
 | Feature | In short |
 |---|---|
-| [Authentication](authentication.md) | Optional: lightMock can require a login (Keycloak), with different rights per user and group. |
-| [Kafka messaging](kafka-messaging.md) | Optional: beyond HTTP, lightMock can also answer Kafka messages (needs a build that includes it). |
-| [Security model](security.md) | What lightMock exposes, what it connects to, what it trusts, and how to harden a deployment. |
+| [Authentication](authentication.md) | Optional: Mimicway can require a login (Keycloak), with different rights per user and group. |
+| [Kafka messaging](kafka-messaging.md) | Optional: beyond HTTP, Mimicway can also answer Kafka messages (needs a build that includes it). |
+| [Security model](security.md) | What Mimicway exposes, what it connects to, what it trusts, and how to harden a deployment. |

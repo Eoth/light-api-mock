@@ -1,4 +1,4 @@
-# Contributing to lightMock
+# Contributing to Mimicway
 
 Thank you for helping. Bug reports, documentation fixes, translations and code are all welcome. This page says how to get a change merged quickly.
 
@@ -7,7 +7,7 @@ Security issues are the exception: never in a public issue, see [SECURITY.md](SE
 ## Before you start
 
 - **Bugs**: open an issue with the bug template; a failing request (method, path, headers, body) and the service configuration that produced it save most of the back and forth.
-- **Features**: open an issue first, or comment on the matching [roadmap](ROADMAP.md) item, so that the design is agreed before the code. lightMock keeps a few promises (one program, no telemetry, every outbound flow opt-in, easy to review); a change that bends one of them needs that discussion.
+- **Features**: open an issue first, or comment on the matching [roadmap](ROADMAP.md) item, so that the design is agreed before the code. Mimicway keeps a few promises (one program, no telemetry, every outbound flow opt-in, easy to review); a change that bends one of them needs that discussion.
 - **Small fixes** (typos, wrong docs, obvious bugs): a pull request alone is fine.
 
 ## Set up
@@ -17,7 +17,7 @@ Rust 1.85 or later, Node.js 20 or later. The bootstrap scripts install them: `sc
 ```bash
 cd frontend && npm ci && npm run build && cd ..
 cargo build
-DATA_PATH=./data ./target/debug/light-mock     # http://localhost:7342
+DATA_PATH=./data ./target/debug/mimicway     # http://localhost:7342
 cd frontend && npm run dev                     # UI with hot reload on http://localhost:5173
 ```
 
@@ -31,7 +31,7 @@ cargo clippy --all-targets --features tcp-mock -- -D warnings
 cargo test --features tcp-mock
 cargo deny check                       # when Cargo.toml or Cargo.lock change
 cd frontend && npm test                # unit tests, including translation checks
-cd frontend && npm run test:e2e        # with lightMock running, see frontend/e2e/README.md
+cd frontend && npm run test:e2e        # with Mimicway running, see frontend/e2e/README.md
 ```
 
 The Kafka feature builds librdkafka from source: it needs cmake, a C toolchain and, on Linux, the libcurl headers (`libcurl4-openssl-dev` on Debian and Ubuntu). Then `cargo test --features messaging-kafka`.
@@ -57,7 +57,7 @@ A native speaker's review is welcome on every translation pull request.
 
 ## Licensing
 
-lightMock is under the [MIT license](LICENSE). By contributing, you agree that your contribution is licensed under the same terms.
+Mimicway is under the [MIT license](LICENSE). By contributing, you agree that your contribution is licensed under the same terms.
 
 ## Conduct
 

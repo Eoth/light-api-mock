@@ -1,12 +1,12 @@
 apiVersion: gloo.solo.io/v1
 kind: Upstream
 metadata:
-  name: lightmock
+  name: mimicway
   labels:
-    app.kubernetes.io/name: lightmock
+    app.kubernetes.io/name: mimicway
     app.kubernetes.io/component: routing
 spec:
   kube:
-    serviceName: lightmock
-    serviceNamespace: lightmock
+    serviceName: mimicway
+    serviceNamespace: mimicway
     servicePort: 80
