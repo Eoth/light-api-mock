@@ -18,7 +18,7 @@ Each item has an identifier that never changes, a size (S: a day or less, M: a f
 
 ## Order of work
 
-1. [Ready for an international launch](#1-ready-for-an-international-launch): R2, R10, R5, R6, R11, R12, R9.
+1. [Ready for an international launch](#1-ready-for-an-international-launch): R2, R10, R6, R11, R12, R13, R14, R9.
 2. [Trust and operations](#2-trust-and-operations): T1 to T11.
 3. [Make it indispensable](#3-make-it-indispensable): U1 to U16, in the listed order.
 4. [Engineering backlog](#4-engineering-backlog): taken alongside, when they unblock an item above.
@@ -36,16 +36,6 @@ Size S (what is left)
 **What.** Cut the first release (0.2.0) with it, make the GHCR package public, and fix whatever the first run reveals.
 
 **Done when.** `cosign verify` and `gh attestation verify` succeed on the published image and binaries, and the README quick start runs as written.
-
-### R5. Complete the documentation screenshots
-
-Size M
-
-**Why.** The end-to-end suite produces every screenshot of the guide in English and French (`docs/en/screenshots/`, `docs/fr/screenshots/`), but some states of the interface are not reached by any test, so the guide has no image for them: group members, combined conditions, rule reordering, the JSON breadcrumb, chaos settings, the fake data picker, the import dialog and the reset confirmation. Some existing images also miss their subject: `rhai-autocompletion.png` leaves the suggestion list below the bottom edge, `rule-conflict-warning.png` cuts the warning before its "Save anyway" and "Edit the rule" buttons, and `rule-script-json-repetition.png`, `rule-script-parse-date.png` and `rule-script-soap-extraction.png` show the response template but not the script they illustrate.
-
-**What.** Add the end-to-end steps that reach the missing states, each with an assertion on what it shows and a screenshot, and reference the images from both languages of the guide. Frame the five images above on their subject (scroll the element into view before the capture: a `target` on the scenario's `screenshot` step, `scrollIntoViewIfNeeded()` in a spec). Regenerate the Kafka images from a build with `messaging-kafka`, as the Kafka CI job builds it.
-
-**Done when.** Every feature page of `docs/en/` and `docs/fr/` shows its main state, every image shows what its caption says, and the English images show no French text.
 
 ### R6. English code comments
 
@@ -75,7 +65,7 @@ Size S
 
 **Depends on** R11. · **Why.** Many French messages were written without accents ("reserve", "deja", "regle"), which reads as careless to French users.
 
-**What.** Restore accents and typography (non-breaking space before `:`, `«»` quotes) in `src/locales/fr.json` and `frontend/src/locales/fr.json`; the existing catalogue tests keep placeholders intact. Fix the mistranslations the French screenshots show, such as "Réécriture annuaire" for "Directory URL rewriting" and an example name that differs from the English one ("ex: get-siret" for "e.g. get-customer"). Then regenerate the screenshots (`npm run docs:screenshots`): the French images show the catalogue as it is today.
+**What.** Restore accents and typography (non-breaking space before `:`, `«»` quotes) in `src/locales/fr.json` and `frontend/src/locales/fr.json`; the existing catalogue tests keep placeholders intact. Fix the mistranslations the French screenshots show, such as "Réécriture annuaire" for "Directory URL rewriting" and an example name that differs from the English one ("ex: get-siret" for "e.g. get-customer"). Give both typed confirmation keywords the same rule: the restore confirmation asks for a translated keyword (`RESTAURER`), the reset confirmation for `RESET` in every language (`App.svelte`); a translated keyword must stay easy to type on any keyboard, and the guide names it in each language. Then regenerate the screenshots (`npm run docs:screenshots`): the French images show the catalogue as it is today.
 
 **Done when.** A spell check of both French catalogues passes, and the French screenshots are regenerated from them.
 
@@ -88,6 +78,26 @@ Size S
 **What.** Build the label in `RuleConditionsEditor.svelte` from the source and operator labels the condition form already translates (`Query parameter`, `HTTP header`, `Equals`, `Exists (any value)`…), through `t()` with placeholders, one message per operator shape, as `ObservationSuggestions.svelte` does; translate the new messages in `frontend/src/locales/fr.json`; regenerate the screenshots that show a condition list.
 
 **Done when.** No condition in the interface shows a source or operator type name, in either language, and a Vitest test covers the label of each source and operator.
+
+### R13. Screens open at their top
+
+Size S
+
+**Why.** The interface is one page without a router: switching screens keeps the scroll position. A service opened from far down the list, or reached by saving a long form, opens part-way down with its title and the navigation bar cut off, and the guide's screenshots of the service page show it.
+
+**What.** Scroll to the top when the main screen changes (list, service page, logs, groups, backups, Kafka, TCP), and bring the list back to where it was when the user returns to it, as the expanded groups already are.
+
+**Done when.** An end-to-end test opens a service from below the fold and finds its page at the top, then goes back and finds the list where it left it.
+
+### R14. A header that fits in every language
+
+Size S
+
+**Why.** At 1280 px the navigation bar wraps onto two lines as soon as it holds more than the basic actions: in English for a signed-in super-admin (user badge, "Log out" and "Reset", see `docs/en/screenshots/authentication-user-badge.png`), in French already for a signed-in user or with the Kafka button (`docs/fr/screenshots/group-members.png`, `kafka-message-log.png`). Every language longer than English makes it worse.
+
+**What.** Make the header hold on one line at common desktop widths whatever the language: shorter labels, icons with an accessible name for the secondary actions, or a menu for the rare ones (import, export, backups), chosen from a mock-up in both languages.
+
+**Done when.** An end-to-end test measures the header at 1280 px in English and French, signed in as a super-admin, and finds a single line in both.
 
 ### R10. Public supply-chain score
 
@@ -396,6 +406,16 @@ Size M
 **What.** Make the by-example level fully editable, then add a side-by-side preview that highlights the field being edited.
 
 **Done when.** A pasted sample can be reshaped without switching to the detailed level.
+
+### E8. Room for long values in the detailed XML builder
+
+Size S
+
+**Why.** In the detailed XML builder, a node holds its tag, type, source, value and transformation on one line, and the value field gets what is left: an XPath such as `Envelope/Body/recherche/Siret` shows cut after `Envelope/Body/recherche/S` in English and after `Envelope/Body/re` in French (`response-xml-xpath-source.png`), so the user cannot read back what they typed.
+
+**What.** Give the value field a minimum width that fits a usual XPath, letting the line wrap before the value instead of shrinking it, and check the JSON builder's rows the same way.
+
+**Done when.** The XPath of `response-xml-xpath-source.png` shows whole in both languages, the image's subject includes the value field, and the screenshot guard fails on an input whose value overflows it.
 
 ### E3. Kafka parity
 
