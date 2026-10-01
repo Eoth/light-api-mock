@@ -35,14 +35,14 @@ pub fn max_message_size() -> usize {
         .unwrap_or(DEFAULT_MAX_MESSAGE_SIZE)
 }
 
-/// Statut d'un service TCP au demarrage -- expose via `GET /tcp/status`
-/// (`server/api.rs`) pour que l'operateur puisse voir sans grep-er les logs
-/// si un port a effectivement pu etre bind. Fige a l'instant du demarrage,
-/// comme la config elle-meme (pas de re-verification periodique).
+/// Whether a TCP service could listen, as `GET /api/tcp/status` reports it, so that an operator sees a port
+/// conflict without reading the log. Set when the listeners (re)start.
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct TcpServiceStatus {
     pub name: String,
     pub listen_port: u16,
+    /// The address actually listened on (`BIND_ADDRESS` and the port), or the one that could not be.
+    pub address: String,
     pub listening: bool,
     pub error: Option<String>,
 }
@@ -58,13 +58,16 @@ pub struct TcpServiceStatus {
 /// demarrage du serveur HTTP principal ni des autres services TCP.
 pub async fn spawn_tcp_services(
     config: &crate::tcp::config::TcpConfig,
+    bind_ip: std::net::IpAddr,
 ) -> (Vec<JoinHandle<()>>, Vec<TcpServiceStatus>) {
     let mut handles = Vec::with_capacity(config.services.len());
     let mut statuses = Vec::with_capacity(config.services.len());
 
     for service in &config.services {
-        let addr = format!("0.0.0.0:{}", service.listen_port);
-        let listener = match TcpListener::bind(&addr).await {
+        // The interface of the HTTP server (`BIND_ADDRESS`, loopback by default): a mock created on a workstation
+        // must not be reachable from the network when the rest of lightMock is not.
+        let addr = std::net::SocketAddr::new(bind_ip, service.listen_port);
+        let listener = match TcpListener::bind(addr).await {
             Ok(l) => l,
             Err(e) => {
                 tracing::error!(
@@ -76,16 +79,19 @@ pub async fn spawn_tcp_services(
                 statuses.push(TcpServiceStatus {
                     name: service.name.clone(),
                     listen_port: service.listen_port,
+                    address: addr.to_string(),
                     listening: false,
                     error: Some(e.to_string()),
                 });
                 continue;
             }
         };
+        let addr = listener.local_addr().unwrap_or(addr);
         tracing::info!(service = %service.name, addr = %addr, "tcp-mock: listening");
         statuses.push(TcpServiceStatus {
             name: service.name.clone(),
             listen_port: service.listen_port,
+            address: addr.to_string(),
             listening: true,
             error: None,
         });
@@ -160,6 +166,7 @@ async fn handle_connection(mut stream: TcpStream, service: Arc<TcpService>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tcp::LOOPBACK;
     use crate::tcp::config::{TcpMatcher, TcpRule};
 
     fn svc(rules: Vec<TcpRule>) -> Arc<TcpService> {
@@ -259,10 +266,27 @@ mod tests {
                 rules: vec![],
             }],
         };
-        let (_handles, statuses) = spawn_tcp_services(&config).await;
+        let (_handles, statuses) = spawn_tcp_services(&config, LOOPBACK).await;
         assert_eq!(statuses.len(), 1);
         assert!(statuses[0].listening);
         assert!(statuses[0].error.is_none());
+    }
+
+    #[tokio::test]
+    async fn listens_on_the_bind_address_only() {
+        let config = crate::tcp::config::TcpConfig {
+            services: vec![TcpService {
+                name: "local-only".into(),
+                listen_port: 0,
+                rules: vec![],
+            }],
+        };
+        let (_handles, statuses) = spawn_tcp_services(&config, LOOPBACK).await;
+        assert!(
+            statuses[0].address.starts_with("127.0.0.1:"),
+            "a loopback-only lightMock must not expose its TCP mocks: {:?}",
+            statuses[0]
+        );
     }
 
     #[tokio::test]
@@ -274,7 +298,7 @@ mod tests {
         // spawn_tcp_services bind sur "0.0.0.0:{port}" (toutes interfaces),
         // reserver seulement l'interface loopback ne cree pas toujours un
         // conflit reel selon l'OS (observe sur Windows).
-        let reserved = TcpListener::bind("0.0.0.0:0").await.unwrap();
+        let reserved = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let taken_port = reserved.local_addr().unwrap().port();
 
         let config = crate::tcp::config::TcpConfig {
@@ -284,7 +308,7 @@ mod tests {
                 rules: vec![],
             }],
         };
-        let (handles, statuses) = spawn_tcp_services(&config).await;
+        let (handles, statuses) = spawn_tcp_services(&config, LOOPBACK).await;
         assert_eq!(statuses.len(), 1);
         assert!(!statuses[0].listening);
         assert!(statuses[0].error.is_some());

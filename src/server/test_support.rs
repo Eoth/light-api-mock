@@ -103,7 +103,7 @@ pub(crate) async fn test_state(
             publisher: crate::messaging::consumer::Publisher::None,
         },
         #[cfg(feature = "tcp-mock")]
-        tcp_runtime: crate::tcp::TcpRuntime::load_and_spawn(data_dir).await,
+        tcp_runtime: crate::tcp::TcpRuntime::load_and_spawn(data_dir, crate::tcp::LOOPBACK).await,
     }
 }
 

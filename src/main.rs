@@ -110,7 +110,7 @@ async fn main() {
     // (TcpRuntime::replace). Their tasks are detached: on shutdown only HTTP is drained, and open TCP connections are
     // cut, since a binary protocol has no generic way to end a session cleanly from the server side anyway.
     #[cfg(feature = "tcp-mock")]
-    let tcp_runtime = crate::tcp::TcpRuntime::load_and_spawn(&data_dir).await;
+    let tcp_runtime = crate::tcp::TcpRuntime::load_and_spawn(&data_dir, bind_ip).await;
 
     let state = AppState {
         store,

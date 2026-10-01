@@ -25,6 +25,7 @@ struct Inner {
 #[derive(Clone)]
 pub struct TcpRuntime {
     data_dir: PathBuf,
+    bind_ip: std::net::IpAddr,
     inner: Arc<RwLock<Inner>>,
 }
 
@@ -32,11 +33,12 @@ impl TcpRuntime {
     /// Charge `{data_dir}/tcp-config.yaml` (absent/mal forme -> config vide,
     /// cf `TcpConfig::load`) et demarre les listeners correspondants. Point
     /// d'entree unique, appele une fois au demarrage (`main.rs`).
-    pub async fn load_and_spawn(data_dir: &Path) -> Self {
+    pub async fn load_and_spawn(data_dir: &Path, bind_ip: std::net::IpAddr) -> Self {
         let config = TcpConfig::load(data_dir);
-        let (handles, statuses) = spawn_tcp_services(&config).await;
+        let (handles, statuses) = spawn_tcp_services(&config, bind_ip).await;
         Self {
             data_dir: data_dir.to_path_buf(),
+            bind_ip,
             inner: Arc::new(RwLock::new(Inner {
                 config,
                 handles,
@@ -72,7 +74,7 @@ impl TcpRuntime {
             handle.abort();
             let _ = handle.await;
         }
-        let (handles, statuses) = spawn_tcp_services(&new_config).await;
+        let (handles, statuses) = spawn_tcp_services(&new_config, self.bind_ip).await;
         guard.config = new_config;
         guard.handles = handles;
         guard.statuses = statuses;
@@ -107,7 +109,7 @@ mod tests {
     #[tokio::test]
     async fn load_and_spawn_starts_empty_with_no_config_file() {
         let dir = temp_dir();
-        let runtime = TcpRuntime::load_and_spawn(&dir).await;
+        let runtime = TcpRuntime::load_and_spawn(&dir, crate::tcp::LOOPBACK).await;
         assert!(runtime.snapshot_config().await.services.is_empty());
         assert!(runtime.statuses().await.is_empty());
     }
@@ -115,7 +117,7 @@ mod tests {
     #[tokio::test]
     async fn replace_persists_config_to_disk() {
         let dir = temp_dir();
-        let runtime = TcpRuntime::load_and_spawn(&dir).await;
+        let runtime = TcpRuntime::load_and_spawn(&dir, crate::tcp::LOOPBACK).await;
 
         let config = TcpConfig {
             services: vec![TcpService {
@@ -134,7 +136,7 @@ mod tests {
     #[tokio::test]
     async fn replace_updates_live_statuses() {
         let dir = temp_dir();
-        let runtime = TcpRuntime::load_and_spawn(&dir).await;
+        let runtime = TcpRuntime::load_and_spawn(&dir, crate::tcp::LOOPBACK).await;
         assert!(runtime.statuses().await.is_empty());
 
         let config = TcpConfig {
@@ -158,7 +160,7 @@ mod tests {
         // listener doit avoir libere le port avant que le nouveau essaie de
         // le reprendre), pas echouer en "address already in use".
         let dir = temp_dir();
-        let runtime = TcpRuntime::load_and_spawn(&dir).await;
+        let runtime = TcpRuntime::load_and_spawn(&dir, crate::tcp::LOOPBACK).await;
 
         // Port reel (pas 0) : necessaire pour reutiliser EXACTEMENT le meme
         // port au deuxieme replace() ci-dessous.

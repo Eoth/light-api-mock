@@ -13,7 +13,7 @@ lightMock is a single process with no database, no telemetry and no outbound tra
 | Management API | `/api/...` | The UI and your automation. Protected by Keycloak tokens when `AUTH_ENABLED=true`. |
 | UI shell | `/`, `/index.html`, `/assets/...`, `/runtime-config.json` | Browsers. Public on purpose: it shows the login screen. |
 | Service traffic | `/{service}/...`, `/{group code}/{service}/...` | The applications under test. Never requires a lightMock token: it carries the applications' own credentials. |
-| Raw TCP mocks | ports you configure (`tcp-mock` feature, off by default) | Clients of binary protocols. |
+| Raw TCP mocks | ports you configure, on the `BIND_ADDRESS` interface (`tcp-mock` feature, off by default) | Clients of binary protocols. |
 
 By default the binary listens on `127.0.0.1` only (`BIND_ADDRESS`). The container image sets `0.0.0.0`, the container network being the boundary there.
 
