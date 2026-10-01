@@ -1,67 +1,49 @@
-# Politique de sécurité
+# Security policy
 
-## Versions supportées
+## Supported versions
 
-lightMock suit le [versionnage sémantique](https://semver.org/lang/fr/) (voir
-[CHANGELOG.md](CHANGELOG.md)). Le projet étant en version `0.x`, seule la **dernière version
-publiée sur `main`** reçoit des correctifs de sécurité — il n'y a pas encore de branche de
-maintenance long terme.
+lightMock follows [semantic versioning](https://semver.org) (see [CHANGELOG.md](CHANGELOG.md)). While the version is `0.x`, only the **latest release** receives security fixes; maintenance branches will exist from `1.0.0` on.
 
-| Version | Supportée |
-|---------|-----------|
-| dernière version sur `main` | ✅ |
-| toute version antérieure | ❌ |
+| Version | Supported |
+|---|---|
+| latest release | ✅ |
+| any older release | ❌ |
 
-Cette politique sera revue et étendue (branches de maintenance dédiées) au passage en `1.0.0`.
+## Reporting a vulnerability
 
-## Signaler une vulnérabilité
+**Please do not open a public issue** for a potential vulnerability (information leak, authentication bypass, injection, path traversal, denial of service, sandbox escape...).
 
-**Ne pas ouvrir d'issue publique** pour un problème de sécurité potentiel (fuite d'information,
-contournement d'authentification, injection, traversée de répertoire, déni de service...).
+Report it privately through [GitHub Security Advisories](https://github.com/eoth/light-api-mock/security/advisories/new). If that channel is not available to you, write to **etokan.devs@gmail.com**.
 
-Canal recommandé : [GitHub Security Advisories](https://github.com/eoth/light-api-mock/security/advisories/new)
-(signalement privé, natif à GitHub, avec suivi de conversation dédié).
+Please include, as far as possible:
+- a description of the issue and its impact;
+- steps to reproduce (lightMock version, relevant configuration such as `AUTH_ENABLED`, `BIND_ADDRESS`, the requests involved);
+- a fix or mitigation, if you have one.
 
-Si ce canal n'est pas accessible, contacter directement : **etokan.devs@gmail.com**.
+### Response times
 
-Merci d'inclure, dans la mesure du possible :
-- Une description du problème et de son impact
-- Les étapes de reproduction (version de lightMock, configuration `AUTH_ENABLED`/`AUTH_*`,
-  requête(s) concernée(s))
-- Un correctif proposé si vous en avez un
+lightMock is maintained on a best-effort basis: these are targets, not a contractual SLA.
 
-### Délais visés
+| Step | Target |
+|---|---|
+| Acknowledgement | 5 business days |
+| First assessment (confirmed, not reproducible, more information needed) | 10 business days |
+| Fix or mitigation plan | Depends on severity, with priority to authentication, file access and script sandbox issues |
 
-Ce projet est maintenu de façon bénévole/best-effort — les délais ci-dessous sont des objectifs,
-pas une garantie contractuelle (SLA) :
+We ask for coordinated disclosure: please give us time to publish a fix before disclosing technical details.
 
-| Étape | Délai visé |
-|-------|------------|
-| Accusé de réception | 5 jours ouvrés |
-| Premier diagnostic (confirmé / non reproductible / besoin d'infos) | 10 jours ouvrés |
-| Correctif ou plan de mitigation communiqué | Selon la sévérité — best effort, en priorité pour tout ce qui touche à l'authentification, à la traversée de fichiers ou à l'exécution de script (moteur Rhai) |
+## Scope
 
-Nous demandons une divulgation coordonnée : merci de nous laisser le temps de publier un
-correctif avant toute divulgation publique du détail technique.
+In scope:
+- the Rust binary (`src/`): matching engine, proxy, templates, Rhai script sandbox, authentication, persistence, REST API, raw TCP mock;
+- the web UI (`frontend/src/`);
+- the provided `Dockerfile` and Kubernetes manifests (`k8s/`).
 
-## Ce qui est dans le périmètre
+Out of scope:
+- the services that users choose to mock or proxy (`real_target_url`): lightMock does not control their security;
+- Keycloak or Kafka deployments provided by the user;
+- vulnerabilities of third-party dependencies with no demonstrated impact on lightMock: please report them upstream. Dependencies are checked continuously in CI (`cargo deny`, `npm audit`, image scan).
 
-- Le binaire Rust (`src/`) : moteur de matching, proxy, rendu de template, moteur de script Rhai
-  (sandbox), authentification Keycloak, persistance YAML, API REST.
-- Le frontend Svelte (`frontend/src/`) : UI d'administration servie par le binaire.
-- Les manifests Kubernetes fournis (`k8s/`) et le `Dockerfile`.
+## How lightMock is secured
 
-## Hors périmètre
-
-- Les services tiers que l'utilisateur choisit de mocker/proxyfier (`real_target_url`) : lightMock
-  n'a aucun contrôle sur leur sécurité.
-- Un déploiement Keycloak/Kafka externe fourni par l'utilisateur.
-- Les vulnérabilités dans les dépendances tierces (crates Rust / paquets npm) sans exploitation
-  démontrée dans le contexte de lightMock — signaler plutôt en amont, ou via le processus
-  `cargo audit`/`npm audit` documenté dans le [README](README.md#audit-des-dépendances).
-
-## Voir aussi
-
-Le [README](README.md#sécurité-et-confidentialité) documente le comportement réseau complet du
-produit (absence de télémétrie, portée exacte des appels sortants), ce qui peut aider à évaluer
-si un comportement observé est une anomalie ou un fonctionnement attendu avant de signaler.
+[docs/security.md](docs/security.md) describes the threat model, every outbound network flow, the defaults and how to harden a deployment. [REVIEWING.md](REVIEWING.md) is a guide for a security or code review of the project.
