@@ -1,5 +1,6 @@
 pub(crate) mod matcher;
 mod proxy;
+pub mod regex_cache;
 mod renderer;
 pub mod script;
 pub mod template;

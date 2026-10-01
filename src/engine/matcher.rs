@@ -512,7 +512,7 @@ impl MatchEngine {
             Operator::Contains(sub) => value.is_some_and(|v| v.contains(sub.as_str())),
             Operator::Regex(pattern) => {
                 let Some(v) = value else { return false };
-                regex::Regex::new(pattern).is_ok_and(|re| re.is_match(v))
+                crate::engine::regex_cache::text(pattern).is_some_and(|re| re.is_match(v))
             }
         }
     }

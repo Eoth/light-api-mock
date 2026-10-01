@@ -17,11 +17,8 @@ fn matches(matcher: &TcpMatcher, data: &[u8]) -> bool {
             Ok(prefix) => !prefix.is_empty() && data.starts_with(&prefix),
             Err(_) => false,
         },
-        // Compile a chaque appel, meme choix que Operator::Regex cote HTTP
-        // (engine/matcher.rs) : pas de cache, coherence avec l'existant
-        // plutot qu'une optimisation isolee sur ce seul chemin.
         TcpMatcher::Regex(pattern) => {
-            regex::bytes::Regex::new(pattern).is_ok_and(|re| re.is_match(data))
+            crate::engine::regex_cache::bytes(pattern).is_some_and(|re| re.is_match(data))
         }
     }
 }
