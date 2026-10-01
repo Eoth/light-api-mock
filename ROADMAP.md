@@ -85,16 +85,6 @@ Size L, to split by module
 
 **Done when.** No French comment left in `src/` and `frontend/src/`, checked by a script in CI that flags French stop words in comments.
 
-### R7. Remaining French around the code
-
-Size S
-
-**Why.** Small leftovers make a project look unfinished: `frontend/README.md`, `frontend/e2e/README.md`, the bootstrap scripts' messages, `Cargo.toml` and `package.json` descriptions, the oldest changelog entries.
-
-**What.** Translate them to English, once, without keeping a French copy.
-
-**Done when.** A search for French stop words outside the French catalogues finds nothing.
-
 ### R8. Contributor and community files
 
 Size S

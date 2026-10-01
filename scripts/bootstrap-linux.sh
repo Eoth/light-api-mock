@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# lightMock - Bootstrap Linux (Debian/Ubuntu)
-# Usage: chmod +x scripts/bootstrap-linux.sh && ./scripts/bootstrap-linux.sh
-# Idempotent: safe to run multiple times
+# lightMock - build from source on Debian/Ubuntu.
+# Usage: ./scripts/bootstrap-linux.sh
+# Safe to run several times: installed tools are kept.
 set -euo pipefail
 
 step() { echo -e "\n=== $1 ==="; }
@@ -10,70 +10,68 @@ skip() { echo "  SKIP: $1"; }
 
 step "1/6 - Rust toolchain"
 if command -v rustc &>/dev/null; then
-    ok "rustc deja installe ($(rustc --version))"
+    ok "rustc already installed ($(rustc --version))"
 else
-    echo "  Installation de Rust via rustup..."
+    echo "  Installing Rust with rustup..."
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
     source "$HOME/.cargo/env"
-    ok "Rust installe ($(rustc --version))"
+    ok "Rust installed ($(rustc --version))"
 fi
 source "$HOME/.cargo/env" 2>/dev/null || true
 
-step "2/6 - Dependances systeme (Debian/Ubuntu)"
+step "2/6 - System packages (Debian/Ubuntu)"
+# A C toolchain for the few crates with C parts. TLS is pure Rust (rustls): no OpenSSL needed.
 if command -v apt-get &>/dev/null; then
     NEEDED=""
-    for pkg in build-essential pkg-config libssl-dev; do
+    for pkg in build-essential pkg-config; do
         dpkg -s "$pkg" &>/dev/null || NEEDED="$NEEDED $pkg"
     done
     if [ -n "$NEEDED" ]; then
-        echo "  Installation de :$NEEDED"
+        echo "  Installing:$NEEDED"
         sudo apt-get update -qq && sudo apt-get install -y -qq $NEEDED
-        ok "Paquets installes"
+        ok "Packages installed"
     else
-        skip "Paquets deja presents"
+        skip "Packages already present"
     fi
 else
-    echo "  WARN: apt-get non disponible. Verifiez que build-essential, pkg-config, libssl-dev sont installes."
+    echo "  WARN: apt-get not available. Make sure a C toolchain (gcc or clang, make) and pkg-config are installed."
 fi
 
 step "3/6 - Node.js"
 if command -v node &>/dev/null; then
-    ok "Node.js deja installe ($(node --version))"
+    ok "Node.js already installed ($(node --version))"
 else
-    echo "  Installation de Node.js 20 LTS..."
+    echo "  Installing Node.js 20 LTS..."
     if command -v curl &>/dev/null; then
         curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
         sudo apt-get install -y -qq nodejs
-        ok "Node.js installe ($(node --version))"
+        ok "Node.js installed ($(node --version))"
     else
-        echo "  WARN: Installez Node.js >= 20 manuellement."
+        echo "  WARN: install Node.js 20 or later yourself."
     fi
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
-step "4/6 - Dependances frontend"
+step "4/6 - UI dependencies"
 cd "$PROJECT_DIR/frontend"
-if [ -d "node_modules" ]; then
-    skip "node_modules existe deja"
-else
-    npm install
-    ok "npm install termine"
-fi
+# Exactly the versions of package-lock.json, without running package install scripts.
+npm ci --ignore-scripts
+ok "npm ci done"
 
-step "5/6 - Build frontend"
+step "5/6 - UI build"
 npm run build
-ok "Frontend compile dans dist/"
+ok "UI built in frontend/dist/"
 
-step "6/6 - Build backend"
+step "6/6 - Server build"
 cd "$PROJECT_DIR"
-cargo build --release
-ok "Backend compile dans target/release/"
+cargo build --release --locked
+ok "Server built in target/release/"
 
 echo ""
 echo "================================================================"
-echo "  lightMock pret ! Lancez avec :"
-echo "  STATIC_DIR=./frontend/dist DATA_PATH=./data ./target/release/light-mock"
-echo "  Puis ouvrez http://localhost:7342"
+echo "  lightMock is ready. Start it with:"
+echo "  ./target/release/light-mock"
+echo "  then open http://localhost:7342"
 echo "================================================================"

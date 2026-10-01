@@ -1,23 +1,26 @@
 # Changelog
 
-Tous les changements notables de ce projet sont documentés dans ce fichier.
+Every notable change to lightMock is recorded here.
 
-Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et ce projet
-adhère au [Semantic Versioning](https://semver.org/lang/fr/). Tant que la version reste en
-`0.x`, l'API (REST comme configuration YAML) peut encore évoluer de façon non rétrocompatible
-entre versions mineures.
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project follows [Semantic Versioning](https://semver.org/). While the version is `0.x`, the REST API and the configuration format may still change incompatibly between minor versions; such changes are marked **Breaking**.
 
 ## [Unreleased]
 
 ### Added
+- A security policy (`SECURITY.md`: private reporting channel, scope, response times), a security model (`docs/security.md`: exposed surfaces, every outbound flow, trust boundaries, hardening checklist) and a reviewer guide (`REVIEWING.md`: reading order, authorization matrix, commands that check each claim).
+- An explicit `LICENSE` file (MIT, already announced by the README).
+- A roadmap (`ROADMAP.md`).
+- Packaging metadata (license, repository, description) in `Cargo.toml` and `frontend/package.json`, for complete SBOMs.
 - The interface is available in English and French: it follows the browser's language (English when no catalogue exists for it), and a language selector in the header remembers the choice. Each sentence is written once, in English, where it is used, and a language adds one catalogue (`frontend/src/locales/<language>.json`), loaded only by its users; a test fails on any message missing from a catalogue, any catalogue entry no longer used, any lost placeholder, and any visible word of the interface that escapes translation (rendered in a pseudo-locale).
 - The messages of the server that people read (API validation errors, rule tester hints, script errors, availability-test errors) follow the `Accept-Language` of the request, which the UI sets to its own language; English by default. Same rule and same test as the UI, with `src/locales/fr.json`.
 
 ### Changed
+- The README, the user guide (`docs/`, under English file names), the Kubernetes and UI READMEs and the build scripts are in English.
 - The Kubernetes manifests are a base plus two overlays, `k8s/ingress` (a standard `Ingress`, the new default) and `k8s/gloo-edge`, in a `lightmock` namespace; set the image with `kustomize edit set image`. **Breaking** for `kubectl apply -k k8s/`: apply an overlay instead.
 - The responses that lightMock itself sends to the applications under test (no matching rule, purely mocked service, refused path) are in English.
 
 ### Security
+- The Windows build script no longer turns off certificate revocation checks for crate downloads; when a proxy blocks revocation lists, it says how to do it knowingly. Both build scripts install the UI's exact locked dependencies without running their install scripts.
 - With authentication enabled, the Kafka message log and `POST /api/messaging/simulate` are reserved to super-admins: Kafka is configured for the whole instance, its log spans every group's services, and a simulation publishes on the real reply topic.
 - Dependencies upgraded past known vulnerabilities: quick-xml 0.42 (RUSTSEC-2026-0194 and -0195: quadratic time and unbounded allocation on crafted XML, which lightMock parses from incoming requests), rustls 0.23.45 (RUSTSEC-2026-0285), and the yanked chacha20 0.10.0. XML text now resolves character references (`&#233;`) as well as the predefined entities.
 - The UI and the management API are served with a content security policy (no inline script, no framing, API calls to the UI's own origin or `API_BASE_URL` only), `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` and `Referrer-Policy: no-referrer`. Responses of mocked and proxied services are left untouched.
@@ -40,36 +43,17 @@ entre versions mineures.
 - Non-ASCII path parameters are decoded as UTF-8: `/users/%C3%A9t%C3%A9` gives `été` (it gave `Ã©tÃ©`), in any script; patterns written with non-ASCII characters match their percent-encoded requests. `%` followed by anything but two hex digits is kept as is.
 - SIGTERM (Kubernetes, Docker, systemd) now triggers the graceful shutdown that drains pending configuration writes; only Ctrl+C did, so a pod stop could lose the last changes.
 
-### Added
-- `SECURITY.md` : politique de signalement de vulnérabilité (canal, périmètre, délais visés).
-- `LICENSE` : licence MIT explicite (le README l'annonçait déjà, le fichier manquait).
-- README : section "Sécurité et confidentialité" (comportement réseau exhaustif — absence de
-  télémétrie, portée exacte des 4 flux sortants possibles), et documentation des commandes
-  d'audit de dépendances (`cargo audit`/`npm audit`), de génération de SBOM (CycloneDX) et de
-  scan de l'image Docker (Trivy).
-- Métadonnées de packaging (`license`, `repository`, `description`) dans `Cargo.toml` et
-  `frontend/package.json`, pour une meilleure qualité de SBOM généré.
-
 ## [0.1.0] - 2026-07-29
 
 ### Added
-- Première version versionnée de lightMock : mock & proxy HTTP intelligent, un seul binaire Rust
-  (Axum) servant une UI Svelte 5, déployable en Kubernetes, Docker Compose ou nativement.
-- Moteur de règles first-match (conditions ET/OU sur path/query/header/body JSON/XML/form),
-  bascule mock/proxy par service et par règle, testeur de règle et détecteur de conflits.
-- Templates dynamiques (`{{variable | pipe}}`), 19 types de données factices, scripts Rhai
-  sandboxés (jusqu'à 3 blocs par règle, fonctions natives déterministes par seed).
-- Groupes de services (accordéons, préfixe d'URL, permissions admins/membres), mode SOAP/WSDL
-  par service, mode Chaos (latence/erreurs injectées).
-- Journal des requêtes, ping de disponibilité (connexion TCP pure, jamais de requête HTTP),
-  sauvegardes YAML automatiques avec rotation et restauration depuis l'UI.
-- Authentification Keycloak optionnelle (désactivée par défaut), rôles et permissions par
-  groupe de services.
-- Support Kafka optionnel (feature Cargo `messaging-kafka`, non compilée par défaut).
-- Interface Svelte 5 accessible (RGAA niveau AA), mode sombre.
-
-Voir l'historique des commits pour le détail des décisions d'architecture ayant mené à cette
-version.
+- First versioned release: an HTTP mock and proxy in one Rust binary (Axum) serving a Svelte 5 UI, deployable on Kubernetes, with Docker Compose or natively.
+- First-match rule engine (AND/OR conditions on path, query, headers, JSON, XML and form bodies), mock or proxy per service and per rule, rule tester and conflict detection.
+- Dynamic templates (`{{variable | pipe}}`), 19 kinds of fake data, sandboxed Rhai scripts (up to 3 blocks per rule, deterministic functions per seed).
+- Service groups (collapsible sections, URL prefix, admins and members), SOAP/WSDL handling per service, chaos mode (injected latency and errors).
+- Request log, availability check (a TCP connection only, never an HTTP request), automatic YAML backups with rotation and restore from the UI.
+- Optional Keycloak authentication (off by default), rights per service group.
+- Optional Kafka support (Cargo feature `messaging-kafka`, not compiled by default).
+- Accessible Svelte 5 interface (WCAG 2.1 AA), dark mode.
 
 [Unreleased]: https://github.com/eoth/light-api-mock/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/eoth/light-api-mock/releases/tag/v0.1.0
