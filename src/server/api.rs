@@ -604,12 +604,18 @@ async fn messaging_status() -> Json<MessagingStatusResponse> {
 }
 
 #[cfg(feature = "messaging-kafka")]
+// Kafka is configured for the whole instance (brokers and topics come from the environment), not per group:
+// its message log spans every team's services and a simulation publishes on the real reply topic. With
+// authentication, both are reserved to super-admins.
 async fn get_messaging_logs(
     State(state): State<AppState>,
-    Extension(_user): Extension<AuthUser>,
+    Extension(user): Extension<AuthUser>,
     Query(q): Query<LogsQuery>,
-) -> Json<Vec<crate::messaging::message_log::MessageLogEntry>> {
-    Json(state.messaging.message_log.recent(q.limit))
+) -> Result<Json<Vec<crate::messaging::message_log::MessageLogEntry>>, AppError> {
+    if state.auth_config.enabled {
+        require_super_admin(&user)?;
+    }
+    Ok(Json(state.messaging.message_log.recent(q.limit)))
 }
 
 /// Simule la reception d'un message sur le topic d'ecoute : declenche
@@ -631,9 +637,12 @@ struct SimulateMessageRequest {
 #[cfg(feature = "messaging-kafka")]
 async fn simulate_message(
     State(state): State<AppState>,
-    Extension(_user): Extension<AuthUser>,
+    Extension(user): Extension<AuthUser>,
     Json(req): Json<SimulateMessageRequest>,
-) -> StatusCode {
+) -> Result<StatusCode, AppError> {
+    if state.auth_config.enabled {
+        require_super_admin(&user)?;
+    }
     crate::messaging::consumer::process_message(
         &state.store,
         &state.messaging.message_log,
@@ -644,7 +653,7 @@ async fn simulate_message(
         req.headers,
     )
     .await;
-    StatusCode::NO_CONTENT
+    Ok(StatusCode::NO_CONTENT)
 }
 
 // --------------- TCP brut (protocoles binaires non-HTTP) ---------------
