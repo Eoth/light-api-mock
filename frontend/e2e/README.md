@@ -94,14 +94,15 @@ grep -rhoE 'data-testid="[^"]*"' frontend/src --include="*.svelte" | sort -u
 
 ## Documentation screenshots
 
-The images of `docs/` are taken by this suite, so they follow the interface instead of going stale.
+The images of `docs/` are taken by this suite, so they follow the interface instead of going stale. The guide exists in English and French with the same pages, so every image exists in both languages.
 
 - `docsScreenshot(page, file)` (`docs-screenshot.js`) does nothing unless `DOCS_SCREENSHOTS` is set: the standard run takes no screenshot and pays nothing.
 - In a scenario, a `{ "action": "screenshot", "file": "name.png" }` step captures the page at that point; in a spec, `await docsScreenshot(page, 'name.png')` does the same.
+- Each call captures the page in English, switches it to French with the interface's language selector (no reload: the screen keeps its state), captures it again and switches back, so the test goes on in English. A screen without the navigation bar (the login screen) has no selector: pass `{ reopenWaitingFor: '<selector>' }` and the French image is taken by opening the same URL in a French browser. Without that option, a missing selector fails the test rather than producing an image in the wrong language.
 - `playwright.docs-screenshots.config.js` sets `DOCS_SCREENSHOTS` and runs only the files that take screenshots.
 
 ```bash
 npm run docs:screenshots   # from frontend/, with Mimicway running on :7342
 ```
 
-Images are written to `docs/en/screenshots/` under the names the pages reference; `node scripts/check-doc-links.mjs` (run by CI) fails when a page references an image that does not exist. The three Kafka images need a binary built with `--features messaging-kafka`. States that no test reaches yet have no image; covering them is roadmap item R5.
+Images are written to `docs/en/screenshots/` and `docs/fr/screenshots/` under the names the pages reference. `node scripts/check-doc-links.mjs` (run by CI) fails when a page references an image that does not exist. The three Kafka images need a binary built with `--features messaging-kafka`. States that no test reaches yet have no image; covering them is roadmap item R5.

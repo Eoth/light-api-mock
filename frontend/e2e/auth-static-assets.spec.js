@@ -115,7 +115,9 @@ test.describe('Auth: assets statiques de la SPA accessibles sans token (AUTH_ENA
     // la liste des services.
     await expect(page.locator('[data-testid="login-form-username-input"]')).toBeVisible();
     await expect(page.locator('[data-testid="login-form-password-input"]')).toBeVisible();
-    await docsScreenshot(page, 'authentication-login-screen.png');
+    await docsScreenshot(page, 'authentication-login-screen.png', {
+      reopenWaitingFor: '[data-testid="login-form-username-input"]',
+    });
   });
 
   test('a signed-in super-admin sees their name and the reset button', async ({ page }) => {

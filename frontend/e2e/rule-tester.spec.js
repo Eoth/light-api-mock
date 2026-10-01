@@ -90,7 +90,14 @@ test.describe('Testeur de regle : condition mal choisie contre une vraie requete
     await expect(page.getByText(/would not match this request/)).toBeVisible();
     await expect(page.getByText(/value found: none/)).toBeVisible();
     await expect(page.getByText(/present as a path parameter/)).toBeVisible();
-    await docsScreenshot(page, 'rule-tester-hint.png');
+    // The hint is worded by the server in the language of the request: test again after each language switch.
+    await docsScreenshot(page, 'rule-tester-hint.png', {
+      afterSwitch: async (p) => {
+        const answered = p.waitForResponse('**/api/rule-test');
+        await p.getByTestId('rule-tester-test-button').click();
+        await answered;
+      },
+    });
   });
 
   test('la selection du path param est stricte (select ferme, pas de saisie libre)', async ({ page, request }) => {
