@@ -1,3 +1,5 @@
+[Français](../fr/backups-and-restore.md)
+
 # Backups and restore
 
 Mimicway protects your configuration against mistakes: before each change, the previous state is saved, so you can always go back.

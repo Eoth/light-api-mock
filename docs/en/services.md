@@ -1,3 +1,5 @@
+[Français](../fr/services.md)
+
 # Services and routing
 
 A **service** is the basic unit of Mimicway: it stands for one API you want to mock or relay. Each service you create is reachable at once on its own URL, without restarting anything.

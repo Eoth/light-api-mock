@@ -1,3 +1,5 @@
+[Français](../fr/authentication.md)
+
 # Authentication
 
 By default, Mimicway is **open to everyone** who can reach it: anyone can see and change everything, without logging in. That suits a developer's machine or a closed test environment, and it is why the binary only listens on the local machine by default. Authentication can be **turned on** when needed, for an environment shared by several teams, for instance.

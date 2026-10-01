@@ -1,3 +1,5 @@
+[Français](../fr/traffic-observation.md)
+
 # Traffic observation and rule suggestions
 
 For a service in **pure proxy** mode (not mocked at all yet), Mimicway can watch the traffic really exchanged with the real backend and **suggest mock rules** from what it saw, instead of having you write them all by hand. Nothing starts by itself: you turn it on explicitly, service by service.

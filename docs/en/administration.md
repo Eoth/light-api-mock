@@ -1,3 +1,5 @@
+[Français](../fr/administration.md)
+
 # Administration: import, export, reset, dark mode
 
 A few features that apply to everything, from the navigation bar at the top of the interface.
