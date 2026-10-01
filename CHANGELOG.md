@@ -9,6 +9,9 @@ entre versions mineures.
 
 ## [Unreleased]
 
+### Fixed
+- SIGTERM (Kubernetes, Docker, systemd) now triggers the graceful shutdown that drains pending configuration writes; only Ctrl+C did, so a pod stop could lose the last changes.
+
 ### Added
 - `SECURITY.md` : politique de signalement de vulnérabilité (canal, périmètre, délais visés).
 - `LICENSE` : licence MIT explicite (le README l'annonçait déjà, le fichier manquait).
