@@ -116,7 +116,12 @@ test.describe('URL de l API configurable independamment du Host du frontend', ()
     let backChild;
     let frontChild;
     try {
-      ({ child: backChild } = await spawnLightMock({ port: backPort, dataDir: backDataDir }));
+      // The API answers a browser on another origin only if that origin is listed.
+      ({ child: backChild } = await spawnLightMock({
+        port: backPort,
+        dataDir: backDataDir,
+        extraEnv: { CORS_ALLOWED_ORIGINS: `http://127.0.0.1:${frontPort}` },
+      }));
       const backBaseUrl = `http://127.0.0.1:${backPort}`;
 
       // Sert de "back" : seede un service directement sur cette instance,
@@ -162,6 +167,38 @@ test.describe('URL de l API configurable independamment du Host du frontend', ()
       const frontOwnServices = await page.request.get(`${frontBaseUrl}/api/services`);
       const frontOwnBody = await frontOwnServices.json();
       expect(frontOwnBody.find((s) => s.name === 'cross-origin-demo')).toBeUndefined();
+    } finally {
+      if (frontChild) frontChild.kill();
+      if (backChild) backChild.kill();
+      rmSync(frontDataDir, { recursive: true, force: true });
+      rmSync(backDataDir, { recursive: true, force: true });
+    }
+  });
+
+  test('an origin missing from CORS_ALLOWED_ORIGINS cannot call the management API from a browser', async ({ page }) => {
+    const backDataDir = mkdtempSync(path.join(tmpdir(), 'lightmock-apibase-cors-back-'));
+    const frontDataDir = mkdtempSync(path.join(tmpdir(), 'lightmock-apibase-cors-front-'));
+    const backPort = await getFreePort();
+    let frontPort = await getFreePort();
+    if (frontPort === backPort) frontPort = await getFreePort();
+
+    let backChild;
+    let frontChild;
+    try {
+      ({ child: backChild } = await spawnLightMock({ port: backPort, dataDir: backDataDir }));
+      const backBaseUrl = `http://127.0.0.1:${backPort}`;
+      ({ child: frontChild } = await spawnLightMock({ port: frontPort, dataDir: frontDataDir }));
+      await page.goto(`http://127.0.0.1:${frontPort}/`);
+
+      const outcome = await page.evaluate(async (url) => {
+        try {
+          await fetch(`${url}/api/config`);
+          return 'readable';
+        } catch {
+          return 'blocked';
+        }
+      }, backBaseUrl);
+      expect(outcome).toBe('blocked');
     } finally {
       if (frontChild) frontChild.kill();
       if (backChild) backChild.kill();

@@ -4,6 +4,7 @@
 //   validation.rs → validation des noms de services, methodes HTTP, etc.
 //   request_log.rs → journal en memoire des 200 dernieres requetes interceptees
 mod api;
+pub mod browser_guard;
 pub(crate) mod codegen;
 mod intercept;
 pub mod observation;
@@ -24,7 +25,6 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, RwLock};
-use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::ServeDir;
 
 #[derive(Clone)]
@@ -106,11 +106,15 @@ async fn runtime_config_handler() -> axum::Json<RuntimeConfig> {
 }
 
 pub fn build_router(state: AppState, static_dir: &Path) -> Router {
-    let cors = CorsLayer::new()
-        .allow_origin(Any)
-        .allow_methods(Any)
-        .allow_headers(Any);
+    build_router_with(state, static_dir, browser_guard::BrowserGuard::from_env())
+}
 
+pub fn build_router_with(
+    state: AppState,
+    static_dir: &Path,
+    guard: browser_guard::BrowserGuard,
+) -> Router {
+    let cors = guard.cors_layer();
     let api_routes = api::routes();
 
     let auth_config = state.auth_config.clone();
@@ -135,9 +139,16 @@ pub fn build_router(state: AppState, static_dir: &Path) -> Router {
                 next,
             )
         }))
+        .layer(axum::middleware::from_fn_with_state(
+            guard,
+            browser_guard::cross_site_write_guard,
+        ))
         .with_state(state)
         .layer(cors)
 }
+
+#[cfg(test)]
+pub(crate) mod test_support;
 
 // ENV_MUTEX guards are held across awaits on purpose: they serialize the tests that mutate process-wide
 // environment variables, and each #[tokio::test] owns its runtime, so holding one cannot deadlock.
