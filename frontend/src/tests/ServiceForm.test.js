@@ -335,3 +335,28 @@ describe('ServiceForm service purement mocké', () => {
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ real_target_url: '', is_mocked: true }));
   });
 });
+
+describe('ServiceForm: settings the form does not show', () => {
+  const soapService = (wsdl_mode) => ({
+    name: 'soap-svc', listen_path: '', real_target_url: 'http://backend:8080', is_mocked: true,
+    rewrite_directory_urls: true, group_name: null, wsdl_mode, rules: [],
+  });
+
+  it.each(['mock', 'proxy'])('keeps a WSDL mode set to %s when the service is saved', async (wsdl_mode) => {
+    const onSave = vi.fn();
+    const { container } = render(ServiceForm, { props: { service: soapService(wsdl_mode), isEdit: true, onSave } });
+
+    await submitForm(container);
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ wsdl_mode }));
+  });
+
+  it('gives a new service the automatic WSDL mode', async () => {
+    const onSave = vi.fn();
+    const { container } = render(ServiceForm, { props: { onSave } });
+
+    await setInput(container.querySelector('[data-testid="service-form-name-input"]'), 'new-svc');
+    await setInput(container.querySelector('[data-testid="service-form-target-input"]'), 'http://backend:8080');
+    await submitForm(container);
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ wsdl_mode: 'auto' }));
+  });
+});

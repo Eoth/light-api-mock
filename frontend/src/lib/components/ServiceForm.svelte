@@ -79,7 +79,9 @@
       real_target_url: purelyMocked ? '' : realTargetUrl.trim(),
       is_mocked: purelyMocked ? true : (service?.is_mocked ?? false),
       rewrite_directory_urls: isSoap,
-      wsdl_mode: isSoap ? 'auto' : 'auto',
+      // The form does not show the WSDL mode: it keeps the one the service has (set through the API or the
+      // configuration file), 'auto' for a new service.
+      wsdl_mode: service?.wsdl_mode ?? 'auto',
       rules: service?.rules ?? [],
     };
     if (groupName) payload.group_name = groupName;
