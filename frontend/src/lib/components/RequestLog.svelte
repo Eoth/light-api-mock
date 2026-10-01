@@ -167,9 +167,9 @@
               <td class="col-time">{formatDateTimePrecise(log.timestamp)}</td>
               <td><strong>{log.service_name}</strong></td>
               <td><span class="method-badge" data-method={log.method}>{log.method}</span></td>
-              <td class="col-path"><code>{log.path}</code></td>
+              <td class="col-path"><code class="truncate" title={log.path}>{log.path}</code></td>
               <td><span class="badge {modeBadge(log.mode)}">{log.mode}</span></td>
-              <td class="col-detail" translate="no" title={log.rule_matched || log.target_url || '-'}>{log.rule_matched || log.target_url || '-'}</td>
+              <td class="col-detail" translate="no"><span class="truncate" title={log.rule_matched || log.target_url || '-'}>{log.rule_matched || log.target_url || '-'}</span></td>
               <td><span class="status" class:status-ok={log.status < 400} class:status-err={log.status >= 400}>{log.status}</span></td>
               <td>
                 <button type="button" class="btn-detail" onclick={() => openDetail(log)} aria-label={t("Show the details of the request {0}", log.path)} title={t("Details")} data-testid="request-log-detail-button-{idx}">&#8942;</button>
@@ -257,9 +257,13 @@
   .log-table th { background: var(--color-bg); font-weight: 600; text-align: left; padding: 0.5rem; border-bottom: 2px solid var(--color-border); }
   .log-table td { padding: 0.375rem 0.5rem; border-bottom: 1px solid var(--color-border); vertical-align: middle; }
   .col-time { white-space: nowrap; color: var(--color-text-muted); font-family: monospace; }
-  .col-path { max-width: 20rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* A table cell ignores max-width in automatic table layout, so long paths and target URLs widened the table past
+     its container; the truncation sits on an inner block instead. */
+  .truncate { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .col-path .truncate { max-width: 20rem; }
   .col-path code { background: none; padding: 0; font-size: 0.8125rem; }
-  .col-detail { max-width: 12rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.75rem; color: var(--color-text-muted); cursor: default; }
+  .col-detail { font-size: 0.75rem; color: var(--color-text-muted); cursor: default; }
+  .col-detail .truncate { max-width: 12rem; }
 
   .status { font-weight: 600; font-family: monospace; }
   .status-ok { color: var(--color-success); }
