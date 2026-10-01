@@ -9,6 +9,7 @@ pub(crate) mod codegen;
 mod intercept;
 pub mod observation;
 pub mod ping;
+pub mod redaction;
 pub mod request_log;
 pub mod suggestion;
 pub mod validation;

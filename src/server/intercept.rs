@@ -153,7 +153,7 @@ async fn do_proxy(
         path = %path,
         mode = "proxy",
         context = %context,
-        target = %target,
+        target = %crate::server::redaction::redact_url_credentials(&target),
         "proxy forwarding"
     );
     if observe {
