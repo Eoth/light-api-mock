@@ -20,16 +20,7 @@ export const COVERED = [
   'build.rs',
   'scripts/*.mjs',
   'frontend/src/main.js',
-  'frontend/src/lib/api.js',
-  'frontend/src/lib/auth.svelte.js',
-  'frontend/src/lib/format-date.js',
-  'frontend/src/lib/group-expansion-state.svelte.js',
-  'frontend/src/lib/hex-utils.js',
-  'frontend/src/lib/i18n.svelte.js',
-  'frontend/src/lib/legacy-storage.js',
-  'frontend/src/lib/path-params.js',
-  'frontend/src/lib/runtime-config.js',
-  'frontend/src/lib/service-url.js',
+  'frontend/src/lib/*.js',
 ];
 
 // Frequent French words that English comments do not use, with and without their accents (comments are often typed

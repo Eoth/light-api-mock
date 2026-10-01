@@ -1,27 +1,16 @@
-// Source unique de verite pour les fonctions natives Rhai exposees par
-// Mimicway (miroir de src/engine/script.rs::ScriptEngine::new). Reutilisee a
-// la fois par la doc contextuelle de l'editeur de script (RuleForm.svelte) ET
-// par l'autocompletion (RhaiScriptEditor.svelte) — meme principe que
-// tpl-utils.js pour le format template : une seule liste a mettre a jour
-// quand une fonction native est ajoutee/modifiee cote moteur.
+// The native Rhai functions Mimicway provides (the UI's counterpart of ScriptEngine::new in src/engine/script.rs). The
+// script help ("Rhai examples and syntax", RuleResponseSection.svelte) and the autocompletion of the script editor
+// (RhaiScriptEditor.svelte) both read this list, so a function added to the engine is described here once.
 import { t } from './i18n.svelte.js';
 
 // Texts are getters, read when shown, so that they follow a change of language.
 export const RHAI_FUNCTIONS = [
-  // --- Acces au contexte de la requete (variable `request`, pas des
-  // fonctions a proprement parler, mais listees ici pour beneficier de la
-  // meme autocompletion/doc que le reste — meme principe de source unique).
-  // Miroir de ScriptEngine::execute() (src/engine/script.rs), qui pousse un
-  // seul objet `request` dans le scope Rhai avec 4 champs : body/headers/
-  // query/path. IMPORTANT : acceder a une cle absente ne leve JAMAIS
-  // d'erreur en Rhai (ni via `.cle`, ni via `["cle"]`) — ca renvoie
-  // simplement une valeur vide/absente. Une regle qui ne matche jamais a
-  // cause d'un nom de cle errone (ex. `request.path.id` alors que le path
-  // param s'appelle `orderId`) echoue donc SILENCIEUSEMENT (aucune erreur a
-  // l'execution), contrairement a l'appel d'une fonction native inexistante
-  // (voir plus bas) qui, lui, produit une vraie erreur. Utiliser le testeur
-  // de regle (section "Tester contre une requete reelle" ci-dessus) pour
-  // verifier qu'une cle est bien trouvee avant de se fier au script.
+  // The request: `request` is a variable, not a function, listed here for the same help and autocompletion.
+  // ScriptEngine::execute() (src/engine/script.rs) puts one `request` object in the Rhai scope, with four fields:
+  // body, headers, query, path. Reading a missing key is never an error in Rhai (neither `.key` nor `["key"]`), it
+  // gives an empty value: a script that reads a misspelled key (`request.path.id` when the path parameter is
+  // `orderId`) fails silently, whereas calling a function that does not exist is a real error. The rule tester
+  // ("Test against a real request") shows whether a key is found.
   {
     name: 'request.path',
     get signature() { return t("request.path.parameter_name"); },
@@ -144,19 +133,16 @@ export const RHAI_FUNCTIONS = [
   },
 ];
 
-// Fonctions dont le nom commence par `query` (insensible a la casse).
-// Liste complete si query est vide/absent (utilise pour Ctrl+Espace sans
-// prefixe deja tape).
+// The functions whose name starts with `query`, ignoring case; all of them when `query` is empty (Ctrl+Space before
+// anything is typed).
 export function filterRhaiFunctions(query) {
   if (!query) return RHAI_FUNCTIONS;
   const lower = query.toLowerCase();
   return RHAI_FUNCTIONS.filter((f) => f.name.toLowerCase().startsWith(lower));
 }
 
-// Identifiant Rhai (lettres/chiffres/underscore) immediatement avant
-// `cursorPos` dans `text`. Sert a la fois a determiner le prefixe de
-// recherche de l'autocompletion et la portion de texte a remplacer lors de
-// l'insertion d'une suggestion.
+// The Rhai identifier (letters, digits, underscores) right before `cursorPos` in `text`: both the prefix the
+// autocompletion looks for and the text an inserted suggestion replaces.
 export function tokenAtCursor(text, cursorPos) {
   const before = text.slice(0, cursorPos);
   const match = before.match(/[A-Za-z_][A-Za-z0-9_]*$/);
@@ -165,11 +151,9 @@ export function tokenAtCursor(text, cursorPos) {
     : { token: '', start: cursorPos };
 }
 
-// Selection (offsets relatifs a insertText) a appliquer juste apres
-// insertion : les parametres entre parentheses sont selectionnes pour etre
-// remplaces immediatement par la frappe (ex. "random_int(min, max)" ->
-// "min, max" selectionne) ; sans parametres, le curseur est simplement place
-// apres l'appel (ex. "now_ms()" -> curseur apres la parenthese fermante).
+// What to select right after inserting `insertText` (offsets within it): the arguments between the parentheses, so
+// that typing replaces them ("random_int(min, max)" selects "min, max"); without arguments, the caret goes after the
+// call ("now_ms()").
 export function computeInsertSelection(insertText) {
   const openIdx = insertText.indexOf('(');
   const closeIdx = insertText.lastIndexOf(')');
