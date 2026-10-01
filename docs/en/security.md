@@ -52,7 +52,7 @@ Because an editor chooses proxy targets, Mimicway will send HTTP requests to any
 
 When enabled, Mimicway validates Keycloak access tokens locally against the realm's published keys: asymmetric signature (RSA, RSA-PSS, ECDSA, EdDSA; never HMAC or `none`), issuer (`KEYCLOAK_ISSUER` if tokens carry another URL than `KEYCLOAK_URL`), expiry, and the client the token was issued to (`azp` or `aud` must name `KEYCLOAK_CLIENT_ID`). Keycloak is never asked to validate a token on Mimicway's behalf. An unknown key id refreshes the key set at most once every 30 seconds. Error responses carry no internal detail. Tests run against a fake realm signing real tokens (`src/auth/keycloak/tests.rs`).
 
-The login form uses Keycloak's password grant. Replacing it with the authorization code flow with PKCE, and supporting any OpenID Connect provider, are planned (see [ROADMAP.md](../ROADMAP.md)).
+The login form uses Keycloak's password grant. Replacing it with the authorization code flow with PKCE, and supporting any OpenID Connect provider, are planned (see [ROADMAP.md](../../ROADMAP.md)).
 
 ## Data
 
@@ -63,11 +63,11 @@ The login form uses Keycloak's password grant. Replacing it with the authorizati
 ## Supply chain and build
 
 - `Cargo.lock` and `frontend/package-lock.json` are committed: builds resolve exactly the same dependency graph.
-- CI fails on any known vulnerability or yanked crate, on a license outside a permissive allow-list and on a dependency from outside crates.io ([deny.toml](../deny.toml)), on high-severity npm advisories, on critical or high vulnerabilities of the container image (Trivy) and on committed secrets (gitleaks).
+- CI fails on any known vulnerability or yanked crate, on a license outside a permissive allow-list and on a dependency from outside crates.io ([deny.toml](../../deny.toml)), on high-severity npm advisories, on critical or high vulnerabilities of the container image (Trivy) and on committed secrets (gitleaks).
 - The CI's third-party actions are pinned to commit SHAs, and Dependabot proposes their updates along with those of the crates, npm packages and base images.
 - The production code contains no `unsafe` Rust (`#![forbid(unsafe_code)]` outside tests).
 - The image is a multi-stage build ending on Alpine, running as a dedicated non-root user; the Kubernetes manifests add a read-only root filesystem, no privilege escalation and no Linux capability.
-- Releases are built from the tagged commit by `.github/workflows/release.yml`: every archive has a build provenance attestation and a CycloneDX SBOM (one for the Rust crates, one for the UI's shipped packages), and the image is signed keylessly with cosign. [SECURITY.md](../SECURITY.md#verifying-a-release) gives the verification commands.
+- Releases are built from the tagged commit by `.github/workflows/release.yml`: every archive has a build provenance attestation and a CycloneDX SBOM (one for the Rust crates, one for the UI's shipped packages), and the image is signed keylessly with cosign. [SECURITY.md](../../SECURITY.md#verifying-a-release) gives the verification commands.
 - The base images of both Dockerfiles are pinned by digest.
 
 ## Hardening checklist
@@ -85,4 +85,4 @@ The login form uses Keycloak's password grant. Replacing it with the authorizati
 - Without authentication, every user is a super-admin. This is intended for local use only.
 - Authentication supports Keycloak only for now.
 
-To report a vulnerability, see [SECURITY.md](../SECURITY.md).
+To report a vulnerability, see [SECURITY.md](../../SECURITY.md).

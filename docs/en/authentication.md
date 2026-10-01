@@ -13,7 +13,7 @@ Access rights then depend on:
 - The user's membership of [service groups](groups.md): group admins manage the group and its services, members work on its services.
 - A list of **super-admins**, who can do everything, including sensitive actions (full reset, restoring backups, ungrouped services).
 
-The exact rights of each endpoint are listed in the [reviewer guide](../REVIEWING.md#authorization-matrix).
+The exact rights of each endpoint are listed in the [reviewer guide](../../REVIEWING.md#authorization-matrix).
 
 ![The navigation bar once logged in, with the user name badge](screenshots/authentication-user-badge.png)
 
@@ -26,5 +26,5 @@ Once logged in, the user name shows as a badge in the navigation bar; here the u
 - **Mimicway needs no authentication gateway in front of it.** It serves its own login screen, including when authentication is on: the page itself (HTML, script, styles) is reachable without a token, and only the management API (services, groups, backups…) requires one. Running behind a reverse proxy or gateway is possible, never required.
 - The mocked services themselves never require a Mimicway token: they carry the credentials of the applications under test.
 - Tokens are checked by Mimicway itself against the realm's published keys (signature, issuer, expiry, client); see the [security model](security.md#authentication).
-- Only Keycloak is supported today, through its password login. Other OpenID Connect providers and a browser redirect login (authorization code with PKCE) are on the [roadmap](../ROADMAP.md).
+- Only Keycloak is supported today, through its password login. Other OpenID Connect providers and a browser redirect login (authorization code with PKCE) are on the [roadmap](../../ROADMAP.md).
 - The "Reset" button (full reset, see [Administration](administration.md)) can be shown or hidden independently of authentication, but its presence on screen is **never** the protection: the server always checks the permission.

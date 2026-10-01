@@ -1,6 +1,6 @@
 # Reviewing Mimicway
 
-This guide is for the engineer asked to approve Mimicway before it runs in their company. It gives a reading order that follows the trust boundaries, the authorization matrix of the API, and commands that check each claim instead of taking it on trust. The security model itself (what is exposed, outbound flows, defaults) is described in [docs/security.md](docs/security.md).
+This guide is for the engineer asked to approve Mimicway before it runs in their company. It gives a reading order that follows the trust boundaries, the authorization matrix of the API, and commands that check each claim instead of taking it on trust. The security model itself (what is exposed, outbound flows, defaults) is described in [docs/security.md](docs/en/security.md).
 
 ## Facts that bound the review
 
@@ -93,4 +93,4 @@ Development only: `proptest` (property tests of the suggestion engine), `ring` a
 
 ## Out of scope of the code
 
-TLS termination, rate limiting and network egress control are left to the deployment (ingress, service mesh, network policies); [docs/security.md](docs/security.md) lists what to configure.
+TLS termination, rate limiting and network egress control are left to the deployment (ingress, service mesh, network policies); [docs/security.md](docs/en/security.md) lists what to configure.

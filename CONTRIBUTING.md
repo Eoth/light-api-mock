@@ -44,7 +44,7 @@ The Kafka feature builds librdkafka from source: it needs cmake, a C toolchain a
 - **No `unsafe`**: the crate forbids it outside tests.
 - **A new dependency is justified** in the commit message (what it replaces, its size, its license); `cargo deny` must pass.
 - **Every visible text is translatable.** Write the English sentence once, where it is used: `t("...")` in the UI, `tr("...", &[...])` in the server, with `{0}`, `{1}` placeholders for values. Add the French translation to `frontend/src/locales/fr.json` or `src/locales/fr.json`; the tests fail on a missing or unused entry. Data (names, URLs, values typed by users) is never translated: mark it `translate="no"` in the UI.
-- **The docs follow the code.** Update the README, the guide in `docs/` and `CHANGELOG.md` (section `Unreleased`) in the same pull request. A new environment variable goes into the README's configuration table; a new outbound connection into `docs/security.md`.
+- **The docs follow the code.** Update the README, the guide in `docs/` and `CHANGELOG.md` (section `Unreleased`) in the same pull request. A new environment variable goes into the README's configuration table; a new outbound connection into `docs/en/security.md`.
 - **Accessibility holds**: visible labels, keyboard access, 4.5:1 contrast in both themes.
 
 ## Adding a language

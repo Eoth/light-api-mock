@@ -9,7 +9,7 @@
 //
 // parse_json/to_json/parse_xml_items/xml_element exist for one need that neither template variables nor conditions
 // can meet, because they cannot loop: a request that holds a list of objects and a response that must hold as many
-// items, built position by position (JSON and XML/SOAP). docs/rhai-scripts.md has checked examples of both.
+// items, built position by position (JSON and XML/SOAP). docs/en/rhai-scripts.md has checked examples of both.
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -1355,9 +1355,9 @@ mod tests {
         assert!(result.value.contains("<doubledQty>18</doubledQty>"));
     }
 
-    // --- Representative scripts (see docs/rhai-scripts.md): lookup tables, loops with conditions, every request source
-    // in one script. Map indexing, `.contains()`, `in`, `.get()` and `switch` all work, and a missing key gives an
-    // empty value rather than an error.
+    // --- Representative scripts (see docs/en/rhai-scripts.md): lookup tables, loops with conditions, every request
+    // source in one script. Map indexing, `.contains()`, `in`, `.get()` and `switch` all work, and a missing key gives
+    // an empty value rather than an error.
 
     #[test]
     fn map_lookup_returns_mapped_value_for_known_key() {
