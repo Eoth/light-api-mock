@@ -21,6 +21,7 @@ pub(crate) fn auth_disabled() -> AuthConfig {
         realm: String::new(),
         client_id: String::new(),
         super_admins: vec![],
+        issuer: String::new(),
         show_reset_button: false,
     }
 }

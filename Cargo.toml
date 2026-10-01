@@ -69,6 +69,10 @@ rdkafka = { version = "0.36", features = ["cmake-build"], optional = true }
 # Rust, fonctionne sur toute plateforme stable, meme objectif (entrees
 # adversariales/aleatoires sur suggest() et le parsing JSON qu'il declenche).
 proptest = "1"
+# Generate signing keys and encode them for the fake Keycloak realm of the authentication tests. Both are already
+# in the dependency graph through jsonwebtoken (same versions), so they add nothing to build.
+ring = "0.17"
+base64 = "0.22"
 
 [features]
 # Support Kafka fonctionnel (consumer + publisher + journal des messages) :

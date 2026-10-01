@@ -1,8 +1,36 @@
+//! Keycloak client: password login (for the UI's login form) and local validation of access tokens.
+//!
+//! Tokens are only ever validated locally, against the realm's published keys (JWKS): signature with an asymmetric
+//! algorithm, expiry, issuer, and the client the token was issued for. There is no fallback to Keycloak's
+//! `userinfo` endpoint: that endpoint accepts a token issued to *any* client of the realm, so a fallback turns
+//! every local refusal (another client's token, for one) into an acceptance, and it makes every invalid token cost
+//! a call to Keycloak.
 use crate::auth::AuthConfig;
+use jsonwebtoken::jwk::{AlgorithmParameters, Jwk, PublicKeyUse};
 use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode};
 use serde::Deserialize;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
+
+/// The asymmetric algorithms Keycloak can sign access tokens with. HMAC and `none` are refused, so a token can
+/// never be checked against a key that its sender could also hold.
+const ACCEPTED_ALGORITHMS: &[Algorithm] = &[
+    Algorithm::RS256,
+    Algorithm::RS384,
+    Algorithm::RS512,
+    Algorithm::PS256,
+    Algorithm::PS384,
+    Algorithm::PS512,
+    Algorithm::ES256,
+    Algorithm::ES384,
+    Algorithm::EdDSA,
+];
+const JWKS_TTL: Duration = Duration::from_secs(300);
+/// Minimum delay between two key-set fetches triggered by an unknown key id (what a key rotation looks like), and
+/// between two fetches of a set found empty, so that tokens carrying made-up key ids cannot turn each request into
+/// a call to Keycloak.
+const JWKS_REFETCH_COOLDOWN: Duration = Duration::from_secs(30);
 
 #[derive(Clone)]
 pub struct KeycloakClient {
@@ -11,30 +39,11 @@ pub struct KeycloakClient {
     jwks: Arc<RwLock<CachedJwks>>,
 }
 
+#[derive(Default)]
 struct CachedJwks {
-    keys: Vec<JwkEntry>,
-    fetched_at: Option<std::time::Instant>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-struct JwkSet {
-    keys: Vec<JwkEntry>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-struct JwkEntry {
-    #[serde(default)]
-    kid: Option<String>,
-    kty: String,
-    #[serde(default)]
-    #[allow(dead_code)]
-    alg: Option<String>,
-    #[serde(default)]
-    n: Option<String>,
-    #[serde(default)]
-    e: Option<String>,
-    #[serde(rename = "use", default)]
-    use_: Option<String>,
+    keys: Vec<Jwk>,
+    fetched_at: Option<Instant>,
+    refetched_for_unknown_key_at: Option<Instant>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -48,18 +57,31 @@ pub struct TokenResponse {
 
 #[derive(Debug, Deserialize)]
 struct KeycloakClaims {
-    #[allow(dead_code)]
-    exp: usize,
-    #[allow(dead_code)]
-    iss: String,
     preferred_username: String,
-    #[allow(dead_code)]
+    #[serde(default)]
     azp: Option<String>,
+    #[serde(default)]
+    aud: Option<Audience>,
 }
 
 #[derive(Debug, Deserialize)]
-struct UserInfoResponse {
-    preferred_username: String,
+#[serde(untagged)]
+enum Audience {
+    One(String),
+    Many(Vec<String>),
+}
+
+impl KeycloakClaims {
+    /// Keycloak names the client that requested a token in `azp` and lists in `aud` the clients it is meant for
+    /// (often only `account`, unless an audience mapper is configured): either one naming this client will do.
+    fn is_for(&self, client_id: &str) -> bool {
+        let in_audience = match &self.aud {
+            Some(Audience::One(aud)) => aud == client_id,
+            Some(Audience::Many(auds)) => auds.iter().any(|a| a == client_id),
+            None => false,
+        };
+        in_audience || self.azp.as_deref() == Some(client_id)
+    }
 }
 
 #[derive(Debug)]
@@ -73,58 +95,53 @@ pub enum AuthError {
 impl std::fmt::Display for AuthError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            AuthError::InvalidCredentials => write!(f, "Identifiants invalides"),
-            AuthError::TokenExpired => write!(f, "Token expire"),
-            AuthError::TokenInvalid(msg) => write!(f, "Token invalide: {msg}"),
-            AuthError::KeycloakUnavailable(msg) => write!(f, "Keycloak indisponible: {msg}"),
+            AuthError::InvalidCredentials => write!(f, "invalid credentials"),
+            AuthError::TokenExpired => write!(f, "token expired"),
+            AuthError::TokenInvalid(msg) => write!(f, "invalid token: {msg}"),
+            AuthError::KeycloakUnavailable(msg) => write!(f, "Keycloak unavailable: {msg}"),
         }
     }
 }
 
-const JWKS_TTL_SECS: u64 = 300;
-
 impl KeycloakClient {
     pub fn new(config: AuthConfig) -> Self {
+        // Bounded so that a slow or unreachable Keycloak fails the request instead of holding it forever.
+        let http = reqwest::Client::builder()
+            .connect_timeout(Duration::from_secs(5))
+            .timeout(Duration::from_secs(10))
+            .build()
+            .unwrap_or_default();
         Self {
-            http: reqwest::Client::new(),
+            http,
             config,
-            jwks: Arc::new(RwLock::new(CachedJwks {
-                keys: vec![],
-                fetched_at: None,
-            })),
+            jwks: Arc::new(RwLock::new(CachedJwks::default())),
         }
     }
 
-    fn token_url(&self) -> String {
-        format!(
-            "{}/realms/{}/protocol/openid-connect/token",
-            self.config.keycloak_url.trim_end_matches('/'),
-            self.config.realm
-        )
-    }
-
-    fn certs_url(&self) -> String {
-        format!(
-            "{}/realms/{}/protocol/openid-connect/certs",
-            self.config.keycloak_url.trim_end_matches('/'),
-            self.config.realm
-        )
-    }
-
-    fn userinfo_url(&self) -> String {
-        format!(
-            "{}/realms/{}/protocol/openid-connect/userinfo",
-            self.config.keycloak_url.trim_end_matches('/'),
-            self.config.realm
-        )
-    }
-
-    fn issuer(&self) -> String {
+    fn realm_url(&self) -> String {
         format!(
             "{}/realms/{}",
             self.config.keycloak_url.trim_end_matches('/'),
             self.config.realm
         )
+    }
+
+    fn token_url(&self) -> String {
+        format!("{}/protocol/openid-connect/token", self.realm_url())
+    }
+
+    fn certs_url(&self) -> String {
+        format!("{}/protocol/openid-connect/certs", self.realm_url())
+    }
+
+    /// `KEYCLOAK_ISSUER` when Keycloak issues tokens under another URL than the one lightMock reaches it through
+    /// (a public hostname in front of an in-cluster service, for instance); the realm URL otherwise.
+    fn issuer(&self) -> String {
+        if self.config.issuer.is_empty() {
+            self.realm_url()
+        } else {
+            self.config.issuer.clone()
+        }
     }
 
     pub async fn login(&self, username: &str, password: &str) -> Result<TokenResponse, AuthError> {
@@ -184,189 +201,155 @@ impl KeycloakClient {
             .map_err(|e| AuthError::KeycloakUnavailable(e.to_string()))
     }
 
+    /// The `preferred_username` of a valid access token issued by the realm to this client.
     pub async fn validate_token(&self, token: &str) -> Result<String, AuthError> {
-        match self.validate_jwt_local(token).await {
-            Ok(username) => Ok(username),
-            Err(_) => self.validate_via_userinfo(token).await,
-        }
-    }
-
-    async fn validate_jwt_local(&self, token: &str) -> Result<String, AuthError> {
-        self.refresh_jwks_if_stale().await?;
-
         let header = jsonwebtoken::decode_header(token)
-            .map_err(|e| AuthError::TokenInvalid(e.to_string()))?;
-
-        let jwks = self.jwks.read().await;
-
-        let key_entry = header
-            .kid
-            .as_ref()
-            .and_then(|kid| jwks.keys.iter().find(|k| k.kid.as_deref() == Some(kid)))
-            .or_else(|| {
-                jwks.keys
-                    .iter()
-                    .find(|k| k.use_.as_deref() == Some("sig") && k.kty == "RSA")
-            })
-            .ok_or_else(|| AuthError::TokenInvalid("No matching JWK found".into()))?;
-
-        let n = key_entry
-            .n
-            .as_ref()
-            .ok_or_else(|| AuthError::TokenInvalid("JWK missing 'n'".into()))?;
-        let e = key_entry
-            .e
-            .as_ref()
-            .ok_or_else(|| AuthError::TokenInvalid("JWK missing 'e'".into()))?;
-
-        let decoding_key = DecodingKey::from_rsa_components(n, e)
-            .map_err(|e| AuthError::TokenInvalid(e.to_string()))?;
-
-        let mut validation = Validation::new(Algorithm::RS256);
-        validation.set_issuer(&[self.issuer()]);
-        validation.set_audience(&[&self.config.client_id]);
-
-        let token_data =
-            decode::<KeycloakClaims>(token, &decoding_key, &validation).map_err(|e| {
-                match e.kind() {
-                    jsonwebtoken::errors::ErrorKind::ExpiredSignature => AuthError::TokenExpired,
-                    _ => AuthError::TokenInvalid(e.to_string()),
-                }
-            })?;
-
-        Ok(token_data.claims.preferred_username)
-    }
-
-    async fn validate_via_userinfo(&self, token: &str) -> Result<String, AuthError> {
-        let res = self
-            .http
-            .get(self.userinfo_url())
-            .bearer_auth(token)
-            .send()
-            .await
-            .map_err(|e| AuthError::KeycloakUnavailable(e.to_string()))?;
-
-        if !res.status().is_success() {
-            return Err(AuthError::TokenInvalid("userinfo validation failed".into()));
+            .map_err(|e| AuthError::TokenInvalid(format!("malformed: {e}")))?;
+        if !ACCEPTED_ALGORITHMS.contains(&header.alg) {
+            return Err(AuthError::TokenInvalid(format!(
+                "algorithm {:?} not accepted",
+                header.alg
+            )));
         }
+        let key = self
+            .verification_key(header.kid.as_deref(), header.alg)
+            .await?;
 
-        let info: UserInfoResponse = res
-            .json()
-            .await
-            .map_err(|e| AuthError::TokenInvalid(e.to_string()))?;
-
-        Ok(info.preferred_username)
+        let mut validation = Validation::new(header.alg);
+        validation.set_issuer(&[self.issuer()]);
+        // Checked by `is_for` below, which also accepts `azp`.
+        validation.validate_aud = false;
+        let data =
+            decode::<KeycloakClaims>(token, &key, &validation).map_err(|e| match e.kind() {
+                jsonwebtoken::errors::ErrorKind::ExpiredSignature => AuthError::TokenExpired,
+                _ => AuthError::TokenInvalid(e.to_string()),
+            })?;
+        if !data.claims.is_for(&self.config.client_id) {
+            return Err(AuthError::TokenInvalid(
+                "issued for another client of the realm".into(),
+            ));
+        }
+        Ok(data.claims.preferred_username)
     }
 
-    async fn refresh_jwks_if_stale(&self) -> Result<(), AuthError> {
+    async fn verification_key(
+        &self,
+        kid: Option<&str>,
+        alg: Algorithm,
+    ) -> Result<DecodingKey, AuthError> {
+        self.refresh_jwks(false).await?;
+        if let Some(key) = self.find_key(kid, alg).await {
+            return key;
+        }
+        if self.refresh_jwks(true).await?
+            && let Some(key) = self.find_key(kid, alg).await
+        {
+            return key;
+        }
+        Err(AuthError::TokenInvalid(
+            "no published key matches it".into(),
+        ))
+    }
+
+    async fn find_key(
+        &self,
+        kid: Option<&str>,
+        alg: Algorithm,
+    ) -> Option<Result<DecodingKey, AuthError>> {
+        let jwks = self.jwks.read().await;
+        let jwk = match kid {
+            Some(kid) => jwks
+                .keys
+                .iter()
+                .find(|k| k.common.key_id.as_deref() == Some(kid))?,
+            None => jwks.keys.iter().find(|k| key_fits(k, alg))?,
+        };
+        if !key_fits(jwk, alg) {
+            return Some(Err(AuthError::TokenInvalid(
+                "its key does not match its algorithm".into(),
+            )));
+        }
+        Some(DecodingKey::from_jwk(jwk).map_err(|e| AuthError::TokenInvalid(e.to_string())))
+    }
+
+    /// Fetches the realm's key set when the cached one is too old, or, when `unknown_key` is set, unless such a
+    /// fetch already happened within the cooldown. Returns whether a fetch happened.
+    async fn refresh_jwks(&self, unknown_key: bool) -> Result<bool, AuthError> {
         {
             let cached = self.jwks.read().await;
-            let is_fresh = cached
-                .fetched_at
-                .map(|t| t.elapsed().as_secs() < JWKS_TTL_SECS)
-                .unwrap_or(false);
-            if is_fresh && !cached.keys.is_empty() {
-                return Ok(());
+            let recent = |at: Option<Instant>, max_age| at.is_some_and(|t| t.elapsed() < max_age);
+            let up_to_date = if unknown_key {
+                recent(cached.refetched_for_unknown_key_at, JWKS_REFETCH_COOLDOWN)
+            } else if cached.keys.is_empty() {
+                recent(cached.fetched_at, JWKS_REFETCH_COOLDOWN)
+            } else {
+                recent(cached.fetched_at, JWKS_TTL)
+            };
+            if up_to_date {
+                return Ok(false);
             }
         }
+        let keys = self.fetch_jwks().await?;
+        let mut cached = self.jwks.write().await;
+        cached.keys = keys;
+        cached.fetched_at = Some(Instant::now());
+        if unknown_key {
+            cached.refetched_for_unknown_key_at = cached.fetched_at;
+        }
+        Ok(true)
+    }
 
+    async fn fetch_jwks(&self) -> Result<Vec<Jwk>, AuthError> {
         let res = self
             .http
             .get(self.certs_url())
             .send()
             .await
             .map_err(|e| AuthError::KeycloakUnavailable(e.to_string()))?;
-
         if !res.status().is_success() {
             return Err(AuthError::KeycloakUnavailable(format!(
-                "JWKS fetch failed: {}",
+                "key set fetch failed: {}",
                 res.status()
             )));
         }
-
-        let jwk_set: JwkSet = res
+        let set: serde_json::Value = res
             .json()
             .await
             .map_err(|e| AuthError::KeycloakUnavailable(e.to_string()))?;
-
-        let mut cached = self.jwks.write().await;
-        cached.keys = jwk_set.keys;
-        cached.fetched_at = Some(std::time::Instant::now());
-
-        Ok(())
+        // One key per entry, skipping the ones this library cannot read (a new key type, an unknown algorithm):
+        // a single unreadable key must not make every token of the realm unverifiable.
+        let keys = set
+            .get("keys")
+            .and_then(|k| k.as_array())
+            .map(|keys| {
+                keys.iter()
+                    .filter_map(|k| match serde_json::from_value::<Jwk>(k.clone()) {
+                        Ok(jwk) => Some(jwk),
+                        Err(e) => {
+                            tracing::debug!(error = %e, "skipping an unreadable key of the realm key set");
+                            None
+                        }
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        Ok(keys)
     }
+}
+
+/// A signing key of the right family for `alg`; encryption keys and symmetric keys never qualify.
+fn key_fits(jwk: &Jwk, alg: Algorithm) -> bool {
+    use Algorithm::*;
+    let family = matches!(
+        (&jwk.algorithm, alg),
+        (
+            AlgorithmParameters::RSA(_),
+            RS256 | RS384 | RS512 | PS256 | PS384 | PS512
+        ) | (AlgorithmParameters::EllipticCurve(_), ES256 | ES384)
+            | (AlgorithmParameters::OctetKeyPair(_), EdDSA)
+    );
+    family && jwk.common.public_key_use != Some(PublicKeyUse::Encryption)
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn test_config() -> AuthConfig {
-        AuthConfig {
-            enabled: true,
-            keycloak_url: "https://keycloak.example.com".into(),
-            realm: "entreprise".into(),
-            client_id: "lightmock".into(),
-            super_admins: vec!["admin".into()],
-            show_reset_button: false,
-        }
-    }
-
-    #[test]
-    fn token_url_construction() {
-        let client = KeycloakClient::new(test_config());
-        assert_eq!(
-            client.token_url(),
-            "https://keycloak.example.com/realms/entreprise/protocol/openid-connect/token"
-        );
-    }
-
-    #[test]
-    fn certs_url_construction() {
-        let client = KeycloakClient::new(test_config());
-        assert_eq!(
-            client.certs_url(),
-            "https://keycloak.example.com/realms/entreprise/protocol/openid-connect/certs"
-        );
-    }
-
-    #[test]
-    fn issuer_construction() {
-        let client = KeycloakClient::new(test_config());
-        assert_eq!(
-            client.issuer(),
-            "https://keycloak.example.com/realms/entreprise"
-        );
-    }
-
-    #[test]
-    fn trailing_slash_in_url_handled() {
-        let cfg = AuthConfig {
-            keycloak_url: "https://keycloak.example.com/".into(),
-            ..test_config()
-        };
-        let client = KeycloakClient::new(cfg);
-        assert_eq!(
-            client.token_url(),
-            "https://keycloak.example.com/realms/entreprise/protocol/openid-connect/token"
-        );
-    }
-
-    #[test]
-    fn parse_token_response() {
-        let json = r#"{"access_token":"abc","refresh_token":"def","expires_in":300}"#;
-        let resp: TokenResponse = serde_json::from_str(json).unwrap();
-        assert_eq!(resp.access_token, "abc");
-        assert_eq!(resp.refresh_token.as_deref(), Some("def"));
-        assert_eq!(resp.expires_in, 300);
-    }
-
-    #[test]
-    fn parse_token_response_minimal() {
-        let json = r#"{"access_token":"abc"}"#;
-        let resp: TokenResponse = serde_json::from_str(json).unwrap();
-        assert_eq!(resp.access_token, "abc");
-        assert!(resp.refresh_token.is_none());
-        assert_eq!(resp.expires_in, 0);
-    }
-}
+mod tests;

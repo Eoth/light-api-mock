@@ -256,6 +256,7 @@ mod tests {
             realm: "test-realm".into(),
             client_id: "lightmock".into(),
             super_admins: vec![],
+            issuer: String::new(),
             show_reset_button: false,
         };
         let base = spawn_test_app(auth_config).await;
@@ -284,6 +285,7 @@ mod tests {
             realm: String::new(),
             client_id: String::new(),
             super_admins: vec![],
+            issuer: String::new(),
             show_reset_button: false,
         };
         let base = spawn_test_app(auth_config).await;
