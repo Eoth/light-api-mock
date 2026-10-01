@@ -1,13 +1,8 @@
-// Client REST pour l'API backend Mimicway.
-// Toutes les fonctions exportees appellent le backend via fetch().
-// Le token Keycloak (si auth activee) est injecte automatiquement.
-// En dev, le proxy Vite redirige /api vers http://localhost:7342.
+// Client of the Mimicway management API. With authentication on, every request carries the user's access token, and a
+// 401 signs the user out. In development, Vite's proxy forwards /api to http://localhost:7342.
 //
-// L'URL de base de l'API (getApiBaseUrl()) est '' par defaut (chemin relatif
-// /api/..., derive du Host courant par le navigateur — comportement
-// historique) sauf si /runtime-config.json en fournit une autre au
-// demarrage de l'app (voir runtime-config.js) : permet de cibler une API
-// exposee sur une origine distincte de celle qui sert la SPA.
+// Requests go to /api/... on the origin that served the UI, unless /runtime-config.json gives another base URL
+// (runtime-config.js): the infrastructure may route the API to another origin than the UI.
 import { auth, logout } from './auth.svelte.js';
 import { getApiBaseUrl } from './runtime-config.js';
 import { t, getLocale } from './i18n.svelte.js';
@@ -62,12 +57,9 @@ export function getMe() {
 
 // Services
 //
-// Un service est identifie sans ambiguite par (group_name, name) : le backend
-// autorise deux services du meme nom dans des groupes differents (le nom
-// seul ne suffit pas). `servicePath` est la source unique de
-// verite pour construire le bon chemin : `/groups/:group/services/:name...`
-// quand `groupName` est fourni (service groupe), `/services/:name...` sinon
-// (perimetre "sans groupe").
+// A service is identified by its group and its name together: two groups may each hold a service of the same name.
+// Every service path is built by `servicePath`: `/groups/:group/services/:name...` for a service in a group,
+// `/services/:name...` for an ungrouped one.
 function servicePath(name, groupName, suffix = '') {
   return groupName
     ? `/groups/${encodeURIComponent(groupName)}/services/${encodeURIComponent(name)}${suffix}`
@@ -106,11 +98,9 @@ export function reorderRules(serviceName, groupName, order) {
   return request('PUT', servicePath(serviceName, groupName, '/rules/reorder'), { order });
 }
 
-// Observation de trafic proxy (niveau service, is_mocked=false uniquement) :
-// active/desactive EXPLICITEMENT par l'utilisateur, jamais automatique.
-// getObservationStatus() liste TOUS les services actuellement observes
-// (visibles par l'utilisateur courant, filtre cote backend) — pas de
-// endpoint "statut d'un seul service", le composant filtre localement.
+// Observation of the proxied traffic of a service in proxy mode, turned on and off by the user, never automatically.
+// getObservationStatus() lists every observed service the user can access (the server filters them); there is no
+// status endpoint for a single service, the component filters the list.
 export function observeService(name, groupName = null) {
   return request('POST', servicePath(name, groupName, '/observe'));
 }
@@ -123,12 +113,10 @@ export function getObservationStatus() {
   return request('GET', '/observation/status');
 }
 
-// Recalculee a la demande cote backend (aucun etat en cache) : chaque appel
-// relit le trafic reellement observe depuis le dernier appel a
-// observeService(). `outcome` de chaque element : "Unconditional" (une seule
-// regle, sans condition), "Conditional" (une regle par valeur distincte
-// d'un champ discriminant), "VarianceUnexplained" (signal seul, rien a
-// proposer).
+// Computed by the server at each call, nothing cached, from the exchanges captured while the service was observed (the
+// latest few per endpoint, in memory only). The `outcome` of each entry is "Unconditional" (one rule, without
+// condition), "Conditional" (one rule per value of the field that explains the differences) or "VarianceUnexplained"
+// (a diagnosis only, nothing to suggest).
 export function getServiceSuggestions(name, groupName = null) {
   return request('GET', servicePath(name, groupName, '/suggestions'));
 }
@@ -146,27 +134,21 @@ export function getLogs(limit = 50) {
   return request('GET', `/logs?limit=${limit}`);
 }
 
-// Testeur de regle : rejeu en lecture seule d'un brouillon de regle (pas
-// necessairement sauvegarde) contre une requete deja capturee dans les logs.
-// Endpoint stateless, non scope par service (aucun service n'est charge cote
-// backend) — pas de servicePath() ici.
+// Rule tester: runs a draft rule, saved or not, against a request taken from the log, and changes nothing. The
+// endpoint is stateless and loads no service, hence no servicePath().
 export function testRule(payload) {
   return request('POST', '/rule-test', payload);
 }
 
-// Detecteur de conflit entre regles, appele a la SAUVEGARDE d'une regle
-// (RuleForm) : compare le brouillon aux autres regles du service et signale
-// les chevauchements evidents (memes conditions, ou conditions incluses),
-// sans jamais bloquer la sauvegarde. Endpoint stateless comme /rule-test,
-// non scope par service (aucun service n'est charge cote backend) — pas de
-// servicePath() ici.
+// Rule conflict detector, called when a rule is saved (RuleForm): compares the draft with the other rules of the
+// service, sent in the payload, and reports obvious overlaps (same conditions, or conditions included in others). The
+// user may save anyway, and a failed check saves without asking. Stateless like /rule-test, hence no servicePath().
 export function checkRuleConflicts(payload) {
   return request('POST', '/rule-conflicts', payload);
 }
 
-// Messaging (Kafka) — routes absentes (404) sur un binaire compile sans la
-// feature "messaging-kafka" ; les appelants doivent gerer cet echec (voir
-// App.svelte, verification au demarrage).
+// Messaging (Kafka). These routes answer 404 on a binary built without the "messaging-kafka" feature: callers handle
+// that failure (App.svelte checks at startup).
 export function getMessagingStatus() {
   return request('GET', '/messaging/status');
 }
@@ -183,12 +165,9 @@ export function validateScript(script) {
   return request('POST', '/script/validate', { script });
 }
 
-// TCP brut (protocoles binaires non-HTTP, mock seul — pas de proxy). Routes
-// absentes (404) sur un binaire compile sans la feature "tcp-mock" ; les
-// appelants doivent gerer cet echec (meme pattern que Messaging, voir
-// App.svelte). /tcp/status est en lecture seule et sans auth cote backend ;
-// /tcp/services est le CRUD, mutation reservee aux super-admins si l'auth
-// est active.
+// Raw TCP (binary protocols other than HTTP, mocks only, no proxy). These routes answer 404 on a binary built without
+// the "tcp-mock" feature, handled like messaging (App.svelte). With authentication on, any signed-in user may read
+// them; only super-admins may change the services.
 export function getTcpStatus() {
   return request('GET', '/tcp/status');
 }
