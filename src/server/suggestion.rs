@@ -1,32 +1,20 @@
-// Calcul de suggestions de regles de mock a partir des echanges captures par
-// `server::observation` pendant qu'un service est explicitement observe.
-// TOUJOURS recalcule a la demande depuis `ObservationStore` (jamais de
-// cache/etat de suggestion mis a jour separement) : le volume est deja borne
-// par construction (buffer d'observation lui-meme borne, cf observation.rs),
-// donc recalculer a chaque lecture est moins cher et plus sur qu'un cache a
-// invalider — pas de decalage possible entre "ce qui a ete observe" et "ce
-// qui est propose".
+// Mock rules suggested from the exchanges `server::observation` captured while a user observed a service. Always
+// computed from `ObservationStore` when asked: the input is already bounded, so recomputing costs less than a cache
+// to invalidate, and suggestions can never lag behind what was observed.
 //
-// Piege central (souleve explicitement en amont de ce chantier, a ne jamais
-// perdre de vue) : deux appels au meme (service, method, sub_path) peuvent
-// legitimement renvoyer des reponses differentes. Une regle inconditionnelle
-// batie sur la premiere reponse observee casserait silencieusement les autres
-// cas. D'ou l'algorithme en 3 temps : (1) partitionner les observations par
-// reponse EQUIVALENTE, (2) si une seule classe -> regle inconditionnelle,
-// (3) si plusieurs classes -> chercher un champ de la requete qui les
-// discrimine PARFAITEMENT (meme valeur => meme classe, classes differentes
-// => valeurs differentes) avant de proposer quoi que ce soit ; si aucun champ
-// ne discrimine parfaitement, ne RIEN proposer (silence explicite plutot
-// qu'une regle fragile).
+// The trap: two calls to the same method and path can legitimately get different answers, and a rule built from
+// the first answer seen would silently break the others. Hence three steps: (1) group the observations by
+// equivalent response; (2) one group gives an unconditional rule; (3) several groups need a request field that
+// tells them apart perfectly (same value, same group; different groups, different values) before anything is
+// suggested. When no field does, nothing is suggested: no rule beats a fragile one.
 use crate::models::{Condition, ConditionSource, HeaderEntry, MockResponse, Operator};
 use crate::server::observation::ObservedExchange;
 use std::collections::{BTreeSet, HashMap};
 
 const DEFAULT_MIN_SAMPLES: usize = 3;
 
-/// Nombre minimum d'observations d'une cle (service, method, sub_path) avant
-/// de tenter quoi que ce soit. En-dessous, une seule reponse observee (ou
-/// deux identiques) ne prouve rien sur la stabilite reelle de l'endpoint.
+/// Observations needed for one endpoint (service, method, sub-path) before anything is suggested: one response, or
+/// two identical ones, prove nothing about how stable the endpoint is.
 pub fn min_samples() -> usize {
     std::env::var("TRAFFIC_OBSERVATION_MIN_SAMPLES")
         .ok()
@@ -34,12 +22,9 @@ pub fn min_samples() -> usize {
         .unwrap_or(DEFAULT_MIN_SAMPLES)
 }
 
-/// En-tetes jamais retenues comme champ discriminant : varient d'un appel a
-/// l'autre par nature (horodatage, identifiants de correlation/traçage,
-/// authentification) sans rapport avec une DECISION metier de la cible.
-/// Les retenir produirait une condition techniquement "parfaite" sur
-/// l'echantillon mais inutilisable/dangereuse une fois generalisee (ex. une
-/// regle conditionnee sur un jeton d'auth ne matchera plus jamais).
+/// Request headers never used to tell responses apart: they change from call to call by nature (timestamps,
+/// correlation and tracing ids, credentials), not because of a decision of the backend. A condition on them could
+/// fit the sample perfectly and still be useless or harmful (a rule conditioned on a token never matches again).
 const NOISY_HEADERS: &[&str] = &[
     "date",
     "x-request-id",
@@ -52,9 +37,8 @@ const NOISY_HEADERS: &[&str] = &[
     "user-agent",
 ];
 
-/// Une regle proposee : soit LA regle inconditionnelle (aucune variance
-/// observee), soit UNE des N regles conditionnelles couvrant chaque classe de
-/// reponse distincte observee (`condition` alors `Some`).
+/// A suggested rule: the unconditional one (no variance observed), or one of the conditional rules covering each
+/// distinct response (`condition` is then `Some`).
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct SuggestedRule {
     pub method: String,
@@ -67,34 +51,26 @@ pub struct SuggestedRule {
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(tag = "outcome")]
 pub enum Suggestion {
-    /// Aucune variance sur l'echantillon : une seule regle, sans condition.
+    /// No variance in the sample: one rule, without condition.
     Unconditional { rule: Box<SuggestedRule> },
-    /// Variance expliquee par un champ de la requete : une regle par valeur
-    /// distincte observee, chacune avec sa condition `Eq`.
+    /// Variance explained by a request field: one rule per value seen, each with an `Eq` condition.
     Conditional { rules: Vec<SuggestedRule> },
-    /// Variance observee mais aucun champ ne l'explique de facon fiable sur
-    /// l'echantillon : rien a proposer, seulement un signal diagnostique.
+    /// Variance that no field explains reliably in the sample: nothing to suggest, only a diagnosis.
     VarianceUnexplained {
         sample_count: usize,
         response_class_count: usize,
     },
 }
 
-/// Signature d'egalite de reponse : statut + corps octet-a-octet (le corps
-/// retenu est deja tronque a `observation::max_body_size()`, cf limitation
-/// documentee la-bas — deux corps distincts au-dela de la troncature qui
-/// partagent le meme prefixe seraient vus ici comme "la meme reponse").
-/// Les en-tetes de reponse ne participent PAS a la signature : deux appels
-/// avec un corps identique mais un en-tete de correlation different ne
-/// doivent pas etre vus comme deux reponses "differentes" a expliquer.
+/// What makes two responses equal: status and body, byte for byte. Bodies are already truncated to
+/// `observation::max_body_size()`, so two bodies that differ only beyond that point count as equal. Response
+/// headers are left out: the same body with another correlation header is not a different answer to explain.
 fn response_signature(exchange: &ObservedExchange) -> (u16, &str) {
     (exchange.response_status, exchange.response_body.as_str())
 }
 
-/// Calcule la suggestion pour UNE cle (service, method, sub_path) a partir de
-/// ses observations retenues. `None` si l'echantillon est encore trop petit
-/// (`min_samples()`) — pas encore de decision a prendre, ni positive ni
-/// negative.
+/// The suggestion for one endpoint (service, method, sub-path) from its observations. `None` while the sample is
+/// smaller than `min_samples()`: no decision yet, either way.
 pub fn suggest(
     method: &str,
     sub_path: &str,
@@ -153,12 +129,9 @@ pub fn suggest(
     })
 }
 
-/// En-tetes de reponse jamais reportees dans une regle SUGGEREE (mais
-/// conservees telles quelles dans `ObservedExchange` pour l'inspection brute)
-/// : `content-length` est recalculee par le moteur de rendu a partir du
-/// corps reel de la regle (une valeur figee deviendrait fausse des que
-/// l'utilisateur edite le corps suggere), `date` fige un horodatage qui n'a
-/// aucun sens une fois transforme en donnee statique de config.
+/// Response headers never copied into a suggested rule (they stay in `ObservedExchange` for inspection):
+/// `content-length` is computed from the rule's actual body when it is rendered (a fixed value would be wrong as
+/// soon as the body is edited), and `date` would freeze a timestamp that means nothing in a static configuration.
 const NEVER_SUGGESTED_RESPONSE_HEADERS: &[&str] = &["content-length", "date"];
 
 fn build_response(exchange: &ObservedExchange) -> MockResponse {
@@ -184,8 +157,7 @@ fn build_response(exchange: &ObservedExchange) -> MockResponse {
     }
 }
 
-/// Gabarit d'une source de condition candidate, sans la valeur (connue
-/// seulement une fois le champ retenu comme discriminant).
+/// A candidate condition source, without its value (known once the field is chosen).
 #[derive(Clone)]
 enum SourceTemplate {
     QueryParam(String),
@@ -215,9 +187,8 @@ impl SourceTemplate {
     }
 }
 
-/// Parse le corps requete en JSON si c'est un objet a plat (pas de tableau/
-/// objet imbrique en v1, cf commentaire de module) : chaque champ scalaire
-/// devient un candidat `JsonPointer("/cle")`.
+/// Reads the request body as a flat JSON object (no arrays or nested objects for now): each scalar field becomes a
+/// `JsonPointer("/key")` candidate.
 fn json_top_level_fields(body: &str) -> HashMap<String, String> {
     let Ok(serde_json::Value::Object(map)) = serde_json::from_str::<serde_json::Value>(body) else {
         return HashMap::new();
@@ -232,12 +203,9 @@ fn json_top_level_fields(body: &str) -> HashMap<String, String> {
         .collect()
 }
 
-/// Cherche, PAR ORDRE DE PRIORITE (query param, puis champ JSON top-level de
-/// requete, puis en-tete), un champ dont la valeur partitionne les
-/// observations EXACTEMENT comme les classes de reponse deja calculees :
-/// meme valeur => meme classe, classes differentes => valeurs differentes.
-/// Retourne le gabarit de source retenu + la valeur representative de chaque
-/// classe (meme ordre que `classes`).
+/// Looks, in order of preference (query parameter, top-level JSON field, header), for a field whose value splits
+/// the observations exactly like the response groups: same value, same group; different groups, different values.
+/// Returns the chosen source and the value that stands for each group (in the order of `classes`).
 fn find_discriminator(
     observations: &[ObservedExchange],
     classes: &[Vec<&ObservedExchange>],
@@ -279,11 +247,8 @@ fn find_discriminator(
     None
 }
 
-/// Valide UN candidat : chaque observation d'une meme classe doit porter la
-/// MEME valeur pour ce champ (et la porter -- absence = candidat invalide),
-/// et cette valeur doit etre UNIQUE a la classe (jamais partagee avec une
-/// autre classe). Retourne la valeur representative de chaque classe si
-/// valide.
+/// Checks one candidate: every observation of a group carries the same value for this field (a missing value
+/// disqualifies it), and no other group shares that value. Returns the value of each group when it holds.
 fn discriminator_values(
     candidate: &SourceTemplate,
     classes: &[Vec<&ObservedExchange>],
@@ -410,11 +375,9 @@ mod tests {
 
     #[test]
     fn suggested_response_never_includes_content_length_or_date() {
-        // Vues sur le fil reel (proxy) : content-length et date sont
-        // presentes cote reponse captured, mais n'ont pas leur place dans
-        // une regle SAUVEGARDEE (content-length recalculee par le moteur de
-        // rendu, date figerait un horodatage sans aucun sens en config
-        // statique). Un en-tete "legitime" comme x-env doit lui survivre.
+        // Captured from a real backend, content-length and date are in the response, but have no place in a saved rule
+        // (content-length is computed when rendering, date would freeze a timestamp). An ordinary header such as x-env
+        // stays.
         let mut e = exchange(200, "ok");
         e.response_headers
             .insert("content-length".into(), "2".into());
@@ -512,9 +475,8 @@ mod tests {
 
     #[test]
     fn noisy_headers_are_never_used_as_discriminator() {
-        // x-request-id varie a CHAQUE appel (unique par requete) mais n'a
-        // aucune valeur predictive reelle -- ne doit jamais etre choisi,
-        // meme s'il "discrimine parfaitement" au sens technique.
+        // x-request-id changes on every call and predicts nothing: never chosen, even though it splits the sample
+        // "perfectly".
         let obs = vec![
             exchange_with_header(200, "ok", ("x-request-id", "r1")),
             exchange_with_header(200, "ok", ("x-request-id", "r2")),
@@ -526,9 +488,8 @@ mod tests {
 
     #[test]
     fn unexplainable_variance_suggests_nothing_actionable() {
-        // Meme requete exacte (aucun champ ne varie), reponses differentes :
-        // rien ne permet d'expliquer la variance -- ne JAMAIS figer une
-        // regle inconditionnelle sur la premiere reponse observee.
+        // The same request (no field varies) with different responses: nothing explains the variance, so never freeze an
+        // unconditional rule on the first response seen.
         let obs = vec![
             exchange(200, "reponse-1"),
             exchange(200, "reponse-2"),
@@ -549,8 +510,7 @@ mod tests {
 
     #[test]
     fn partial_correlation_is_not_treated_as_discriminator() {
-        // "id" vaut parfois la meme chose pour deux classes differentes :
-        // ne discrimine PAS parfaitement, doit etre rejete comme candidat.
+        // "id" sometimes has the same value in two groups: it does not split them perfectly and must be rejected.
         let obs = vec![
             exchange_with_query(200, "a", &[("id", "1")]),
             exchange_with_query(404, "b", &[("id", "1")]),
@@ -561,15 +521,10 @@ mod tests {
     }
 }
 
-// Property-based testing (surface non fiable : corps de reponse d'un vrai
-// backend proxifie, potentiellement hostile) — pas de cargo-fuzz/libFuzzer
-// ici, faute de toolchain nightly et de support Windows fiable sur ce poste
-// (decide avec l'utilisateur) ; `proptest` couvre le meme objectif en pur
-// Rust, portable sur toute plateforme stable. Genere des observations
-// aleatoires/adversariales (statuts, corps JSON ou non, en-tetes bruyants
-// inclus) et verifie des invariants qu'aucun cas manuel ne couvre tous a la
-// fois : jamais de panique, jamais d'en-tete calcule (content-length/date)
-// ou d'en-tete de bruit dans une regle suggeree.
+// Property-based tests: the input is untrusted (bodies of a real proxied backend, possibly hostile). They generate
+// random and adversarial observations (statuses, JSON or not, noisy headers) and check invariants no hand-written
+// case covers all at once: never a panic, never a computed header (content-length, date) nor a noise header in a
+// suggested rule.
 #[cfg(test)]
 mod proptests {
     use super::*;

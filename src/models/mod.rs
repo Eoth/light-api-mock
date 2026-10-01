@@ -1,8 +1,8 @@
-// Structures de donnees serializees en YAML (persistance) et JSON (API REST).
-// Hierarchie : MockConfig → Service[] + Group[]
-//              Service → Rule[] (regles de matching, first-match)
-//              Rule → method + sub_path + conditions + response + script
-// Modifier un champ ici impacte : le YAML stocke, l'API JSON, et le frontend.
+// The configuration schema, stored as YAML and exchanged as JSON by the API.
+// MockConfig -> Service[] and Group[]
+// Service -> Rule[] (first match wins)
+// Rule -> method, sub_path, conditions, response, scripts
+// A change here changes the stored files, the API and the UI at once.
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -42,20 +42,12 @@ pub struct Service {
     pub rules: Vec<Rule>,
 }
 
-// pre_script/post_script : blocs additionnels optionnels executes au meme
-// point du pipeline que `script` (intercept.rs, juste avant le rendu du
-// template), SANS chainage entre eux — chacun recoit le meme ScriptContext
-// (donnees de la requete uniquement), aucun ne voit le resultat des autres.
-// Ce choix evite d'introduire une surface de mutation/ordonnancement inter-
-// scripts ; le nommage pre/post est une convention d'ecriture pour l'auteur
-// de regle (preparer vs. finaliser des donnees), pas deux phases d'execution
-// reellement separees. Resultats exposes independamment en template :
-// {{pre_script}}/{{pre_script.champ}}, {{post_script}}/{{post_script.champ}},
-// en plus de {{script}}/{{script.champ}} (inchange). Comme `script`, ces deux
-// champs n'ont PAS de #[serde(default)] (choix assume : pas de retrocompat
-// serde sur les champs obligatoires) : tout YAML doit desormais fournir
-// ces deux cles (a `~`/null si non utilisees). Les YAML existants doivent
-// etre re-sauvegardes via l'UI (qui reecrit toujours la config complete).
+// pre_script and post_script run at the same point as `script` (intercept.rs, just before the template is rendered)
+// and are not chained: each gets the same context (the request only) and none sees another's result, which avoids
+// ordering and shared-state questions between scripts. "Pre" and "post" are a naming convention for whoever writes
+// the rule (preparing, then finishing data), not two phases. Their results are {{pre_script}}/{{pre_script.field}}
+// and {{post_script}}/{{post_script.field}}, next to {{script}}/{{script.field}}. As options, a missing key reads as
+// None.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Rule {
     pub name: String,
@@ -65,18 +57,10 @@ pub struct Rule {
     pub pre_script: Option<String>,
     pub script: Option<String>,
     pub post_script: Option<String>,
-    // Discriminant purement UI/editeur (jamais lu par le moteur de matching
-    // ou de rendu) : memorise QUELLE vue du formulaire de regle a produit
-    // `response.body` (json-paste/json-guided/xml-paste/xml-guided/text/
-    // advanced/empty), pour que RuleResponseSection.svelte puisse restaurer
-    // la vue d'origine a l'edition plutot que de systematiquement retomber
-    // sur "Template avance". EXCEPTION DELIBEREE (contrairement aux autres
-    // champs de Rule, pas de retrocompat serde) : contrairement a
-    // pre_script/script/post_script (comportement fonctionnel reel),
-    // response_mode ne pilote QUE l'affichage du formulaire d'edition —
-    // l'absence de la cle (YAML/JSON pre-existant) degrade gracieusement vers
-    // l'ancienne heuristique de detection par forme du corps, jamais une
-    // erreur de chargement. Meme precedent que group_name/wsdl_mode.
+    // For the editor only (matching and rendering never read it): which view of the rule form produced
+    // `response.body` (json-paste, json-guided, xml-paste, xml-guided, text, advanced, empty), so that
+    // RuleResponseSection.svelte reopens the same view instead of the advanced template. A missing key falls back to
+    // guessing from the body's shape, never to a loading error.
     #[serde(default)]
     pub response_mode: Option<ResponseEditorMode>,
     pub conditions: ConditionGroup,
@@ -344,13 +328,8 @@ groups: []
 
     #[test]
     fn deserialize_rule_without_response_mode_defaults_to_none() {
-        // response_mode est un champ purement UI (jamais lu par le moteur de
-        // matching/rendu) -- EXCEPTION deliberee au point 16 (pas de
-        // #[serde(default)] sur les champs obligatoires de Rule) : son
-        // absence dans une config pre-existante ne doit jamais faire echouer
-        // le chargement au demarrage, contrairement a pre_script/script/
-        // post_script (obligatoires, sans default). Cette YAML omet
-        // volontairement la cle `response_mode`.
+        // response_mode only drives the editor: a configuration written without it must still load. This YAML leaves the
+        // key out on purpose.
         let yaml = r#"
 services:
   - name: svc

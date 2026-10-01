@@ -1,9 +1,9 @@
-// Moteur de template : remplace les expressions {{var}} ou {{var | pipe}} dans le texte.
-// Syntaxe : { et } sont des caracteres normaux (JSON/XML), {{ et }} delimitent les variables.
-// Variables disponibles : path.*, query.*, header.*, body.* (JSON pointer), xpath.*
-//   (chemin XPath simplifie, XML/SOAP), fake.*, uuid, now_ms, seq, script.*
-// Pipes disponibles : lower, upper, trim, capitalize, length, first(N), last(N),
-//   substr(s,l), default("v"), replace("a","b"), prepend("p"), append("s")
+// Response templates: replaces {{var}} and {{var | pipe}} in the text. Single braces are ordinary characters (JSON,
+// XML); double braces hold an expression.
+// Variables: path.*, query.*, header.*, body.* (JSON pointer), xpath.* (simplified path, XML/SOAP), fake.*, uuid,
+//   now_ms, now_iso, now_epoch, seq, script.*, pre_script.*, post_script.*
+// Pipes: lower, upper, trim, capitalize, length, first(N), last(N), substr(s,l), default("v"), replace("a","b"),
+//   prepend("p"), append("s")
 use crate::engine::renderer::TemplateRenderer;
 use std::collections::HashMap;
 
@@ -16,10 +16,8 @@ pub struct TemplateContext<'a> {
     pub request_body: &'a [u8],
     pub seq_counter: u64,
     pub script_result: Option<&'a ScriptResult>,
-    // pre_script/post_script : blocs additionnels, executes independamment de
-    // `script` (meme ScriptContext, pas de chainage — voir commentaire sur
-    // Rule dans models/mod.rs). Exposes en template comme {{pre_script}}/
-    // {{pre_script.champ}} et {{post_script}}/{{post_script.champ}}.
+    // The pre_script and post_script slots run independently of `script` (same context, no chaining, see `Rule`) and
+    // are available as {{pre_script}}, {{pre_script.field}}, {{post_script}} and {{post_script.field}}.
     pub pre_script_result: Option<&'a ScriptResult>,
     pub post_script_result: Option<&'a ScriptResult>,
 }
@@ -193,12 +191,8 @@ fn extract_body_json(body: &[u8], pointer: &str) -> String {
     }
 }
 
-// Equivalent XML/SOAP de extract_body_json ci-dessus : source "XPath
-// (XML/SOAP)" du builder de reponse (variable de template {{xpath.chemin}}).
-// Reutilise MatchEngine::extract_xpath telle quelle (meme parsing que
-// ConditionSource::XPath) plutot que de dupliquer un second parseur XML — le
-// chemin ne contient jamais de prefixe de namespace (deja decape par
-// local_name()), tout comme pour une condition XPath.
+// The XML counterpart of extract_body_json, for {{xpath.path}}. It reuses MatchEngine::extract_xpath, the parser of
+// XPath conditions, so the path has the same syntax: no namespace prefixes.
 fn extract_body_xpath(body: &[u8], path: &str) -> String {
     crate::engine::matcher::MatchEngine::extract_xpath(body, path).unwrap_or_default()
 }
@@ -369,8 +363,7 @@ pub fn epoch_to_iso(epoch_secs: u64) -> String {
     format!("{y:04}-{mo:02}-{d:02}T{h:02}:{m:02}:{s:02}Z")
 }
 
-// pub(crate) : reutilise tel quel par engine::script pour formater date_now/
-// date_past/date_future sans dupliquer le calcul calendaire (Howard Hinnant).
+// Also used by the date functions of scripts, so the calendar arithmetic (Howard Hinnant's) exists once.
 pub(crate) fn civil_from_days(days: i64) -> (i64, u32, u32) {
     let z = days + 719468;
     let era = z.div_euclid(146097);
@@ -385,18 +378,10 @@ pub(crate) fn civil_from_days(days: i64) -> (i64, u32, u32) {
     (y, mo, d)
 }
 
-// Inverse exacte de civil_from_days (meme algorithme, Howard Hinnant :
-// http://howardhinnant.github.io/date_algorithms.html#days_from_civil).
-// pub(crate) : reutilisee telle quelle par engine::script::parse_date_impl
-// (conversion inverse de date_now/date_past/date_future) pour ne jamais
-// dupliquer le calcul calendaire — meme discipline que
-// civil_from_days ci-dessus. `m` doit etre dans [1,12] et `d` dans [1,31] :
-// l'appelant valide ces bornes avant d'appeler cette fonction ; un `d`
-// hors des jours reels du mois (ex. 31 fevrier) ne panique pas mais produit
-// un decompte de jours qui NE RE-CONVERTIT PAS vers (y,m,d) via
-// civil_from_days — c'est le mecanisme de validation utilise par
-// parse_date_impl (round-trip) plutot que de dupliquer les regles de
-// jours-par-mois/annees bissextiles.
+// The exact inverse of civil_from_days (Howard Hinnant, http://howardhinnant.github.io/date_algorithms.html),
+// used by parse_date in scripts. The caller keeps `m` in [1,12] and `d` in [1,31]. A day beyond the month's real
+// length (February 31) does not panic: it gives a day count that does not convert back to the same date, which is
+// how parse_date detects it without repeating the month length and leap year rules.
 pub(crate) fn days_from_civil(y: i64, m: u32, d: u32) -> i64 {
     let y = if m <= 2 { y - 1 } else { y };
     let era = if y >= 0 { y } else { y - 399 } / 400;
@@ -629,9 +614,7 @@ mod tests {
         assert_eq!(render_template("{{body.id}}", &ctx), "99");
     }
 
-    // --- xpath.chemin : equivalent XML/SOAP de body.pointeur ci-dessus
-    // (source "XPath (XML/SOAP)" du builder de reponse XML). Reutilise
-    // MatchEngine::extract_xpath plutot qu'un parsing XML duplique.
+    // --- xpath.path: the XML counterpart of body.pointer above, through MatchEngine::extract_xpath.
 
     #[test]
     fn xpath_echo_extracts_value_from_xml_body() {
@@ -651,8 +634,7 @@ mod tests {
 
     #[test]
     fn xpath_echo_survives_non_self_closing_sibling_before_target() {
-        // Regression (walk_xml, matcher.rs) : un <Header></Header> non-autoferme,
-        // sibling de <Body>, ne doit pas casser l'extraction d'un ancetre deja matche.
+        // An empty <Header></Header> written in full next to <Body> must not break the extraction (walk_xml, matcher.rs).
         let (p, q, h) = empty_ctx();
         let body = br#"<SOAP:Envelope><SOAP-ENV:Header></SOAP-ENV:Header><SOAP-ENV:Body><ns3:recherche><ns3:Siret>12345678901234</ns3:Siret></ns3:recherche></SOAP-ENV:Body></SOAP:Envelope>"#;
         let ctx = make_ctx(&p, &q, &h, body, 0);

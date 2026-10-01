@@ -5,12 +5,9 @@ use std::sync::{Arc, RwLock};
 const MAX_ENTRIES: usize = 200;
 const DEFAULT_MAX_BODY_SIZE: usize = 16 * 1024;
 
-/// Taille maximale (en octets) du corps retenu dans `CapturedRequest::body`.
-/// Meme idiome que `messaging::message_log::max_body_size` (env var, defaut
-/// 16 Ko) : les 200 entrees de `RequestLog` pourraient sinon retenir jusqu'a
-/// plusieurs Mo de corps chacune (le corps est deja entierement bufferise en
-/// amont pour le matching, cf `intercept.rs`), ce qui grillerait la memoire
-/// du pod (PVC/limite 64Mi) sans utilite pour le testeur de regle.
+/// Largest body kept in `CapturedRequest::body`, in bytes (`REQUEST_LOG_MAX_BODY_SIZE`, 16 KiB by default, like
+/// `messaging::message_log::max_body_size`). Bodies up to 10 MiB are buffered for matching; keeping them whole in
+/// 200 entries would use memory for nothing the rule tester needs.
 pub fn max_body_size() -> usize {
     std::env::var("REQUEST_LOG_MAX_BODY_SIZE")
         .ok()
@@ -18,22 +15,14 @@ pub fn max_body_size() -> usize {
         .unwrap_or(DEFAULT_MAX_BODY_SIZE)
 }
 
-/// Detail d'une requete HTTP reellement recue, retenu pour permettre au
-/// testeur de regle (UI) de rejouer une regle EN COURS D'EDITION contre du
-/// trafic reel, en lecture seule. `path_params` est le sous-ensemble
-/// SERVICE-LEVEL uniquement (avant fusion avec les parametres du `sub_path`
-/// de la regle qui avait matche a la capture) : le testeur recalcule les
-/// parametres du `sub_path` pour le brouillon de regle en cours d'edition,
-/// qui peut differer de la regle qui avait matche a l'origine.
+/// A request lightMock really received, kept so that the rule tester can replay a rule being edited against real
+/// traffic, read-only. `path_params` holds the service-level parameters only, before the matching rule's sub-path
+/// added its own: the tester recomputes the sub-path parameters for the draft rule, which may differ from the rule
+/// that matched then.
 ///
-/// N'existe QUE pour les requetes qui passent par `handle_service`
-/// (mock, no-rule, proxy niveau regle) : ces requetes bufferisent deja
-/// integralement le corps pour le matching (`RequestData`), donc retenir ce
-/// detail ne cree AUCUNE nouvelle capture de trafic — on ne fait que
-/// conserver ce qui est deja en memoire a cet instant. Reste `None` pour le
-/// proxy niveau service (`is_mocked=false`) : ce chemin est volontairement
-/// streame sans buffering ("Proxy streaming"), et le construire
-/// la introduirait un `to_bytes()` qui n'existe pas aujourd'hui.
+/// Only requests handled by rules (mocked, unmatched, proxied by a rule) have one: their body is already buffered
+/// for matching, so keeping it is a copy, not a new capture. A service-level proxy streams without buffering, and
+/// building one there would add a full read of the body that does not happen today.
 #[derive(Debug, Clone, Serialize)]
 pub struct CapturedRequest {
     pub remaining_path: String,
