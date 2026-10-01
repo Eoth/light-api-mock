@@ -408,56 +408,56 @@
 </div>
 
 <style>
-  .json-builder { display: flex; flex-direction: column; gap: 0.5rem; }
-  .builder-header strong { font-size: 0.9rem; }
-  .empty-msg { color: var(--color-text-muted); font-style: italic; font-size: 0.875rem; margin: 0.25rem 0; }
+  .json-builder { display: flex; flex-direction: column; gap: var(--space-2); }
+  .builder-header strong { font-size: var(--text-m); }
+  .empty-msg { color: var(--color-text-muted); font-style: italic; font-size: var(--text-m); margin: var(--space-1) 0; }
 
   .field-row {
-    padding: 0.375rem; background: var(--color-bg); border: var(--line-thin) solid var(--color-border);
-    border-radius: var(--radius-m); margin-bottom: 0.25rem;
+    padding: var(--space-1-5); background: var(--color-bg); border: var(--line-thin) solid var(--color-border);
+    border-radius: var(--radius-m); margin-bottom: var(--space-1);
   }
 
   .field-main {
-    display: flex; gap: 0.375rem; align-items: center; flex-wrap: wrap;
+    display: flex; gap: var(--space-1-5); align-items: center; flex-wrap: wrap;
   }
 
-  .key-input { width: 7rem; padding: 0.3rem 0.5rem; border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); font-size: 0.8125rem; font-weight: var(--weight-strong); }
-  .type-select { padding: 0.3rem 0.5rem; border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); font-size: 0.8125rem; min-width: 5rem; background: var(--color-surface); }
-  .value-input { flex: 1; min-width: 6rem; padding: 0.3rem 0.5rem; border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); font-size: 0.8125rem; }
-  select { padding: 0.3rem 0.5rem; border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); font-size: 0.8125rem; }
+  .key-input { width: 7rem; padding: var(--space-1) var(--space-2); border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); font-size: var(--text-s); font-weight: var(--weight-strong); }
+  .type-select { padding: var(--space-1) var(--space-2); border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); font-size: var(--text-s); min-width: 5rem; background: var(--color-surface); }
+  .value-input { flex: 1; min-width: 6rem; padding: var(--space-1) var(--space-2); border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); font-size: var(--text-s); }
+  select { padding: var(--space-1) var(--space-2); border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); font-size: var(--text-s); }
 
-  .pipe-input { min-width: 8rem; max-width: 14rem; padding: 0.3rem 0.5rem; border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); font-size: 0.75rem; font-family: var(--font-code); color: var(--color-primary); }
-  .number-toggle { display: flex; align-items: center; gap: 0.2rem; cursor: pointer; }
+  .pipe-input { min-width: 8rem; max-width: 14rem; padding: var(--space-1) var(--space-2); border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); font-size: var(--text-s); font-family: var(--font-code); color: var(--color-primary); }
+  .number-toggle { display: flex; align-items: center; gap: var(--space-1); cursor: pointer; }
   .number-toggle input { width: 1rem; height: 1rem; }
-  .number-label { font-size: 0.75rem; font-weight: var(--weight-heavy); color: var(--color-text-muted); }
+  .number-label { font-size: var(--text-xs); font-weight: var(--weight-heavy); color: var(--color-text-muted); }
 
-  .field-actions { display: flex; gap: 0.2rem; margin-left: auto; }
-  .btn-icon { width: 1.5rem; height: 1.5rem; display: inline-flex; align-items: center; justify-content: center; border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); background: var(--color-surface); color: var(--color-text-muted); font-size: 0.7rem; cursor: pointer; }
+  .field-actions { display: flex; gap: var(--space-1); margin-left: auto; }
+  .btn-icon { width: 1.5rem; height: 1.5rem; display: inline-flex; align-items: center; justify-content: center; border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); background: var(--color-surface); color: var(--color-text-muted); font-size: var(--text-xs); cursor: pointer; }
   .btn-icon:hover:not(:disabled) { background: var(--color-bg); color: var(--color-text); }
   .btn-icon:disabled { opacity: 0.35; cursor: not-allowed; }
   .btn-icon.btn-delete:hover:not(:disabled) { color: var(--color-danger); border-color: var(--color-danger); }
 
-  .nested-block { margin-top: 0.375rem; padding-left: 0.75rem; border-left: var(--line-thick) solid var(--color-primary); }
-  .nested-hint { font-size: 0.75rem; color: var(--color-text-muted); font-style: italic; display: block; margin-bottom: 0.25rem; }
+  .nested-block { margin-top: var(--space-1-5); padding-left: var(--space-3); border-left: var(--line-thick) solid var(--color-primary); }
+  .nested-hint { font-size: var(--text-s); color: var(--color-text-muted); font-style: italic; display: block; margin-bottom: var(--space-1); }
 
   .collapse-toggle { flex-shrink: 0; }
-  .collapsed-indicator { font-size: 0.75rem; color: var(--color-text-muted); font-style: italic; white-space: nowrap; }
+  .collapsed-indicator { font-size: var(--text-s); color: var(--color-text-muted); font-style: italic; white-space: nowrap; }
 
-  .array-item { display: flex; gap: 0.375rem; align-items: center; flex-wrap: wrap; padding: 0.25rem 0; }
-  .item-index { display: inline-flex; align-items: center; justify-content: center; width: 1.25rem; height: 1.25rem; border-radius: var(--radius-round); background: var(--color-text-muted); color: var(--color-surface); font-size: 0.65rem; font-weight: var(--weight-heavy); flex-shrink: 0; }
+  .array-item { display: flex; gap: var(--space-1-5); align-items: center; flex-wrap: wrap; padding: var(--space-1) 0; }
+  .item-index { display: inline-flex; align-items: center; justify-content: center; width: 1.25rem; height: 1.25rem; border-radius: var(--radius-round); background: var(--color-text-muted); color: var(--color-surface); font-size: var(--text-xs); font-weight: var(--weight-heavy); flex-shrink: 0; }
 
-  .btn-xs { padding: 0.15rem 0.5rem; font-size: 0.75rem; border-radius: var(--radius-m); border: var(--line-thin) solid transparent; font-weight: var(--weight-strong); }
+  .btn-xs { padding: var(--space-0-5) var(--space-2); font-size: var(--text-s); border-radius: var(--radius-m); border: var(--line-thin) solid transparent; font-weight: var(--weight-strong); }
 
-  .data-breadcrumb { margin: 0.25rem 0; }
-  .data-breadcrumb ol { list-style: none; display: flex; align-items: center; gap: 0.375rem; flex-wrap: wrap; margin: 0; padding: 0; font-size: 0.8125rem; }
-  .data-breadcrumb li { display: flex; align-items: center; gap: 0.375rem; color: var(--color-text-muted); }
+  .data-breadcrumb { margin: var(--space-1) 0; }
+  .data-breadcrumb ol { list-style: none; display: flex; align-items: center; gap: var(--space-1-5); flex-wrap: wrap; margin: 0; padding: 0; font-size: var(--text-s); }
+  .data-breadcrumb li { display: flex; align-items: center; gap: var(--space-1-5); color: var(--color-text-muted); }
   .data-breadcrumb li:not(:last-child)::after { content: ">"; color: var(--color-text-muted); }
   .data-breadcrumb li[aria-current="page"] { color: var(--color-text); font-weight: var(--weight-strong); }
   .breadcrumb-link { background: none; border: none; padding: 0; color: var(--color-primary); cursor: pointer; font: inherit; text-decoration: underline; text-underline-offset: 2px; }
   .breadcrumb-link:hover { color: var(--color-primary-hover); }
 
-  .preview-section { margin-top: 0.375rem; }
-  .preview-section summary { font-size: 0.8125rem; cursor: pointer; color: var(--color-text-muted); }
-  .preview-code { display: block; margin-top: 0.25rem; padding: 0.5rem; background: var(--color-bg); border-radius: var(--radius-m); font-size: 0.75rem; word-break: break-all; white-space: pre-wrap; }
+  .preview-section { margin-top: var(--space-1-5); }
+  .preview-section summary { font-size: var(--text-s); cursor: pointer; color: var(--color-text-muted); }
+  .preview-code { display: block; margin-top: var(--space-1); padding: var(--space-2); background: var(--color-bg); border-radius: var(--radius-m); font-size: var(--text-s); word-break: break-all; white-space: pre-wrap; }
   .preview-readable { color: var(--color-primary); }
 </style>

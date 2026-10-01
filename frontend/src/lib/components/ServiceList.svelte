@@ -125,36 +125,36 @@
   .groups-container {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: var(--space-3);
   }
 
   .search-bar {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 1rem;
+    gap: var(--space-3);
+    margin-bottom: var(--space-4);
   }
 
   .search-bar input {
     flex: 1;
-    padding: 0.625rem 1rem;
+    padding: var(--space-3) var(--space-4);
     border: var(--line-thin) solid var(--color-control);
     border-radius: var(--radius-m);
-    font-size: 1rem;
+    font-size: var(--text-l);
     font-family: inherit;
     background: var(--color-surface);
     color: var(--color-text);
   }
 
   .search-count {
-    font-size: 0.875rem;
+    font-size: var(--text-m);
     color: var(--color-text-muted);
     white-space: nowrap;
   }
 
   .empty-state {
     text-align: center;
-    padding: 3rem 1rem;
+    padding: var(--space-12) var(--space-4);
     color: var(--color-text-muted);
     background: var(--color-surface);
     border: var(--line-thick) dashed var(--color-border);
@@ -163,16 +163,16 @@
 
   .empty-title {
     font-weight: var(--weight-strong);
-    font-size: 1.125rem;
+    font-size: var(--text-xl);
     color: var(--color-text);
-    margin-bottom: 0.25rem;
+    margin-bottom: var(--space-1);
   }
 
-  .empty-state p { margin: 0.25rem 0; }
+  .empty-state p { margin: var(--space-1) 0; }
 
   .no-results {
     text-align: center;
-    padding: 2rem 1rem;
+    padding: var(--space-8) var(--space-4);
     color: var(--color-text-muted);
     background: var(--color-surface);
     border: var(--line-thin) solid var(--color-border);
@@ -181,5 +181,4 @@
 
   .no-results p { margin: 0; }
 
-  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 </style>

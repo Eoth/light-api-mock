@@ -60,9 +60,9 @@
   .group-header {
     display: flex;
     align-items: center;
-    gap: 0.625rem;
+    gap: var(--space-3);
     width: 100%;
-    padding: 0.75rem 1rem;
+    padding: var(--space-3) var(--space-4);
     background: var(--color-bg);
     border: none;
     cursor: pointer;
@@ -82,7 +82,7 @@
   }
 
   .group-chevron {
-    font-size: 0.625rem;
+    font-size: var(--text-xs);
     transition: transform var(--duration-move) ease;
     flex-shrink: 0;
     color: var(--color-text-muted);
@@ -94,19 +94,19 @@
 
   .group-name {
     margin: 0;
-    font-size: 0.9375rem;
+    font-size: var(--text-m);
     font-weight: var(--weight-heavy);
   }
 
   .group-count {
     margin-left: auto;
-    font-size: 0.8125rem;
+    font-size: var(--text-s);
     color: var(--color-text-muted);
     font-weight: var(--weight-regular);
   }
 
   .group-panel {
-    padding: 0.5rem;
+    padding: var(--space-2);
   }
 
   .service-list {
@@ -115,6 +115,6 @@
     margin: 0;
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
 </style>

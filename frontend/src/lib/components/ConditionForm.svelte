@@ -172,14 +172,14 @@
     background: var(--color-bg);
     border: var(--line-thin) solid var(--color-border);
     border-radius: var(--radius-m);
-    padding: 1rem;
-    margin: 0.5rem 0;
+    padding: var(--space-4);
+    margin: var(--space-2) 0;
   }
 
   .form-row {
     display: flex;
-    gap: 0.75rem;
-    margin-bottom: 0.75rem;
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
     flex-wrap: wrap;
   }
 
@@ -191,28 +191,28 @@
   .form-field label {
     display: block;
     font-weight: var(--weight-strong);
-    font-size: 0.875rem;
-    margin-bottom: 0.25rem;
+    font-size: var(--text-m);
+    margin-bottom: var(--space-1);
   }
 
   .form-field input,
   .form-field select {
     width: 100%;
-    padding: 0.375rem 0.5rem;
+    padding: var(--space-1-5) var(--space-2);
     border: var(--line-thin) solid var(--color-control);
     border-radius: var(--radius-m);
-    font-size: 0.875rem;
+    font-size: var(--text-m);
     font-family: inherit;
   }
 
   .form-actions {
     display: flex;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
 
   .path-param-badge {
     display: block;
-    margin-bottom: 0.35rem;
+    margin-bottom: var(--space-1-5);
     font-weight: var(--weight-strong);
     color: var(--color-primary, inherit);
   }

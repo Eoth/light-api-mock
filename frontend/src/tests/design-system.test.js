@@ -64,13 +64,16 @@ describe('a primitive read outside the tokens file', () => {
   });
 });
 
-describe('a font, a radius, a layer or a shadow that is not a token', () => {
+describe('a font, a size of text, a spacing, a radius, a layer or a shadow that is not a token', () => {
   test('is caught', () => {
     const sample = 'a { font-family: monospace; border-radius: 50%; z-index: 30; box-shadow: 0 1px 2px var(--x); }\n' +
       'b { font-family: var(--font-code); border-radius: var(--radius-m); z-index: var(--z-modal); }\n' +
-      'c { font-family: inherit; box-shadow: none; box-shadow: 0 0 0 var(--line-thick) var(--color-focus); }';
+      'c { font-family: inherit; box-shadow: none; box-shadow: 0 0 0 var(--line-thick) var(--color-focus); }\n' +
+      'd { font-size: 0.8125rem; padding: 0.5rem var(--space-2); margin: 0 auto; gap: 6px; line-height: 1.2; }\n' +
+      'e { font-size: var(--text-s); padding: 0 var(--space-2); margin: calc(-1 * var(--space-1)) auto; line-height: var(--leading-body); }';
     expect(unscaledValues(sample)).toEqual([
       '1: font-family: monospace', '1: border-radius: 50%', '1: z-index: 30', '1: box-shadow: 0 1px 2px var(--x)',
+      '4: font-size: 0.8125rem', '4: padding: 0.5rem var(--space-2)', '4: gap: 6px', '4: line-height: 1.2',
     ]);
   });
 

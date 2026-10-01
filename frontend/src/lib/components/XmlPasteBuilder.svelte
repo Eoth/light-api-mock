@@ -405,90 +405,90 @@
 </div>
 
 <style>
-  .paste-builder { display: flex; flex-direction: column; gap: 0.75rem; }
+  .paste-builder { display: flex; flex-direction: column; gap: var(--space-3); }
 
-  .paste-zone { display: flex; flex-direction: column; gap: 0.5rem; }
-  .paste-zone label { font-weight: var(--weight-strong); font-size: 0.875rem; }
+  .paste-zone { display: flex; flex-direction: column; gap: var(--space-2); }
+  .paste-zone label { font-weight: var(--weight-strong); font-size: var(--text-m); }
   .paste-textarea {
     width: 100%; font-family: var(--font-code);
-    font-size: 0.8125rem; padding: 0.5rem;
+    font-size: var(--text-s); padding: var(--space-2);
     border: var(--line-thick) dashed var(--color-control); border-radius: var(--radius-m);
     background: var(--color-bg); color: var(--color-text); resize: vertical;
     min-height: 8rem;
   }
   .paste-textarea:focus { border-color: var(--color-primary); border-style: solid; }
 
-  .paste-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
+  .paste-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
 
   .paste-field {
-    padding: 0.375rem 0; border-bottom: var(--line-thin) solid var(--color-border);
+    padding: var(--space-1-5) 0; border-bottom: var(--line-thin) solid var(--color-border);
   }
   .paste-field:last-child { border-bottom: none; }
 
-  .paste-field-main { display: flex; flex-direction: column; gap: 0.25rem; align-items: flex-start; }
+  .paste-field-main { display: flex; flex-direction: column; gap: var(--space-1); align-items: flex-start; }
 
   .paste-key {
-    font-weight: var(--weight-heavy); font-size: 0.875rem; color: var(--color-primary);
+    font-weight: var(--weight-heavy); font-size: var(--text-m); color: var(--color-primary);
     font-family: var(--font-code);
   }
 
   .paste-type-badge {
-    display: inline-block; font-size: 0.6875rem; font-weight: var(--weight-strong);
+    display: inline-block; font-size: var(--text-xs); font-weight: var(--weight-strong);
     color: var(--color-text-muted); background: var(--color-bg);
-    padding: 0.1rem 0.375rem; border-radius: var(--radius-s); width: fit-content;
+    padding: var(--space-0-5) var(--space-1-5); border-radius: var(--radius-s); width: fit-content;
   }
 
   .paste-controls {
-    display: flex; gap: 0.375rem; align-items: center; flex-wrap: wrap;
+    display: flex; gap: var(--space-1-5); align-items: center; flex-wrap: wrap;
   }
   .paste-controls select {
-    padding: 0.25rem 0.5rem; border: var(--line-thin) solid var(--color-control);
-    border-radius: var(--radius-m); font-size: 0.8125rem;
+    padding: var(--space-1) var(--space-2); border: var(--line-thin) solid var(--color-control);
+    border-radius: var(--radius-m); font-size: var(--text-s);
     background: var(--color-surface); color: var(--color-text);
   }
   .paste-value {
-    padding: 0.25rem 0.5rem; border: var(--line-thin) solid var(--color-border);
-    border-radius: var(--radius-m); font-size: 0.8125rem;
+    padding: var(--space-1) var(--space-2); border: var(--line-thin) solid var(--color-border);
+    border-radius: var(--radius-m); font-size: var(--text-s);
     background: var(--color-surface); color: var(--color-text);
     min-width: 8rem; flex: 1;
   }
 
   .pipe-input {
-    min-width: 8rem; max-width: 14rem; padding: 0.25rem 0.5rem;
+    min-width: 8rem; max-width: 14rem; padding: var(--space-1) var(--space-2);
     border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m);
-    font-size: 0.75rem; font-family: var(--font-code);
+    font-size: var(--text-s); font-family: var(--font-code);
     color: var(--color-primary);
   }
 
   .paste-preview-fixed {
-    font-size: 0.75rem; color: var(--color-text-muted); font-style: italic;
+    font-size: var(--text-s); color: var(--color-text-muted); font-style: italic;
   }
   .paste-preview-var {
-    font-size: 0.75rem; color: var(--color-success); font-family: var(--font-code);
+    font-size: var(--text-s); color: var(--color-success); font-family: var(--font-code);
     font-weight: var(--weight-strong);
   }
 
   .paste-attrs {
-    display: flex; flex-direction: column; gap: 0.25rem;
-    margin: 0.25rem 0 0.375rem; padding: 0.375rem 0.5rem;
+    display: flex; flex-direction: column; gap: var(--space-1);
+    margin: var(--space-1) 0 var(--space-1-5); padding: var(--space-1-5) var(--space-2);
     background: var(--color-bg); border-radius: var(--radius-m);
     border: var(--line-thin) dashed var(--color-border);
   }
-  .paste-attrs-label { font-size: 0.6875rem; font-weight: var(--weight-strong); color: var(--color-text-muted); text-transform: uppercase; }
-  .paste-attr-row { display: flex; gap: 0.375rem; align-items: center; flex-wrap: wrap; }
-  .paste-attr-name { font-family: var(--font-code); font-size: 0.8125rem; color: var(--color-text-muted); }
-  .paste-attr-row select { padding: 0.25rem 0.5rem; border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); font-size: 0.8125rem; background: var(--color-surface); color: var(--color-text); }
+  .paste-attrs-label { font-size: var(--text-xs); font-weight: var(--weight-strong); color: var(--color-text-muted); text-transform: uppercase; }
+  .paste-attr-row { display: flex; gap: var(--space-1-5); align-items: center; flex-wrap: wrap; }
+  .paste-attr-name { font-family: var(--font-code); font-size: var(--text-s); color: var(--color-text-muted); }
+  .paste-attr-row select { padding: var(--space-1) var(--space-2); border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); font-size: var(--text-s); background: var(--color-surface); color: var(--color-text); }
 
   .collapse-toggle { flex-shrink: 0; }
-  .btn-icon { width: 1.5rem; height: 1.5rem; display: inline-flex; align-items: center; justify-content: center; border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); background: var(--color-surface); color: var(--color-text-muted); font-size: 0.7rem; cursor: pointer; }
+  .btn-icon { width: 1.5rem; height: 1.5rem; display: inline-flex; align-items: center; justify-content: center; border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); background: var(--color-surface); color: var(--color-text-muted); font-size: var(--text-xs); cursor: pointer; }
   .btn-icon:hover { background: var(--color-bg); color: var(--color-text); }
-  .collapsed-indicator { font-size: 0.75rem; color: var(--color-text-muted); font-style: italic; white-space: nowrap; }
+  .collapsed-indicator { font-size: var(--text-s); color: var(--color-text-muted); font-style: italic; white-space: nowrap; }
 
-  .nested-block { margin-top: 0.25rem; padding-left: 0.75rem; border-left: var(--line-thick) solid var(--color-primary); }
+  .nested-block { margin-top: var(--space-1); padding-left: var(--space-3); border-left: var(--line-thick) solid var(--color-primary); }
 
-  .data-breadcrumb { margin: 0.25rem 0; }
-  .data-breadcrumb ol { list-style: none; display: flex; align-items: center; gap: 0.375rem; flex-wrap: wrap; margin: 0; padding: 0; font-size: 0.8125rem; }
-  .data-breadcrumb li { display: flex; align-items: center; gap: 0.375rem; color: var(--color-text-muted); }
+  .data-breadcrumb { margin: var(--space-1) 0; }
+  .data-breadcrumb ol { list-style: none; display: flex; align-items: center; gap: var(--space-1-5); flex-wrap: wrap; margin: 0; padding: 0; font-size: var(--text-s); }
+  .data-breadcrumb li { display: flex; align-items: center; gap: var(--space-1-5); color: var(--color-text-muted); }
   .data-breadcrumb li:not(:last-child)::after { content: ">"; color: var(--color-text-muted); }
   .data-breadcrumb li[aria-current="page"] { color: var(--color-text); font-weight: var(--weight-strong); }
   .breadcrumb-link { background: none; border: none; padding: 0; color: var(--color-primary); cursor: pointer; font: inherit; text-decoration: underline; text-underline-offset: 2px; }

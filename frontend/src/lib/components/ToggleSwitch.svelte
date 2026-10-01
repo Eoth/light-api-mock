@@ -43,7 +43,7 @@
   .toggle-wrapper {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: var(--space-3);
   }
 
   .toggle-label {
@@ -88,7 +88,7 @@
   }
 
   .toggle-status {
-    font-size: 0.875rem;
+    font-size: var(--text-m);
     font-weight: var(--weight-strong);
     min-width: 2rem;
     color: var(--color-text-muted);

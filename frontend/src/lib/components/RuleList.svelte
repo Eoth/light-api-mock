@@ -142,19 +142,19 @@
 </section>
 
 <style>
-  .rule-list-section { margin-top: 1.25rem; }
-  .rule-list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
-  .rule-list-header h3 { margin: 0; font-size: 1rem; }
-  .rule-hint { font-size: 0.8125rem; color: var(--color-text-muted); margin: 0 0 0.5rem; }
-  .empty-rules { color: var(--color-text-muted); font-style: italic; padding: 1rem; text-align: center; background: var(--color-bg); border-radius: var(--radius-m); }
+  .rule-list-section { margin-top: var(--space-5); }
+  .rule-list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2); }
+  .rule-list-header h3 { margin: 0; font-size: var(--text-l); }
+  .rule-hint { font-size: var(--text-s); color: var(--color-text-muted); margin: 0 0 var(--space-2); }
+  .empty-rules { color: var(--color-text-muted); font-style: italic; padding: var(--space-4); text-align: center; background: var(--color-bg); border-radius: var(--radius-m); }
 
-  .rule-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.375rem; }
+  .rule-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: var(--space-1-5); }
 
   .rule-item {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 0.75rem;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
     background: var(--color-surface);
     border: var(--line-thin) solid var(--color-border);
     border-left: var(--line-stem) dashed var(--color-mock);
@@ -168,24 +168,24 @@
 
   .rule-grip {
     color: var(--color-text-muted);
-    font-size: 0.875rem;
+    font-size: var(--text-m);
     flex-shrink: 0;
     user-select: none;
     cursor: grab;
-    padding: 0.25rem;
+    padding: var(--space-1);
   }
 
   .rule-grip:active { cursor: grabbing; }
 
-  .rule-content { flex: 1; display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
-  .rule-index { display: inline-flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; border-radius: var(--radius-round); background: var(--color-bg); font-size: 0.75rem; font-weight: var(--weight-heavy); flex-shrink: 0; }
-  .rule-action-badge { display: inline-block; padding: 0.0625rem 0.375rem; border-radius: var(--radius-m); font-size: 0.6875rem; font-weight: var(--weight-heavy); letter-spacing: 0.04em; background: var(--color-mock-bg); color: var(--color-mock-text); border: var(--line-thin) dashed var(--color-mock); flex-shrink: 0; }
+  .rule-content { flex: 1; display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+  .rule-index { display: inline-flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; border-radius: var(--radius-round); background: var(--color-bg); font-size: var(--text-xs); font-weight: var(--weight-heavy); flex-shrink: 0; }
+  .rule-action-badge { display: inline-block; padding: var(--space-0-5) var(--space-1-5); border-radius: var(--radius-m); font-size: var(--text-xs); font-weight: var(--weight-heavy); letter-spacing: 0.04em; background: var(--color-mock-bg); color: var(--color-mock-text); border: var(--line-thin) dashed var(--color-mock); flex-shrink: 0; }
   .rule-action-badge.proxy { background: var(--color-proxy-bg); color: var(--color-proxy-text); border-style: solid; border-color: var(--color-proxy); }
   .rule-name { font-weight: var(--weight-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .rule-meta { font-size: 0.8125rem; color: var(--color-text-muted); white-space: nowrap; }
+  .rule-meta { font-size: var(--text-s); color: var(--color-text-muted); white-space: nowrap; }
 
-  .rule-actions { display: flex; gap: 0.25rem; flex-shrink: 0; }
-  .btn-icon { width: 2rem; height: 2rem; display: inline-flex; align-items: center; justify-content: center; border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); background: var(--color-surface); color: var(--color-text-muted); font-size: 0.875rem; cursor: pointer; transition: background-color var(--duration-quick), color var(--duration-quick); }
+  .rule-actions { display: flex; gap: var(--space-1); flex-shrink: 0; }
+  .btn-icon { width: 2rem; height: 2rem; display: inline-flex; align-items: center; justify-content: center; border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); background: var(--color-surface); color: var(--color-text-muted); font-size: var(--text-m); cursor: pointer; transition: background-color var(--duration-quick), color var(--duration-quick); }
   .btn-icon:hover:not(:disabled) { background: var(--color-bg); color: var(--color-text); }
   .btn-icon:disabled { opacity: 0.35; cursor: not-allowed; }
   .btn-icon.btn-delete:hover:not(:disabled) { color: var(--color-danger); border-color: var(--color-danger); }

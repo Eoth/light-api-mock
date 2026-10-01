@@ -102,24 +102,24 @@
 
 <style>
   .backup-manager { max-width: 60rem; }
-  .list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+  .list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4); }
   .list-header h2 { margin: 0; }
 
-  .backup-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.75rem; }
+  .backup-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: var(--space-3); }
   .backup-card {
     background: var(--color-surface);
     border: var(--line-thin) solid var(--color-border);
     border-radius: var(--radius-m);
-    padding: 0.875rem 1.25rem;
+    padding: var(--space-3) var(--space-5);
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 1rem;
+    gap: var(--space-4);
     flex-wrap: wrap;
   }
-  .backup-info { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
-  .backup-name { font-family: var(--font-code); font-size: 0.875rem; font-weight: var(--weight-strong); word-break: break-all; }
-  .backup-meta { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; color: var(--color-text-muted); font-size: 0.8125rem; }
+  .backup-info { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+  .backup-name { font-family: var(--font-code); font-size: var(--text-m); font-weight: var(--weight-strong); word-break: break-all; }
+  .backup-meta { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; color: var(--color-text-muted); font-size: var(--text-s); }
 
-  .loading-text, .empty-text { color: var(--color-text-muted); font-size: 0.875rem; text-align: center; padding: 1rem; }
+  .loading-text, .empty-text { color: var(--color-text-muted); font-size: var(--text-m); text-align: center; padding: var(--space-4); }
 </style>

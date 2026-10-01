@@ -79,42 +79,42 @@
     align-items: center;
     justify-content: center;
     min-height: 100vh;
-    padding: 1rem;
+    padding: var(--space-4);
   }
 
   .login-card {
     background: var(--color-surface);
     border: var(--line-thin) solid var(--color-border);
     border-radius: var(--radius-m);
-    padding: 2.5rem;
+    padding: var(--space-10);
     width: 100%;
     max-width: 24rem;
   }
 
   .login-title {
-    font-size: 1.75rem;
+    font-size: var(--text-3xl);
     color: var(--color-primary);
-    margin: 0 0 0.25rem;
+    margin: 0 0 var(--space-1);
     text-align: center;
   }
 
   .login-subtitle {
     color: var(--color-text-muted);
-    font-size: 0.875rem;
-    margin: 0 0 1.5rem;
+    font-size: var(--text-m);
+    margin: 0 0 var(--space-6);
     text-align: center;
   }
 
   .login-form {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: var(--space-4);
   }
 
   .btn-login {
     width: 100%;
-    padding: 0.625rem;
-    font-size: 1rem;
-    margin-top: 0.5rem;
+    padding: var(--space-3);
+    font-size: var(--text-l);
+    margin-top: var(--space-2);
   }
 </style>

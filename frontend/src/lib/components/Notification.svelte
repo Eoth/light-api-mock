@@ -21,11 +21,11 @@
   .notification {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem 1rem;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
     border-radius: var(--radius-m);
     font-weight: var(--weight-medium);
-    margin-bottom: 1rem;
+    margin-bottom: var(--space-4);
     border: var(--line-thin) solid;
   }
 

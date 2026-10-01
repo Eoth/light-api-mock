@@ -458,33 +458,33 @@
 {/if}
 
 <style>
-  :global(.skip-link:focus) { position: fixed; top: 0; left: 0; z-index: var(--z-skip-link); width: auto; height: auto; clip: auto; padding: 0.75rem 1.5rem; background: var(--color-primary); color: var(--color-on-primary); font-weight: var(--weight-strong); text-decoration: none; }
+  :global(.skip-link:focus) { position: fixed; top: 0; left: 0; z-index: var(--z-skip-link); width: auto; height: auto; clip: auto; padding: var(--space-3) var(--space-6); background: var(--color-primary); color: var(--color-on-primary); font-weight: var(--weight-strong); text-decoration: none; }
 
-  .app-header { background: var(--color-surface); border-bottom: var(--line-thin) solid var(--color-border); padding: 0.75rem 1.5rem; }
-  .header-content { max-width: 60rem; margin: 0 auto; display: flex; align-items: baseline; gap: 1rem; flex-wrap: wrap; }
-  .header-actions { margin-left: auto; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+  .app-header { background: var(--color-surface); border-bottom: var(--line-thin) solid var(--color-border); padding: var(--space-3) var(--space-6); }
+  .header-content { max-width: 60rem; margin: 0 auto; display: flex; align-items: baseline; gap: var(--space-4); flex-wrap: wrap; }
+  .header-actions { margin-left: auto; display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap; }
   .app-title-btn { background: none; border: none; padding: 0; cursor: pointer; }
   .app-title { font-size: var(--text-3xl); margin: 0; color: var(--color-text); }
   /* The mark of Phasme: a short dashed stem, the line an imitation is drawn with. */
-  .app-title::before { content: ""; display: inline-block; height: 0.8em; margin-right: 0.5rem; border-left: var(--line-stem) dashed var(--color-mock); vertical-align: -0.05em; }
+  .app-title::before { content: ""; display: inline-block; height: 0.8em; margin-right: var(--space-2); border-left: var(--line-stem) dashed var(--color-mock); vertical-align: -0.05em; }
   .app-subtitle { margin: 0; color: var(--color-text-muted); font-size: var(--text-m); }
-  .app-main { max-width: 60rem; margin: 1.5rem auto; padding: 0 1.5rem; }
+  .app-main { max-width: 60rem; margin: var(--space-6) auto; padding: 0 var(--space-6); }
 
-  .breadcrumb { max-width: 60rem; margin: 0 auto; padding: 0.5rem 1.5rem; }
-  .breadcrumb ol { list-style: none; display: flex; align-items: center; gap: 0.375rem; margin: 0; padding: 0; font-size: var(--text-m); }
-  .breadcrumb li { display: flex; align-items: center; gap: 0.375rem; color: var(--color-text-muted); }
+  .breadcrumb { max-width: 60rem; margin: 0 auto; padding: var(--space-2) var(--space-6); }
+  .breadcrumb ol { list-style: none; display: flex; align-items: center; gap: var(--space-1-5); margin: 0; padding: 0; font-size: var(--text-m); }
+  .breadcrumb li { display: flex; align-items: center; gap: var(--space-1-5); color: var(--color-text-muted); }
   .breadcrumb li:not(:last-child)::after { content: "/"; color: var(--color-text-muted); }
   .breadcrumb li[aria-current="page"] { color: var(--color-text); font-weight: var(--weight-strong); }
   .breadcrumb-link { background: none; border: none; padding: 0; color: var(--color-primary); cursor: pointer; font: inherit; text-decoration: underline; text-underline-offset: 2px; }
   .breadcrumb-link:hover { color: var(--color-primary-hover); }
 
-  .import-actions { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 1rem; }
-  .loading { text-align: center; padding: 3rem; color: var(--color-text-muted); }
-  .list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+  .import-actions { display: flex; gap: var(--space-3); flex-wrap: wrap; margin-top: var(--space-4); }
+  .loading { text-align: center; padding: var(--space-12); color: var(--color-text-muted); }
+  .list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4); }
   .list-header h2 { margin: 0; }
 
-  .demo-section { text-align: center; margin-top: 1rem; }
-  .btn-demo { font-size: var(--text-l); padding: 0.75rem 1.5rem; }
+  .demo-section { text-align: center; margin-top: var(--space-4); }
+  .btn-demo { font-size: var(--text-l); padding: var(--space-3) var(--space-6); }
 
   .language-select {
     font: inherit;
@@ -493,7 +493,7 @@
     background: var(--color-surface);
     border: var(--line-thin) solid var(--color-control);
     border-radius: var(--radius-m);
-    padding: 0.25rem 0.5rem;
+    padding: var(--space-1) var(--space-2);
   }
 
   .user-badge {
@@ -503,7 +503,7 @@
     background: var(--color-bg);
     border: var(--line-thin) solid var(--color-border);
     border-radius: var(--radius-m);
-    padding: 0.2rem 0.625rem;
+    padding: var(--space-1) var(--space-3);
   }
 
 </style>

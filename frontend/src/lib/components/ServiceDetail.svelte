@@ -232,12 +232,12 @@
 {/if}
 
 <style>
-  .service-detail { display: flex; flex-direction: column; gap: 1rem; }
+  .service-detail { display: flex; flex-direction: column; gap: var(--space-4); }
 
   .detail-nav {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: var(--space-4);
   }
 
   .detail-nav h2 { margin: 0; }
@@ -246,23 +246,23 @@
     background: var(--color-surface);
     border: var(--line-thin) solid var(--color-border);
     border-radius: var(--radius-m);
-    padding: 1.25rem;
+    padding: var(--space-5);
   }
 
   .detail-dl { margin: 0; }
-  .dl-row { display: flex; gap: 0.5rem; margin-bottom: 0.375rem; }
+  .dl-row { display: flex; gap: var(--space-2); margin-bottom: var(--space-1-5); }
   dt { font-weight: var(--weight-medium); color: var(--color-text-muted); min-width: 10rem; }
   dd { margin: 0; }
-  code { font-size: 0.875rem; background: var(--color-bg); padding: 0.125rem 0.375rem; border-radius: var(--radius-s); }
+  code { font-size: var(--text-m); background: var(--color-bg); padding: var(--space-0-5) var(--space-1-5); border-radius: var(--radius-s); }
 
   .detail-actions {
     display: flex;
-    gap: 0.75rem;
+    gap: var(--space-3);
     align-items: center;
-    margin-top: 1rem;
-    padding-top: 1rem;
+    margin-top: var(--space-4);
+    padding-top: var(--space-4);
     border-top: var(--line-thin) solid var(--color-border);
   }
 
-  .btn-back { padding: 0.375rem 0.75rem; font-size: 0.875rem; }
+  .btn-back { padding: var(--space-1-5) var(--space-3); font-size: var(--text-m); }
 </style>

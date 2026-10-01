@@ -137,7 +137,7 @@
 <style>
   .rhai-editor { position: relative; }
 
-  .script-textarea { width: 100%; font-family: var(--font-code); font-size: 0.8125rem; padding: 0.5rem; border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); background: var(--color-bg); color: var(--color-text); resize: vertical; font-variant-ligatures: none; }
+  .script-textarea { width: 100%; font-family: var(--font-code); font-size: var(--text-s); padding: var(--space-2); border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); background: var(--color-bg); color: var(--color-text); resize: vertical; font-variant-ligatures: none; }
 
   .rhai-suggestions {
     position: absolute;
@@ -145,8 +145,8 @@
     left: 0;
     right: 0;
     z-index: var(--z-popover);
-    margin: 0.25rem 0 0;
-    padding: 0.25rem;
+    margin: var(--space-1) 0 0;
+    padding: var(--space-1);
     list-style: none;
     max-height: 14rem;
     overflow-y: auto;
@@ -161,8 +161,8 @@
   .rhai-suggestion {
     display: flex;
     flex-direction: column;
-    gap: 0.125rem;
-    padding: 0.375rem 0.5rem;
+    gap: var(--space-0-5);
+    padding: var(--space-1-5) var(--space-2);
     border-radius: var(--radius-m);
     cursor: pointer;
   }
@@ -174,13 +174,13 @@
 
   .rhai-suggestion-sig {
     font-family: var(--font-code);
-    font-size: 0.8125rem;
+    font-size: var(--text-s);
     font-weight: var(--weight-strong);
     color: var(--color-primary);
   }
 
   .rhai-suggestion-desc {
-    font-size: 0.75rem;
+    font-size: var(--text-s);
     color: var(--color-text-muted);
   }
 

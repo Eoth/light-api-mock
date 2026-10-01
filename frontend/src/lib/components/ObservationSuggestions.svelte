@@ -185,8 +185,8 @@
     background: var(--color-surface);
     border: var(--line-thin) solid var(--color-border);
     border-radius: var(--radius-m);
-    padding: 1rem 1.25rem;
-    margin-top: 1rem;
+    padding: var(--space-4) var(--space-5);
+    margin-top: var(--space-4);
   }
 
   .panel-header {
@@ -194,63 +194,63 @@
     justify-content: space-between;
     align-items: center;
     flex-wrap: wrap;
-    gap: 0.75rem;
+    gap: var(--space-3);
   }
 
-  .panel-header h4 { margin: 0; font-size: 1rem; }
+  .panel-header h4 { margin: 0; font-size: var(--text-l); }
 
   .panel-hint {
-    margin: 0.5rem 0 0;
-    font-size: 0.8125rem;
+    margin: var(--space-2) 0 0;
+    font-size: var(--text-s);
     color: var(--color-text-muted);
   }
 
-  .panel-actions { margin-top: 0.75rem; }
+  .panel-actions { margin-top: var(--space-3); }
 
   .panel-empty, .panel-unexplained {
-    margin: 0.75rem 0 0;
-    font-size: 0.875rem;
+    margin: var(--space-3) 0 0;
+    font-size: var(--text-m);
     color: var(--color-text-muted);
   }
 
   .suggestion-card {
-    margin-top: 0.75rem;
-    padding: 0.75rem;
+    margin-top: var(--space-3);
+    padding: var(--space-3);
     border: var(--line-thin) solid var(--color-border);
     border-radius: var(--radius-m);
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 0.375rem;
+    gap: var(--space-1-5);
   }
 
-  .suggestion-summary { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+  .suggestion-summary { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
 
-  .suggestion-condition { font-size: 0.8125rem; color: var(--color-text-muted); }
+  .suggestion-condition { font-size: var(--text-s); color: var(--color-text-muted); }
 
-  .suggestion-response { display: flex; align-items: center; gap: 0.5rem; }
+  .suggestion-response { display: flex; align-items: center; gap: var(--space-2); }
 
   .suggestion-status {
     font-weight: var(--weight-heavy);
-    font-size: 0.8125rem;
-    padding: 0.125rem 0.5rem;
+    font-size: var(--text-s);
+    padding: var(--space-0-5) var(--space-2);
     border-radius: var(--radius-m);
     background: var(--color-bg);
   }
 
   .suggestion-body {
-    font-size: 0.8125rem;
+    font-size: var(--text-s);
     background: var(--color-bg);
-    padding: 0.125rem 0.375rem;
+    padding: var(--space-0-5) var(--space-1-5);
     border-radius: var(--radius-s);
     overflow-wrap: anywhere;
   }
 
-  code { font-size: 0.8125rem; }
+  code { font-size: var(--text-s); }
 
   .panel-error {
-    margin: 0.75rem 0 0;
-    font-size: 0.8125rem;
+    margin: var(--space-3) 0 0;
+    font-size: var(--text-s);
     color: var(--color-danger);
   }
 </style>

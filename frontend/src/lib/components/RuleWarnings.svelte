@@ -53,10 +53,10 @@
 {/if}
 
 <style>
-  .conflict-warning { background: var(--color-warning-bg); border: var(--line-thin) solid var(--color-warning); color: var(--color-warning-text); padding: 0.75rem; border-radius: var(--radius-m); margin-bottom: 0.75rem; }
-  .conflict-warning-title { margin: 0 0 0.5rem; font-weight: var(--weight-strong); font-size: 0.875rem; }
-  .conflict-warning-list { margin: 0 0 0.5rem; padding-left: 1.25rem; display: flex; flex-direction: column; gap: 0.375rem; }
-  .conflict-warning-list li { font-size: 0.875rem; word-break: break-word; }
+  .conflict-warning { background: var(--color-warning-bg); border: var(--line-thin) solid var(--color-warning); color: var(--color-warning-text); padding: var(--space-3); border-radius: var(--radius-m); margin-bottom: var(--space-3); }
+  .conflict-warning-title { margin: 0 0 var(--space-2); font-weight: var(--weight-strong); font-size: var(--text-m); }
+  .conflict-warning-list { margin: 0 0 var(--space-2); padding-left: var(--space-5); display: flex; flex-direction: column; gap: var(--space-1-5); }
+  .conflict-warning-list li { font-size: var(--text-m); word-break: break-word; }
 
-  .mode-warning-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+  .mode-warning-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
 </style>

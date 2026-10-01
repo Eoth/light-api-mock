@@ -66,7 +66,7 @@
     border: var(--line-thin) solid var(--color-border);
     border-left: var(--line-stem) solid var(--color-proxy);
     border-radius: var(--radius-m);
-    padding: 1rem 1.25rem;
+    padding: var(--space-4) var(--space-5);
   }
 
   /* The stem tells the mode down a long list: dashed for a mocked service, solid for one relayed to its target. */
@@ -77,31 +77,31 @@
     justify-content: space-between;
     align-items: center;
     flex-wrap: wrap;
-    gap: 0.75rem;
+    gap: var(--space-3);
   }
 
-  .card-info { display: flex; align-items: center; gap: 0.75rem; }
+  .card-info { display: flex; align-items: center; gap: var(--space-3); }
 
-  .card-title { margin: 0; font-size: 1.125rem; font-weight: var(--weight-strong); }
+  .card-title { margin: 0; font-size: var(--text-xl); font-weight: var(--weight-strong); }
 
   .card-details {
-    margin-top: 0.75rem;
-    padding-top: 0.75rem;
+    margin-top: var(--space-3);
+    padding-top: var(--space-3);
     border-top: var(--line-thin) solid var(--color-border);
   }
 
   dl { margin: 0; }
 
-  .detail-row { display: flex; gap: 0.5rem; margin-bottom: 0.125rem; font-size: 0.875rem; }
+  .detail-row { display: flex; gap: var(--space-2); margin-bottom: var(--space-0-5); font-size: var(--text-m); }
 
   dt { font-weight: var(--weight-medium); color: var(--color-text-muted); min-width: 4rem; }
   dd { margin: 0; }
 
-  code { font-size: 0.8125rem; background: var(--color-bg); padding: 0.125rem 0.375rem; border-radius: var(--radius-s); }
+  code { font-size: var(--text-s); background: var(--color-bg); padding: var(--space-0-5) var(--space-1-5); border-radius: var(--radius-s); }
 
   .card-actions {
-    margin-top: 0.75rem;
-    padding-top: 0.75rem;
+    margin-top: var(--space-3);
+    padding-top: var(--space-3);
     border-top: var(--line-thin) solid var(--color-border);
   }
 </style>

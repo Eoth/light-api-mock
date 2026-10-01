@@ -79,19 +79,19 @@
   .url-health {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: var(--space-2);
     flex-wrap: wrap;
   }
 
   .ping-error {
-    font-size: 0.8125rem;
+    font-size: var(--text-s);
     color: var(--color-danger);
   }
 
   .ping-warning {
     flex-basis: 100%;
     margin: 0;
-    font-size: 0.8125rem;
+    font-size: var(--text-s);
     color: var(--color-danger);
   }
 </style>

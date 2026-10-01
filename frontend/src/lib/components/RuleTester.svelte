@@ -235,22 +235,22 @@
     background: var(--color-sunken);
     border: var(--line-thin) solid var(--color-border);
     border-radius: var(--radius-m);
-    padding: 1rem;
-    margin: 0.5rem 0 1rem;
+    padding: var(--space-4);
+    margin: var(--space-2) 0 var(--space-4);
   }
 
   .rule-tester h3 {
-    margin: 0 0 0.5rem;
-    font-size: 1rem;
+    margin: 0 0 var(--space-2);
+    font-size: var(--text-l);
   }
 
   .tester-result {
-    margin-top: 0.75rem;
+    margin-top: var(--space-3);
   }
 
   .result-banner {
     font-weight: var(--weight-strong);
-    padding: 0.5rem 0.75rem;
+    padding: var(--space-2) var(--space-3);
     border-radius: var(--radius-m);
   }
 
@@ -267,32 +267,32 @@
   .result-summary {
     list-style: none;
     padding: 0;
-    margin: 0.5rem 0;
+    margin: var(--space-2) 0;
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
-    font-size: 0.875rem;
+    gap: var(--space-1);
+    font-size: var(--text-m);
   }
 
   .body-truncation-warning {
-    font-size: 0.875rem;
+    font-size: var(--text-m);
     color: var(--color-warning-text);
     background: var(--color-warning-bg);
-    padding: 0.5rem 0.75rem;
+    padding: var(--space-2) var(--space-3);
     border-radius: var(--radius-m);
   }
 
   .script-error-banner {
-    margin: 0.5rem 0;
-    padding: 0.5rem 0.75rem;
+    margin: var(--space-2) 0;
+    padding: var(--space-2) var(--space-3);
     border-radius: var(--radius-m);
     background: var(--color-danger-bg);
     border: var(--line-thin) solid var(--color-danger);
   }
 
   .script-error-title {
-    margin: 0 0 0.375rem;
-    font-size: 0.875rem;
+    margin: 0 0 var(--space-1-5);
+    font-size: var(--text-m);
     font-weight: var(--weight-strong);
     color: var(--color-danger-text);
   }
@@ -303,28 +303,28 @@
     margin: 0;
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
-    font-size: 0.8125rem;
+    gap: var(--space-1);
+    font-size: var(--text-s);
     word-break: break-word;
   }
 
   .script-result-panel {
-    margin: 0.5rem 0;
-    padding: 0.5rem 0.75rem;
+    margin: var(--space-2) 0;
+    padding: var(--space-2) var(--space-3);
     border-radius: var(--radius-m);
     background: var(--color-surface);
     border: var(--line-thin) solid var(--color-border);
   }
 
   .script-result-title {
-    margin: 0 0 0.375rem;
-    font-size: 0.8125rem;
+    margin: 0 0 var(--space-1-5);
+    font-size: var(--text-s);
     color: var(--color-text-muted);
   }
 
   .script-result-slot {
-    font-size: 0.8125rem;
-    margin: 0.375rem 0;
+    font-size: var(--text-s);
+    margin: var(--space-1-5) 0;
   }
 
   .script-result-slot:first-of-type {
@@ -334,27 +334,27 @@
   .script-result-fields {
     list-style: none;
     padding: 0;
-    margin: 0.25rem 0 0;
+    margin: var(--space-1) 0 0;
     display: flex;
     flex-direction: column;
-    gap: 0.2rem;
+    gap: var(--space-1);
     word-break: break-word;
   }
 
   .script-result-value-line {
-    margin: 0.25rem 0 0;
+    margin: var(--space-1) 0 0;
     word-break: break-word;
   }
 
   .script-result-value {
     background: var(--color-sunken);
-    padding: 0.05rem 0.3rem;
+    padding: var(--space-0-5) var(--space-1);
     border-radius: var(--radius-s);
   }
 
   .condition-group-result h4 {
-    font-size: 0.875rem;
-    margin: 0.75rem 0 0.25rem;
+    font-size: var(--text-m);
+    margin: var(--space-3) 0 var(--space-1);
   }
 
   .condition-eval-list {
@@ -363,11 +363,11 @@
     margin: 0;
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
 
   .condition-eval {
-    padding: 0.5rem 0.75rem;
+    padding: var(--space-2) var(--space-3);
     border-radius: var(--radius-m);
     border: var(--line-thin) solid var(--color-border);
   }
@@ -383,17 +383,17 @@
   .eval-line {
     display: flex;
     align-items: flex-start;
-    gap: 0.5rem;
+    gap: var(--space-2);
   }
 
   .eval-text {
-    font-size: 0.875rem;
+    font-size: var(--text-m);
     word-break: break-word;
   }
 
   .eval-hint {
-    margin: 0.35rem 0 0 1.4rem;
-    font-size: 0.8125rem;
+    margin: var(--space-1-5) 0 0 var(--space-6);
+    font-size: var(--text-s);
     font-style: italic;
     color: var(--color-text-muted);
   }

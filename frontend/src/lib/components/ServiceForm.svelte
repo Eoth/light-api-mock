@@ -253,22 +253,22 @@
     background: var(--color-surface);
     border: var(--line-thin) solid var(--color-border);
     border-radius: var(--radius-m);
-    padding: 1.5rem;
+    padding: var(--space-6);
   }
 
   /* The same non-blocking warning style as RuleWarnings.svelte: component styles are scoped, and app.css has no
      shared warning class. */
-  .mode-warning { background: var(--color-warning-bg); border: var(--line-thin) solid var(--color-warning); color: var(--color-warning-text); padding: 0.75rem; border-radius: var(--radius-m); margin-bottom: 0.75rem; }
-  .mode-warning p { margin: 0 0 0.5rem; font-size: 0.875rem; }
-  .mode-warning-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+  .mode-warning { background: var(--color-warning-bg); border: var(--line-thin) solid var(--color-warning); color: var(--color-warning-text); padding: var(--space-3); border-radius: var(--radius-m); margin-bottom: var(--space-3); }
+  .mode-warning p { margin: 0 0 var(--space-2); font-size: var(--text-m); }
+  .mode-warning-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
 
   .url-preview {
     background: var(--color-bg);
     border: var(--line-thin) solid var(--color-border);
     border-radius: var(--radius-m);
-    padding: 0.625rem 0.75rem;
-    margin-bottom: 1rem;
-    font-size: 0.875rem;
+    padding: var(--space-3) var(--space-3);
+    margin-bottom: var(--space-4);
+    font-size: var(--text-m);
   }
   .url-preview code { background: none; padding: 0; font-weight: var(--weight-strong); color: var(--color-primary); }
 

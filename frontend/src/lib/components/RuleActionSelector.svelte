@@ -32,12 +32,12 @@
 </fieldset>
 
 <style>
-  .section { border: var(--line-thin) solid var(--color-border); border-radius: var(--radius-m); padding: 0.75rem; margin-bottom: 1rem; }
-  .section legend { font-weight: var(--weight-strong); font-size: 0.875rem; padding: 0 0.375rem; }
-  .section-help { font-size: 0.8125rem; color: var(--color-text-muted); margin: 0 0 0.5rem; }
+  .section { border: var(--line-thin) solid var(--color-border); border-radius: var(--radius-m); padding: var(--space-3); margin-bottom: var(--space-4); }
+  .section legend { font-weight: var(--weight-strong); font-size: var(--text-m); padding: 0 var(--space-1-5); }
+  .section-help { font-size: var(--text-s); color: var(--color-text-muted); margin: 0 0 var(--space-2); }
 
-  .action-selector { display: flex; gap: 0.75rem; flex-wrap: wrap; }
-  .action-option { position: relative; display: flex; flex-direction: column; gap: 0.125rem; padding: 0.625rem 1rem; border: var(--line-thick) solid var(--color-control); border-radius: var(--radius-m); cursor: pointer; min-width: 10rem; background: var(--color-surface); }
+  .action-selector { display: flex; gap: var(--space-3); flex-wrap: wrap; }
+  .action-option { position: relative; display: flex; flex-direction: column; gap: var(--space-0-5); padding: var(--space-3) var(--space-4); border: var(--line-thick) solid var(--color-control); border-radius: var(--radius-m); cursor: pointer; min-width: 10rem; background: var(--color-surface); }
   /* The chosen action is drawn in its mode: dashed for the mock that imitates, solid for the real target. */
   .action-option.mock.selected { border-style: dashed; border-color: var(--color-mock); background: var(--color-mock-bg); }
   .action-option.proxy.selected { border-color: var(--color-proxy); background: var(--color-proxy-bg); }
@@ -45,6 +45,6 @@
      out of the keyboard's reach. The card shows its focus instead. */
   .action-option input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; pointer-events: none; }
   .action-option:has(input:focus-visible) { outline: var(--line-thick) solid var(--color-focus); outline-offset: var(--line-thick); }
-  .action-label { font-weight: var(--weight-heavy); font-size: 0.9375rem; }
-  .action-desc { font-size: 0.8125rem; color: var(--color-text-muted); }
+  .action-label { font-weight: var(--weight-heavy); font-size: var(--text-m); }
+  .action-desc { font-size: var(--text-s); color: var(--color-text-muted); }
 </style>

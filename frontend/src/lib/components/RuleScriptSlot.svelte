@@ -46,24 +46,24 @@
 </div>
 
 <style>
-  .sub-section { margin-top: 0.75rem; padding-top: 0.75rem; border-top: var(--line-thin) solid var(--color-border); }
+  .sub-section { margin-top: var(--space-3); padding-top: var(--space-3); border-top: var(--line-thin) solid var(--color-border); }
   .script-section { border-top-color: var(--color-primary); }
-  .script-editor { margin-top: 0.75rem; }
-  .script-editor label { display: block; font-weight: var(--weight-strong); font-size: 0.875rem; margin-bottom: 0.25rem; }
-  .script-actions { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.375rem; }
-  .script-valid { font-size: 0.8125rem; color: var(--color-success); font-weight: var(--weight-strong); }
-  .script-invalid { font-size: 0.8125rem; color: var(--color-danger); }
-  .script-help { margin-top: 0.375rem; }
+  .script-editor { margin-top: var(--space-3); }
+  .script-editor label { display: block; font-weight: var(--weight-strong); font-size: var(--text-m); margin-bottom: var(--space-1); }
+  .script-actions { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-1-5); }
+  .script-valid { font-size: var(--text-s); color: var(--color-success); font-weight: var(--weight-strong); }
+  .script-invalid { font-size: var(--text-s); color: var(--color-danger); }
+  .script-help { margin-top: var(--space-1-5); }
 
   /* The `help` snippet is defined in RuleResponseSection.svelte, so its elements carry that component's scope class,
      not this one's: :global() lets these rules reach them across the component boundary. */
-  .script-help :global(p) { margin: 0.25rem 0; }
-  .script-help :global(code) { font-size: 0.8125rem; background: var(--color-bg); padding: 0.1rem 0.25rem; border-radius: var(--radius-s); }
-  .script-help :global(.script-examples) { margin-top: 0.375rem; }
-  .script-help :global(.script-examples summary) { cursor: pointer; color: var(--color-primary); font-size: 0.8125rem; }
-  .script-help :global(.script-examples-content) { padding: 0.5rem; background: var(--color-bg); border-radius: var(--radius-m); margin-top: 0.25rem; font-size: 0.8125rem; }
-  .script-help :global(.script-examples-content p) { margin: 0.25rem 0; }
+  .script-help :global(p) { margin: var(--space-1) 0; }
+  .script-help :global(code) { font-size: var(--text-s); background: var(--color-bg); padding: var(--space-0-5) var(--space-1); border-radius: var(--radius-s); }
+  .script-help :global(.script-examples) { margin-top: var(--space-1-5); }
+  .script-help :global(.script-examples summary) { cursor: pointer; color: var(--color-primary); font-size: var(--text-s); }
+  .script-help :global(.script-examples-content) { padding: var(--space-2); background: var(--color-bg); border-radius: var(--radius-m); margin-top: var(--space-1); font-size: var(--text-s); }
+  .script-help :global(.script-examples-content p) { margin: var(--space-1) 0; }
   .script-help :global(.script-examples-content a) { color: var(--color-primary); }
-  .script-help :global(.script-fn-list) { margin: 0.25rem 0 0.5rem; padding-left: 1.125rem; }
-  .script-help :global(.script-fn-list li) { margin: 0.125rem 0; }
+  .script-help :global(.script-fn-list) { margin: var(--space-1) 0 var(--space-2); padding-left: var(--space-4); }
+  .script-help :global(.script-fn-list li) { margin: var(--space-0-5) 0; }
 </style>

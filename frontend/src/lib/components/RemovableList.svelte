@@ -37,20 +37,20 @@
   .removable-list {
     list-style: none;
     padding: 0;
-    margin: 0 0 0.5rem;
+    margin: 0 0 var(--space-2);
   }
   .removable-list-item {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.5rem;
-    padding: 0.25rem 0;
-    font-size: 0.875rem;
+    gap: var(--space-2);
+    padding: var(--space-1) 0;
+    font-size: var(--text-m);
   }
   .removable-list-empty {
     color: var(--color-text-muted);
-    font-size: 0.8125rem;
-    margin: 0.5rem 0;
+    font-size: var(--text-s);
+    margin: var(--space-2) 0;
     font-style: italic;
   }
   .chip-remove {
@@ -59,9 +59,9 @@
     color: var(--color-text-muted);
     cursor: pointer;
     font-weight: var(--weight-heavy);
-    font-size: 0.875rem;
-    padding: 0 0.25rem;
-    line-height: 1;
+    font-size: var(--text-m);
+    padding: 0 var(--space-1);
+    line-height: var(--leading-none);
   }
   .chip-remove:hover {
     color: var(--color-danger);

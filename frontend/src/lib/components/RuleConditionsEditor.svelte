@@ -158,13 +158,13 @@
 </fieldset>
 
 <style>
-  .section { border: var(--line-thin) solid var(--color-border); border-radius: var(--radius-m); padding: 0.75rem; margin-bottom: 1rem; }
-  .section legend { font-weight: var(--weight-strong); font-size: 0.875rem; padding: 0 0.375rem; }
-  .section-help { font-size: 0.8125rem; color: var(--color-text-muted); margin: 0 0 0.5rem; }
+  .section { border: var(--line-thin) solid var(--color-border); border-radius: var(--radius-m); padding: var(--space-3); margin-bottom: var(--space-4); }
+  .section legend { font-weight: var(--weight-strong); font-size: var(--text-m); padding: 0 var(--space-1-5); }
+  .section-help { font-size: var(--text-s); color: var(--color-text-muted); margin: 0 0 var(--space-2); }
 
-  .cond-list { list-style: none; padding: 0; margin: 0 0 0.5rem; }
-  .cond-item { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.375rem 0.5rem; border: var(--line-thin) solid var(--color-border); border-radius: var(--radius-m); margin-bottom: 0.25rem; background: var(--color-bg); font-size: 0.875rem; }
-  .cond-item-editing { margin-bottom: 0.25rem; }
+  .cond-list { list-style: none; padding: 0; margin: 0 0 var(--space-2); }
+  .cond-item { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); padding: var(--space-1-5) var(--space-2); border: var(--line-thin) solid var(--color-border); border-radius: var(--radius-m); margin-bottom: var(--space-1); background: var(--color-bg); font-size: var(--text-m); }
+  .cond-item-editing { margin-bottom: var(--space-1); }
 
   .cond-label-button {
     flex: 1;
@@ -172,8 +172,8 @@
     text-align: left;
     background: none;
     border: none;
-    padding: 0.25rem 0.375rem;
-    margin: -0.25rem -0.375rem;
+    padding: var(--space-1) var(--space-1-5);
+    margin: calc(-1 * var(--space-1)) calc(-1 * var(--space-1-5));
     border-radius: var(--radius-m);
     font: inherit;
     color: inherit;
@@ -182,7 +182,7 @@
   }
   .cond-label-button:hover { background: var(--color-surface); text-decoration: underline; }
 
-  .btn-icon { flex-shrink: 0; width: 1.75rem; height: 1.75rem; display: inline-flex; align-items: center; justify-content: center; border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); background: var(--color-surface); color: var(--color-text-muted); font-size: 0.75rem; cursor: pointer; }
+  .btn-icon { flex-shrink: 0; width: 1.75rem; height: 1.75rem; display: inline-flex; align-items: center; justify-content: center; border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); background: var(--color-surface); color: var(--color-text-muted); font-size: var(--text-s); cursor: pointer; }
   .btn-icon:hover:not(:disabled) { background: var(--color-bg); color: var(--color-text); }
   .btn-icon:disabled { opacity: 0.35; cursor: not-allowed; }
   .btn-icon.btn-delete:hover:not(:disabled) { color: var(--color-danger); border-color: var(--color-danger); }

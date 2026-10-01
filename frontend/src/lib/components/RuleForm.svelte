@@ -286,5 +286,5 @@
 </form>
 
 <style>
-  .rule-form { background: var(--color-surface); border: var(--line-thin) solid var(--color-border); border-radius: var(--radius-m); padding: 1.25rem; }
+  .rule-form { background: var(--color-surface); border: var(--line-thin) solid var(--color-border); border-radius: var(--radius-m); padding: var(--space-5); }
 </style>

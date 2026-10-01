@@ -85,12 +85,18 @@ export function primitives(tokens) {
   );
 }
 
-// Properties whose value comes from a scale, and what a value may hold besides the scale's tokens.
+// Properties whose value comes from a scale, and what a value may hold besides the scale's tokens. A spacing may be 0,
+// auto, or a negative step written calc(-1 * var(--space-N)).
+const SPACING = /^(0|auto|calc\(\s*-1\s*\*\s*\)|\s)*$/;
 const SCALED = {
   'font-family': /^(inherit)?$/,
   'border-radius': /^$/,
   'z-index': /^$/,
   'box-shadow': /^(none|inset|0|[\s,])*$/,
+  'font-size': /^(inherit)?$/,
+  'line-height': /^$/,
+  ...Object.fromEntries(['padding', 'margin'].flatMap((p) => [p, `${p}-top`, `${p}-right`, `${p}-bottom`, `${p}-left`])
+    .concat(['gap', 'row-gap', 'column-gap']).map((property) => [property, SPACING])),
 };
 
 /** Values of scaled properties that do not come from a token, as "line: property: value". */

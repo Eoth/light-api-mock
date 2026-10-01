@@ -349,39 +349,39 @@
 
 <style>
   .tcp-manager { max-width: 60rem; }
-  .list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; gap: 0.75rem; flex-wrap: wrap; }
+  .list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2); gap: var(--space-3); flex-wrap: wrap; }
   .list-header h2 { margin: 0; }
-  .header-actions-inline { display: flex; gap: 0.5rem; }
+  .header-actions-inline { display: flex; gap: var(--space-2); }
 
-  .tcp-scope-hint { margin: 0 0 1rem; }
+  .tcp-scope-hint { margin: 0 0 var(--space-4); }
 
-  .tcp-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.75rem; }
+  .tcp-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: var(--space-3); }
   .tcp-card {
     background: var(--color-surface);
     border: var(--line-thin) solid var(--color-border);
     border-radius: var(--radius-m);
-    padding: 0.875rem 1.25rem;
+    padding: var(--space-3) var(--space-5);
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 1rem;
+    gap: var(--space-4);
     flex-wrap: wrap;
   }
-  .tcp-info { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
-  .tcp-info-line { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
-  .tcp-name { font-weight: var(--weight-strong); font-size: 0.9375rem; }
+  .tcp-info { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+  .tcp-info-line { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+  .tcp-name { font-weight: var(--weight-strong); font-size: var(--text-m); }
   .tcp-port { font-family: var(--font-code); color: var(--color-text-muted); }
-  .tcp-meta { color: var(--color-text-muted); font-size: 0.8125rem; }
-  .tcp-actions { display: flex; gap: 0.5rem; }
+  .tcp-meta { color: var(--color-text-muted); font-size: var(--text-s); }
+  .tcp-actions { display: flex; gap: var(--space-2); }
 
-  .loading-text, .empty-text { color: var(--color-text-muted); font-size: 0.875rem; text-align: center; padding: 1rem; }
+  .loading-text, .empty-text { color: var(--color-text-muted); font-size: var(--text-m); text-align: center; padding: var(--space-4); }
 
-  .tcp-form { background: var(--color-surface); border: var(--line-thin) solid var(--color-border); border-radius: var(--radius-m); padding: 1rem 1.25rem; }
-  .tcp-form h3 { margin: 1rem 0 0.5rem; font-size: 0.9375rem; }
+  .tcp-form { background: var(--color-surface); border: var(--line-thin) solid var(--color-border); border-radius: var(--radius-m); padding: var(--space-4) var(--space-5); }
+  .tcp-form h3 { margin: var(--space-4) 0 var(--space-2); font-size: var(--text-m); }
 
-  .rule-editor { border: var(--line-thin) dashed var(--color-border); border-radius: var(--radius-m); padding: 0.75rem 1rem; margin-bottom: 0.75rem; }
-  .rule-editor-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
-  .rule-index { font-size: 0.8125rem; font-weight: var(--weight-strong); color: var(--color-text-muted); }
+  .rule-editor { border: var(--line-thin) dashed var(--color-border); border-radius: var(--radius-m); padding: var(--space-3) var(--space-4); margin-bottom: var(--space-3); }
+  .rule-editor-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2); }
+  .rule-index { font-size: var(--text-s); font-weight: var(--weight-strong); color: var(--color-text-muted); }
 
   .mono-input { font-family: var(--font-code); }
 </style>

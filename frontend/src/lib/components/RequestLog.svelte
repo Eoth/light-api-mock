@@ -236,33 +236,33 @@
 {/if}
 
 <style>
-  .log-section { margin-top: 1rem; }
-  .log-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
-  .log-header h2 { margin: 0; font-size: 1.25rem; }
-  .log-controls { display: flex; gap: 0.5rem; align-items: center; }
+  .log-section { margin-top: var(--space-4); }
+  .log-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-3); }
+  .log-header h2 { margin: 0; font-size: var(--text-2xl); }
+  .log-controls { display: flex; gap: var(--space-2); align-items: center; }
 
-  .filters-bar { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.75rem; padding: 0.625rem 0.75rem; background: var(--color-surface); border: var(--line-thin) solid var(--color-border); border-radius: var(--radius-m); }
-  .filter-select { padding: 0.25rem 0.5rem; border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); font-size: 0.8125rem; background: var(--color-bg); color: var(--color-text); }
-  .filter-search { padding: 0.25rem 0.5rem; border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); font-size: 0.8125rem; background: var(--color-bg); color: var(--color-text); min-width: 10rem; flex: 1; }
+  .filters-bar { display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap; margin-bottom: var(--space-3); padding: var(--space-3) var(--space-3); background: var(--color-surface); border: var(--line-thin) solid var(--color-border); border-radius: var(--radius-m); }
+  .filter-select { padding: var(--space-1) var(--space-2); border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); font-size: var(--text-s); background: var(--color-bg); color: var(--color-text); }
+  .filter-search { padding: var(--space-1) var(--space-2); border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); font-size: var(--text-s); background: var(--color-bg); color: var(--color-text); min-width: 10rem; flex: 1; }
   .filter-search::placeholder { color: var(--color-text-muted); }
   .btn-clear { color: var(--color-danger); border-color: var(--color-danger); }
   .btn-clear:hover { background: var(--color-danger); color: var(--color-on-danger); }
 
-  .result-count { font-size: 0.8125rem; color: var(--color-text-muted); margin: 0 0 0.5rem; }
+  .result-count { font-size: var(--text-s); color: var(--color-text-muted); margin: 0 0 var(--space-2); }
 
-  .loading, .empty { color: var(--color-text-muted); text-align: center; padding: 2rem; }
+  .loading, .empty { color: var(--color-text-muted); text-align: center; padding: var(--space-8); }
 
   .table-wrap { overflow-x: auto; }
-  .log-table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
-  .log-table th { background: var(--color-bg); font-weight: var(--weight-strong); text-align: left; padding: 0.5rem; border-bottom: var(--line-thick) solid var(--color-border); }
-  .log-table td { padding: 0.375rem 0.5rem; border-bottom: var(--line-thin) solid var(--color-border); vertical-align: middle; }
+  .log-table { width: 100%; border-collapse: collapse; font-size: var(--text-s); }
+  .log-table th { background: var(--color-bg); font-weight: var(--weight-strong); text-align: left; padding: var(--space-2); border-bottom: var(--line-thick) solid var(--color-border); }
+  .log-table td { padding: var(--space-1-5) var(--space-2); border-bottom: var(--line-thin) solid var(--color-border); vertical-align: middle; }
   .col-time { white-space: nowrap; color: var(--color-text-muted); font-family: var(--font-code); }
   /* A table cell ignores max-width in automatic table layout, so long paths and target URLs widened the table past
      its container; the truncation sits on an inner block instead. */
   .truncate { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .col-path .truncate { max-width: 20rem; }
-  .col-path code { background: none; padding: 0; font-size: 0.8125rem; }
-  .col-detail { font-size: 0.75rem; color: var(--color-text-muted); cursor: default; }
+  .col-path code { background: none; padding: 0; font-size: var(--text-s); }
+  .col-detail { font-size: var(--text-s); color: var(--color-text-muted); cursor: default; }
   .col-detail .truncate { max-width: 12rem; }
 
   .status { font-weight: var(--weight-strong); font-family: var(--font-code); }
@@ -271,17 +271,17 @@
 
   .btn-detail {
     background: none; border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m);
-    padding: 0.15rem 0.4rem; font-size: 0.875rem; cursor: pointer; color: var(--color-text-muted);
-    line-height: 1; letter-spacing: 0.05em;
+    padding: var(--space-0-5) var(--space-1-5); font-size: var(--text-m); cursor: pointer; color: var(--color-text-muted);
+    line-height: var(--leading-none); letter-spacing: 0.05em;
   }
   .btn-detail:hover { background: var(--color-bg); color: var(--color-text); }
 
   .detail-list { margin: 0; padding: 0; }
-  .detail-row { display: flex; gap: 1rem; padding: 0.5rem 0; border-bottom: var(--line-thin) solid var(--color-border); }
+  .detail-row { display: flex; gap: var(--space-4); padding: var(--space-2) 0; border-bottom: var(--line-thin) solid var(--color-border); }
   .detail-row:last-child { border-bottom: none; }
-  .detail-row dt { font-weight: var(--weight-strong); font-size: 0.8125rem; min-width: 7rem; flex-shrink: 0; color: var(--color-text-muted); }
-  .detail-row dd { margin: 0; font-size: 0.875rem; word-break: break-word; }
-  .dd-mono { font-family: var(--font-code); font-size: 0.8125rem; }
+  .detail-row dt { font-weight: var(--weight-strong); font-size: var(--text-s); min-width: 7rem; flex-shrink: 0; color: var(--color-text-muted); }
+  .detail-row dd { margin: 0; font-size: var(--text-m); word-break: break-word; }
+  .dd-mono { font-family: var(--font-code); font-size: var(--text-s); }
   .dd-break { word-break: break-all; }
 
 </style>
