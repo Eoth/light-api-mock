@@ -1,0 +1,138 @@
+# Every gate a reviewer would otherwise have to run by hand. A pull request merges only when all jobs pass.
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust:
+    name: Rust (fmt, clippy, tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo clippy --features tcp-mock --all-targets -- -D warnings
+      - run: cargo test
+      - run: cargo test --features tcp-mock
+
+  kafka:
+    name: Rust with the Kafka feature
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: sudo apt-get update && sudo apt-get install -y cmake
+      - run: cargo clippy --features messaging-kafka --all-targets -- -D warnings
+      - run: cargo test --features messaging-kafka
+
+  supply-chain:
+    name: Supply chain (advisories, licenses, sources)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: npm audit (production dependencies of the UI)
+        working-directory: frontend
+        run: npm audit --omit=dev --audit-level=high
+      - name: npm audit (build and test tooling)
+        working-directory: frontend
+        run: npm audit --audit-level=critical
+
+  frontend:
+    name: UI (unit tests, build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - working-directory: frontend
+        run: npm ci --ignore-scripts
+      - working-directory: frontend
+        run: npm test
+      - working-directory: frontend
+        run: npm run build
+
+  e2e:
+    name: End-to-end (real binary, real browser)
+    runs-on: ubuntu-latest
+    needs: [rust, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: cargo build
+      - working-directory: frontend
+        run: npm ci --ignore-scripts && npm run build && npx playwright install --with-deps chromium
+      - name: Start lightMock
+        run: |
+          mkdir -p data
+          DATA_PATH=./data STATIC_DIR=./frontend/dist ./target/debug/light-mock > lightmock.log 2>&1 &
+          for i in $(seq 1 50); do curl -sf http://localhost:7342/api/health && exit 0; sleep 0.2; done
+          cat lightmock.log; exit 1
+      - working-directory: frontend
+        run: npx playwright test
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report
+          path: |
+            frontend/test-results
+            lightmock.log
+
+  docker:
+    name: Container image (build, vulnerability scan)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t lightmock:ci .
+      - uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: lightmock:ci
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
