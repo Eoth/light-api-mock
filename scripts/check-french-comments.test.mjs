@@ -112,10 +112,18 @@ function sampleOf(pattern) {
   return pattern.replace('**/', '').replace('*', 'sample');
 }
 
+// A file of comment lines, written in the comment syntax of `file`: in Svelte markup, "//" is text.
+function commented(file, ...lines) {
+  const [open, close] = file.endsWith('.svelte') ? ['<!-- ', ' -->'] : ['// ', ''];
+  return lines.map((line) => `${open}${line}${close}\n`).join('');
+}
+
 test('the command fails on a French comment in every covered path, and ignores the others', () => {
   const root = mkdtempSync(path.join(tmpdir(), 'french-comments-'));
   try {
-    const files = Object.fromEntries(COVERED.map((pattern) => [sampleOf(pattern), '// The first line is fine.\n']));
+    const files = Object.fromEntries(
+      COVERED.map((pattern) => [sampleOf(pattern), commented(sampleOf(pattern), 'The first line is fine.')]),
+    );
     files['notes/sample.js'] = '// Pas encore traduit, pour plus tard.\n';
     for (const [file, text] of Object.entries(files)) {
       mkdirSync(path.join(root, path.dirname(file)), { recursive: true });
@@ -128,11 +136,11 @@ test('the command fails on a French comment in every covered path, and ignores t
 
     for (const pattern of COVERED) {
       const file = sampleOf(pattern);
-      writeFileSync(path.join(root, file), '// The first line is fine.\n// Mais pas la seconde.\n');
+      writeFileSync(path.join(root, file), commented(file, 'The first line is fine.', 'Mais pas la seconde.'));
       const broken = spawnSync(process.execPath, [SCRIPT, root], { encoding: 'utf8' });
       assert.equal(broken.status, 1, `${pattern}: ${broken.stdout}`);
-      assert.match(broken.stderr, new RegExp(`^${file.replaceAll('.', '\\.')}:2: // Mais pas la seconde\\.$`, 'm'));
-      writeFileSync(path.join(root, file), '// The first line is fine.\n');
+      assert.match(broken.stderr, new RegExp(`^${file.replaceAll('.', '\\.')}:2: .*Mais pas la seconde\\.`, 'm'));
+      writeFileSync(path.join(root, file), commented(file, 'The first line is fine.'));
     }
   } finally {
     rmSync(root, { recursive: true, force: true });
