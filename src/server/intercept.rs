@@ -836,8 +836,7 @@ mod tests {
     // do_proxy / handle_service.
 
     fn temp_dir_for_intercept_test() -> std::path::PathBuf {
-        let dir =
-            std::env::temp_dir().join(format!("lightmock-intercept-test-{}", fastrand::u64(..)));
+        let dir = crate::server::test_support::temp_data_dir("intercept-test");
         std::fs::create_dir_all(&dir).unwrap();
         dir
     }
