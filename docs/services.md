@@ -1,93 +1,93 @@
-# Services et routage
+# Services and routing
 
-Un **service** est l'unité de base dans lightMock : il représente une API que vous voulez simuler ou relayer. Chaque service que vous créez devient immédiatement accessible sur sa propre URL, sans redémarrer quoi que ce soit.
+A **service** is the basic unit of lightMock: it stands for one API you want to mock or relay. Each service you create is reachable at once on its own URL, without restarting anything.
 
-## Créer un service
+## Creating a service
 
-Depuis l'écran d'accueil, le bouton **"+ Ajouter un service"** ouvre un formulaire avec :
+On the home screen, **"+ Add a service"** opens a form with:
 
-- **Nom** : identifie le service et sert de premier segment de son URL (voir plus bas). Uniquement lettres, chiffres, tirets et underscores (pas d'espace ni de caractères spéciaux).
-- **Chemin d'écoute** (`listen_path`) : la portion d'URL après le nom du service, par exemple `/v1/utilisateurs/{id}`. Elle peut contenir des paramètres entre accolades (`{id}`) qui seront réutilisables dans les réponses. Si elle est laissée vide, le service répond à **n'importe quel chemin** en dessous de son nom.
-- **URL cible réelle** (`real_target_url`) : l'adresse du vrai backend, utilisée quand une requête est relayée en mode proxy (voir ci-dessous) et par le [ping de disponibilité](ping-de-disponibilite.md).
-- **Service purement mocké** (case à cocher) : voir la section dédiée juste après.
-- **Mock actif** : interrupteur qui bascule le service entre mode simulé et mode relais (voir ci-dessous).
-- **Type de service** : REST (par défaut) ou SOAP — voir la section dédiée plus bas.
-- **Groupe** (optionnel) : rattache le service à un [groupe de services](groupes.md).
+- **Name**: identifies the service and is the first segment of its URL (see below). Letters, digits, dashes and underscores only.
+- **Listen path** (`listen_path`): the part of the URL after the service name, for example `/v1/users/{id}`. It can hold parameters in braces (`{id}`) that responses can reuse. Left empty, the service answers **any path** under its name.
+- **Real target URL** (`real_target_url`): the address of the real backend, used when a request is relayed in proxy mode (see below) and by the [availability check](availability-check.md).
+- **Purely mocked service** (checkbox): see the next section.
+- **Mock mode**: a switch between mocked and relayed (see below).
+- **Service type**: REST (default) or SOAP; see the section further down.
+- **Group** (optional): attaches the service to a [group](groups.md).
 
-![Formulaire de création d'un nouveau service](screenshots/service-formulaire-creation.png)
+![Form to create a service](screenshots/service-formulaire-creation.png)
 
-## Service purement mocké (aucune cible)
+## Purely mocked service (no target)
 
-Certains services n'ont jamais vocation à relayer une vraie requête : ils ne servent qu'à simuler des réponses. Pour eux, saisir une URL cible est une charge inutile. La case **"Service purement mocké"** retire cette étape :
+Some services are never meant to relay a real request: they only produce mocked answers, and typing a target URL for them is pointless. The **"Purely mocked service"** checkbox removes that step:
 
-- Une fois cochée, le champ **URL cible réelle** disparaît complètement du formulaire (pas seulement grisé) — ainsi que le [ping de disponibilité](ping-de-disponibilite.md), qui n'a plus de sens sans cible.
-- Le service est automatiquement gardé en mode simulé (l'interrupteur "Mock actif" ne peut pas être désactivé pour un service sans cible : un mode relais sans cible ne mènerait qu'à une erreur).
-- Décocher la case à tout moment (y compris en modification) réaffiche le champ cible sans perdre quoi que ce soit — règles, groupe, type de service restent intacts.
+- Once checked, the **Real target URL** field disappears from the form, and so does the [availability check](availability-check.md), which means nothing without a target.
+- The service stays in mock mode (the mock switch cannot be turned off for a service without a target: relaying to nowhere could only fail).
+- Unchecking the box at any time, including when editing, shows the target field again without losing anything: rules, group and service type stay as they were.
 
-![Formulaire avec la case "Service purement mocké" cochée : le champ cible a disparu](screenshots/service-purement-mocke-formulaire.png)
+![The form with "Purely mocked service" checked: the target field is gone](screenshots/service-purement-mocke-formulaire.png)
 
-**Comportement d'une requête sans règle correspondante** : sur un service purement mocké, si aucune règle ne matche, la réponse est un `404` avec un message explicite ("ce service est purement mocké, aucune cible configurée") plutôt qu'une tentative de relais ratée vers une adresse vide.
+**A request that no rule matches**: on a purely mocked service, the answer is a `404` with an explicit message ("this service is purely mocked, no target configured") rather than a failed attempt to relay to an empty address.
 
-**Une règle en action "Proxy" n'a pas de sens sur un service purement mocké** : cette option est donc retirée du formulaire de règle pour ces services-là (seule l'action "Mock" reste proposée).
+**A rule with the "Proxy" action makes no sense on a purely mocked service**, so the rule form only offers "Mock" for such services.
 
-**Basculer un service existant vers "purement mocké" alors qu'il a déjà des règles en action Proxy** : lightMock avertit plutôt que de bloquer — un message liste les règles concernées (elles cesseront de relayer réellement, remplacées par une erreur claire) et propose "Enregistrer quand même" ou de revenir en arrière pour les corriger d'abord.
+**Making an existing service purely mocked while some of its rules use "Proxy"**: lightMock warns instead of blocking. The message lists the rules concerned (they will stop relaying and answer with a clear error) and offers "Save anyway" or going back to fix them first.
 
-## Comment l'URL est construite
+## How the URL is built
 
-Chaque service est exposé sous son propre "espace de noms" pour éviter toute collision entre services :
-
-```
-/{nom-du-service}/{chemin-d-ecoute}
-```
-
-ou, si le service appartient à un groupe :
+Each service lives in its own namespace, so services never collide:
 
 ```
-/{code-du-groupe}/{nom-du-service}/{chemin-d-ecoute}
+/{service-name}/{listen-path}
 ```
 
-| Nom du service | Chemin d'écoute | URL finale à appeler |
+or, when the service belongs to a group:
+
+```
+/{group-code}/{service-name}/{listen-path}
+```
+
+| Service name | Listen path | URL to call |
 |---|---|---|
 | `insee` | `/v4/sirene/{siret}` | `GET /insee/v4/sirene/44306184100047` |
-| `auth` | `/login` | `POST /auth/login` |
-| `utilisateurs` | *(vide)* | `GET /utilisateurs/n-importe-quoi` (chemin libre) |
+| `accounts` | `/login` | `POST /accounts/login` |
+| `users` | *(empty)* | `GET /users/anything` (any path) |
 
-L'URL exacte à utiliser pour tester un service est toujours affichée dans sa fiche détail — pas besoin de la recalculer à la main.
+The exact URL to call is always shown on the service's page: no need to work it out by hand.
 
-![Fiche détail d'un service avec l'URL de test affichée](screenshots/service-fiche-detail-url.png)
+![A service's page showing its test URL](screenshots/service-fiche-detail-url.png)
 
-## Mock ou Proxy : deux modes, à deux niveaux
+## Mock or proxy: two modes, two levels
 
-lightMock peut soit **répondre lui-même** à une requête (mode *Mock*, avec une réponse que vous avez configurée), soit **la transmettre au vrai backend** et renvoyer sa réponse telle quelle (mode *Proxy*). Ce choix existe à deux niveaux :
+lightMock can either **answer a request itself** (*mock* mode, with the response you configured) or **pass it to the real backend** and return its answer unchanged (*proxy* mode). The choice exists at two levels:
 
-- **Au niveau du service** : l'interrupteur "Mock actif" bascule TOUT le service en mode proxy pur (aucune règle n'est évaluée, chaque requête part directement vers `real_target_url`) ou en mode simulé (les règles du service sont évaluées, voir [Règles de correspondance](regles-de-matching.md)).
-- **Au niveau d'une règle** : même quand le service est en mode simulé, chaque règle individuelle peut elle-même être réglée sur "mock" (répondre avec le contenu configuré) ou "proxy" (relayer cette requête précise vers le vrai backend). Cela permet un **mock partiel** : par exemple, simuler uniquement les cas d'erreur et laisser tout le reste passer vers le vrai service.
+- **Service level**: the mock switch turns the WHOLE service into a pure proxy (no rule is evaluated, every request goes straight to `real_target_url`) or into mock mode (the service's rules are evaluated, see [Matching rules](matching-rules.md)).
+- **Rule level**: while the service is in mock mode, each rule can itself be set to "mock" (answer with the configured content) or "proxy" (relay the requests it matches to the real backend). This gives a **partial mock**: for instance, mock only the error cases and let everything else reach the real service.
 
-Dans les deux cas, quand une requête est relayée (proxy), elle part avec sa méthode, ses paramètres, ses en-têtes et son corps intacts — rien n'est modifié ni perdu en cours de route.
+Either way, a relayed request keeps its method, parameters, headers and body: nothing is changed or lost on the way.
 
-## Type de service : REST ou SOAP
+## Service type: REST or SOAP
 
-Le sélecteur "Type de service" configure automatiquement le comportement vis-à-vis des requêtes techniques SOAP (WSDL — le fichier qui décrit une API SOAP) :
+The "Service type" selector sets how technical SOAP requests are handled (WSDL, the file that describes a SOAP API):
 
-- **REST** (par défaut) : comportement standard, sans traitement SOAP particulier.
-- **SOAP** : les requêtes de description WSDL peuvent soit être **relayées telles quelles vers le vrai backend** (`Proxy`/`Auto`, pratique pour laisser un client SOAP découvrir le vrai contrat d'API), soit être **prises en charge par vos règles mockées** (`Mock`, si vous voulez simuler aussi la description du service).
+- **REST** (default): standard behavior, no SOAP-specific handling.
+- **SOAP**: WSDL requests can either be **relayed as they are to the real backend** (`Proxy`/`Auto`, handy to let a SOAP client discover the real API contract) or **answered by your mocked rules** (`Mock`, to mock the service description too).
 
-![Formulaire de service avec le type "SOAP / XML" sélectionné](screenshots/service-formulaire-soap.png)
+![The service form with "SOAP / XML" selected](screenshots/service-formulaire-soap.png)
 
-*(Capture réalisée manuellement. Passer un service en SOAP se fait entièrement depuis ce même formulaire de création/modification — aucune configuration supplémentaire n'est nécessaire.)*
+Turning a service into a SOAP one happens entirely in this form: nothing else needs configuring.
 
-## Suppression, modification, clonage
+## Editing, duplicating, deleting
 
-- **Modifier** un service ouvre le même formulaire pré-rempli.
-- **Cloner** un service pré-remplit un nouveau formulaire à partir d'un service existant (nom suggéré en `{nom}-copie`, modifiable) — pratique pour créer rapidement une variante.
-- **Supprimer** un service retire uniquement ce service précis : si un autre service du même nom existe dans un groupe différent, il n'est pas affecté (deux services peuvent porter le même nom tant qu'ils sont dans des groupes différents, ou l'un sans groupe et l'autre dans un groupe).
+- **Edit** opens the same form, filled in.
+- **Duplicate** fills a new form from an existing service (suggested name `{name}-copy`, which you can change): a quick way to build a variant.
+- **Delete** removes that service only: a service with the same name in another group is not affected (two services may share a name as long as they are in different groups, or one has no group and the other has one).
 
-## Rechercher un service
+## Finding a service
 
-La liste des services propose un champ de recherche qui filtre par nom et ouvre automatiquement le groupe correspondant si le service trouvé appartient à un groupe replié.
+The service list has a search field that filters by name, path, URL or group, and opens the group of a match that sits in a collapsed group.
 
-## Prérequis et limites
+## Requirements and limits
 
-- Aucun prérequis particulier : cette fonctionnalité est disponible dès l'installation de base.
-- Le nom d'un service doit être unique **dans son périmètre** (sans groupe, ou au sein d'un même  groupe) — deux services identiques dans deux groupes différents sont autorisés et bien distingués partout dans l'interface.
-- Certains noms sont réservés par lightMock lui-même (`api`, `auth`, `assets`...) et ne peuvent pas être utilisés comme nom de service, pour éviter tout conflit avec l'interface.
+- No requirement: available in every installation.
+- A service name must be unique **within its scope** (no group, or one group). Two services with the same name in two groups are allowed and told apart everywhere in the interface.
+- Some names are reserved by lightMock itself (`api`, `auth`, `assets`, `index.html`, `favicon.ico`, `runtime-config.json`) and cannot name a service, so that they never hide the interface.

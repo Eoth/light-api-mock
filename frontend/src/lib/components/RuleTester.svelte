@@ -17,7 +17,7 @@
   // AVANT sauvegarde, contre une requete reelle (jamais un contexte
   // synthetique/vide qui produirait de faux positifs sur des scripts qui
   // dependent legitimement du corps/des params de la requete, ex. le
-  // pattern parse_json(request.body) documente dans scripts-rhai.md).
+  // pattern parse_json(request.body) documente dans rhai-scripts.md).
   //
   // `logs` est deja filtre par le parent (RuleForm) aux entrees du service
   // courant — on ne fait ici que filtrer celles qui ont un detail capture

@@ -1451,7 +1451,7 @@ mod tests {
     // contenir le meme nombre d'elements construits par position. Verifie
     // bout-en-bout (vrai serveur Axum + vraie requete HTTP)
     // pour N=2, N=1 et N=0, en JSON (REST) et en XML (SOAP) — memes scripts
-    // que ceux documentes dans docs/scripts-rhai.md, pour garantir qu'un
+    // que ceux documentes dans docs/rhai-scripts.md, pour garantir qu'un
     // utilisateur qui copie-colle l'exemple obtient bien ce comportement.
     fn json_repetition_rule() -> Rule {
         Rule {
@@ -1687,7 +1687,7 @@ mod tests {
     // pattern (map literale #{...}, `.contains(cle)` + indexation
     // `mapping[cle]`, fallback via if/else) fonctionne, y compris la branche
     // de repli quand la cle est absente — meme script que celui documente
-    // dans docs/scripts-rhai.md, pour garantir qu'un copier-coller fonctionne.
+    // dans docs/rhai-scripts.md, pour garantir qu'un copier-coller fonctionne.
     fn service_lookup_rule() -> Rule {
         Rule {
             name: "lookup-service".into(),

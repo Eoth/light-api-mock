@@ -1,51 +1,48 @@
-# lightMock — Vue d'ensemble des fonctionnalités
+# lightMock user guide
 
-lightMock est un outil qui simule ("mock") ou relaie ("proxy") des appels HTTP vers un vrai service — utile pour tester une application sans dépendre d'un backend réel, ou pour rejouer des scénarios précis (erreurs, lenteurs, données particulières) à la demande. Tout se pilote depuis une interface web, sans redémarrage.
+lightMock mocks or relays ("proxies") HTTP calls to a real service: test an application without depending on a real backend, or replay precise scenarios (errors, slowness, particular data) on demand. Everything is driven from a web interface, without restarts.
 
-Cette page est une **vue d'ensemble rapide** : une ligne ou deux par fonctionnalité, avec un lien vers la page qui explique comment l'utiliser en détail. Si vous découvrez lightMock, parcourez cette liste une première fois pour savoir ce qui existe, puis revenez piocher les pages détaillées au besoin.
+This page is a **quick overview**: a line or two per feature, with a link to the page that explains how to use it. If you are new to lightMock, read this list once to know what exists, then come back to the detailed pages when needed.
 
-> Cette documentation est destinée aux utilisateurs et testeurs du produit (métier, QA). Pour les détails techniques d'installation ou d'architecture, voir `README.md` à la racine du dépôt — cette doc-ci ne le duplique pas, elle explique **ce que le produit permet de faire** et **comment s'en servir**.
+> These pages are for the people who use and test with lightMock (QA, developers, business analysts). Installation, configuration and architecture are in the [README](../README.md); the security model is in [security.md](security.md).
 
-![Écran d'accueil de lightMock avec la liste des services](screenshots/accueil-liste-services.png)
+![The lightMock home screen with the list of services](screenshots/accueil-liste-services.png)
 
-## Services & routage
+## Services and routing
 
-| Fonctionnalité | En bref |
+| Feature | In short |
 |---|---|
-| [Services et routage](services.md) | Chaque service simulé est exposé sous sa propre URL (`/mon-service/...`). On y définit l'adresse du vrai backend, si le mock est actif ou non, et le type d'API (REST ou SOAP). |
-| [Groupes de services](groupes.md) | Regrouper plusieurs services liés (ex. tous les services d'une même équipe) sous un même préfixe d'URL, avec une gestion des droits par groupe. |
-| [Ping de disponibilité](ping-de-disponibilite.md) | Un bouton pour vérifier rapidement si le vrai backend est joignable sur le réseau, sans jamais lui envoyer de vraie requête. |
+| [Services and routing](services.md) | Each mocked service has its own URL (`/my-service/...`), with the address of the real backend, whether the mock is on, and the API type (REST or SOAP). |
+| [Service groups](groups.md) | Gather related services (all the services of a team, for instance) under one URL prefix, with rights per group. |
+| [Availability check](availability-check.md) | A button that checks whether the real backend can be reached over the network, without ever sending it a real request. |
 
-## Règles & réponses simulées
+## Rules and mocked responses
 
-| Fonctionnalité | En bref |
+| Feature | In short |
 |---|---|
-| [Règles de correspondance (matching)](regles-de-matching.md) | Un service peut avoir plusieurs règles : chacune définit une méthode HTTP, un sous-chemin et des conditions (sur les paramètres, en-têtes, corps...) pour décider quelle réponse renvoyer. |
-| [Réponses dynamiques et templates](reponses-et-templates.md) | Construire la réponse (JSON ou XML) avec un éditeur visuel, des données factices (faux noms, adresses, SIRET...), et simuler des pannes/lenteurs (mode Chaos). |
-| [Scripts Rhai](scripts-rhai.md) | Pour les cas avancés : écrire un petit script qui calcule des valeurs (dates, nombres aléatoires ou déterministes, UUID...) réutilisables dans la réponse. |
-| [Testeur de règle et détection de conflits](testeur-de-regle-et-conflits.md) | Vérifier qu'une règle fonctionne comme prévu contre une vraie requête déjà reçue, et être averti si une nouvelle règle risque d'entrer en conflit avec une règle existante. |
+| [Matching rules](matching-rules.md) | A service can hold several rules: each sets an HTTP method, a sub-path and conditions (on parameters, headers, body…) that decide which response to send. |
+| [Responses and templates](responses-and-templates.md) | Build the response (JSON or XML) in a visual editor, with fake data (names, addresses…) and simulated failures and slowness (chaos mode). |
+| [Rhai scripts](rhai-scripts.md) | For advanced cases: a short script computes values (dates, random or stable numbers, UUIDs…) that the response reuses. |
+| [Rule tester and conflict detection](rule-tester-and-conflicts.md) | Check that a rule works against a real request already received, and get a warning when a new rule may conflict with an existing one. |
 
-## Suivi & diagnostic
+## Monitoring and diagnosis
 
-| Fonctionnalité | En bref |
+| Feature | In short |
 |---|---|
-| [Journal des requêtes](journal-des-requetes.md) | Historique des dernières requêtes reçues par lightMock, consultable dans l'interface — utile pour comprendre pourquoi une règle a (ou n'a pas) matché. |
-| [Observation de trafic et suggestions de règles](observation-de-trafic.md) | Pour un service en mode proxy pur : observer le trafic réel (activé à la demande) et se faire proposer des règles de mock à partir des appels réellement vus. |
+| [Request log](request-log.md) | The latest requests lightMock received, in the interface: see why a rule matched, or did not. |
+| [Traffic observation and rule suggestions](traffic-observation.md) | For a service in pure proxy mode: observe real traffic (on demand) and get mock rules suggested from the calls actually seen. |
 
-## Sauvegarde & administration
+## Backups and administration
 
-| Fonctionnalité | En bref |
+| Feature | In short |
 |---|---|
-| [Sauvegardes et restauration](sauvegardes-et-restauration.md) | La configuration est sauvegardée automatiquement avant chaque changement important ; on peut restaurer un état antérieur en un clic. |
-| [Administration (Import / Export / Réinitialisation / Mode sombre)](administration.md) | Exporter/importer toute la configuration en un fichier, réinitialiser complètement l'outil, et basculer entre thème clair et sombre. |
+| [Backups and restore](backups-and-restore.md) | The configuration is backed up before each change; an earlier state is restored in one click. |
+| [Administration (import, export, reset, dark mode, language)](administration.md) | Export or import the whole configuration as a file, reset everything, switch theme and language. |
 
-## Sécurité & intégrations
+## Security and integrations
 
-| Fonctionnalité | En bref |
+| Feature | In short |
 |---|---|
-| [Authentification](authentification.md) | Optionnelle : lightMock peut être protégé par une connexion (Keycloak), avec des droits différents selon les utilisateurs et les groupes. |
-| [Messaging Kafka](messaging-kafka.md) | Optionnel : au-delà du HTTP, lightMock peut aussi simuler des réponses à des messages Kafka (nécessite une version compilée spécifiquement pour ça). |
-
----
-
-**Vous ne trouvez pas une fonctionnalité ?** Elle est peut-être décrite dans une des pages ci-dessus sous un autre nom — utilisez la recherche de votre wiki. Si elle manque vraiment, signalez-le : cette documentation est maintenue en même temps que le produit.
+| [Authentication](authentication.md) | Optional: lightMock can require a login (Keycloak), with different rights per user and group. |
+| [Kafka messaging](kafka-messaging.md) | Optional: beyond HTTP, lightMock can also answer Kafka messages (needs a build that includes it). |
+| [Security model](security.md) | What lightMock exposes, what it connects to, what it trusts, and how to harden a deployment. |
