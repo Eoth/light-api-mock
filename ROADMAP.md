@@ -85,16 +85,6 @@ Size L, to split by module
 
 **Done when.** No French comment left in `src/` and `frontend/src/`, checked by a script in CI that flags French stop words in comments.
 
-### R8. Contributor and community files
-
-Size S
-
-**Why.** Companies check that a project can accept fixes and handles conduct and security reports before depending on it.
-
-**What.** `CONTRIBUTING.md` (build, tests, commit style, how to add a language), `CODE_OF_CONDUCT.md` (Contributor Covenant), issue and pull request templates, `CODEOWNERS`.
-
-**Done when.** GitHub's community profile for the repository is complete.
-
 ### R9. Polish the French catalogues
 
 Size S

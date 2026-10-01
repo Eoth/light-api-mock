@@ -1,0 +1,53 @@
+name: Bug report
+description: Something does not work as documented.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Security issues go through the private channel of SECURITY.md, never here.
+        Remove credentials, tokens and internal host names from everything you paste.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The release, image tag or commit you run.
+      placeholder: 0.1.0, ghcr.io/…:0.1.0, or a commit hash
+    validations:
+      required: true
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: How lightMock runs
+      options:
+        - Binary on a workstation
+        - Container (Docker, Podman, Compose)
+        - Kubernetes
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened, and what you expected
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce
+      description: The service and rule involved (export them from the UI), and the request sent (method, path, headers, body), for instance as a curl command.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Server log
+      description: The lines around the problem; RUST_LOG=light_mock=debug gives more detail.
+      render: text
+  - type: input
+    id: settings
+    attributes:
+      label: Settings that differ from the defaults
+      placeholder: AUTH_ENABLED=true, BIND_ADDRESS=0.0.0.0, API_BASE_URL=…

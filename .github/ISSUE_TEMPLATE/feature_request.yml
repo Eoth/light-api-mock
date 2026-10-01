@@ -1,0 +1,26 @@
+name: Feature request
+description: A problem lightMock could solve, or solve better.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check the roadmap (ROADMAP.md) first: if an item covers your need, comment on why it matters to you here and name the item.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What you are trying to do, and what makes it hard today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would help
+      description: How you imagine it working. Mention any new outbound connection, dependency or setting it would need.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you do today instead
