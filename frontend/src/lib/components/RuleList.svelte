@@ -110,6 +110,7 @@
             ondragend={handleDragEnd}
             role="button"
             tabindex="-1"
+            data-testid="rule-list-grip-{rule.name}"
           >&#9776;</div>
 
           <div class="rule-content">

@@ -38,7 +38,9 @@ Chaque champ **objet** ou **tableau** (JSON et XML) affiche un **chevron** (▼/
 
 ![Un champ JSON replié : le chevron pointe vers la droite et une note signale le contenu masqué](screenshots/rule-json-folded-node.png)
 
-Pour circuler dans une structure profondément imbriquée, un fil d'Ariane au-dessus de l'éditeur (un chemin cliquable comme `racine > address > city`) permet d'entrer dans un niveau et d'en ressortir en un clic.
+Pour circuler dans une structure profondément imbriquée, le bouton **→** d'un champ objet permet d'y entrer : l'éditeur n'affiche plus que ce niveau, sous un fil d'Ariane (un chemin cliquable comme `racine > customer > address`) qui permet d'en ressortir en un clic.
+
+![Le constructeur JSON détaillé à l'intérieur de customer > address : le fil d'Ariane au-dessus des champs city et postcode](screenshots/response-json-breadcrumb.png)
 
 ### Changer de format en cours de route
 
@@ -103,12 +105,20 @@ Exemple : `{{path.siret | first(9)}}` garde les 9 premiers caractères du SIRET 
 
 Pour remplir une réponse avec des données d'apparence réaliste sans les saisir : prénom, nom, e-mail, numéro de téléphone français, entreprise, rue, ville, code postal, SIREN/SIRET, adresse complète, date passée ou future, horodatage, booléen aléatoire, phrase de remplissage (« lorem »), pays, IBAN français. Le constructeur propose aussi un entier dans une plage (`Integer{min,max}`). Plusieurs types suivent aujourd'hui des formats français ; des données factices adaptées à chaque langue sont prévues (voir la [feuille de route](../../ROADMAP.md)).
 
+Dans le constructeur, choisissez **Donnée fictive** comme source d'un champ, puis le type de donnée dans le menu voisin. L'expression écrite pour le champ (`{{fake.CompanyName}}`) s'affiche à sa droite, et une nouvelle valeur est tirée à chaque requête.
+
+![Deux champs d'un exemple JSON collé passés en données factices : un nom d'entreprise et une ville française](screenshots/response-fake-data.png)
+
 ## Mode Chaos : pannes et lenteurs à la demande
 
 Pour tester comment une application se comporte face à un backend peu fiable, chaque réponse simulée peut activer un « mode Chaos » :
 
 - **Latence** : un délai fixe, ou aléatoire entre un minimum et un maximum, avant de répondre.
 - **Taux d'erreur** : une part des requêtes reçoit une erreur HTTP au lieu de la réponse normale (statut configurable, `500` par défaut).
+
+Ces réglages apparaissent quand l'interrupteur **Mode Chaos** de la règle est activé. Quand une latence minimale et une latence maximale sont toutes deux renseignées, chaque délai est tiré entre les deux et la latence fixe est ignorée.
+
+![Mode Chaos activé : une latence entre 200 et 800 ms, et 20 % des requêtes reçoivent une erreur 503](screenshots/rule-chaos-settings.png)
 
 ## Prérequis et limites
 

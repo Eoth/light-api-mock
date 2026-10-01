@@ -42,6 +42,10 @@ Conditions combine in two ways:
 - **AND conditions (all must match)**: the rule matches only when every condition holds.
 - **OR conditions (at least one must match)**: the rule matches as soon as one holds.
 
+A rule can use both: it then matches when **all** its AND conditions hold **and** at least one of its OR conditions does. The rule below answers clients that send the `X-Client-Version: 2` header and ask for the `web` or the `mobile` channel (`?channel=web` or `?channel=mobile`); a version 2 client on another channel, or a client without that header, does not trigger it.
+
+![One AND condition (X-Client-Version header equals 2) and two OR conditions (channel query parameter equals web, or mobile)](screenshots/rule-conditions-and-or.png)
+
 ### Typing help
 
 For a path parameter, the form offers a closed list of the parameter names that the service's URL really contains (no typo possible). For a query parameter, it suggests the parameters seen in the recent [request log](request-log.md), while still accepting a name that does not appear there yet.
@@ -108,7 +112,11 @@ To copy a value of this SOAP body (the `Siret`, for instance) into the response,
 
 A service's rules are evaluated **in the order they are listed**, and **the first match wins**: the next ones are not even looked at. Order matters: a general rule placed before a more specific one always hides it.
 
-You can **reorder rules** by drag and drop in the list. To avoid surprises, use the [rule tester and conflict detection](rule-tester-and-conflicts.md): when you save, it warns if a new rule may be hidden by an existing one (or hide it), without stopping you when that is what you want.
+You can **reorder rules** in the list: drag a rule by its ☰ handle onto the handle of the rule whose place it should take, or move it one step with its ▲ ▼ buttons. The new order is saved at once. In the example below, the general rule `any-order` came first and answered every `GET /orders/{id}`, even `/orders/42` that `order-42` was written for; once `order-42` is dragged above it, `/orders/42` gets its own answer and every other order still gets the general one.
+
+![The rule list after dragging order-42 above the catch-all rule any-order: order-42 is now first](screenshots/rule-list-reordered.png)
+
+To avoid surprises, use the [rule tester and conflict detection](rule-tester-and-conflicts.md): when you save, it warns if a new rule may be hidden by an existing one (or hide it), without stopping you when that is what you want.
 
 ## Requirements and limits
 

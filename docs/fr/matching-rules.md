@@ -42,6 +42,10 @@ Les conditions se combinent de deux façons :
 - **Conditions ET (toutes doivent correspondre)** : la règle ne matche que si chaque condition est vraie.
 - **Conditions OU (au moins une doit correspondre)** : la règle matche dès qu'une condition est vraie.
 
+Une règle peut utiliser les deux : elle matche alors quand **toutes** ses conditions ET sont vraies **et** qu'au moins une de ses conditions OU l'est. La règle ci-dessous répond aux clients qui envoient l'en-tête `X-Client-Version: 2` et demandent le canal `web` ou le canal `mobile` (`?channel=web` ou `?channel=mobile`) ; un client en version 2 sur un autre canal, ou un client sans cet en-tête, ne la déclenche pas.
+
+![Une condition ET (en-tête X-Client-Version égal à 2) et deux conditions OU (paramètre de requête channel égal à web, ou à mobile)](screenshots/rule-conditions-and-or.png)
+
 ### Aide à la saisie
 
 Pour un paramètre de chemin, le formulaire propose la liste fermée des noms de paramètres que l'URL du service contient réellement (aucune faute de frappe possible). Pour un paramètre de requête, il suggère les paramètres vus dans le [journal des requêtes](request-log.md) récent, tout en acceptant un nom qui n'y figure pas encore.
@@ -108,7 +112,11 @@ Pour recopier une valeur de ce corps SOAP (le `Siret`, par exemple) dans la rép
 
 Les règles d'un service sont évaluées **dans l'ordre de la liste**, et **la première qui correspond l'emporte** : les suivantes ne sont même pas examinées. L'ordre compte : une règle générale placée avant une règle plus précise la masque toujours.
 
-Vous pouvez **réordonner les règles** par glisser-déposer dans la liste. Pour éviter les surprises, servez-vous du [testeur de règle et de la détection de conflits](rule-tester-and-conflicts.md) : à l'enregistrement, il prévient si une nouvelle règle risque d'être masquée par une règle existante (ou de la masquer), sans vous bloquer quand c'est voulu.
+Vous pouvez **réordonner les règles** dans la liste : faites glisser une règle par sa poignée ☰ jusqu'à la poignée de la règle dont elle doit prendre la place, ou déplacez-la d'un cran avec ses boutons ▲ ▼. Le nouvel ordre est enregistré aussitôt. Dans l'exemple ci-dessous, la règle générale `any-order` venait en premier et répondait à tous les `GET /orders/{id}`, même à `/orders/42` pour lequel `order-42` avait été écrite ; une fois `order-42` glissée au-dessus, `/orders/42` reçoit sa propre réponse et toutes les autres commandes reçoivent toujours la réponse générale.
+
+![La liste des règles après avoir glissé order-42 au-dessus de la règle générale any-order : order-42 est désormais première](screenshots/rule-list-reordered.png)
+
+Pour éviter les surprises, servez-vous du [testeur de règle et de la détection de conflits](rule-tester-and-conflicts.md) : à l'enregistrement, il prévient si une nouvelle règle risque d'être masquée par une règle existante (ou de la masquer), sans vous bloquer quand c'est voulu.
 
 ## Prérequis et limites
 

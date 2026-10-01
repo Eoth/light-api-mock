@@ -785,3 +785,54 @@ test.describe('Runner data-driven (scenarios JSON) - lot 17 (parse_date)', () =>
     expect(body.ms).toBe(1773532800000);
   });
 });
+
+test.describe('Runner data-driven (scenarios JSON) - lot 18 (rule form states shown in the guide)', () => {
+  test.beforeEach(async ({ request }) => {
+    await request.delete(`${API}/config/reset`);
+    for (const name of ['catalog-svc', 'nested-demo', 'chaos-demo', 'fake-demo']) {
+      await request.post(`${API}/services`, { data: validService(name, { listen_path: '/v1/*', real_target_url: '' }) });
+    }
+  });
+
+  test('AND and OR conditions combine as the guide says (scenario JSON)', async ({ page, request }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Combine AND and OR conditions on a rule (doc illustration)'));
+
+    const call = (channel, version) =>
+      request.get(`http://localhost:7342/catalog-svc/v1/items?channel=${channel}`, {
+        headers: version ? { 'X-Client-Version': version } : {},
+      });
+    expect(await (await call('web', '2')).text()).toBe('catalog for v2 clients');
+    expect(await (await call('mobile', '2')).text()).toBe('catalog for v2 clients');
+    expect((await call('desktop', '2')).status()).toBe(404);
+    expect((await call('web', null)).status()).toBe(404);
+  });
+
+  test('the breadcrumb enters a nested object without changing what the rule answers (scenario JSON)', async ({ page, request }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Enter a nested object of the detailed JSON builder through its breadcrumb (doc illustration)'));
+
+    const resp = await request.get('http://localhost:7342/nested-demo/v1/customer');
+    expect(await resp.json()).toEqual({ customer: { address: { city: 'Lyon', postcode: '69000' } } });
+  });
+
+  test('the chaos settings are saved with the rule (scenario JSON)', async ({ page, request }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Set the latency and the error rate of the chaos mode (doc illustration)'));
+
+    const services = await (await request.get(`${API}/services`)).json();
+    const rule = services.find((s) => s.name === 'chaos-demo').rules.find((r) => r.name === 'slow-and-flaky');
+    expect(rule.response.chaos).toMatchObject({ delay_min_ms: 200, delay_max_ms: 800, error_rate: 0.2, error_status: 503 });
+  });
+
+  test('fake data replaces the pasted values on every call (scenario JSON)', async ({ page, request }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Replace pasted values with fake data (doc illustration)'));
+
+    // The generated values are random, and may even repeat the pasted ones: the saved template says what was chosen.
+    const services = await (await request.get(`${API}/services`)).json();
+    const rule = services.find((s) => s.name === 'fake-demo').rules.find((r) => r.name === 'random-customer');
+    const template = JSON.stringify(rule.response.body);
+    expect(template).toContain('{{fake.CompanyName}}');
+    expect(template).toContain('{{fake.CityFR}}');
+    const body = await (await request.get('http://localhost:7342/fake-demo/v1/customer')).json();
+    expect(body).toEqual({ id: '42', company: expect.any(String), city: expect.any(String) });
+    expect(body.company).not.toBe('');
+  });
+});
