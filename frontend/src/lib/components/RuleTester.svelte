@@ -162,7 +162,7 @@
             <ul class="script-error-list">
               {#each result.script_errors as err}
                 <li data-testid="rule-tester-script-error-{err.slot}">
-                  <strong>{slotLabel(err.slot)}</strong> : <code>{err.message}</code>
+                  <strong>{t("{0}:", slotLabel(err.slot))}</strong> <code>{err.message}</code>
                 </li>
               {/each}
             </ul>

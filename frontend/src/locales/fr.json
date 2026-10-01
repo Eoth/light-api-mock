@@ -430,6 +430,7 @@
   "matches /{0}/": "correspond à /{0}/",
   "Pre-script (preparation)": "Pré-script (préparation)",
   "Custom script": "Script personnalisé",
+  "{0}:": "{0} :",
   "Post-script (finalization)": "Post-script (finalisation)",
   "Rule tester against a real request": "Testeur de règle contre une requête réelle",
   "Test against a real request": "Tester contre une requête réelle",

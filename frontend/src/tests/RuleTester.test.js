@@ -1,6 +1,7 @@
 import { render, fireEvent, waitFor } from '@testing-library/svelte';
 import { describe, it, expect, vi } from 'vitest';
 import RuleTester from '../lib/components/RuleTester.svelte';
+import { setLocale } from '../lib/i18n.svelte.js';
 import { testRule } from '../lib/api.js';
 
 vi.mock('../lib/api.js', () => ({
@@ -391,5 +392,34 @@ describe('RuleTester: appel API et affichage du resultat', () => {
 
     await waitFor(() => expect(queryByTestId('rule-tester-result')).toBeInTheDocument());
     expect(queryByTestId('rule-tester-script-results')).not.toBeInTheDocument();
+  });
+});
+
+describe('RuleTester: script errors in each language', () => {
+  async function scriptErrorText() {
+    testRule.mockResolvedValue({
+      method_matches: true, sub_path_matches: true, path_params: {}, overall_matched: true, body_truncated: false,
+      all_of: [], any_of: [], script_errors: [{ slot: 'script', message: 'boom' }],
+    });
+    const { container, getByTestId } = render(RuleTester, {
+      props: { serviceName: 'svc-a', logs: [logWithDetail], getDraftRule: draft({ script: 'boom()' }) },
+    });
+    await fireEvent.change(container.querySelector('[data-testid="rule-tester-log-select"]'), { target: { value: '0' } });
+    await fireEvent.click(container.querySelector('[data-testid="rule-tester-test-button"]'));
+    await waitFor(() => expect(getByTestId('rule-tester-script-error-script')).toBeInTheDocument());
+    return getByTestId('rule-tester-script-error-script').textContent.trim();
+  }
+
+  it('punctuates the slot and its error as English does', async () => {
+    await setLocale('en');
+    try {
+      expect(await scriptErrorText()).toBe('Custom script: boom');
+    } finally {
+      await setLocale('fr');
+    }
+  });
+
+  it('punctuates the slot and its error as French does', async () => {
+    expect(await scriptErrorText()).toBe('Script personnalisé : boom');
   });
 });

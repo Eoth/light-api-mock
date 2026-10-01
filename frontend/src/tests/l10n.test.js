@@ -7,7 +7,8 @@
 //   * each catalogue translates exactly the existing messages (nothing missing, nothing left over from a sentence
 //     that was reworded) and keeps their {0}, {1}… placeholders;
 //   * no visible word of the interface escapes t: the components are rendered in a pseudo-locale where every
-//     translated text is marked, and any other word found in the page fails the test.
+//     translated text is marked, and any other word found in the page fails the test, as does punctuation spaced
+//     the French way (" : ").
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { render, fireEvent, waitFor, cleanup } from '@testing-library/svelte';
@@ -178,12 +179,15 @@ const marked = (text) => `⟦${text}⟧`;
 // Code, data marked translate="no" (names, URLs, template expressions) and form values are not interface text.
 const NOT_INTERFACE_TEXT = 'code, pre, textarea, datalist, script, style, kbd, [translate="no"]';
 
-/** `text` without its marked (translated) parts; markers nest when a translation is a value of another one. */
-function unmarked(text) {
+/**
+ * `text` with its marked (translated) parts replaced by `by`; markers nest when a translation is a value of another
+ * one.
+ */
+function unmarked(text, by = ' ') {
   let rest = text;
   for (let previous = ''; previous !== rest; ) {
     previous = rest;
-    rest = rest.replace(/⟦[^⟦⟧]*⟧/g, ' ');
+    rest = rest.replace(/⟦[^⟦⟧]*⟧/g, by);
   }
   return rest.trim();
 }
@@ -192,6 +196,9 @@ function untranslatedWords(container) {
   const found = [];
   const check = (text, where) => {
     const rest = unmarked(text);
+    // Languages space a colon, a semicolon or a mark differently (French puts a space before it): written outside t,
+    // one spacing would show in every language. Next to a blank only, so that a time (12:00) or a port (:9000) passes.
+    if (/\s[:;!?]|[:;!?](\s|$)/.test(unmarked(text, 'x'))) found.push(`${where}: "${text.trim()}"`);
     if (!rest || UNTRANSLATED.has(rest)) return;
     for (const token of rest.split(/\s+/)) {
       if (/[A-Za-zÀ-ÿ]{2,}/.test(token) && !UNTRANSLATED.has(token)) found.push(`${where}: "${rest}"`);
