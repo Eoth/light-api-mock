@@ -14,7 +14,7 @@ Once enabled and connected to Kafka, Mimicway listens to a topic (a Kafka messag
 
 A **message log**, like the HTTP [request log](request-log.md), shows the messages received, whether they matched, and their answer.
 
-![The Kafka message log with matched and unmatched statuses](screenshots/kafka-message-log.png)
+![The Kafka message log with a matched message](screenshots/kafka-message-log.png)
 
 ## Simulating a message without a Kafka server
 
