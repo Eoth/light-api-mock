@@ -31,6 +31,14 @@ describe('hex-utils', () => {
     expect(hexToBytes('zz')).toBeNull();
   });
 
+  it('hexToBytes returns null when only the second digit of a pair is invalid, or the pair has a sign or a space', () => {
+    // parseInt stops at the first character that is not a digit: '1z' would read as 1, '-1' as 255 once in a byte.
+    for (const hex of ['1z', 'a ', ' a', '+1', '-1', '0x']) {
+      expect(hexToBytes(hex), hex).toBeNull();
+      expect(hexToTextOrNull(hex), hex).toBeNull();
+    }
+  });
+
   it('hexToTextOrNull fait l\'aller-retour avec textToHex', () => {
     expect(hexToTextOrNull(textToHex('hello world'))).toBe('hello world');
   });
