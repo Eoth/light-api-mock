@@ -117,7 +117,7 @@ jobs:
         run: |
           mkdir -p data
           DATA_PATH=./data ./target/debug/mimicway > mimicway.log 2>&1 &
-          for i in $(seq 1 50); do curl -sf http://localhost:7342/api/health && exit 0; sleep 0.2; done
+          for _ in $(seq 1 50); do curl -sf http://localhost:7342/api/health && exit 0; sleep 0.2; done
           cat mimicway.log; exit 1
       - working-directory: frontend
         run: npx playwright test
@@ -158,6 +158,20 @@ jobs:
           for overlay in k8s/ingress k8s/gloo-edge; do
             kubectl kustomize "$overlay" | ./kubeconform -strict -summary -ignore-missing-schemas -
           done
+
+  workflows:
+    name: Workflows (actionlint, shellcheck)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      # Checks every workflow, including the release one that only runs on tags, and the shell steps through the
+      # runner's shellcheck.
+      - name: Lint the workflows
+        run: |
+          curl -sSLo actionlint.tgz https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  actionlint.tgz" | sha256sum -c -
+          tar xzf actionlint.tgz actionlint
+          ./actionlint -color
 
   secrets:
     name: Secret scan

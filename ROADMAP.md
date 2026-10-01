@@ -81,13 +81,15 @@ Size S
 
 ### R10. Public supply-chain score
 
-**Decision needed** (the repository must be public, and results are published to the OpenSSF) Â· Size S
+Size S (what is left)
 
-**Why.** Reviewers increasingly start from the OpenSSF Scorecard: it checks pinned dependencies, branch protection, signed releases, CI tests and more, and shows the result as a badge.
+**Why.** Reviewers increasingly start from the OpenSSF Scorecard: it checks pinned dependencies, token permissions, branch protection, signed releases, CI tests and more, and shows the result as a badge.
 
-**What.** Add the Scorecard workflow (weekly and on pushes to `main`) with published results, show the badge in the README, and fix what it flags (branch protection and required reviews are repository settings).
+**Progress.** The repository is public, `.github/workflows/scorecard.yml` publishes the score weekly and on pushes to `develop`, and the README shows the badge. Actions and base images are pinned by digest, workflow permissions are read-only by default, and releases are signed.
 
-**Done when.** The badge is visible and the score is 8 or more.
+**What.** Read the first published report and fix what it flags. Branch protection with required reviews and status checks on `develop` and `main` is a repository setting for the maintainers.
+
+**Done when.** The score is 8 or more.
 
 ## 2. Trust and operations
 
