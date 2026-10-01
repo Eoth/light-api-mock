@@ -1,6 +1,6 @@
-# lightMock - Bootstrap Windows (PowerShell)
+# lightMock - build from source on Windows (PowerShell).
 # Usage: .\scripts\bootstrap-windows.ps1
-# Idempotent: safe to run multiple times
+# Safe to run several times: installed tools are kept.
 
 $ErrorActionPreference = "Stop"
 
@@ -11,17 +11,17 @@ function Write-Skip($msg)  { Write-Host "  SKIP: $msg" -ForegroundColor Yellow }
 Write-Step "1/6 - Rust toolchain"
 if (Get-Command rustc -ErrorAction SilentlyContinue) {
     $v = (rustc --version)
-    Write-Ok "rustc deja installe ($v)"
+    Write-Ok "rustc already installed ($v)"
 } else {
-    Write-Host "  Installation de Rust via rustup..."
+    Write-Host "  Installing Rust with rustup..."
     Invoke-WebRequest -Uri "https://win.rustup.rs/x86_64" -OutFile "$env:TEMP\rustup-init.exe" -UseBasicParsing
     & "$env:TEMP\rustup-init.exe" -y --default-toolchain stable
     $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
-    Write-Ok "Rust installe ($(rustc --version))"
+    Write-Ok "Rust installed ($(rustc --version))"
 }
 $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
 
-Write-Step "2/6 - VS Build Tools (linker MSVC)"
+Write-Step "2/6 - Visual Studio Build Tools (MSVC linker)"
 $vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
 $hasVS = $false
 if (Test-Path $vsWhere) {
@@ -29,61 +29,57 @@ if (Test-Path $vsWhere) {
     if ($vsPath) { $hasVS = $true }
 }
 if ($hasVS) {
-    Write-Ok "VS Build Tools deja installe"
+    Write-Ok "Build Tools already installed"
 } else {
     if (Get-Command winget -ErrorAction SilentlyContinue) {
-        Write-Host "  Installation de VS Build Tools via winget..."
+        Write-Host "  Installing the Build Tools with winget..."
         winget install Microsoft.VisualStudio.2022.BuildTools --override "--quiet --wait --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended" --accept-source-agreements --accept-package-agreements
-        Write-Ok "VS Build Tools installe"
+        Write-Ok "Build Tools installed"
     } else {
-        Write-Host "  WARN: winget non disponible. Installez manuellement VS Build Tools avec le workload C++." -ForegroundColor Red
+        Write-Host "  WARN: winget is not available. Install the Visual Studio Build Tools with the C++ workload yourself." -ForegroundColor Red
     }
 }
 
 Write-Step "3/6 - Node.js"
 if (Get-Command node -ErrorAction SilentlyContinue) {
-    Write-Ok "Node.js deja installe ($(node --version))"
+    Write-Ok "Node.js already installed ($(node --version))"
 } else {
     if (Get-Command winget -ErrorAction SilentlyContinue) {
         winget install OpenJS.NodeJS.LTS --accept-source-agreements --accept-package-agreements
-        Write-Ok "Node.js installe"
+        Write-Ok "Node.js installed"
     } else {
-        Write-Host "  WARN: Installez Node.js >= 20 manuellement." -ForegroundColor Red
+        Write-Host "  WARN: install Node.js 20 or later yourself." -ForegroundColor Red
     }
 }
 
-Write-Step "4/6 - Dependances frontend"
+Write-Step "4/6 - UI dependencies"
 Set-Location "$PSScriptRoot\..\frontend"
-if (Test-Path "node_modules") {
-    Write-Skip "node_modules existe deja"
-} else {
-    npm install
-    Write-Ok "npm install termine"
-}
+# Exactly the versions of package-lock.json, without running package install scripts.
+npm ci --ignore-scripts
+Write-Ok "npm ci done"
 
-Write-Step "5/6 - Build frontend"
+Write-Step "5/6 - UI build"
 npm run build
-Write-Ok "Frontend compile dans dist/"
+Write-Ok "UI built in frontend\dist\"
 
-Write-Step "6/6 - Build backend"
+Write-Step "6/6 - Server build"
 Set-Location "$PSScriptRoot\.."
-# Contournement : sur certains environnements Windows, la verification de
-# revocation SSL (CRL) echoue lors du telechargement des crates.
-# Cette variable desactive uniquement la verification CRL cote Cargo.
-$env:CARGO_HTTP_CHECK_REVOKE = "false"
 $vcvars = "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvarsall.bat"
 if (Test-Path $vcvars) {
-    cmd /c "`"$vcvars`" x64 >nul 2>&1 && cargo build --release 2>&1"
+    cmd /c "`"$vcvars`" x64 >nul 2>&1 && cargo build --release --locked 2>&1"
 } else {
-    cargo build --release
+    cargo build --release --locked
 }
-Write-Ok "Backend compile dans target/release/"
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "  The server build failed. Behind a proxy that blocks certificate revocation lists, crate downloads fail" -ForegroundColor Red
+    Write-Host "  with a CRL error: ask your network team to allow them, or, knowingly, set CARGO_HTTP_CHECK_REVOKE=false." -ForegroundColor Red
+    exit 1
+}
+Write-Ok "Server built in target\release\"
 
 Write-Host "`n" -NoNewline
 Write-Host "================================================================" -ForegroundColor Green
-Write-Host "  lightMock pret ! Lancez avec :" -ForegroundColor Green
-Write-Host '  $env:STATIC_DIR = "frontend/dist"' -ForegroundColor White
-Write-Host '  $env:DATA_PATH = "data"' -ForegroundColor White
+Write-Host "  lightMock is ready. Start it with:" -ForegroundColor Green
 Write-Host '  .\target\release\light-mock.exe' -ForegroundColor White
-Write-Host "  Puis ouvrez http://localhost:7342" -ForegroundColor Green
+Write-Host "  then open http://localhost:7342" -ForegroundColor Green
 Write-Host "================================================================" -ForegroundColor Green

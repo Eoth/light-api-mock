@@ -1,96 +1,68 @@
-# frontend/ — Interface Web Svelte 5
+# lightMock UI
 
-SPA pure (sans SvelteKit) servie en statique par le backend Rust.
+A Svelte 5 single-page application (no SvelteKit), built to static files that the lightMock binary serves. It has no runtime dependency: `package.json` only lists build and test tools.
 
-## Dev
-
-```bash
-npm install
-npm run dev       # http://localhost:5173, proxy /api/* vers :7342
-```
-
-## Build / Tests
+## Develop
 
 ```bash
-npm run build     # -> dist/
-npm test          # Vitest (91+ tests unitaires)
-npm run test:e2e  # Playwright (17 tests, serveur doit tourner)
+npm ci
+npm run dev           # http://localhost:5173, proxies /api and /runtime-config.json to a lightMock on :7342
 ```
 
-## Composants
+## Build and test
 
-| Composant | Role |
+```bash
+npm run build         # dist/, served by the binary (STATIC_DIR)
+npm test              # Vitest unit tests, including the translation checks
+npm run test:e2e      # Playwright, against a lightMock running on :7342 (see e2e/README.md)
+npm run docs:screenshots   # regenerates the images of docs/ from the end-to-end suite
+```
+
+## Layout
+
+| Path | Role |
 |---|---|
-| `App.svelte` | Layout, navigation, import/export, reset, dark mode, vue logs |
-| `ServiceList` | Liste filtrable des services (recherche) |
-| `ServiceCard` | Carte service (badge methode, URL namespace, toggle, configurer) |
-| `ServiceDetail` | Vue detail : edition, suppression, gestion des regles |
-| `ServiceForm` | Formulaire service (name, method, listen_path, validation securite) |
-| `RuleList` | Liste ordonnee des regles avec badge MOCK/PROXY (drag-and-drop + clavier) |
-| `RuleForm` | Formulaire regle : action mock/proxy, conditions, reponse (5 modes) |
-| `ConditionForm` | Condition inline (7 sources x 4 operateurs) |
-| `JsonResponseBuilder` | Editeur visuel JSON avec sources dynamiques, pipes, preview |
-| `XmlResponseBuilder` | Editeur visuel XML avec sources dynamiques, pipes, preview |
-| `RequestLog` | Journal des requetes avec filtre par service |
-| `ToggleSwitch` | Interrupteur ON/OFF (role="switch", aria-checked) |
-| `StatusBadge` | Badge MOCK/PROXY |
-| `Notification` | Bandeau feedback (role="alert") |
+| `src/App.svelte` | Layout, navigation, import and export, reset, theme and language switches, log view |
+| `src/lib/components/` | One component per screen or block: service list, card, form and detail; rule list, form and its sections (conditions, response, scripts, warnings); JSON and XML response builders, by example and in detail; rule tester; request and Kafka logs; backups; groups; traffic observation; raw TCP mocks; shared pieces (`FormField`, `ConfirmDialog`, `ToggleSwitch`, `Notification`, `Sentence`…) |
+| `src/lib/api.js` | Management API client; sends the UI language as `Accept-Language` |
+| `src/lib/runtime-config.js` | Reads `/runtime-config.json` at startup (`API_BASE_URL`) |
+| `src/lib/i18n.svelte.js` | `t()` and `tCount()`, language detection and switch, lazy-loaded catalogues |
+| `src/lib/tpl-utils.js` | The only place that converts between response templates and the builders' fields (JSON and XML), validates them and renders previews |
+| `src/lib/rhai-functions.js` | Documentation and autocompletion of the script functions |
+| `src/lib/service-url.js`, `path-params.js`, `format-date.js`, `hex-utils.js` | Small shared helpers |
+| `src/locales/` | Translation catalogues, one file per language, keyed by the English text |
+| `src/tests/` | Vitest tests, one file per component or module |
+| `e2e/` | Playwright tests and scenarios |
 
-## Module partage : tpl-utils.js
+## Response editor modes
 
-Source unique de verite pour le format template lightMock. Centralise :
+The rule form offers five **formats**: JSON, XML, Text, Advanced template, Empty (204). JSON and XML each have two internal modes (`responseMode`) that are never shown as two buttons: a format starts *by example* (`json-paste`, `xml-paste`) and "Edit in detail" reveals the full editor (`json-guided`, `xml-guided`) on the same fields, without conversion.
 
-| Fonction | Role |
+| `responseMode` | What it edits |
 |---|---|
-| `fieldsToTemplate(fields)` | Fields JS → template string (serialisation JSON) |
-| `templateToFields(tpl)` | Template string → Fields JS (deserialisation JSON) |
-| `xmlFieldsToTemplate(fields, rootTag)` | Fields JS → template string (serialisation XML) |
-| `templateToTestJson(tpl)` | Template → JSON de test (pour validation par JSON.parse) |
-| `validateTemplateAsJson(tpl)` | Validation structurelle JSON |
-| `validateTemplateAsXml(tpl)` | Validation structurelle XML |
-| `templateToPreview(tpl)` | Rendu lisible avec «variables» |
-| `buildExpr(field)` | Construction d'expression variable + pipe |
-| `templateToXmlFields(tpl)` | Template string → Fields JS (deserialisation XML, restauration a l'edition) |
+| `json-paste` | A pasted JSON sample: source and pipe of each detected field |
+| `json-guided` | The full JSON structure: keys, types, order, sources and pipes; produces a template |
+| `xml-paste` | A pasted XML sample: source, pipe and attributes of each detected node |
+| `xml-guided` | The full XML structure; produces a template |
+| `text` | Free text; produces a literal body |
+| `advanced` | The raw template (`{{path.siret \| first(9)}}`) |
+| `empty` | No body (204) |
 
-## Modes de reponse (RuleForm / RuleResponseSection)
+`Rule.response_mode` stores the mode with the rule, so the same view opens again (`RuleResponseSection.svelte`, `computeInitialEditorState()`).
 
-Le selecteur expose 5 boutons de **Format** (JSON, XML, Texte, Template avance, Vide) ; JSON et
-XML se declinent chacun en 2 sous-modes internes (`responseMode`), jamais visibles comme 2 boutons
-distincts : le format demarre toujours en `*-paste` (assiste), et un bouton "Modifier en detail"
-revele `*-guided` (detail) SANS conversion (memes Fields, juste plus de capacites d'edition).
-
-| responseMode (interne) | Description |
-|---|---|
-| json-paste | Coller un exemple JSON, editer uniquement source/pipe par champ deja detecte |
-| json-guided | Editeur cle/valeur complet (renommage/ajout/suppression), sources dynamiques et pipes, genere un Template |
-| xml-paste | Coller un exemple XML, editer source/pipe/attributs par noeud deja detecte |
-| xml-guided | Editeur tag/valeur complet, sources dynamiques et pipes, genere un Template |
-| Texte | Textarea libre, genere un Literal |
-| Template avance | Syntaxe `{path.siret \| first(9)}` brute |
-| Vide (204) | Pas de body |
-
-`Rule.response_mode` (backend, `#[serde(default)]`) persiste cette valeur pour restaurer la bonne
-vue a la reouverture d'une regle (cf `RuleResponseSection.svelte::computeInitialEditorState()`).
-
-### Conversions entre modes
-
-| De → Vers | Supporte | Notes |
+| From → to | Supported | Notes |
 |---|---|---|
-| json-paste ↔ json-guided | Oui, sans perte, hors systeme d'avertissement | `revealDetailMode()`, memes Fields |
-| json-guided → Avance | Oui, sans perte | Via `fieldsToTemplate()` |
-| Avance → json-paste / json-guided | Oui, si JSON objet racine | Via `templateToFields()` |
-| json-guided/json-paste → xml-paste/xml-guided | Partiel | Pas de tableaux scalaires |
-| Avance ↔ Texte | Oui | Concatenation / fragment Literal |
-| xml-guided/xml-paste → json-guided/json-paste | Non | Structures incompatibles |
+| `json-paste` ↔ `json-guided` | Yes, lossless | Same fields, `revealDetailMode()` |
+| `json-guided` → advanced | Yes, lossless | `fieldsToTemplate()` |
+| advanced → JSON | When the template is a JSON object | `templateToFields()` |
+| JSON → XML | Partly | Arrays of scalar values have no XML form |
+| advanced ↔ text | Yes | Template fragment or literal |
+| XML → JSON | No | Go through the advanced template |
 
-## Securite frontend
+## Translations
 
-- Noms de service reserves refuses (api, index.html, assets, favicon.ico)
-- Chemins dangereux refuses (vide, `/`, `/*`)
-- Noms de service dupliques refuses (409 backend, validation frontend)
-- Noms de regle dupliques refuses dans un meme service
-- Routes internes protegees contre interception
+Every visible sentence goes through `t("English text")`, written once where it is used; `src/locales/fr.json` maps it to French. `src/tests/l10n.test.js` extracts every message, fails on a missing or unused catalogue entry or a lost placeholder, and renders the components in a pseudo-locale to catch any text that escapes translation. Data (names, URLs, values typed by users) carries `translate="no"`.
 
-## Accessibilite RGAA AA
+## Accessibility
 
-Skip link, labels visibles, aria-describedby, role="switch", role="radio", role="alert", focus-visible, contrastes >= 4.5:1, drag-and-drop avec boutons alternatifs, mode sombre respectant les contrastes.
+Built to WCAG 2.1 AA (RGAA): skip link, visible labels, `aria-describedby` on hints and errors, `role="switch"` and `role="radio"` where they apply, `role="alert"` notifications, visible focus, 4.5:1 contrast in both themes, keyboard alternatives to drag and drop.

@@ -2,7 +2,7 @@
 name = "light-mock"
 version = "0.1.0"
 edition = "2024"
-description = "Mock & Proxy HTTP intelligent, deployable en Kubernetes, Docker Compose ou binaire natif"
+description = "Mock or proxy any HTTP API, rule by rule, from a web UI: one self-contained binary, no telemetry"
 license = "MIT"
 repository = "https://github.com/eoth/light-api-mock"
 
@@ -55,19 +55,13 @@ rhai = { version = "1", features = ["sync"] }
 # URL parsing (form_urlencoded for condition extraction)
 url = "2"
 
-# Client Kafka (consumer + producer). Optionnel : compile UNIQUEMENT quand la
-# feature "messaging-kafka" est active (dep:rdkafka ci-dessous). "cmake-build"
-# compile librdkafka (C) depuis les sources via cmake — voir la section
-# "Messaging Kafka" de README.md pour les prerequis de build (cmake + toolchain C).
+# Kafka client (consumer and producer), only compiled with the "messaging-kafka" feature. "cmake-build" builds
+# librdkafka (C) from source, which needs cmake and a C toolchain.
 rdkafka = { version = "0.36", features = ["cmake-build"], optional = true }
 
 [dev-dependencies]
-# Property-based testing (dev uniquement, jamais dans le binaire livre) :
-# cargo-fuzz/libFuzzer ecarte pour la surface non fiable de server::suggestion
-# (corps de reponse d'un vrai backend proxifie) faute de toolchain nightly et
-# de support Windows fiable pour libFuzzer sur ce poste — proptest est pur
-# Rust, fonctionne sur toute plateforme stable, meme objectif (entrees
-# adversariales/aleatoires sur suggest() et le parsing JSON qu'il declenche).
+# Property-based tests of the code that reads untrusted backend responses (rule suggestions). Pure Rust, runs on
+# stable toolchains on every platform, never part of the shipped binary.
 proptest = "1"
 # Generate signing keys and encode them for the fake Keycloak realm of the authentication tests. Both are already
 # in the dependency graph through jsonwebtoken (same versions), so they add nothing to build.
@@ -75,21 +69,12 @@ ring = "0.17"
 base64 = "0.22"
 
 [features]
-# Support Kafka fonctionnel (consumer + publisher + journal des messages) :
-# NON active par defaut, zero impact sur le binaire/tests tant que non
-# activee (dep:rdkafka n'est meme pas telechargee/compilee). Voir la section
-# "Messaging Kafka" de README.md.
+# Kafka messaging (consumer, publisher, message log). Off by default: without it, rdkafka is neither downloaded
+# nor compiled.
 messaging-kafka = ["dep:rdkafka"]
 
-# Mock TCP brut pour des protocoles binaires non-HTTP simples, un message ->
-# une reponse fixe (PAS de relais/proxy : un relais sans mock n'ajoute aucune
-# valeur et route inutilement le trafic vers un intermediaire, cf src/tcp/mod.rs
-# pour la decision complete). NON active par defaut, zero impact sur le
-# binaire/tests tant que non activee (le module src/tcp/ ne compile meme
-# pas sinon). Aucune dependance externe nouvelle : le matching bytes/regex
-# binaire s'appuie sur `regex::bytes` (deja fourni par la dependance `regex`
-# ci-dessus), volontairement pour ne pas introduire de crate a auditer
-# (licence, mainteneurs, unsafe interne) pour cette premiere tranche.
+# Raw TCP mocks for simple binary protocols: one message in, fixed bytes out, never a relay (src/tcp/mod.rs says
+# why). Off by default: src/tcp/ is not even compiled. No extra dependency: byte matching uses regex::bytes.
 tcp-mock = ["tokio/io-util"]
 
 [profile.release]
