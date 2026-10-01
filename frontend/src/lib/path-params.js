@@ -1,18 +1,13 @@
-// Source unique de verite pour extraire les noms de path params ({name} ou
-// :name) d'un pattern d'URL PRIS ISOLEMENT (pas de requete reelle en face) —
-// meme principe que tpl-utils.js/service-url.js. Miroir cote frontend de
-// `normalize_colon_syntax`/`match_path` (src/engine/matcher.rs) : ces
-// fonctions Rust n'extraient les noms qu'en comparant a un VRAI chemin de
-// requete ; ce module fait la meme analyse de segments mais sur le pattern
-// seul, pour peupler le selecteur strict de path param (ConditionForm.svelte)
-// avant meme qu'une requete existe.
+// The path parameter names ({name} or :name) of a URL pattern taken alone. The server's matcher
+// (`normalize_colon_syntax`, `match_path` in src/engine/matcher.rs) learns them only by matching a real request path;
+// this module reads the same segments from the pattern alone, so that the path parameter picker of
+// ConditionForm.svelte is filled before any request exists.
 //
-// Utilise pour combiner les params du listen_path du service ET du sub_path
-// de la regle en cours d'edition (RuleForm.svelte).
+// RuleForm.svelte combines the parameters of the service's listen_path and of the edited rule's sub_path.
 
 /**
- * Extrait, dans l'ordre de premiere apparition et sans doublon, les noms de
- * path params d'un pattern d'URL (`{name}` ou `:name`). Ignore le wildcard `*`.
+ * The path parameter names of a URL pattern (`{name}` or `:name`), in order of first appearance, without duplicates.
+ * The `*` wildcard is not one.
  * @param {string} pattern
  * @returns {string[]}
  */
@@ -37,8 +32,8 @@ export function extractPathParamNames(pattern) {
 }
 
 /**
- * Combine les path params de plusieurs patterns (ex: listen_path du service +
- * sub_path de la regle), dedupliques, ordre de premiere apparition.
+ * The path parameter names of several patterns (e.g. the service's listen_path and the rule's sub_path), in order of
+ * first appearance, without duplicates.
  * @param {string[]} patterns
  * @returns {string[]}
  */
