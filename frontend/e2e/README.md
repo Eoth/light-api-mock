@@ -8,9 +8,10 @@ Playwright tests that drive a real Mimicway binary through a real browser. Two s
 ## Run
 
 ```bash
-# From the repository root: a Mimicway on :7342 with an empty data directory
+# From the repository root: build the UI, then the binary (which embeds it), and start it with an empty data directory
+(cd frontend && npm run build) && cargo build
 mkdir -p data
-DATA_PATH=./data STATIC_DIR=./frontend/dist ./target/debug/mimicway &
+DATA_PATH=./data ./target/debug/mimicway &
 
 cd frontend
 npx playwright install chromium   # once

@@ -7,7 +7,6 @@ metadata:
     app.kubernetes.io/component: config
 data:
   DATA_PATH: /data
-  STATIC_DIR: /app/static
   PORT: "7342"
   # Every interface: the pod network is the boundary (the binary alone listens on 127.0.0.1 only).
   BIND_ADDRESS: "0.0.0.0"

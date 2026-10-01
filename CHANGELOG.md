@@ -7,6 +7,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 ## [Unreleased]
 
 ### Added
+- The UI is embedded in the binary when it is built first (as the Dockerfile and the release builds do): one file is a complete Mimicway, with no `frontend/dist` to ship next to it. `STATIC_DIR` still serves a directory instead, and a binary built without the UI reads `./frontend/dist` as before. Fingerprinted assets are served with a one-year immutable cache, `index.html` is revalidated on each visit. The embedding is a 50-line `build.rs`, with no new dependency.
 - A security policy (`SECURITY.md`: private reporting channel, scope, response times), a security model (`docs/security.md`: exposed surfaces, every outbound flow, trust boundaries, hardening checklist) and a reviewer guide (`REVIEWING.md`: reading order, authorization matrix, commands that check each claim).
 - An explicit `LICENSE` file (MIT, already announced by the README).
 - A roadmap (`ROADMAP.md`).
