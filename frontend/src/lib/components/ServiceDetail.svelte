@@ -30,13 +30,9 @@
   let addingRule = $state(false);
   let confirmDelete = $state(false);
 
-  // Capture le nom/groupe AVANT tout point d'attente (await) : `service` est
-  // une prop reactive, et onDelete()/onUpdate() peuvent faire disparaitre le
-  // service courant du parent (App.svelte) pendant qu'une requete est en
-  // vol, ce qui rend `service` null en cours de route. Lire une valeur
-  // capturee au debut de la fonction, plutot que relire la prop apres un
-  // await, evite cette course — pas un simple garde `if (!service)` qui
-  // masquerait le symptome sans corriger la cause.
+  // The handlers read the service's name and group before their first await: `service` is a reactive prop, and
+  // onDelete() or onUpdate() can remove the service from the parent (App.svelte) while a request is in flight, which
+  // turns `service` null. Values captured up front remove the race; an `if (!service)` guard would only hide it.
   async function handleSaveService(updated) {
     const name = service.name;
     const groupName = service.group_name;
@@ -103,10 +99,8 @@
     clonedRule = source;
   }
 
-  // Meme flux que handleCloneRule : pre-remplit le formulaire de creation
-  // avec le brouillon de regle suggere, l'utilisateur reste maitre de la
-  // relecture/edition/sauvegarde (RuleForm inchange, meme validation, meme
-  // detecteur de conflit).
+  // Same flow as handleCloneRule: the creation form opens filled with the suggested draft, and the user reviews, edits
+  // and saves it like any other rule (same validation, same conflict check).
   function handleUseSuggestion(ruleDraft) {
     editingRuleIdx = null;
     addingRule = true;

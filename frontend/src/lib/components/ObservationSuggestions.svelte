@@ -1,17 +1,11 @@
 <script>
-  // Observation de trafic proxy (niveau service, is_mocked=false uniquement,
-  // cf server::observation cote backend) + suggestions de regles calculees a
-  // partir du trafic reellement capture. Rien n'est automatique : l'utilisateur
-  // active/desactive explicitement l'observation, et rafraichit lui-meme les
-  // suggestions (pas de polling en arriere-plan) — meme philosophie "cout
-  // proportionnel a l'usage reel" que UrlHealthBadge.svelte.
+  // Observation of the traffic of a pure proxy service (is_mocked=false, src/server/observation.rs), and rule
+  // suggestions computed from what it captured. Nothing is automatic: the user turns observation on and off and
+  // refreshes the suggestions (no background polling), so the cost follows actual use, as for UrlHealthBadge.svelte.
   //
-  // "Utiliser cette suggestion" ne cree PAS la regle directement : ca
-  // pre-remplit le formulaire de regle existant (RuleForm.svelte, via
-  // onUseSuggestion -> ServiceDetail.svelte) pour que l'utilisateur relise/
-  // edite avant de sauvegarder par le chemin deja valide (validate_service,
-  // detecteur de conflit) — decide explicitement avec l'utilisateur plutot
-  // qu'un endpoint "materialiser en un clic" qui bypasserait ces gardes.
+  // "Use this suggestion" does not create the rule: it fills the rule form (RuleForm.svelte, through onUseSuggestion
+  // in ServiceDetail.svelte), so that the user reviews it and saves it through the usual checks (validation on the
+  // server, conflict check), rather than through a one-click endpoint that would skip them.
   import { observeService, unobserveService, getObservationStatus, getServiceSuggestions } from '../api.js';
   import { t } from '../i18n.svelte.js';
 
@@ -32,8 +26,7 @@
         (e) => e.service_name === serviceName && (e.group_name ?? null) === (groupName ?? null)
       );
     } catch {
-      // Statut non critique : reste sur la derniere valeur connue plutot que
-      // de bloquer l'affichage du panneau pour une erreur reseau ponctuelle.
+      // Not critical: keep the last known status rather than block the panel on a passing network error.
     } finally {
       statusLoaded = true;
     }

@@ -1,19 +1,13 @@
 <script>
-  // Gestion des services de mock TCP brut (feature backend "tcp-mock") :
-  // liste + CRUD (GET/POST/PUT/DELETE /api/tcp/services) + statut d'ecoute
-  // (GET /api/tcp/status, sans auth). Mock UNIQUEMENT — pas de mode proxy :
-  // un relais qui ne fait que retransmettre sans matching n'ajoute aucune
-  // valeur de mock, et route inutilement le trafic vers un intermediaire.
-  // Utile pour un protocole binaire simple ou chaque connexion est UN
-  // message envoye par le client suivi d'UNE reponse fixe (ping/heartbeat
-  // proprietaire, handshake fixe) — PAS pour LDAP/SMTP ou tout protocole
-  // qui enchaine plusieurs messages sur la meme connexion.
+  // Raw TCP mocks (the server's "tcp-mock" feature): the list, its changes (GET, POST, PUT, DELETE
+  // /api/tcp/services) and whether each one listens (GET /api/tcp/status). Mocks only, no relay: forwarding without
+  // matching adds nothing a mock is for (see src/tcp/mod.rs). Meant for simple protocols where a connection carries one
+  // message and gets one fixed answer (a proprietary heartbeat, a fixed handshake); not for LDAP, SMTP or any
+  // protocol that exchanges several messages on one connection.
   //
-  // Les champs stockes en hexadecimal cote backend (prefixe de matching,
-  // reponse) sont saisis en TEXTE par defaut (conversion via hex-utils.js) :
-  // un utilisateur qui veut mocker un protocole texte simple n'a jamais
-  // besoin de taper de l'hexadecimal a la main. Le mode "Hexadecimal" reste
-  // disponible pour les protocoles binaires reels (ex: prefixe BER).
+  // The server stores the matching prefix and the response in hexadecimal, but they are typed as text by default
+  // (converted by hex-utils.js), so that a simple text protocol needs no hexadecimal at all; the hexadecimal mode stays
+  // for binary protocols (a BER prefix, for instance).
   import { getTcpServices, getTcpStatus, createTcpService, updateTcpService, deleteTcpService } from '../api.js';
   import { textToHex, hexToTextOrNull, isValidHex } from '../hex-utils.js';
   import ConfirmDialog from './ConfirmDialog.svelte';

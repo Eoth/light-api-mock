@@ -2,9 +2,8 @@
   import { pingService } from '../api.js';
   import { t } from '../i18n.svelte.js';
 
-  // Doit rester alignee avec PING_TTL_MS cote backend (src/server/ping.rs).
-  // Duplique volontairement plutot que d'ajouter un aller-retour reseau
-  // dedie juste pour lire la TTL : c'est une simple constante d'affichage.
+  // Must match PING_TTL_MS in src/server/ping.rs. Repeated here rather than read from the server: a display constant
+  // is not worth a request of its own.
   const PING_TTL_MS = 120_000;
 
   let { serviceName, groupName = null } = $props();
@@ -14,9 +13,8 @@
   let error = $state('');
   let nowTick = $state(Date.now());
 
-  // Rafraichit uniquement l'affichage (etat "expire") toutes les 15s — pas
-  // d'appel reseau, juste un recalcul local pour que le badge ne reste pas
-  // indefiniment sur "Accessible" alors que le cache serveur a expire.
+  // Every 15 s, recomputes the display only (no request), so that the badge does not keep showing "Reachable" once the
+  // server's cached result has expired.
   $effect(() => {
     const id = setInterval(() => { nowTick = Date.now(); }, 15_000);
     return () => clearInterval(id);

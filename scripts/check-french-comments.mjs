@@ -22,21 +22,7 @@ export const COVERED = [
   'frontend/src/main.js',
   'frontend/src/App.svelte',
   'frontend/src/lib/*.js',
-  'frontend/src/lib/components/ConditionForm.svelte',
-  'frontend/src/lib/components/JsonPasteBuilder.svelte',
-  'frontend/src/lib/components/JsonResponseBuilder.svelte',
-  'frontend/src/lib/components/RhaiScriptEditor.svelte',
-  'frontend/src/lib/components/RuleActionSelector.svelte',
-  'frontend/src/lib/components/RuleConditionsEditor.svelte',
-  'frontend/src/lib/components/RuleForm.svelte',
-  'frontend/src/lib/components/RuleList.svelte',
-  'frontend/src/lib/components/RuleResponseSection.svelte',
-  'frontend/src/lib/components/RuleScriptSlot.svelte',
-  'frontend/src/lib/components/RuleTester.svelte',
-  'frontend/src/lib/components/RuleWarnings.svelte',
-  'frontend/src/lib/components/Sentence.svelte',
-  'frontend/src/lib/components/XmlPasteBuilder.svelte',
-  'frontend/src/lib/components/XmlResponseBuilder.svelte',
+  'frontend/src/lib/components/*.svelte',
 ];
 
 // Frequent French words that English comments do not use, with and without their accents (comments are often typed

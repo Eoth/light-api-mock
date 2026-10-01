@@ -46,10 +46,8 @@
       : getExpandedGroupKeys()
   );
 
-  // Force le groupe cible a deplie au moment de quitter la liste vers
-  // l'edition/le clonage : garantit que le contexte reste visible au retour,
-  // meme si le groupe n'etait visible que via l'expansion
-  // ephemere de la recherche (jamais ecrite dans le store partage).
+  // Leaving the list to edit or clone a service unfolds its group for good, so that it is still open on the way back,
+  // even when only the search had unfolded it (the search never writes to the shared expansion state).
   function handleSelect(name, groupName) {
     setGroupExpanded(groupName || '__ungrouped__', true);
     onSelect(name, groupName);

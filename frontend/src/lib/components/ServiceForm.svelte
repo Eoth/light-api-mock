@@ -16,16 +16,10 @@
   let name = $state(untrack(() => service?.name ?? ''));
   let listenPath = $state(untrack(() => service?.listen_path ?? ''));
   let realTargetUrl = $state(untrack(() => service?.real_target_url ?? 'http://'));
-  // Service "purement mocke" : deduit de real_target_url plutot qu'un
-  // nouveau champ persiste — une cible vide EST la definition de "purement
-  // mocke". `??` ne remplace pas une chaine vide, donc un service existant
-  // avec real_target_url: "" est correctement detecte comme deja purement
-  // mocke a l'ouverture du formulaire.
+  // "Purely mocked" is not stored: an empty real_target_url is what makes a service purely mocked.
   let purelyMocked = $state(untrack(() => service ? !service.real_target_url?.trim() : false));
-  // Regles action=Proxy deja presentes sur ce service (avant edition) :
-  // sert uniquement a l'avertissement de bascule a posteriori (meme esprit
-  // non-bloquant que le detecteur de conflit de regles) quand l'utilisateur
-  // coche "purement mocke" alors que ces regles existent deja.
+  // The proxy rules of the service before this edit: checking "Purely mocked" warns about them on save, without
+  // blocking.
   const proxyRulesAffected = untrack(() => (service?.rules ?? []).filter((r) => r.action === 'proxy'));
   let pendingPurelyMockedWarning = $state(false);
   let pendingPayload = $state(null);
@@ -66,11 +60,8 @@
     return null;
   }
 
-  // Bascule d'affichage : decocher reaffiche le champ cible sans perdre la
-  // valeur precedemment saisie (realTargetUrl n'est jamais efface quand la
-  // case est cochee, seul son rendu est conditionne).
-  // Si le champ n'a jamais eu de valeur exploitable, un point de depart
-  // pratique ('http://') est propose, comme pour un service tout neuf.
+  // Unchecking shows the target field again with its previous value: checking the box hides realTargetUrl but never
+  // clears it. A field that never held a value starts from 'http://', as for a new service.
   function handlePurelyMockedChange(val) {
     purelyMocked = val;
     if (!val && !realTargetUrl.trim()) {
@@ -80,10 +71,8 @@
 
   function buildPayload() {
     const isSoap = serviceType === 'soap';
-    // Service purement mocke = is_mocked force a true (une cible vide en
-    // proxy direct n'a aucun sens, cf validate_service cote backend) et
-    // real_target_url toujours envoye vide, quoi que contienne encore le
-    // champ cache (il n'est jamais lu dans ce cas).
+    // A purely mocked service is always mocked (the server refuses a pure proxy without a target) and sends an empty
+    // real_target_url, whatever the hidden field still holds.
     const payload = {
       name: name.trim(),
       listen_path: listenPath.trim(),
@@ -124,10 +113,8 @@
 
     const payload = buildPayload();
 
-    // Bascule a posteriori : avertir plutot que bloquer, meme esprit
-    // non-bloquant que le detecteur de conflit de regles (RuleForm.svelte)
-    // — une regle Proxy existante ne casse rien tant que l'utilisateur n'a
-    // pas explicitement confirme vouloir passer outre.
+    // Warn rather than block, as the rule conflict check does (RuleForm.svelte): the proxy rules keep working until the
+    // user confirms.
     if (purelyMocked && proxyRulesAffected.length > 0) {
       pendingPurelyMockedWarning = true;
       pendingPayload = payload;
@@ -267,9 +254,8 @@
     padding: 1.5rem;
   }
 
-  /* Meme pattern d'avertissement non-bloquant que RuleForm.svelte
-     (detecteur de conflit de regles) : classe locale, pas de redefinition
-     d'une classe centralisee d'app.css. */
+  /* The same non-blocking warning style as RuleWarnings.svelte: component styles are scoped, and app.css has no
+     shared warning class. */
   .mode-warning { background: #fff3cd; border: 1px solid #ffc107; color: #664d03; padding: 0.75rem; border-radius: var(--radius); margin-bottom: 0.75rem; }
   :global([data-theme="dark"]) .mode-warning { background: #332701; border-color: #e5a50a; color: #ffe082; }
   .mode-warning p { margin: 0 0 0.5rem; font-size: 0.875rem; }

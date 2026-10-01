@@ -1,11 +1,7 @@
 <script>
-  // Liste les sauvegardes YAML disponibles (backups/ + backups/protected/) et
-  // permet de restaurer la configuration depuis l'une d'elles. Reutilise
-  // ConfirmDialog.svelte (confirmKeyword, meme pattern que le reset complet
-  // dans App.svelte) — aucun pattern de confirmation maison. Reserve aux
-  // super-admins cote backend (require_super_admin sur les deux routes) ;
-  // ce composant n'est monte par App.svelte que si canShowReset est vrai
-  // (meme garde que le bouton Reset).
+  // Lists the configuration backups (backups/ and backups/protected/) and restores one of them, after a confirmation
+  // by keyword in ConfirmDialog.svelte, as the full reset of App.svelte asks. Both routes are for super-admins only
+  // (require_super_admin on the server).
   import { getBackups, restoreBackup } from '../api.js';
   import { formatDateTime } from '../format-date.js';
   import { t, intlLocale } from '../i18n.svelte.js';

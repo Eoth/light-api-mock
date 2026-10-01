@@ -1,13 +1,9 @@
 <script>
-  // Journal des messages Kafka traites (feature "messaging-kafka" cote
-  // backend) — meme structure visuelle/RGAA que RequestLog.svelte (table,
-  // filtres, modal de detail), adaptee au domaine messaging : direction
-  // (entrant/sortant) au lieu de mode HTTP, badge "tronque" quand le corps
-  // depasse MESSAGE_LOG_MAX_BODY_SIZE cote serveur (src/messaging/message_log.rs).
-  // Inclut aussi un panneau "Simuler un message" (POST /api/messaging/simulate) :
-  // utile pour tester une regle de messaging sans producteur Kafka reel, et
-  // c'est le chemin utilise par les tests E2E dans un environnement sans
-  // broker Kafka disponible (voir e2e/messaging.spec.js).
+  // The log of the Kafka messages handled (the server's "messaging-kafka" feature), with the layout and accessibility
+  // of RequestLog.svelte (table, filters, detail dialog), adapted to messages: a direction (incoming, outgoing) instead
+  // of an HTTP mode, and a "truncated" badge when the body exceeded MESSAGE_LOG_MAX_BODY_SIZE on the server
+  // (src/messaging/message_log.rs). Its "Simulate a message" panel (POST /api/messaging/simulate) tries a messaging
+  // rule without a real Kafka producer; the end-to-end tests use it too (e2e/messaging.spec.js).
   import { getMessagingLogs, simulateMessage } from '../api.js';
   import { formatDateTimePrecise } from '../format-date.js';
   import { t, tCount } from '../i18n.svelte.js';

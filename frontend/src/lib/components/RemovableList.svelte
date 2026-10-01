@@ -1,8 +1,7 @@
 <script>
   import { t } from '../i18n.svelte.js';
-  // Liste generique "chip/ligne + bouton supprimer". `getKey`/`getLabel`
-  // restent personnalisables pour reutiliser ce composant avec des items
-  // simples (chaines) ou des objets (ex: membres de groupe).
+  // A list of items, each with a remove button. `getKey` and `getLabel` adapt it to plain strings or to objects (the
+  // members of a group, for instance).
   let {
     items = [],
     getKey = (item) => item,

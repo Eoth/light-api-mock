@@ -1,9 +1,7 @@
 <script>
-  // Wrapper label+champ+hint+erreur, agnostique du type de controle : le
-  // champ reel (input/select/textarea) est fourni par l'appelant via le
-  // snippet `children`, qui recoit { id, describedBy, invalid } a poser sur
-  // son element pour garder l'accessibilite correcte (for/id, aria-describedby,
-  // aria-invalid) sans dupliquer cette logique a chaque formulaire.
+  // Label, hint and error around any kind of control: the caller renders the control (input, select, textarea) in the
+  // `children` snippet, which receives { id, describedBy, invalid } to set on it (for and id, aria-describedby,
+  // aria-invalid), so that no form repeats that wiring.
   let {
     id,
     label,

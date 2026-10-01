@@ -1,9 +1,7 @@
 <script>
-  // Modal de confirmation standard pour les actions destructives (suppression
-  // service/groupe, reset complet). Remplace les 3 patterns incoherents
-  // precedemment dupliques (span inline dans ServiceDetail, window.confirm
-  // dans GroupManager/App). Reutilise .modal-overlay/.modal-content/
-  // .modal-header/.modal-footer/.btn-close d'app.css — ne redefinit rien.
+  // The confirmation dialog of destructive actions (deleting a service or a group, resetting or restoring the
+  // configuration). It uses the dialog classes of app.css (.modal-overlay, .modal-content, .modal-header,
+  // .modal-footer, .btn-close) and has no style of its own.
   import { tick } from 'svelte';
   import { t } from '../i18n.svelte.js';
 
