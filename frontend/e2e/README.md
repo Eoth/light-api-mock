@@ -33,7 +33,7 @@ e2e/
     rules.scenarios.json      rule creation, edition, deletion on a service
     services.scenarios.json   service creation, search, mock switch, same names in different groups
   *.spec.js / *.spec.mjs    classic specs
-  docs-screenshot.js        writes docs/screenshots/*.png, only when DOCS_SCREENSHOTS is set
+  docs-screenshot.js        writes docs/en/screenshots/*.png, only when DOCS_SCREENSHOTS is set
 ```
 
 ## Scenario files
@@ -104,4 +104,4 @@ The images of `docs/` are taken by this suite, so they follow the interface inst
 npm run docs:screenshots   # from frontend/, with Mimicway running on :7342
 ```
 
-Images are written to `docs/screenshots/` under the names the pages reference; `node scripts/check-doc-links.mjs` (run by CI) fails when a page references an image that does not exist. The three Kafka images need a binary built with `--features messaging-kafka`. States that no test reaches yet have no image; covering them is roadmap item R5.
+Images are written to `docs/en/screenshots/` under the names the pages reference; `node scripts/check-doc-links.mjs` (run by CI) fails when a page references an image that does not exist. The three Kafka images need a binary built with `--features messaging-kafka`. States that no test reaches yet have no image; covering them is roadmap item R5.

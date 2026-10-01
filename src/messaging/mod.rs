@@ -1,6 +1,6 @@
 // Kafka messaging, compiled only with the "messaging-kafka" feature: without it, this module and its dependency do
 // not exist in the binary. The configuration (`KafkaConfig`, read from the environment) lives here; the consumer
-// and publisher, and the message log, have their own modules. docs/kafka-messaging.md describes the behavior.
+// and publisher, and the message log, have their own modules. docs/en/kafka-messaging.md describes the behavior.
 pub mod consumer;
 pub mod matcher;
 pub mod message_log;

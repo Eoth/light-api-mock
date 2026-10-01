@@ -1402,7 +1402,7 @@ mod tests {
     }
 
     // --- Repeating response items per request item (parse_json/to_json/parse_xml_items/xml_element), end to end, for
-    // 2, 1 and 0 items, in JSON and in SOAP. The scripts are the ones of docs/rhai-scripts.md, so that copying the
+    // 2, 1 and 0 items, in JSON and in SOAP. The scripts are the ones of docs/en/rhai-scripts.md, so that copying the
     // documented example gives the documented result.
     fn json_repetition_rule() -> Rule {
         Rule {
@@ -1634,7 +1634,7 @@ mod tests {
 
     // --- A lookup table keyed by a path parameter, with an XML response: the documented script (a `#{...}` map,
     // `.contains(key)`, `mapping[key]`, an if/else fallback) works end to end, fallback included, so copying the
-    // example from docs/rhai-scripts.md works.
+    // example from docs/en/rhai-scripts.md works.
     fn service_lookup_rule() -> Rule {
         Rule {
             name: "lookup-service".into(),

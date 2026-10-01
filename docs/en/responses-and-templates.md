@@ -99,7 +99,7 @@ Example: `{{path.siret | first(9)}}` keeps the first 9 characters of the SIRET r
 
 ### Fake data (`fake.*`)
 
-To fill a response with realistic-looking data without typing it: first name, last name, email, French phone number, company, street, city, postcode, SIREN/SIRET, full address, past or future date, timestamp, random boolean, filler sentence ("lorem"), country, French IBAN. The builder also offers an integer in a range (`Integer{min,max}`). Several kinds follow French formats today; locale-aware fake data is planned (see the [roadmap](../ROADMAP.md)).
+To fill a response with realistic-looking data without typing it: first name, last name, email, French phone number, company, street, city, postcode, SIREN/SIRET, full address, past or future date, timestamp, random boolean, filler sentence ("lorem"), country, French IBAN. The builder also offers an integer in a range (`Integer{min,max}`). Several kinds follow French formats today; locale-aware fake data is planned (see the [roadmap](../../ROADMAP.md)).
 
 ## Chaos mode: failures and slowness on demand
 

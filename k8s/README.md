@@ -47,7 +47,7 @@ The configuration is one file on one volume, written by one process. A second re
 - Read-only root file system: only `/data` (the volume) is writable.
 - Memory limit 256 MiB: idle, Mimicway uses a few MiB, but request bodies up to 10 MiB are buffered to evaluate rules.
 - Mimicway serves plain HTTP: terminate TLS in your ingress (commented example in `ingress/ingress.yaml`).
-- To restrict where proxied services may connect, add a `NetworkPolicy` for the pod's egress (see the hardening checklist of the [security model](../docs/security.md#hardening-checklist)).
+- To restrict where proxied services may connect, add a `NetworkPolicy` for the pod's egress (see the hardening checklist of the [security model](../docs/en/security.md#hardening-checklist)).
 
 ## Persistence
 

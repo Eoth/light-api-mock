@@ -10,7 +10,7 @@ A few features that apply to everything, from the navigation bar at the top of t
 
 ## Import: load a configuration from a file
 
-**"Import"** loads a file exported earlier (or an example such as [examples/devops-toolchain.json](../examples/devops-toolchain.json)). Two modes are offered:
+**"Import"** loads a file exported earlier (or an example such as [examples/devops-toolchain.json](../../examples/devops-toolchain.json)). Two modes are offered:
 
 - **Replace everything**: the imported configuration replaces the current one entirely.
 - **Merge (add what is missing)**: the imported services and groups are added to the existing ones, without removing anything.

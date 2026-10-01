@@ -16,7 +16,7 @@ Mimicway sits between the application you test and the services it calls. Each s
 
 The interface is available in English and French; adding a language is one file (see [Translations](#translations)).
 
-![The list of services in the Mimicway UI](docs/screenshots/home-service-list.png)
+![The list of services in the Mimicway UI](docs/en/screenshots/home-service-list.png)
 
 ## Trust at a glance
 
@@ -33,7 +33,7 @@ Mimicway is meant for corporate networks where every outbound flow has to be jus
 | Unsafe code? | `#![forbid(unsafe_code)]` outside tests. |
 | Supply chain? | `Cargo.lock` and `package-lock.json` committed, CI actions and base images pinned by digest; `cargo-deny` (advisories, licenses, sources), `npm audit`, Trivy and gitleaks run in CI. Releases ship SBOMs, build provenance attestations and a signed image. |
 
-Details, with the code that backs each claim: [security model](docs/security.md). A guided path through the code for a reviewer, with commands to check the claims yourself: [REVIEWING.md](REVIEWING.md). Reporting a vulnerability: [SECURITY.md](SECURITY.md).
+Details, with the code that backs each claim: [security model](docs/en/security.md). A guided path through the code for a reviewer, with commands to check the claims yourself: [REVIEWING.md](REVIEWING.md). Reporting a vulnerability: [SECURITY.md](SECURITY.md).
 
 ## Quick start
 
@@ -118,22 +118,22 @@ The same service can be built in the UI in a minute; on an empty instance, the h
 
 | Area | What you get | Guide |
 |---|---|---|
-| Services and routing | URL namespace per service, REST or SOAP (WSDL requests can bypass the mock), directory URL rewriting | [Services](docs/services.md) |
-| Groups | Shared URL prefix, per-group admins and members | [Groups](docs/groups.md) |
-| Matching rules | Method, sub-path, conditions on path, query, headers, JSON, XML/XPath, form; AND/OR | [Matching rules](docs/matching-rules.md) |
-| Responses | Templates, visual JSON/XML builder, fake data, chaos mode (latency, error rate) | [Responses and templates](docs/responses-and-templates.md) |
-| Scripts | Up to three sandboxed Rhai blocks per rule, deterministic values per seed, dates, JSON/XML helpers | [Rhai scripts](docs/rhai-scripts.md) |
-| Rule tester and conflicts | Replay a draft rule against a captured request with a per-condition verdict; warning when a new rule overlaps another | [Rule tester](docs/rule-tester-and-conflicts.md) |
-| Request log | The last 200 requests: mode, matching rule (or none), status, and the captured request for the rule tester | [Request log](docs/request-log.md) |
-| Traffic observation | Watch a proxied service and turn what it really returns into rules | [Traffic observation](docs/traffic-observation.md) |
-| Availability check | A TCP connection test to the backend, never an HTTP request | [Availability check](docs/availability-check.md) |
-| Backups | Automatic rotation before every change, one-click restore | [Backups](docs/backups-and-restore.md) |
-| Administration | Import, export, reset, dark mode | [Administration](docs/administration.md) |
-| Authentication | Optional Keycloak login, roles per group, super-admins | [Authentication](docs/authentication.md) |
-| Kafka (optional) | The same rules applied to Kafka messages, with a message log and a simulator | [Kafka](docs/kafka-messaging.md) |
+| Services and routing | URL namespace per service, REST or SOAP (WSDL requests can bypass the mock), directory URL rewriting | [Services](docs/en/services.md) |
+| Groups | Shared URL prefix, per-group admins and members | [Groups](docs/en/groups.md) |
+| Matching rules | Method, sub-path, conditions on path, query, headers, JSON, XML/XPath, form; AND/OR | [Matching rules](docs/en/matching-rules.md) |
+| Responses | Templates, visual JSON/XML builder, fake data, chaos mode (latency, error rate) | [Responses and templates](docs/en/responses-and-templates.md) |
+| Scripts | Up to three sandboxed Rhai blocks per rule, deterministic values per seed, dates, JSON/XML helpers | [Rhai scripts](docs/en/rhai-scripts.md) |
+| Rule tester and conflicts | Replay a draft rule against a captured request with a per-condition verdict; warning when a new rule overlaps another | [Rule tester](docs/en/rule-tester-and-conflicts.md) |
+| Request log | The last 200 requests: mode, matching rule (or none), status, and the captured request for the rule tester | [Request log](docs/en/request-log.md) |
+| Traffic observation | Watch a proxied service and turn what it really returns into rules | [Traffic observation](docs/en/traffic-observation.md) |
+| Availability check | A TCP connection test to the backend, never an HTTP request | [Availability check](docs/en/availability-check.md) |
+| Backups | Automatic rotation before every change, one-click restore | [Backups](docs/en/backups-and-restore.md) |
+| Administration | Import, export, reset, dark mode | [Administration](docs/en/administration.md) |
+| Authentication | Optional Keycloak login, roles per group, super-admins | [Authentication](docs/en/authentication.md) |
+| Kafka (optional) | The same rules applied to Kafka messages, with a message log and a simulator | [Kafka](docs/en/kafka-messaging.md) |
 | Raw TCP (optional) | Fixed answers to binary protocols matched by prefix or regex | [Optional features](#optional-features) |
 
-All guides: [docs/index.md](docs/index.md).
+All guides: [docs/en/index.md](docs/en/index.md).
 
 ## Configuration
 
@@ -226,7 +226,7 @@ Pipes: `lower`, `upper`, `trim`, `capitalize`, `first(n)`, `last(n)`, `substr(st
 
 Fake data kinds: `FirstName`, `LastName`, `Email`, `CompanyName`, `StreetName`, `DatePast`, `DateFuture`, `TimestampMs`, `BoolRandom`, `LoremSentence`, and French formats (`PhoneNumberFR`, `CityFR`, `PostcodeFR`, `FullAddressFR`, `CountryFR`, `IbanFR`, `Siren`, `Siret`). The visual builder adds integers in a range (`Integer{min,max}`).
 
-A rule can also run up to three [Rhai](https://rhai.rs) scripts (`pre_script`, `script`, `post_script`) that read the request and return a value or a map used by the template. Besides the language itself they get `random_int`, `seeded_int`, `seeded_pick` (same input, same answer), `uuid`, `fake`, `now_ms`, `now_iso`, `year`, `date_now`, `date_past`, `date_future`, `parse_date`, `parse_json`, `to_json`, `parse_xml_items` and `xml_element`. Scripts run in a sandbox: no file or network access, no `eval`, at most 10,000 operations, 1 MB strings, 1,000-item arrays, 32 call levels. Full reference with examples: [Rhai scripts](docs/rhai-scripts.md).
+A rule can also run up to three [Rhai](https://rhai.rs) scripts (`pre_script`, `script`, `post_script`) that read the request and return a value or a map used by the template. Besides the language itself they get `random_int`, `seeded_int`, `seeded_pick` (same input, same answer), `uuid`, `fake`, `now_ms`, `now_iso`, `year`, `date_now`, `date_past`, `date_future`, `parse_date`, `parse_json`, `to_json`, `parse_xml_items` and `xml_element`. Scripts run in a sandbox: no file or network access, no `eval`, at most 10,000 operations, 1 MB strings, 1,000-item arrays, 32 call levels. Full reference with examples: [Rhai scripts](docs/en/rhai-scripts.md).
 
 ## Deployment
 
@@ -288,7 +288,7 @@ Restore from the UI (Backups button, super-admins), or by hand: stop Mimicway, c
 
 Both are compiled out by default: their code and dependencies are not in the standard binary.
 
-- **Kafka** (`cargo build --release --features messaging-kafka`, needs cmake, a C toolchain and, on Linux, the libcurl headers (`libcurl4-openssl-dev`) to build librdkafka): consumes `KAFKA_LISTEN_TOPIC`, matches each message with the same rules and templates as HTTP (scripts excepted), optionally publishes the reply, keeps a message log and offers a simulator in the UI. See [Kafka](docs/kafka-messaging.md).
+- **Kafka** (`cargo build --release --features messaging-kafka`, needs cmake, a C toolchain and, on Linux, the libcurl headers (`libcurl4-openssl-dev`) to build librdkafka): consumes `KAFKA_LISTEN_TOPIC`, matches each message with the same rules and templates as HTTP (scripts excepted), optionally publishes the reply, keeps a message log and offers a simulator in the UI. See [Kafka](docs/en/kafka-messaging.md).
 - **Raw TCP** (`--features tcp-mock`): listens on the ports you declare, on the same interface as HTTP (`BIND_ADDRESS`), and answers each message with fixed bytes, chosen by hexadecimal prefix or regex. No relay mode: a TCP mock never connects anywhere. Configuration lives in `{DATA_PATH}/tcp-config.yaml`.
 
 ## Development

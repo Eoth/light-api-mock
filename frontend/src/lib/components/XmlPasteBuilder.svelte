@@ -3,7 +3,7 @@
   // JsonPasteBuilder.svelte (paste -> exampleXmlToFields -> assignation de
   // source champ par champ, jamais de renommage/ajout/suppression de
   // structure ici -- pour ces retouches, repasser par le mode "XML guide"
-  // habituel, cf docs/responses-and-templates.md) mais avec DEUX ajouts
+  // habituel, cf docs/en/responses-and-templates.md) mais avec DEUX ajouts
   // volontaires par rapport a la parite stricte JSON :
   //  - navigation par fil d'Ariane (focusPath) + chevrons de pliage
   //    (collapsedPaths, meme mecanisme `hidden` que XmlResponseBuilder.svelte
