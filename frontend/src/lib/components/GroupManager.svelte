@@ -317,33 +317,33 @@
   .group-create-form { margin-bottom: 1rem; max-width: 24rem; }
   .group-create-form .form-actions { margin-top: 0; justify-content: flex-start; }
   .inline-form { display: flex; gap: 0.5rem; align-items: center; }
-  .inline-form input { flex: 1; padding: 0.375rem 0.75rem; border: 1px solid var(--color-border); border-radius: var(--radius); font-size: 0.875rem; background: var(--color-bg); color: var(--color-text); }
+  .inline-form input { flex: 1; padding: 0.375rem 0.75rem; border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); font-size: 0.875rem; background: var(--color-bg); color: var(--color-text); }
 
   .group-list { display: flex; flex-direction: column; gap: 0.75rem; }
-  .group-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius); padding: 1rem 1.25rem; }
+  .group-card { background: var(--color-surface); border: var(--line-thin) solid var(--color-border); border-radius: var(--radius-m); padding: 1rem 1.25rem; }
 
   .group-header-row { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
   .group-header-row h3 { margin: 0; font-size: 1rem; }
-  .group-code-badge { font-family: monospace; font-size: 0.8125rem; font-weight: 700; color: var(--color-primary); background: var(--color-focus); padding: 0.1rem 0.375rem; border-radius: 3px; }
+  .group-code-badge { font-family: var(--font-code); font-size: 0.8125rem; font-weight: var(--weight-heavy); color: var(--color-primary); background: var(--color-selected); padding: 0.1rem 0.375rem; border-radius: var(--radius-s); }
   .group-count { color: var(--color-text-muted); font-size: 0.8125rem; }
   .group-actions { margin-left: auto; display: flex; gap: 0.375rem; }
 
   .service-chips { list-style: none; padding: 0; margin: 0.75rem 0 0; display: flex; flex-wrap: wrap; gap: 0.375rem; }
   .service-chip {
     display: inline-flex; align-items: center; gap: 0.375rem;
-    padding: 0.25rem 0.625rem; border-radius: 1rem;
-    background: var(--color-focus); color: var(--color-primary);
-    font-size: 0.8125rem; font-weight: 600;
+    padding: 0.25rem 0.625rem; border-radius: var(--radius-pill);
+    background: var(--color-selected); color: var(--color-primary);
+    font-size: 0.8125rem; font-weight: var(--weight-strong);
   }
   .chip-remove {
     background: none; border: none; color: inherit; cursor: pointer;
-    font-weight: bold; font-size: 0.75rem; padding: 0; opacity: 0.7;
+    font-weight: var(--weight-heavy); font-size: 0.75rem; padding: 0; opacity: 0.7;
   }
   .chip-remove:hover { opacity: 1; }
 
   .empty-hint { color: var(--color-text-muted); font-size: 0.8125rem; margin: 0.5rem 0; font-style: italic; }
 
-  .group-edit { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--color-border); display: flex; gap: 2rem; flex-wrap: wrap; }
+  .group-edit { margin-top: 1rem; padding-top: 1rem; border-top: var(--line-thin) solid var(--color-border); display: flex; gap: 2rem; flex-wrap: wrap; }
   .edit-section { flex: 1; min-width: 14rem; }
   .edit-section h4 { margin: 0 0 0.5rem; font-size: 0.875rem; color: var(--color-text-muted); }
 

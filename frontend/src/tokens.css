@@ -1,0 +1,215 @@
+/* Phasme, the design system of the interface: its tokens.
+ *
+ * Two levels. Primitives (--lichen-*, --moss-*, --bark-*, ...) are raw values named after what they are: this file is
+ * the only place a literal color may appear, and the only reader of the primitives. Semantic tokens (--color-*,
+ * --space-*, --text-*, ...) are named after what they do; the color roles are redefined per theme. Components and
+ * app.css read semantic tokens only. The rule behind each scale is written in docs/design-system.md, and
+ * src/tests/design-system.test.js holds these rules mechanically, contrasts included. */
+
+:root {
+  /* Lichen: the neutrals, a grey with the green cast lichen has on bark. */
+  --lichen-0: #fbfcf9;
+  --lichen-100: #eef0ea;
+  --lichen-150: #e5e9e1;
+  --lichen-200: #d9dfd5;
+  --lichen-300: #c9d0c6;
+  --lichen-400: #a3ada2;
+  --lichen-500: #7c877e;
+  --lichen-600: #6c7a6f;
+  --lichen-700: #525e55;
+  --lichen-800: #2f3b32;
+  --lichen-850: #232c25;
+  --lichen-900: #1a221c;
+  --lichen-950: #121814;
+  --lichen-975: #0e130f;
+  /* Moss: the accent, and the color of what is imitated. */
+  --moss-50: #e3eee2;
+  --moss-200: #a6d7b1;
+  --moss-300: #8cc79a;
+  --moss-600: #2d5e3e;
+  --moss-700: #1f4630;
+  --moss-800: #234d2c;
+  --moss-900: #1f3326;
+  --moss-950: #102015;
+  /* Bark: the real thing a mock stands in for. */
+  --bark-100: #f0e6da;
+  --bark-300: #e8c9a8;
+  --bark-400: #cfa57a;
+  --bark-600: #6e4b2a;
+  --bark-700: #5a3c20;
+  --bark-900: #35281c;
+  /* Berry: faults and actions that destroy. */
+  --berry-100: #f8e3e0;
+  --berry-300: #f2a69c;
+  --berry-400: #f08b80;
+  --berry-600: #a1342b;
+  --berry-700: #7d251e;
+  --berry-900: #3c1915;
+  /* Pollen: warnings. */
+  --pollen-100: #f7ecd3;
+  --pollen-300: #edd29a;
+  --pollen-400: #e3b55c;
+  --pollen-600: #8a5b00;
+  --pollen-700: #6b4600;
+  --pollen-900: #33270c;
+  /* Lake: information. */
+  --lake-100: #e1ecf0;
+  --lake-300: #b5d0da;
+  --lake-400: #8fb8c8;
+  --lake-600: #2f6680;
+  --lake-700: #234e63;
+  --lake-900: #172b33;
+  /* Shades: the dark of the undergrowth, made translucent for shadows and the dialog backdrop. */
+  --shade-20: #0e130f33;
+  --shade-35: #0e130f59;
+  --shade-55: #0e130f8c;
+
+  /* Space: multiples of 4 px; --space-N is N times 4 px. The half steps (2 and 6 px) are for the inside of dense
+     controls only: badges, chips, table cells. */
+  --space-0-5: 0.125rem;
+  --space-1: 0.25rem;
+  --space-1-5: 0.375rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+
+  /* Type: a major second (1.125) from the 16 px root, rounded to the pixel: 11, 13, 14, 16, 18, 20, 23. The small end
+     is close-set on purpose: a tool kept open all day needs a body (14), a secondary size (13) and badges (11) that
+     differ yet stay readable. */
+  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Liberation Sans", Arial, sans-serif;
+  --font-code: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --text-xs: 0.6875rem;
+  --text-s: 0.8125rem;
+  --text-m: 0.875rem;
+  --text-l: 1rem;
+  --text-xl: 1.125rem;
+  --text-2xl: 1.25rem;
+  --text-3xl: 1.4375rem;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-strong: 600;
+  --weight-heavy: 700;
+  --leading-tight: 1.25;
+  --leading-body: 1.5;
+
+  /* Lines and corners: a hairline separates, a thick line marks a choice, the stem marks a service's mode. Corners are
+     barely softened, never rounded into pills except the switch, whose shape is its meaning. */
+  --line-thin: 1px;
+  --line-thick: 2px;
+  --line-stem: 3px;
+  --radius-s: 2px;
+  --radius-m: 3px;
+  --radius-round: 50%;
+  --radius-pill: 999px;
+
+  /* Layers, from the page up. */
+  --z-popover: 30;
+  --z-modal: 1000;
+  --z-skip-link: 1100;
+
+  /* Motion: color changes only, and short. */
+  --duration-quick: 120ms;
+  --duration-move: 150ms;
+
+  /* Sizes shared by several components. */
+  --size-control: 2rem;
+  --size-control-s: 1.75rem;
+  --size-content: 60rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-quick: 0ms;
+    --duration-move: 0ms;
+  }
+}
+
+/* Light theme: lichen paper, moss ink. */
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+  --color-bg: var(--lichen-100);
+  --color-surface: var(--lichen-0);
+  --color-sunken: var(--lichen-150);
+  --color-hover: var(--lichen-150);
+  --color-border: var(--lichen-300);
+  --color-control: var(--lichen-500);
+  --color-text: var(--lichen-900);
+  --color-text-muted: var(--lichen-700);
+  --color-primary: var(--moss-600);
+  --color-primary-hover: var(--moss-700);
+  --color-on-primary: var(--lichen-0);
+  --color-selected: var(--moss-50);
+  --color-focus: var(--moss-700);
+  --color-mock: var(--moss-600);
+  --color-mock-bg: var(--moss-50);
+  --color-mock-text: var(--moss-800);
+  --color-proxy: var(--bark-600);
+  --color-proxy-bg: var(--bark-100);
+  --color-proxy-text: var(--bark-700);
+  --color-success: var(--moss-600);
+  --color-success-bg: var(--moss-50);
+  --color-success-text: var(--moss-800);
+  --color-on-success: var(--lichen-0);
+  --color-warning: var(--pollen-600);
+  --color-warning-bg: var(--pollen-100);
+  --color-warning-text: var(--pollen-700);
+  --color-danger: var(--berry-600);
+  --color-danger-hover: var(--berry-700);
+  --color-danger-bg: var(--berry-100);
+  --color-danger-text: var(--berry-700);
+  --color-on-danger: var(--lichen-0);
+  --color-info: var(--lake-600);
+  --color-info-bg: var(--lake-100);
+  --color-info-text: var(--lake-700);
+  --color-overlay: var(--shade-55);
+  --shadow-popover: 0 4px 12px var(--shade-20);
+  --shadow-overlay: 0 8px 28px var(--shade-35);
+}
+
+/* Dark theme: the undergrowth at night, lighter moss. */
+[data-theme="dark"] {
+  color-scheme: dark;
+  --color-bg: var(--lichen-950);
+  --color-surface: var(--lichen-900);
+  --color-sunken: var(--lichen-975);
+  --color-hover: var(--lichen-850);
+  --color-border: var(--lichen-800);
+  --color-control: var(--lichen-600);
+  --color-text: var(--lichen-150);
+  --color-text-muted: var(--lichen-400);
+  --color-primary: var(--moss-300);
+  --color-primary-hover: var(--moss-200);
+  --color-on-primary: var(--moss-950);
+  --color-selected: var(--moss-900);
+  --color-focus: var(--moss-200);
+  --color-mock: var(--moss-300);
+  --color-mock-bg: var(--moss-900);
+  --color-mock-text: var(--moss-200);
+  --color-proxy: var(--bark-400);
+  --color-proxy-bg: var(--bark-900);
+  --color-proxy-text: var(--bark-300);
+  --color-success: var(--moss-300);
+  --color-success-bg: var(--moss-900);
+  --color-success-text: var(--moss-200);
+  --color-on-success: var(--moss-950);
+  --color-warning: var(--pollen-400);
+  --color-warning-bg: var(--pollen-900);
+  --color-warning-text: var(--pollen-300);
+  --color-danger: var(--berry-400);
+  --color-danger-hover: var(--berry-300);
+  --color-danger-bg: var(--berry-900);
+  --color-danger-text: var(--berry-300);
+  --color-on-danger: var(--lichen-975);
+  --color-info: var(--lake-400);
+  --color-info-bg: var(--lake-900);
+  --color-info-text: var(--lake-300);
+  --color-overlay: var(--shade-55);
+  --shadow-popover: 0 4px 12px var(--shade-55);
+  --shadow-overlay: 0 8px 28px var(--shade-55);
+}

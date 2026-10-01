@@ -84,12 +84,11 @@
 
   .login-card {
     background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
+    border: var(--line-thin) solid var(--color-border);
+    border-radius: var(--radius-m);
     padding: 2.5rem;
     width: 100%;
     max-width: 24rem;
-    box-shadow: var(--shadow);
   }
 
   .login-title {

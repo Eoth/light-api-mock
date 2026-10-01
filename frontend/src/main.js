@@ -3,6 +3,7 @@ import App from './App.svelte';
 import { loadRuntimeConfig } from './lib/runtime-config.js';
 import { initLocale } from './lib/i18n.svelte.js';
 import { migrateLegacyStorage } from './lib/legacy-storage.js';
+import './tokens.css';
 import './app.css';
 
 // The runtime configuration (base URL of the API, lib/runtime-config.js) is loaded before the app is mounted: the API

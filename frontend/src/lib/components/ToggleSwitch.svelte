@@ -47,7 +47,7 @@
   }
 
   .toggle-label {
-    font-weight: 500;
+    font-weight: var(--weight-medium);
     color: var(--color-text);
   }
 
@@ -55,21 +55,16 @@
     position: relative;
     width: 52px;
     height: 28px;
-    border-radius: 14px;
-    border: 2px solid var(--color-border);
-    background: var(--color-border);
+    border-radius: var(--radius-pill);
+    border: var(--line-thick) solid var(--color-control);
+    background: var(--color-sunken);
     padding: 0;
-    transition: background-color 0.2s, border-color 0.2s;
-  }
-
-  .toggle-switch:focus-visible {
-    outline: 3px solid var(--color-primary);
-    outline-offset: 2px;
+    transition: background-color var(--duration-move), border-color var(--duration-move);
   }
 
   .toggle-switch.active {
-    background: var(--color-success);
-    border-color: var(--color-success);
+    background: var(--color-mock);
+    border-color: var(--color-mock);
   }
 
   .toggle-switch:disabled {
@@ -83,10 +78,9 @@
     left: 2px;
     width: 20px;
     height: 20px;
-    border-radius: 50%;
+    border-radius: var(--radius-round);
     background: var(--color-surface);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-    transition: transform 0.2s;
+    transition: transform var(--duration-move);
   }
 
   .toggle-switch.active .toggle-knob {
@@ -95,12 +89,12 @@
 
   .toggle-status {
     font-size: 0.875rem;
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     min-width: 2rem;
     color: var(--color-text-muted);
   }
 
   .toggle-switch.active + .toggle-status {
-    color: var(--color-success);
+    color: var(--color-mock);
   }
 </style>

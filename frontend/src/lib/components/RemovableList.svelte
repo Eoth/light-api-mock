@@ -58,7 +58,7 @@
     border: none;
     color: var(--color-text-muted);
     cursor: pointer;
-    font-weight: bold;
+    font-weight: var(--weight-heavy);
     font-size: 0.875rem;
     padding: 0 0.25rem;
     line-height: 1;

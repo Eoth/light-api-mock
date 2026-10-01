@@ -183,8 +183,8 @@
 <style>
   .observation-panel {
     background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
+    border: var(--line-thin) solid var(--color-border);
+    border-radius: var(--radius-m);
     padding: 1rem 1.25rem;
     margin-top: 1rem;
   }
@@ -216,8 +216,8 @@
   .suggestion-card {
     margin-top: 0.75rem;
     padding: 0.75rem;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
+    border: var(--line-thin) solid var(--color-border);
+    border-radius: var(--radius-m);
     display: flex;
     flex-direction: column;
     align-items: flex-start;
@@ -231,10 +231,10 @@
   .suggestion-response { display: flex; align-items: center; gap: 0.5rem; }
 
   .suggestion-status {
-    font-weight: 700;
+    font-weight: var(--weight-heavy);
     font-size: 0.8125rem;
     padding: 0.125rem 0.5rem;
-    border-radius: var(--radius);
+    border-radius: var(--radius-m);
     background: var(--color-bg);
   }
 
@@ -242,7 +242,7 @@
     font-size: 0.8125rem;
     background: var(--color-bg);
     padding: 0.125rem 0.375rem;
-    border-radius: 3px;
+    border-radius: var(--radius-s);
     overflow-wrap: anywhere;
   }
 

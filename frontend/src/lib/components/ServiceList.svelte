@@ -138,17 +138,12 @@
   .search-bar input {
     flex: 1;
     padding: 0.625rem 1rem;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
+    border: var(--line-thin) solid var(--color-control);
+    border-radius: var(--radius-m);
     font-size: 1rem;
     font-family: inherit;
     background: var(--color-surface);
     color: var(--color-text);
-  }
-
-  .search-bar input:focus-visible {
-    outline: 3px solid var(--color-primary);
-    outline-offset: 1px;
   }
 
   .search-count {
@@ -162,12 +157,12 @@
     padding: 3rem 1rem;
     color: var(--color-text-muted);
     background: var(--color-surface);
-    border: 2px dashed var(--color-border);
-    border-radius: var(--radius);
+    border: var(--line-thick) dashed var(--color-border);
+    border-radius: var(--radius-m);
   }
 
   .empty-title {
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     font-size: 1.125rem;
     color: var(--color-text);
     margin-bottom: 0.25rem;
@@ -180,8 +175,8 @@
     padding: 2rem 1rem;
     color: var(--color-text-muted);
     background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
+    border: var(--line-thin) solid var(--color-border);
+    border-radius: var(--radius-m);
   }
 
   .no-results p { margin: 0; }

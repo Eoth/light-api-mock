@@ -108,8 +108,8 @@
   .backup-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.75rem; }
   .backup-card {
     background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
+    border: var(--line-thin) solid var(--color-border);
+    border-radius: var(--radius-m);
     padding: 0.875rem 1.25rem;
     display: flex;
     justify-content: space-between;
@@ -118,7 +118,7 @@
     flex-wrap: wrap;
   }
   .backup-info { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
-  .backup-name { font-family: monospace; font-size: 0.875rem; font-weight: 600; word-break: break-all; }
+  .backup-name { font-family: var(--font-code); font-size: 0.875rem; font-weight: var(--weight-strong); word-break: break-all; }
   .backup-meta { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; color: var(--color-text-muted); font-size: 0.8125rem; }
 
   .loading-text, .empty-text { color: var(--color-text-muted); font-size: 0.875rem; text-align: center; padding: 1rem; }

@@ -265,11 +265,11 @@
   .paste-builder { display: flex; flex-direction: column; gap: 0.75rem; }
 
   .paste-zone { display: flex; flex-direction: column; gap: 0.5rem; }
-  .paste-zone label { font-weight: 600; font-size: 0.875rem; }
+  .paste-zone label { font-weight: var(--weight-strong); font-size: 0.875rem; }
   .paste-textarea {
-    width: 100%; font-family: 'Cascadia Code', 'Fira Code', monospace;
+    width: 100%; font-family: var(--font-code);
     font-size: 0.8125rem; padding: 0.5rem;
-    border: 2px dashed var(--color-border); border-radius: var(--radius);
+    border: var(--line-thick) dashed var(--color-control); border-radius: var(--radius-m);
     background: var(--color-bg); color: var(--color-text); resize: vertical;
     min-height: 8rem;
   }
@@ -278,48 +278,48 @@
   .paste-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
 
   .paste-field {
-    padding: 0.375rem 0; border-bottom: 1px solid var(--color-border);
+    padding: 0.375rem 0; border-bottom: var(--line-thin) solid var(--color-border);
   }
   .paste-field:last-child { border-bottom: none; }
 
   .paste-field-main { display: flex; flex-direction: column; gap: 0.25rem; align-items: flex-start; }
 
   .paste-key {
-    font-weight: 700; font-size: 0.875rem; color: var(--color-primary);
-    font-family: monospace;
+    font-weight: var(--weight-heavy); font-size: 0.875rem; color: var(--color-primary);
+    font-family: var(--font-code);
   }
 
   .paste-type-badge {
-    display: inline-block; font-size: 0.6875rem; font-weight: 600;
+    display: inline-block; font-size: 0.6875rem; font-weight: var(--weight-strong);
     color: var(--color-text-muted); background: var(--color-bg);
-    padding: 0.1rem 0.375rem; border-radius: 3px; width: fit-content;
+    padding: 0.1rem 0.375rem; border-radius: var(--radius-s); width: fit-content;
   }
 
   .collapse-toggle { flex-shrink: 0; }
-  .btn-icon { width: 1.5rem; height: 1.5rem; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface); color: var(--color-text-muted); font-size: 0.7rem; cursor: pointer; }
+  .btn-icon { width: 1.5rem; height: 1.5rem; display: inline-flex; align-items: center; justify-content: center; border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); background: var(--color-surface); color: var(--color-text-muted); font-size: 0.7rem; cursor: pointer; }
   .btn-icon:hover { background: var(--color-bg); color: var(--color-text); }
   .collapsed-indicator { font-size: 0.75rem; color: var(--color-text-muted); font-style: italic; white-space: nowrap; }
 
-  .nested-block { margin-top: 0.25rem; padding-left: 0.75rem; border-left: 2px solid var(--color-primary); }
+  .nested-block { margin-top: 0.25rem; padding-left: 0.75rem; border-left: var(--line-thick) solid var(--color-primary); }
 
   .paste-controls {
     display: flex; gap: 0.375rem; align-items: center; flex-wrap: wrap;
   }
   .paste-controls select {
-    padding: 0.25rem 0.5rem; border: 1px solid var(--color-border);
-    border-radius: var(--radius); font-size: 0.8125rem;
+    padding: 0.25rem 0.5rem; border: var(--line-thin) solid var(--color-control);
+    border-radius: var(--radius-m); font-size: 0.8125rem;
     background: var(--color-surface); color: var(--color-text);
   }
   .paste-value {
-    padding: 0.25rem 0.5rem; border: 1px solid var(--color-border);
-    border-radius: var(--radius); font-size: 0.8125rem;
+    padding: 0.25rem 0.5rem; border: var(--line-thin) solid var(--color-border);
+    border-radius: var(--radius-m); font-size: 0.8125rem;
     background: var(--color-surface); color: var(--color-text);
     min-width: 8rem; flex: 1;
   }
   .pipe-input {
     min-width: 8rem; max-width: 14rem; padding: 0.25rem 0.5rem;
-    border: 1px solid var(--color-border); border-radius: var(--radius);
-    font-size: 0.75rem; font-family: 'Cascadia Code', 'Fira Code', monospace;
+    border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m);
+    font-size: 0.75rem; font-family: var(--font-code);
     color: var(--color-primary);
   }
 
@@ -327,7 +327,7 @@
     font-size: 0.75rem; color: var(--color-text-muted); font-style: italic;
   }
   .paste-preview-var {
-    font-size: 0.75rem; color: var(--color-success); font-family: monospace;
-    font-weight: 600;
+    font-size: 0.75rem; color: var(--color-success); font-family: var(--font-code);
+    font-weight: var(--weight-strong);
   }
 </style>

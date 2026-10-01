@@ -232,9 +232,9 @@
 
 <style>
   .rule-tester {
-    background: var(--color-bg);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
+    background: var(--color-sunken);
+    border: var(--line-thin) solid var(--color-border);
+    border-radius: var(--radius-m);
     padding: 1rem;
     margin: 0.5rem 0 1rem;
   }
@@ -249,19 +249,19 @@
   }
 
   .result-banner {
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     padding: 0.5rem 0.75rem;
-    border-radius: var(--radius);
+    border-radius: var(--radius-m);
   }
 
   .result-ok {
-    background: var(--color-success-bg, #e6f4ea);
-    color: var(--color-success-text, #1e7e34);
+    background: var(--color-success-bg);
+    color: var(--color-success-text);
   }
 
   .result-fail {
-    background: var(--color-error-bg, #fdecea);
-    color: var(--color-error-text, #c0392b);
+    background: var(--color-danger-bg);
+    color: var(--color-danger-text);
   }
 
   .result-summary {
@@ -276,25 +276,25 @@
 
   .body-truncation-warning {
     font-size: 0.875rem;
-    color: var(--color-warning-text, #8a6d3b);
-    background: var(--color-warning-bg, #fcf8e3);
+    color: var(--color-warning-text);
+    background: var(--color-warning-bg);
     padding: 0.5rem 0.75rem;
-    border-radius: var(--radius);
+    border-radius: var(--radius-m);
   }
 
   .script-error-banner {
     margin: 0.5rem 0;
     padding: 0.5rem 0.75rem;
-    border-radius: var(--radius);
-    background: var(--color-error-bg, #fdecea);
-    border: 1px solid var(--color-error-text, #c0392b);
+    border-radius: var(--radius-m);
+    background: var(--color-danger-bg);
+    border: var(--line-thin) solid var(--color-danger);
   }
 
   .script-error-title {
     margin: 0 0 0.375rem;
     font-size: 0.875rem;
-    font-weight: 600;
-    color: var(--color-error-text, #c0392b);
+    font-weight: var(--weight-strong);
+    color: var(--color-danger-text);
   }
 
   .script-error-list {
@@ -311,15 +311,15 @@
   .script-result-panel {
     margin: 0.5rem 0;
     padding: 0.5rem 0.75rem;
-    border-radius: var(--radius);
-    background: var(--color-bg-secondary, #f5f5f5);
-    border: 1px solid var(--color-border);
+    border-radius: var(--radius-m);
+    background: var(--color-surface);
+    border: var(--line-thin) solid var(--color-border);
   }
 
   .script-result-title {
     margin: 0 0 0.375rem;
     font-size: 0.8125rem;
-    color: var(--color-text-muted, inherit);
+    color: var(--color-text-muted);
   }
 
   .script-result-slot {
@@ -347,9 +347,9 @@
   }
 
   .script-result-value {
-    background: var(--color-bg);
+    background: var(--color-sunken);
     padding: 0.05rem 0.3rem;
-    border-radius: 0.2rem;
+    border-radius: var(--radius-s);
   }
 
   .condition-group-result h4 {
@@ -368,16 +368,16 @@
 
   .condition-eval {
     padding: 0.5rem 0.75rem;
-    border-radius: var(--radius);
-    border: 1px solid var(--color-border);
+    border-radius: var(--radius-m);
+    border: var(--line-thin) solid var(--color-border);
   }
 
   .eval-ok {
-    border-left: 3px solid var(--color-success-text, #1e7e34);
+    border-left: var(--line-stem) solid var(--color-success);
   }
 
   .eval-fail {
-    border-left: 3px solid var(--color-error-text, #c0392b);
+    border-left: var(--line-stem) solid var(--color-danger);
   }
 
   .eval-line {
@@ -395,6 +395,6 @@
     margin: 0.35rem 0 0 1.4rem;
     font-size: 0.8125rem;
     font-style: italic;
-    color: var(--color-text-muted, inherit);
+    color: var(--color-text-muted);
   }
 </style>

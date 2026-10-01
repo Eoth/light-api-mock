@@ -95,6 +95,7 @@
       {#each rules as rule, idx (rule.name)}
         <li
           class="rule-item"
+          class:proxied={rule.action === 'proxy'}
           class:dragging={dragIdx === idx}
           class:drag-over={dragOverIdx === idx}
           data-testid="rule-list-item-{rule.name}"
@@ -145,7 +146,7 @@
   .rule-list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
   .rule-list-header h3 { margin: 0; font-size: 1rem; }
   .rule-hint { font-size: 0.8125rem; color: var(--color-text-muted); margin: 0 0 0.5rem; }
-  .empty-rules { color: var(--color-text-muted); font-style: italic; padding: 1rem; text-align: center; background: var(--color-bg); border-radius: var(--radius); }
+  .empty-rules { color: var(--color-text-muted); font-style: italic; padding: 1rem; text-align: center; background: var(--color-bg); border-radius: var(--radius-m); }
 
   .rule-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.375rem; }
 
@@ -155,13 +156,15 @@
     gap: 0.5rem;
     padding: 0.5rem 0.75rem;
     background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
-    transition: box-shadow 0.15s, border-color 0.15s;
+    border: var(--line-thin) solid var(--color-border);
+    border-left: var(--line-stem) dashed var(--color-mock);
+    border-radius: var(--radius-m);
+    transition: box-shadow var(--duration-quick), border-color var(--duration-quick);
   }
 
   .rule-item.dragging { opacity: 0.4; }
-  .rule-item.drag-over { border-color: var(--color-primary); box-shadow: 0 0 0 2px var(--color-focus); }
+  .rule-item.proxied { border-left-style: solid; border-left-color: var(--color-proxy); }
+  .rule-item.drag-over { border-color: var(--color-primary); box-shadow: 0 0 0 var(--line-thin) var(--color-primary); }
 
   .rule-grip {
     color: var(--color-text-muted);
@@ -175,14 +178,14 @@
   .rule-grip:active { cursor: grabbing; }
 
   .rule-content { flex: 1; display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
-  .rule-index { display: inline-flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; border-radius: 50%; background: var(--color-bg); font-size: 0.75rem; font-weight: 700; flex-shrink: 0; }
-  .rule-action-badge { display: inline-block; padding: 0.0625rem 0.375rem; border-radius: var(--radius); font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.04em; background: var(--color-success); color: #fff; flex-shrink: 0; }
-  .rule-action-badge.proxy { background: var(--color-primary); }
-  .rule-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rule-index { display: inline-flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; border-radius: var(--radius-round); background: var(--color-bg); font-size: 0.75rem; font-weight: var(--weight-heavy); flex-shrink: 0; }
+  .rule-action-badge { display: inline-block; padding: 0.0625rem 0.375rem; border-radius: var(--radius-m); font-size: 0.6875rem; font-weight: var(--weight-heavy); letter-spacing: 0.04em; background: var(--color-mock-bg); color: var(--color-mock-text); border: var(--line-thin) dashed var(--color-mock); flex-shrink: 0; }
+  .rule-action-badge.proxy { background: var(--color-proxy-bg); color: var(--color-proxy-text); border-style: solid; border-color: var(--color-proxy); }
+  .rule-name { font-weight: var(--weight-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .rule-meta { font-size: 0.8125rem; color: var(--color-text-muted); white-space: nowrap; }
 
   .rule-actions { display: flex; gap: 0.25rem; flex-shrink: 0; }
-  .btn-icon { width: 2rem; height: 2rem; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface); color: var(--color-text-muted); font-size: 0.875rem; cursor: pointer; transition: background-color 0.15s, color 0.15s; }
+  .btn-icon { width: 2rem; height: 2rem; display: inline-flex; align-items: center; justify-content: center; border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); background: var(--color-surface); color: var(--color-text-muted); font-size: 0.875rem; cursor: pointer; transition: background-color var(--duration-quick), color var(--duration-quick); }
   .btn-icon:hover:not(:disabled) { background: var(--color-bg); color: var(--color-text); }
   .btn-icon:disabled { opacity: 0.35; cursor: not-allowed; }
   .btn-icon.btn-delete:hover:not(:disabled) { color: var(--color-danger); border-color: var(--color-danger); }

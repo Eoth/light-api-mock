@@ -801,59 +801,57 @@
 {/if}
 
 <style>
-  .section-response { border-color: var(--color-primary); }
-  .legend-toggle { background: none; border: none; font: inherit; font-weight: 600; font-size: 0.875rem; cursor: pointer; padding: 0; color: var(--color-text); }
+  .legend-toggle { background: none; border: none; font: inherit; font-weight: var(--weight-strong); font-size: 0.875rem; cursor: pointer; padding: 0; color: var(--color-text); }
 
   .section-help { font-size: 0.8125rem; color: var(--color-text-muted); margin: 0 0 0.5rem; }
 
   .mode-selector { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
-  .mode-btn { font-size: 0.875rem; font-weight: 500; cursor: pointer; padding: 0.375rem 0.75rem; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-bg); color: var(--color-text); font-family: inherit; }
+  .mode-btn { font-size: 0.875rem; font-weight: var(--weight-medium); cursor: pointer; padding: 0.375rem 0.75rem; border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); background: var(--color-bg); color: var(--color-text); font-family: inherit; }
   .mode-btn:hover { border-color: var(--color-primary); }
-  .mode-btn.mode-active { border-color: var(--color-primary); background: var(--color-focus); font-weight: 600; }
+  .mode-btn.mode-active { border-color: var(--color-primary); background: var(--color-selected); font-weight: var(--weight-strong); }
 
   .open-detail-button, .back-to-paste-button { margin-top: 0.5rem; }
 
-  .mode-warning { background: #fff3cd; border: 1px solid #ffc107; color: #664d03; padding: 0.75rem; border-radius: var(--radius); margin-bottom: 0.75rem; }
-  :global([data-theme="dark"]) .mode-warning { background: #332701; border-color: #e5a50a; color: #ffe082; }
+  .mode-warning { background: var(--color-warning-bg); border: var(--line-thin) solid var(--color-warning); color: var(--color-warning-text); padding: 0.75rem; border-radius: var(--radius-m); margin-bottom: 0.75rem; }
   .mode-warning p { margin: 0 0 0.5rem; font-size: 0.875rem; }
   .mode-warning-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 
-  .sub-section { margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--color-border); }
+  .sub-section { margin-top: 0.75rem; padding-top: 0.75rem; border-top: var(--line-thin) solid var(--color-border); }
   .sub-section strong { display: block; margin-bottom: 0.375rem; font-size: 0.875rem; }
 
   .advanced-options-section { border-top-color: var(--color-border); }
   .advanced-options-panel { margin-top: 0.5rem; }
 
   .header-row { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.375rem; }
-  .header-row input { flex: 1; padding: 0.375rem 0.5rem; border: 1px solid var(--color-border); border-radius: var(--radius); font-size: 0.875rem; }
+  .header-row input { flex: 1; padding: 0.375rem 0.5rem; border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); font-size: 0.875rem; }
 
-  .fragment-card { border: 1px solid var(--color-border); border-radius: var(--radius); padding: 0.625rem; margin-bottom: 0.5rem; background: var(--color-bg); }
+  .fragment-card { border: var(--line-thin) solid var(--color-border); border-radius: var(--radius-m); padding: 0.625rem; margin-bottom: 0.5rem; background: var(--color-bg); }
   .fragment-header { display: flex; align-items: center; gap: 0.5rem; }
-  .fragment-header select { flex: 1; padding: 0.375rem 0.5rem; border: 1px solid var(--color-border); border-radius: var(--radius); font-size: 0.875rem; }
+  .fragment-header select { flex: 1; padding: 0.375rem 0.5rem; border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); font-size: 0.875rem; }
   .fragment-actions { display: flex; gap: 0.25rem; flex-shrink: 0; }
   .fragment-body { margin-top: 0.5rem; }
-  .fragment-body textarea { width: 100%; padding: 0.375rem 0.5rem; border: 1px solid var(--color-border); border-radius: var(--radius); font-size: 0.875rem; font-family: 'Cascadia Code', 'Fira Code', monospace; resize: vertical; }
-  .fragment-body select { width: 100%; padding: 0.375rem 0.5rem; border: 1px solid var(--color-border); border-radius: var(--radius); font-size: 0.875rem; margin-bottom: 0.375rem; }
-  .frag-index { display: inline-flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; border-radius: 50%; background: var(--color-primary); color: #fff; font-size: 0.75rem; font-weight: 700; flex-shrink: 0; }
+  .fragment-body textarea { width: 100%; padding: 0.375rem 0.5rem; border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); font-size: 0.875rem; font-family: var(--font-code); resize: vertical; }
+  .fragment-body select { width: 100%; padding: 0.375rem 0.5rem; border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); font-size: 0.875rem; margin-bottom: 0.375rem; }
+  .frag-index { display: inline-flex; align-items: center; justify-content: center; width: 1.5rem; height: 1.5rem; border-radius: var(--radius-round); background: var(--color-primary); color: var(--color-on-primary); font-size: 0.75rem; font-weight: var(--weight-heavy); flex-shrink: 0; }
   .frag-info { font-size: 0.8125rem; color: var(--color-text-muted); font-style: italic; margin: 0; }
 
-  .text-area { width: 100%; padding: 0.5rem; border: 1px solid var(--color-border); border-radius: var(--radius); font-size: 0.875rem; font-family: inherit; resize: vertical; }
+  .text-area { width: 100%; padding: 0.5rem; border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); font-size: 0.875rem; font-family: inherit; resize: vertical; }
   .template-textarea { min-height: 5rem; }
   .template-help { margin-top: 0.375rem; display: flex; flex-direction: column; gap: 0.125rem; }
-  .template-help code { background: var(--color-bg); padding: 0.1rem 0.25rem; border-radius: 2px; font-size: 0.8rem; }
+  .template-help code { background: var(--color-bg); padding: 0.1rem 0.25rem; border-radius: var(--radius-s); font-size: 0.8rem; }
 
   .pick-row { display: flex; gap: 0.375rem; align-items: center; margin-bottom: 0.25rem; }
-  .pick-row input { flex: 1; padding: 0.375rem 0.5rem; border: 1px solid var(--color-border); border-radius: var(--radius); font-size: 0.875rem; }
+  .pick-row input { flex: 1; padding: 0.375rem 0.5rem; border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); font-size: 0.875rem; }
 
-  .inline-label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.375rem; }
-  .inline-label input { padding: 0.375rem 0.5rem; border: 1px solid var(--color-border); border-radius: var(--radius); font-size: 0.875rem; }
+  .inline-label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; font-weight: var(--weight-medium); margin-bottom: 0.375rem; }
+  .inline-label input { padding: 0.375rem 0.5rem; border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); font-size: 0.875rem; }
 
   .chaos-section { border-top-color: var(--color-warning); }
   .chaos-fields { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 0.5rem; }
   .chaos-fields label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.875rem; min-width: 8rem; }
-  .chaos-fields input { padding: 0.375rem 0.5rem; border: 1px solid var(--color-border); border-radius: var(--radius); font-size: 0.875rem; }
+  .chaos-fields input { padding: 0.375rem 0.5rem; border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); font-size: 0.875rem; }
 
-  .btn-icon { width: 1.75rem; height: 1.75rem; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface); color: var(--color-text-muted); font-size: 0.75rem; cursor: pointer; }
+  .btn-icon { width: 1.75rem; height: 1.75rem; display: inline-flex; align-items: center; justify-content: center; border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); background: var(--color-surface); color: var(--color-text-muted); font-size: 0.75rem; cursor: pointer; }
   .btn-icon:hover:not(:disabled) { background: var(--color-bg); color: var(--color-text); }
   .btn-icon:disabled { opacity: 0.35; cursor: not-allowed; }
   .btn-icon.btn-delete:hover:not(:disabled) { color: var(--color-danger); border-color: var(--color-danger); }
@@ -861,6 +859,6 @@
   /* .section styles the fieldset itself (.section-response above refines it). RuleActionSelector.svelte and
      RuleConditionsEditor.svelte repeat the same rules: component styles are scoped, and app.css has no shared
      fieldset class. */
-  .section { border: 1px solid var(--color-border); border-radius: var(--radius); padding: 0.75rem; margin-bottom: 1rem; }
-  .section legend { font-weight: 600; font-size: 0.875rem; padding: 0 0.375rem; }
+  .section { border: var(--line-thin) solid var(--color-border); border-radius: var(--radius-m); padding: 0.75rem; margin-bottom: 1rem; }
+  .section legend { font-weight: var(--weight-strong); font-size: 0.875rem; padding: 0 0.375rem; }
 </style>

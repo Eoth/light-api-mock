@@ -23,48 +23,32 @@
     align-items: center;
     gap: 0.5rem;
     padding: 0.75rem 1rem;
-    border-radius: var(--radius);
-    font-weight: 500;
+    border-radius: var(--radius-m);
+    font-weight: var(--weight-medium);
     margin-bottom: 1rem;
-    border: 1px solid;
+    border: var(--line-thin) solid;
   }
 
   .notification.success {
-    background: #d1e7dd;
-    border-color: #a3cfbb;
-    color: #0a3622;
+    background: var(--color-success-bg);
+    border-color: var(--color-success);
+    color: var(--color-success-text);
   }
 
   .notification.error {
-    background: #f8d7da;
-    border-color: #f1aeb5;
-    color: #58151c;
+    background: var(--color-danger-bg);
+    border-color: var(--color-danger);
+    color: var(--color-danger-text);
   }
 
   .notification.info {
-    background: #cff4fc;
-    border-color: #9eeaf9;
-    color: #055160;
-  }
-
-  :global([data-theme="dark"]) .notification.success {
-    background: #0a3622;
-    border-color: #198754;
-    color: #a3cfbb;
-  }
-  :global([data-theme="dark"]) .notification.error {
-    background: #3b1219;
-    border-color: #dc3545;
-    color: #f1aeb5;
-  }
-  :global([data-theme="dark"]) .notification.info {
-    background: #032830;
-    border-color: #0dcaf0;
-    color: #9eeaf9;
+    background: var(--color-info-bg);
+    border-color: var(--color-info);
+    color: var(--color-info-text);
   }
 
   .notification-icon {
-    font-size: 1.125rem;
+    font-size: var(--text-xl);
     flex-shrink: 0;
   }
 </style>

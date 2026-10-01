@@ -51,8 +51,8 @@
 
 <style>
   .service-group {
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
+    border: var(--line-thin) solid var(--color-border);
+    border-radius: var(--radius-m);
     background: var(--color-surface);
     overflow: hidden;
   }
@@ -69,21 +69,21 @@
     text-align: left;
     font: inherit;
     color: var(--color-text);
-    transition: background 0.15s;
+    transition: background var(--duration-quick);
   }
 
   .group-header:hover {
-    background: var(--color-border);
+    background: var(--color-hover);
   }
 
+  /* Inside the header: the group's box clips what overflows it. */
   .group-header:focus-visible {
-    outline: 3px solid var(--color-primary);
-    outline-offset: -3px;
+    outline-offset: calc(-2 * var(--line-thick));
   }
 
   .group-chevron {
     font-size: 0.625rem;
-    transition: transform 0.2s ease;
+    transition: transform var(--duration-move) ease;
     flex-shrink: 0;
     color: var(--color-text-muted);
   }
@@ -95,14 +95,14 @@
   .group-name {
     margin: 0;
     font-size: 0.9375rem;
-    font-weight: 700;
+    font-weight: var(--weight-heavy);
   }
 
   .group-count {
     margin-left: auto;
     font-size: 0.8125rem;
     color: var(--color-text-muted);
-    font-weight: 400;
+    font-weight: var(--weight-regular);
   }
 
   .group-panel {

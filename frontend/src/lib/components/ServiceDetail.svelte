@@ -244,16 +244,16 @@
 
   .detail-card {
     background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
+    border: var(--line-thin) solid var(--color-border);
+    border-radius: var(--radius-m);
     padding: 1.25rem;
   }
 
   .detail-dl { margin: 0; }
   .dl-row { display: flex; gap: 0.5rem; margin-bottom: 0.375rem; }
-  dt { font-weight: 500; color: var(--color-text-muted); min-width: 10rem; }
+  dt { font-weight: var(--weight-medium); color: var(--color-text-muted); min-width: 10rem; }
   dd { margin: 0; }
-  code { font-size: 0.875rem; background: var(--color-bg); padding: 0.125rem 0.375rem; border-radius: 3px; }
+  code { font-size: 0.875rem; background: var(--color-bg); padding: 0.125rem 0.375rem; border-radius: var(--radius-s); }
 
   .detail-actions {
     display: flex;
@@ -261,7 +261,7 @@
     align-items: center;
     margin-top: 1rem;
     padding-top: 1rem;
-    border-top: 1px solid var(--color-border);
+    border-top: var(--line-thin) solid var(--color-border);
   }
 
   .btn-back { padding: 0.375rem 0.75rem; font-size: 0.875rem; }

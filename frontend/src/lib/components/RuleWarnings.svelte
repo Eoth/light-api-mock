@@ -53,9 +53,8 @@
 {/if}
 
 <style>
-  .conflict-warning { background: #fff3cd; border: 1px solid #ffc107; color: #664d03; padding: 0.75rem; border-radius: var(--radius); margin-bottom: 0.75rem; }
-  :global([data-theme="dark"]) .conflict-warning { background: #332701; border-color: #e5a50a; color: #ffe082; }
-  .conflict-warning-title { margin: 0 0 0.5rem; font-weight: 600; font-size: 0.875rem; }
+  .conflict-warning { background: var(--color-warning-bg); border: var(--line-thin) solid var(--color-warning); color: var(--color-warning-text); padding: 0.75rem; border-radius: var(--radius-m); margin-bottom: 0.75rem; }
+  .conflict-warning-title { margin: 0 0 0.5rem; font-weight: var(--weight-strong); font-size: 0.875rem; }
   .conflict-warning-list { margin: 0 0 0.5rem; padding-left: 1.25rem; display: flex; flex-direction: column; gap: 0.375rem; }
   .conflict-warning-list li { font-size: 0.875rem; word-break: break-word; }
 

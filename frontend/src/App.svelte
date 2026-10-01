@@ -458,21 +458,23 @@
 {/if}
 
 <style>
-  :global(.skip-link:focus) { position: fixed; top: 0; left: 0; z-index: 1000; width: auto; height: auto; clip: auto; padding: 0.75rem 1.5rem; background: var(--color-primary); color: #fff; font-weight: 600; text-decoration: none; }
+  :global(.skip-link:focus) { position: fixed; top: 0; left: 0; z-index: var(--z-skip-link); width: auto; height: auto; clip: auto; padding: 0.75rem 1.5rem; background: var(--color-primary); color: var(--color-on-primary); font-weight: var(--weight-strong); text-decoration: none; }
 
-  .app-header { background: var(--color-surface); border-bottom: 1px solid var(--color-border); padding: 1rem 1.5rem; box-shadow: var(--shadow); }
+  .app-header { background: var(--color-surface); border-bottom: var(--line-thin) solid var(--color-border); padding: 0.75rem 1.5rem; }
   .header-content { max-width: 60rem; margin: 0 auto; display: flex; align-items: baseline; gap: 1rem; flex-wrap: wrap; }
   .header-actions { margin-left: auto; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
   .app-title-btn { background: none; border: none; padding: 0; cursor: pointer; }
-  .app-title { font-size: 1.5rem; margin: 0; color: var(--color-primary); }
-  .app-subtitle { margin: 0; color: var(--color-text-muted); font-size: 0.875rem; }
+  .app-title { font-size: var(--text-3xl); margin: 0; color: var(--color-text); }
+  /* The mark of Phasme: a short dashed stem, the line an imitation is drawn with. */
+  .app-title::before { content: ""; display: inline-block; height: 0.8em; margin-right: 0.5rem; border-left: var(--line-stem) dashed var(--color-mock); vertical-align: -0.05em; }
+  .app-subtitle { margin: 0; color: var(--color-text-muted); font-size: var(--text-m); }
   .app-main { max-width: 60rem; margin: 1.5rem auto; padding: 0 1.5rem; }
 
   .breadcrumb { max-width: 60rem; margin: 0 auto; padding: 0.5rem 1.5rem; }
-  .breadcrumb ol { list-style: none; display: flex; align-items: center; gap: 0.375rem; margin: 0; padding: 0; font-size: 0.875rem; }
+  .breadcrumb ol { list-style: none; display: flex; align-items: center; gap: 0.375rem; margin: 0; padding: 0; font-size: var(--text-m); }
   .breadcrumb li { display: flex; align-items: center; gap: 0.375rem; color: var(--color-text-muted); }
-  .breadcrumb li:not(:last-child)::after { content: "/"; color: var(--color-border); }
-  .breadcrumb li[aria-current="page"] { color: var(--color-text); font-weight: 600; }
+  .breadcrumb li:not(:last-child)::after { content: "/"; color: var(--color-text-muted); }
+  .breadcrumb li[aria-current="page"] { color: var(--color-text); font-weight: var(--weight-strong); }
   .breadcrumb-link { background: none; border: none; padding: 0; color: var(--color-primary); cursor: pointer; font: inherit; text-decoration: underline; text-underline-offset: 2px; }
   .breadcrumb-link:hover { color: var(--color-primary-hover); }
 
@@ -482,25 +484,25 @@
   .list-header h2 { margin: 0; }
 
   .demo-section { text-align: center; margin-top: 1rem; }
-  .btn-demo { font-size: 1rem; padding: 0.75rem 1.5rem; }
+  .btn-demo { font-size: var(--text-l); padding: 0.75rem 1.5rem; }
 
   .language-select {
     font: inherit;
-    font-size: 0.8125rem;
+    font-size: var(--text-s);
     color: var(--color-text);
     background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
+    border: var(--line-thin) solid var(--color-control);
+    border-radius: var(--radius-m);
     padding: 0.25rem 0.5rem;
   }
 
   .user-badge {
-    font-size: 0.8125rem;
-    font-weight: 600;
+    font-size: var(--text-s);
+    font-weight: var(--weight-strong);
     color: var(--color-primary);
     background: var(--color-bg);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
+    border: var(--line-thin) solid var(--color-border);
+    border-radius: var(--radius-m);
     padding: 0.2rem 0.625rem;
   }
 

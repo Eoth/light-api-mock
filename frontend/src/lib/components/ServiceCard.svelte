@@ -10,7 +10,7 @@
   let testUrl = $derived(buildServiceTestUrl({ name: service.name, listenPath: service.listen_path, groupCode }));
 </script>
 
-<article class="service-card" aria-label={t("Service {0}", service.name)} data-testid="service-card-{service.name}">
+<article class="service-card" class:mocked={service.is_mocked} aria-label={t("Service {0}", service.name)} data-testid="service-card-{service.name}">
   <div class="card-header">
     <div class="card-info">
       <h3 class="card-title">{service.name}</h3>
@@ -63,11 +63,14 @@
 <style>
   .service-card {
     background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
+    border: var(--line-thin) solid var(--color-border);
+    border-left: var(--line-stem) solid var(--color-proxy);
+    border-radius: var(--radius-m);
     padding: 1rem 1.25rem;
-    box-shadow: var(--shadow);
   }
+
+  /* The stem tells the mode down a long list: dashed for a mocked service, solid for one relayed to its target. */
+  .service-card.mocked { border-left-style: dashed; border-left-color: var(--color-mock); }
 
   .card-header {
     display: flex;
@@ -79,26 +82,26 @@
 
   .card-info { display: flex; align-items: center; gap: 0.75rem; }
 
-  .card-title { margin: 0; font-size: 1.125rem; font-weight: 600; }
+  .card-title { margin: 0; font-size: 1.125rem; font-weight: var(--weight-strong); }
 
   .card-details {
     margin-top: 0.75rem;
     padding-top: 0.75rem;
-    border-top: 1px solid var(--color-border);
+    border-top: var(--line-thin) solid var(--color-border);
   }
 
   dl { margin: 0; }
 
   .detail-row { display: flex; gap: 0.5rem; margin-bottom: 0.125rem; font-size: 0.875rem; }
 
-  dt { font-weight: 500; color: var(--color-text-muted); min-width: 4rem; }
+  dt { font-weight: var(--weight-medium); color: var(--color-text-muted); min-width: 4rem; }
   dd { margin: 0; }
 
-  code { font-size: 0.8125rem; background: var(--color-bg); padding: 0.125rem 0.375rem; border-radius: 3px; }
+  code { font-size: 0.8125rem; background: var(--color-bg); padding: 0.125rem 0.375rem; border-radius: var(--radius-s); }
 
   .card-actions {
     margin-top: 0.75rem;
     padding-top: 0.75rem;
-    border-top: 1px solid var(--color-border);
+    border-top: var(--line-thin) solid var(--color-border);
   }
 </style>

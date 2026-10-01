@@ -170,8 +170,8 @@
 <style>
   .condition-form {
     background: var(--color-bg);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
+    border: var(--line-thin) solid var(--color-border);
+    border-radius: var(--radius-m);
     padding: 1rem;
     margin: 0.5rem 0;
   }
@@ -190,7 +190,7 @@
 
   .form-field label {
     display: block;
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     font-size: 0.875rem;
     margin-bottom: 0.25rem;
   }
@@ -199,8 +199,8 @@
   .form-field select {
     width: 100%;
     padding: 0.375rem 0.5rem;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
+    border: var(--line-thin) solid var(--color-control);
+    border-radius: var(--radius-m);
     font-size: 0.875rem;
     font-family: inherit;
   }
@@ -213,7 +213,7 @@
   .path-param-badge {
     display: block;
     margin-bottom: 0.35rem;
-    font-weight: 600;
+    font-weight: var(--weight-strong);
     color: var(--color-primary, inherit);
   }
 </style>

@@ -358,8 +358,8 @@
   .tcp-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.75rem; }
   .tcp-card {
     background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius);
+    border: var(--line-thin) solid var(--color-border);
+    border-radius: var(--radius-m);
     padding: 0.875rem 1.25rem;
     display: flex;
     justify-content: space-between;
@@ -369,19 +369,19 @@
   }
   .tcp-info { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
   .tcp-info-line { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
-  .tcp-name { font-weight: 600; font-size: 0.9375rem; }
-  .tcp-port { font-family: monospace; color: var(--color-text-muted); }
+  .tcp-name { font-weight: var(--weight-strong); font-size: 0.9375rem; }
+  .tcp-port { font-family: var(--font-code); color: var(--color-text-muted); }
   .tcp-meta { color: var(--color-text-muted); font-size: 0.8125rem; }
   .tcp-actions { display: flex; gap: 0.5rem; }
 
   .loading-text, .empty-text { color: var(--color-text-muted); font-size: 0.875rem; text-align: center; padding: 1rem; }
 
-  .tcp-form { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius); padding: 1rem 1.25rem; }
+  .tcp-form { background: var(--color-surface); border: var(--line-thin) solid var(--color-border); border-radius: var(--radius-m); padding: 1rem 1.25rem; }
   .tcp-form h3 { margin: 1rem 0 0.5rem; font-size: 0.9375rem; }
 
-  .rule-editor { border: 1px dashed var(--color-border); border-radius: var(--radius); padding: 0.75rem 1rem; margin-bottom: 0.75rem; }
+  .rule-editor { border: var(--line-thin) dashed var(--color-border); border-radius: var(--radius-m); padding: 0.75rem 1rem; margin-bottom: 0.75rem; }
   .rule-editor-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
-  .rule-index { font-size: 0.8125rem; font-weight: 600; color: var(--color-text-muted); }
+  .rule-index { font-size: 0.8125rem; font-weight: var(--weight-strong); color: var(--color-text-muted); }
 
-  .mono-input { font-family: 'Cascadia Code', 'Fira Code', monospace; }
+  .mono-input { font-family: var(--font-code); }
 </style>
