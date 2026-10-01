@@ -41,11 +41,13 @@ Size S (what is left)
 
 Size L, to split by module
 
-**Why.** Reviewers read the code. The server's comments were French session narratives rather than the reason the code is the way it is; the UI's still are.
+**Why.** Reviewers read the code. The server's comments were French session narratives rather than the reason the code is the way it is; the UI's components and tests still are.
 
 **What.** Module by module, in reading order of the [reviewer guide](REVIEWING.md), rewrite comments in English and keep only what explains *why* (an invariant, a pitfall, a specification reference); history stays in Git. Translate test names and test messages at the same time.
 
-**Progress.** The Rust code is done: every comment, test message and log line of `src/` is in English, and CI fails on a French comment there. Left: the UI, about 900 comment lines (largest: `e2e/scenario-runner.spec.js`, `RuleResponseSection.svelte`, `RuleForm.svelte`, `e2e/rule-tester.spec.js`, `tpl-utils.js`, `api.js`) and the French test titles; then extend the CI check to `frontend/`.
+**Progress.** Done: the Rust code (`src/`, `tests/`, `build.rs`, with every test message and log line), the scripts, and in the UI `main.js`, `App.svelte` and every module of `frontend/src/lib/`. CI fails on a French comment in any of them: `scripts/check-french-comments.mjs` reads comments only (interface strings, fixtures and example data are never reported) and lists the covered paths, which grow with each translated folder.
+
+**Left**, counted in French comment lines by that script: `frontend/src/lib/components/` 473 of its 528 comment lines (rule editor: `RuleResponseSection.svelte` 107, `RuleForm.svelte` 70, `XmlPasteBuilder.svelte` 35, `JsonResponseBuilder.svelte` 26, `JsonPasteBuilder.svelte` 24, `RuleTester.svelte` 22, `RhaiScriptEditor.svelte` 19, `RuleConditionsEditor.svelte` 18, `RuleScriptSlot.svelte` 13, `ConditionForm.svelte` 12, `XmlResponseBuilder.svelte` 11, `RuleWarnings.svelte` 9, `RuleActionSelector.svelte` 5; others 102, `ServiceForm.svelte` 25 the largest), the two style sheets of `frontend/src/` 9, `frontend/e2e/` 422 of 558 (`scenario-runner.spec.js` 187), `frontend/src/tests/` 140 of 188; and the French test titles, which are strings, not comments, so the check does not see them.
 
 **Done when.** No French comment left in `frontend/`, and the CI check covers it.
 
