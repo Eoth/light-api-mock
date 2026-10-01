@@ -55,6 +55,14 @@ The Kafka feature builds librdkafka from source: it needs cmake, a C toolchain a
 
 A native speaker's review is welcome on every translation pull request.
 
+## Releasing
+
+1. Set the new version in `Cargo.toml` and `frontend/package.json` (run `cargo build` and `npm install` to update the lockfiles).
+2. In `CHANGELOG.md`, rename the `Unreleased` section to `[x.y.z] - YYYY-MM-DD` and add a new empty `Unreleased` above it.
+3. Commit, then push a tag `vx.y.z` on that commit.
+
+The release workflow checks that the tag, both versions and the changelog agree, builds the binaries for every platform with the UI inside, publishes the image to GHCR, attaches SBOMs and checksums, attests everything, signs the image, and creates the GitHub release with the changelog section as notes. The first time, make the `mimicway` package public in the GitHub package settings.
+
 ## Licensing
 
 Mimicway is under the [MIT license](LICENSE). By contributing, you agree that your contribution is licensed under the same terms.

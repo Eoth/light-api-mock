@@ -67,7 +67,8 @@ The login form uses Keycloak's password grant. Replacing it with the authorizati
 - The CI's third-party actions are pinned to commit SHAs, and Dependabot proposes their updates along with those of the crates, npm packages and base images.
 - The production code contains no `unsafe` Rust (`#![forbid(unsafe_code)]` outside tests).
 - The image is a multi-stage build ending on Alpine, running as a dedicated non-root user; the Kubernetes manifests add a read-only root filesystem, no privilege escalation and no Linux capability.
-- Generating an SBOM: `cargo cyclonedx --format json` for the binary, `npx @cyclonedx/cyclonedx-npm --output-file sbom.json` in `frontend/` for the UI.
+- Releases are built from the tagged commit by `.github/workflows/release.yml`: every archive has a build provenance attestation and a CycloneDX SBOM (one for the Rust crates, one for the UI's shipped packages), and the image is signed keylessly with cosign. [SECURITY.md](../SECURITY.md#verifying-a-release) gives the verification commands.
+- The base images of both Dockerfiles are pinned by digest.
 
 ## Hardening checklist
 

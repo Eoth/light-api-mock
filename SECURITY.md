@@ -32,6 +32,22 @@ Mimicway is maintained on a best-effort basis: these are targets, not a contract
 
 We ask for coordinated disclosure: please give us time to publish a fix before disclosing technical details.
 
+## Verifying a release
+
+Every release is built by [the release workflow](.github/workflows/release.yml) from the tagged commit, on GitHub's runners. Each archive and SBOM comes with a build provenance attestation, `SHA256SUMS` lists their checksums, and the image is signed with the workflow's identity (Sigstore, no long-lived key) and carries its own provenance and SBOM.
+
+```bash
+# An archive: provenance (GitHub CLI) and checksum
+gh attestation verify mimicway-0.2.0-x86_64-unknown-linux-musl.tar.gz --repo Eoth/mimicway
+sha256sum --ignore-missing -c SHA256SUMS
+
+# The image: provenance and signature
+gh attestation verify oci://ghcr.io/eoth/mimicway:0.2.0 --repo Eoth/mimicway
+cosign verify ghcr.io/eoth/mimicway:0.2.0 \
+  --certificate-identity-regexp '^https://github.com/Eoth/mimicway/.github/workflows/release.yml@refs/tags/v' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
 ## Scope
 
 In scope:
