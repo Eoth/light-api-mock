@@ -6,6 +6,7 @@
   import ObservationSuggestions from './ObservationSuggestions.svelte';
   import ConfirmDialog from './ConfirmDialog.svelte';
   import { updateService, deleteService, reorderRules } from '../api.js';
+  import { buildServiceTestUrl } from '../service-url.js';
   import { t } from '../i18n.svelte.js';
 
   let {
@@ -17,6 +18,13 @@
     onNotify = () => {},
   } = $props();
 
+  // The URL to call, as the service form shows it, where the rules of the service are written.
+  let testUrl = $derived(service ? buildServiceTestUrl({
+    name: service.name,
+    listenPath: service.listen_path,
+    groupCode: availableGroups.find(g => g.name === service.group_name)?.code ?? '',
+    baseUrl: typeof window !== 'undefined' ? window.location.origin : '',
+  }) : '');
   let editing = $state(false);
   let editingRuleIdx = $state(null);
   let addingRule = $state(false);
@@ -141,6 +149,10 @@
         <div class="dl-row">
           <dt>{t("Listen path")}</dt>
           <dd><code>{service.listen_path}</code></dd>
+        </div>
+        <div class="dl-row">
+          <dt>{t("Test URL")}</dt>
+          <dd><code data-testid="service-detail-test-url">{testUrl}</code></dd>
         </div>
         {#if service.real_target_url?.trim()}
           <div class="dl-row">
