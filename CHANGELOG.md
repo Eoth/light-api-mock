@@ -22,6 +22,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - The responses that lightMock itself sends to the applications under test (no matching rule, purely mocked service, refused path) are in English.
 
 ### Security
+- Raw TCP mocks listen on `BIND_ADDRESS`, like the HTTP server; they listened on every interface, so a TCP mock created on a workstation was reachable from the local network while the rest of lightMock was not. `GET /api/tcp/status` now reports the address of each listener.
 - Every GitHub Action of the CI is pinned to a commit SHA, so a moved tag cannot change what runs; the container scan referenced a Trivy action tag that no longer exists, which would have failed the job.
 - The Windows build script no longer turns off certificate revocation checks for crate downloads; when a proxy blocks revocation lists, it says how to do it knowingly. Both build scripts install the UI's exact locked dependencies without running their install scripts.
 - With authentication enabled, the Kafka message log and `POST /api/messaging/simulate` are reserved to super-admins: Kafka is configured for the whole instance, its log spans every group's services, and a simulation publishes on the real reply topic.

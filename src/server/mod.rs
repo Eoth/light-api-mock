@@ -193,7 +193,8 @@ mod tests {
             publisher: crate::messaging::consumer::Publisher::None,
         };
         #[cfg(feature = "tcp-mock")]
-        let tcp_runtime = crate::tcp::TcpRuntime::load_and_spawn(&data_dir).await;
+        let tcp_runtime =
+            crate::tcp::TcpRuntime::load_and_spawn(&data_dir, crate::tcp::LOOPBACK).await;
         let state = AppState {
             store,
             proxy: crate::engine::ProxyClient::new(),

@@ -280,7 +280,7 @@ Restore from the UI (Backups button, super-admins), or by hand: stop lightMock, 
 Both are compiled out by default: their code and dependencies are not in the standard binary.
 
 - **Kafka** (`cargo build --release --features messaging-kafka`, needs cmake, a C toolchain and, on Linux, the libcurl headers (`libcurl4-openssl-dev`) to build librdkafka): consumes `KAFKA_LISTEN_TOPIC`, matches each message with the same rules and templates as HTTP (scripts excepted), optionally publishes the reply, keeps a message log and offers a simulator in the UI. See [Kafka](docs/kafka-messaging.md).
-- **Raw TCP** (`--features tcp-mock`): listens on the ports you declare and answers each message with fixed bytes, chosen by hexadecimal prefix or regex. No relay mode: a TCP mock never connects anywhere. Configuration lives in `{DATA_PATH}/tcp-config.yaml`.
+- **Raw TCP** (`--features tcp-mock`): listens on the ports you declare, on the same interface as HTTP (`BIND_ADDRESS`), and answers each message with fixed bytes, chosen by hexadecimal prefix or regex. No relay mode: a TCP mock never connects anywhere. Configuration lives in `{DATA_PATH}/tcp-config.yaml`.
 
 ## Development
 

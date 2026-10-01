@@ -66,3 +66,7 @@ pub mod validation;
 
 pub use listener::{TcpServiceStatus, spawn_tcp_services};
 pub use runtime::TcpRuntime;
+
+/// The address tests listen on.
+#[cfg(test)]
+pub const LOOPBACK: std::net::IpAddr = std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST);
