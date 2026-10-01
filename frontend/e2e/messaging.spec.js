@@ -84,6 +84,7 @@ test.describe('Messaging (Kafka) — journal des messages via simulation UI', ()
     await expect(row).toBeVisible();
     await expect(row).toContainText('kafka-svc / order-created');
     await expect(row).toContainText('Matches');
+    await expect(page.getByTestId('notification')).toBeHidden();
     await docsScreenshot(page, 'kafka-message-log.png');
   });
 

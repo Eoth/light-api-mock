@@ -11,6 +11,7 @@
         { "action": "screenshot", "file": "service-create-form.png" },
         { "action": "click", "target": "serviceForm.submitButton" },
         { "action": "assertVisible", "target": "serviceDetail.editButton" },
+        { "action": "assertHidden", "target": "notification.notification" },
         { "action": "screenshot", "file": "service-detail-url.png" }
       ]
     },
