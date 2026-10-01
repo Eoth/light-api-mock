@@ -1,12 +1,8 @@
 <script>
-  // Un bloc script Rhai independant (toggle + editeur + validation + aide
-  // contextuelle). Reutilise 3 fois par RuleResponseSection.svelte pour
-  // pre_script/script/post_script (meme structure, execution independante,
-  // pas de chainage). Le contenu
-  // d'aide differe selon le slot (texte court partage pour pre_script/
-  // post_script, doc etendue avec exemples/RHAI_FUNCTIONS pour le script
-  // principal) — fourni par l'appelant via le snippet `help`, jamais
-  // duplique ici.
+  // One Rhai script slot: toggle, editor, validation and help. RuleResponseSection.svelte uses it three times
+  // (pre_script, script, post_script: same layout, run independently, no chaining). The caller passes the help through
+  // the `help` snippet, since it differs per slot: a short text shared by pre_script and post_script, examples and the
+  // list of functions for the main script.
   import ToggleSwitch from './ToggleSwitch.svelte';
   import RhaiScriptEditor from './RhaiScriptEditor.svelte';
   import { t } from '../i18n.svelte.js';
@@ -59,11 +55,8 @@
   .script-invalid { font-size: 0.8125rem; color: var(--color-danger); }
   .script-help { margin-top: 0.375rem; }
 
-  /* Le contenu du bloc "aide" est fourni par l'appelant via le snippet
-     `help` (defini dans RuleResponseSection.svelte) : ces elements portent
-     le hash de scope du PARENT, pas de ce composant. :global() est
-     necessaire pour que ces regles les atteignent malgre la frontiere de
-     composant (cf commentaire similaire cote RuleResponseSection.svelte). */
+  /* The `help` snippet is defined in RuleResponseSection.svelte, so its elements carry that component's scope class,
+     not this one's: :global() lets these rules reach them across the component boundary. */
   .script-help :global(p) { margin: 0.25rem 0; }
   .script-help :global(code) { font-size: 0.8125rem; background: var(--color-bg); padding: 0.1rem 0.25rem; border-radius: 2px; }
   .script-help :global(.script-examples) { margin-top: 0.375rem; }

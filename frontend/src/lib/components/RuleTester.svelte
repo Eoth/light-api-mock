@@ -1,29 +1,17 @@
 <script>
-  // Testeur de regle : rejeu en lecture seule du brouillon de regle en cours
-  // d'edition (RuleForm) contre une requete deja capturee dans les logs du
-  // service. Aucune mutation, aucun appel proxy — un simple POST vers
-  // /api/rule-test (stateless, cf src/server/api.rs) qui recalcule
-  // method/sub_path/conditions et renvoie le detail condition par condition
-  // (MatchEngine::evaluate_rule_test, src/engine/matcher.rs) ET, si la regle
-  // matche, execute reellement les 3 blocs de script (pre_script/script/
-  // post_script) contre la VRAIE requete capturee choisie.
+  // Rule tester: replays the draft rule of RuleForm, read-only, against a request already captured in the service's
+  // log. Nothing changes and nothing is proxied: one POST to /api/rule-test (stateless, src/server/api.rs) evaluates
+  // the method, the sub-path and each condition (MatchEngine::evaluate_rule_test, src/engine/matcher.rs) and, when the
+  // rule matches and is not a proxy rule, runs its three script slots against that real request.
   //
-  // Pourquoi l'execution de script est ici et pas ailleurs : en production,
-  // une erreur d'execution de script (fonction Rhai inexistante, erreur de type...)
-  // est deliberement avalee en soft-fail (intercept.rs::run_rule_script) —
-  // la requete n'est jamais bloquee par un script casse, seul un
-  // tracing::warn! cote serveur en garde trace. Ce testeur est le SEUL
-  // endroit ou cette meme erreur redevient visible pour l'utilisateur,
-  // AVANT sauvegarde, contre une requete reelle (jamais un contexte
-  // synthetique/vide qui produirait de faux positifs sur des scripts qui
-  // dependent legitimement du corps/des params de la requete, ex. le
-  // pattern parse_json(request.body) documente dans rhai-scripts.md).
+  // Why scripts run here: in production a failing script (unknown Rhai function, type error...) is swallowed
+  // (run_rule_script in src/server/intercept.rs), so that a broken script never blocks a request; only a server log
+  // line records it. The tester is where the user sees that error, before saving, on a real request: an empty, made-up
+  // context would report false errors for scripts that rightly read the body or the parameters (the
+  // `parse_json(request.body)` pattern of docs/en/rhai-scripts.md).
   //
-  // `logs` est deja filtre par le parent (RuleForm) aux entrees du service
-  // courant — on ne fait ici que filtrer celles qui ont un detail capture
-  // (`captured` non-null). Les requetes en proxy direct (service
-  // is_mocked=false) n'en ont jamais : le chemin de streaming zero-buffering
-  // ne bufferise pas le corps, donc rien n'est capturable.
+  // RuleForm passes the logs of the current service; only the entries with captured details are kept here. A pure
+  // proxy service streams its requests without buffering them, so they have none.
   import { testRule } from '../api.js';
   import { formatDateTime } from '../format-date.js';
   import FormField from './FormField.svelte';

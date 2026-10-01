@@ -1,10 +1,8 @@
 <script>
   import { t } from '../i18n.svelte.js';
-  // Selecteur d'action (Mock/Proxy) d'une regle. Purement controle : aucun
-  // etat interne, la valeur courante et les changements transitent par
-  // props/callback (meme convention que les autres composants du dossier,
-  // cf ConditionForm.svelte). L'option Proxy est retiree du DOM (pas juste
-  // desactivee) quand `isPurelyMocked` est vrai.
+  // The action of a rule, mock or proxy. Controlled: the value comes in through `action`, changes go out through
+  // `onChange`. On a purely mocked service the proxy option is removed rather than disabled: there is no target to
+  // forward to.
   let {
     action = 'mock',
     isPurelyMocked = false,

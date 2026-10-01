@@ -1,20 +1,13 @@
 <script>
-  // Editeur de script Rhai avec autocompletion legere des fonctions natives
-  // Mimicway. Liste des fonctions : source unique dans ../rhai-functions.js
-  // (partagee avec la doc contextuelle affichee sous chaque editeur dans
-  // RuleForm.svelte — ne pas dupliquer cette liste ici).
+  // Rhai script editor with a light completion of Mimicway's native functions. The list of functions has one source,
+  // ../rhai-functions.js, which also feeds the help under the main script (RuleResponseSection.svelte).
   //
-  // Choix technique : simple <textarea> + liste deroulante positionnee sous
-  // le champ (pas de suivi pixel-precis du curseur, pas de coordonnees de
-  // caret calculees). Aucun editeur de code (CodeMirror/Monaco) n'est
-  // present ailleurs dans le projet ; en ajouter un uniquement pour ce
-  // besoin serait disproportionne.
+  // A plain <textarea> with a list placed under it, without following the caret's pixel position: the UI has no code
+  // editor (CodeMirror, Monaco), and adding one for this alone would be out of proportion.
   //
-  // Accessibilite : le focus DOM reste toujours sur le <textarea> (role
-  // implicite "textbox", qui supporte aria-autocomplete/aria-activedescendant
-  // — pas besoin d'un role="combobox" explicite). La suggestion mise en
-  // surbrillance est signalee via aria-activedescendant vers l'option
-  // correspondante dans la listbox, jamais par un deplacement de focus reel.
+  // Accessibility: DOM focus stays on the <textarea>, whose implicit "textbox" role supports aria-autocomplete and
+  // aria-activedescendant (no explicit role="combobox" needed). The highlighted suggestion is announced through
+  // aria-activedescendant, which points to its option in the listbox, never by moving focus.
   import { tick, untrack } from 'svelte';
   import { filterRhaiFunctions, tokenAtCursor, computeInsertSelection } from '../rhai-functions.js';
   import { t } from '../i18n.svelte.js';
@@ -33,9 +26,7 @@
   let suggestions = $state([]);
   let activeIndex = $state(0);
 
-  // untrack() : `id` est fige par instance (nouvel id -> nouveau composant
-  // via {#snippet}/{@render}, jamais mute en place), lecture unique
-  // volontaire — meme pattern que le reste du projet.
+  // Read once (untrack): each script slot passes a constant `id`, so an instance never sees it change.
   const listboxId = untrack(() => `${id}-rhai-suggestions`);
 
   function openSuggestionsFor(text, cursorPos, { allowEmpty = false } = {}) {
@@ -61,8 +52,8 @@
   }
 
   function handleKeydown(e) {
-    // Raccourci explicite : ouvre l'autocompletion meme sans prefixe deja
-    // tape (liste complete), ou filtree si le curseur est deja dans un mot.
+    // Ctrl+Space opens the completion even before anything is typed (the whole list), or filtered by the word under
+    // the caret.
     if (e.ctrlKey && e.code === 'Space') {
       e.preventDefault();
       openSuggestionsFor(value, e.target.selectionStart, { allowEmpty: true });
@@ -97,9 +88,8 @@
     const sel = computeInsertSelection(fn.insertText);
     showSuggestions = false;
     onInput(newValue);
-    // La valeur du textarea est mise a jour de facon reactive (prop `value`,
-    // pas bind:) : attendre le prochain tick avant de repositionner la
-    // selection, sinon setSelectionRange s'applique a l'ancien contenu DOM.
+    // The textarea takes its text from the `value` prop (not bind:value): wait for the next tick before moving the
+    // selection, or setSelectionRange would apply to the old content.
     await tick();
     el.focus();
     el.setSelectionRange(start + sel.start, start + sel.end);

@@ -1,11 +1,7 @@
 <script>
-  // Editeur des deux groupes de conditions d'une regle (ET/OU). Regroupe la
-  // liste des conditions deja ajoutees + le formulaire d'ajout (ConditionForm)
-  // pour les deux groupes, qui partageaient un template quasi identique dans
-  // RuleForm.svelte. `allOf`/`anyOf` sont controles par le parent (memes
-  // valeurs utilisees par buildRulePayload/le detecteur de conflit) : ce
-  // composant ne fait que proposer add/remove via callbacks, jamais de copie
-  // locale des tableaux.
+  // The two condition groups of a rule (AND, OR): the conditions already added, and the form that adds or edits one
+  // (ConditionForm). `allOf` and `anyOf` belong to the parent, which saves them and sends them to the conflict check:
+  // this component asks for changes through callbacks and never keeps a copy of the arrays.
   import ConditionForm from './ConditionForm.svelte';
   import { t } from '../i18n.svelte.js';
 
@@ -19,14 +15,9 @@
   } = $props();
 
   let addingConditionTo = $state(null);
-  // Condition en cours d'edition en place : { group, idx } | null. Mutuellement
-  // exclusif avec addingConditionTo (ouvrir l'un referme l'autre) — meme
-  // discipline que le reste du formulaire (un seul mini-formulaire ouvert a la
-  // fois). Aucun contenu n'est jamais perdu par ce mecanisme : ConditionForm
-  // est demontee/remontee via {#if}, mais elle ne fait que RE-INITIALISER ses
-  // champs a partir de la condition deja sauvegardee a chaque ouverture — rien
-  // n'est jamais tape "dans le vide" avant que ce {#if} ne bascule : le
-  // demontage/remontage ne perd donc jamais de contenu utilisateur.
+  // The condition edited in place: { group, idx } or null. Exclusive with addingConditionTo, so that one small form is
+  // open at a time: opening one closes the other, and drops what it had not saved, as its Cancel button would. Each
+  // opening mounts ConditionForm again, filled from the saved condition.
   let editingCondition = $state(null);
 
   function addCondition(group, condition) {
@@ -60,9 +51,7 @@
     editingCondition = null;
   }
 
-  // Remplace UNIQUEMENT l'entree a `idx` (map, jamais filter/push) : les
-  // autres conditions du meme groupe gardent leur position et leur contenu
-  // intacts, aucun reordonnancement induit par une edition en place.
+  // Replaces the entry at `idx` only (map, not filter and push): the other conditions of the group keep their place.
   function saveEdit(condition) {
     const { group, idx } = editingCondition;
     const list = group === 'all_of' ? allOf : anyOf;

@@ -1,15 +1,11 @@
 <script>
   import { t, tCount } from '../i18n.svelte.js';
-  // Orchestration purement presentationnelle des deux avertissements NON
-  // BLOQUANTS affiches a la sauvegarde d'une regle :
-  // - stale-proxy : une regle heritee action=proxy rouverte alors que le
-  //   service est devenu purement mocke (l'enregistrer la fera basculer
-  //   reellement en mock) ;
-  // - conflict : la regle chevauche une autre regle existante du service
-  //   (detecteur de conflit, POST /api/rule-conflicts).
-  // Aucun etat interne : tout est controle par le parent (RuleForm.svelte),
-  // qui reste seul responsable de decider QUAND ces avertissements
-  // apparaissent (verifications locale/reseau imbriquees dans handleSubmit).
+  // Shows the two non-blocking warnings of saving a rule:
+  // - stale proxy: a rule saved with the proxy action, reopened after its service became purely mocked (saving it
+  //   really turns it into a mock);
+  // - conflict: the rule overlaps another rule of the service (POST /api/rule-conflicts).
+  // No state of its own: RuleForm.svelte decides when each warning shows (the local check, then the server one, in
+  // handleSubmit).
   let {
     pendingStaleProxyWarning = false,
     onConfirmStaleProxy = () => {},

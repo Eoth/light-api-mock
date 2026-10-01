@@ -28,10 +28,8 @@
     { value: 'Exists', get label() { return t("Exists (any value)"); } },
   ];
 
-  // `condition` non-null = edition en place d'une condition existante
-  // (RuleConditionsEditor.svelte), non-fourni/null = ajout d'une nouvelle
-  // condition — seule difference d'usage entre les deux appelants de ce
-  // composant, jamais un mode distinct a gerer explicitement ailleurs.
+  // With a `condition`, the form edits that condition in place (RuleConditionsEditor.svelte); without one, it adds a
+  // new condition. That is the only difference between the two uses.
   const isEditing = untrack(() => condition != null);
 
   let sourceType = $state(untrack(() => condition?.source?.type ?? 'QueryParam'));
@@ -39,18 +37,15 @@
   let operatorType = $state(untrack(() => condition?.operator?.type ?? 'Eq'));
   let operatorValue = $state(untrack(() => condition?.operator?.value ?? ''));
 
-  // "Path param" est retire du selecteur quand aucun path param n'est
-  // disponible (URL statique) — sauf si une condition existante utilise deja
-  // ce type (garde defensive : ne jamais faire disparaitre une condition
-  // deja saisie, meme si la liste devient vide entre-temps, ex. sub_path
-  // efface pendant l'edition).
+  // "Path parameter" leaves the list of sources when no path parameter exists (a static URL), unless the condition
+  // already uses it: a saved condition must not lose its source because the list became empty (the sub-path cleared
+  // while editing, for instance).
   let sourceTypes = $derived(
     allSourceTypes.filter((st) => st.value !== 'PathParam' || availablePathParams.length > 0 || sourceType === 'PathParam')
   );
 
-  // Idem pour la liste d'options du <select> PathParam : si la valeur
-  // existante n'est plus dans availablePathParams, on la garde quand meme
-  // comme option pour ne pas perdre silencieusement la donnee.
+  // Likewise for the parameter list: a key that is no longer among availablePathParams stays an option, so that it is
+  // not dropped silently.
   let pathParamOptions = $derived(
     sourceKey && !availablePathParams.includes(sourceKey)
       ? [...availablePathParams, sourceKey]
