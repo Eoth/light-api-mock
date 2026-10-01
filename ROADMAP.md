@@ -18,7 +18,7 @@ Each item has an identifier that never changes, a size (S: a day or less, M: a f
 
 ## Order of work
 
-1. [Ready for an international launch](#1-ready-for-an-international-launch): R1 to R10.
+1. [Ready for an international launch](#1-ready-for-an-international-launch): R1 to R11 (R11 before R9).
 2. [Trust and operations](#2-trust-and-operations): T1 to T11.
 3. [Make it indispensable](#3-make-it-indispensable): U1 to U16, in the listed order.
 4. [Engineering backlog](#4-engineering-backlog): taken alongside, when they unblock an item above.
@@ -75,11 +75,21 @@ Size L, to split by module
 
 **Done when.** No French comment left in `src/` and `frontend/src/`, checked by a script in CI that flags French stop words in comments.
 
+### R11. Unit tests in English
+
+Size M
+
+**Why.** The Vitest suite runs the components in French (`src/tests/setup.js`) and asserts about 700 French texts, while the end-to-end suite and the code use English. Contributors who do not read French cannot follow these tests, and any wording change in the French catalogue breaks them, which blocks R9.
+
+**What.** Switch `setup.js` to English and rewrite the assertions with the English texts (the catalogue maps each French text to its English key, which makes most replacements mechanical); keep one test file that renders the main components in French, so that the French catalogue stays exercised in context.
+
+**Done when.** `npm test` passes in English, and changing a French translation breaks no test outside the French-specific file and `l10n.test.js`.
+
 ### R9. Polish the French catalogues
 
 Size S
 
-**Why.** Many French messages were written without accents ("reserve", "deja", "regle"), which reads as careless to French users.
+**Depends on** R11. · **Why.** Many French messages were written without accents ("reserve", "deja", "regle"), which reads as careless to French users.
 
 **What.** Restore accents and typography (non-breaking space before `:`, `«»` quotes) in `src/locales/fr.json` and `frontend/src/locales/fr.json`; the existing catalogue tests keep placeholders intact.
 
