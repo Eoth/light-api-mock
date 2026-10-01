@@ -207,8 +207,8 @@
   async function exportConfig() {
     try {
       const config = { services, groups };
-      const yaml = JSON.stringify(config, null, 2);
-      const blob = new Blob([yaml], { type: 'application/json' });
+      const json = JSON.stringify(config, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
