@@ -82,3 +82,17 @@ describe('ServiceDetail - formulaire d edition (regression URL sans code de grou
     await waitFor(() => expect(getByText(/\/ab3f9\/svc-a\/v1\/\*/)).toBeInTheDocument());
   });
 });
+
+describe('ServiceDetail - test URL', () => {
+  it('shows the URL to call, with the code of the group the service belongs to', () => {
+    const { getByText } = render(ServiceDetail, {
+      props: { service: svc({ group_name: 'team-a' }), availableGroups: [{ name: 'team-a', code: 'ab3f9' }] },
+    });
+    expect(getByText(`${window.location.origin}/ab3f9/svc-a/v1/*`)).toBeInTheDocument();
+  });
+
+  it('shows the URL of an ungrouped service without any prefix', () => {
+    const { getByText } = render(ServiceDetail, { props: { service: svc() } });
+    expect(getByText(`${window.location.origin}/svc-a/v1/*`)).toBeInTheDocument();
+  });
+});

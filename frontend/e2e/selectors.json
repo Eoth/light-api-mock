@@ -59,6 +59,7 @@
   "serviceDetail": {
     "backButton": "[data-testid=\"service-detail-back-button\"]",
     "editButton": "[data-testid=\"service-detail-edit-button\"]",
+    "testUrl": "[data-testid=\"service-detail-test-url\"]",
     "deleteButton": "[data-testid=\"service-detail-delete-button\"]"
   },
 

@@ -45,6 +45,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - With `AUTH_ENABLED=true`, only the management API (`/api/...`) requires a token, as documented. The mocked and proxied service routes required one too, which broke every mock for the applications under test and forwarded the Mimicway token to the real backends on proxied rules.
 
 ### Fixed
+- The page of a service shows the URL to call it, with its group's code, as the guide said it did; only the service card and the service form showed it, so after creating a service one had to go back to the list to find it.
 - The breadcrumb of the detailed JSON builder named its first level "racine" in every language; it reads "root" in English. The translation test now also renders the breadcrumbs of the JSON and XML builders.
 - The Kubernetes Deployment sets `fsGroup: 1000`: on storage classes that create volumes owned by root, the non-root process could not write its configuration and the pod failed to start.
 - `index.html` pointed to a `/favicon.svg` that was never shipped, so every page load ended with a 404: the UI now has its icon, and a unit test fails when the page refers to a public file that does not exist.
