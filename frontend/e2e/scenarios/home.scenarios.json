@@ -16,7 +16,7 @@
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
         { "action": "assertVisible", "target": "serviceCard.card", "params": { "name": "users-api" } },
         { "action": "assertHidden", "target": "notification.notification" },
-        { "action": "screenshot", "file": "home-service-list.png" }
+        { "action": "screenshot", "file": "home-service-list.png", "target": ["serviceCard.card", "urlHealthBadge.testButton"], "params": { "name": "users-api", "serviceName": "users-api" } }
       ]
     }
   ]

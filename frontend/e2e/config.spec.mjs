@@ -44,7 +44,7 @@ test('export telecharge un fichier JSON valide', async ({ page, request }) => {
 
   await page.goto('/');
   await page.waitForLoadState('networkidle');
-  await docsScreenshot(page, 'administration-export-button.png');
+  await docsScreenshot(page, 'administration-export-button.png', '[data-testid="app-export-button"]');
 
   const [download] = await Promise.all([
     page.waitForEvent('download'),

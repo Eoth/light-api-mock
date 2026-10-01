@@ -69,13 +69,17 @@ test.describe('Messaging (Kafka) — journal des messages via simulation UI', ()
 
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    await docsScreenshot(page, 'kafka-nav-button.png');
+    await docsScreenshot(page, 'kafka-nav-button.png', '[data-testid="app-nav-messaging-button"]');
     await page.getByTitle('Kafka message log').click();
     await expect(page.getByRole('heading', { name: 'Kafka messages' })).toBeVisible();
 
     await page.getByLabel('Topic of the simulated message').fill('orders.in');
     await page.getByLabel('Body of the simulated message').fill('{"type":"order.created"}');
-    await docsScreenshot(page, 'kafka-simulation-form.png');
+    await docsScreenshot(
+      page,
+      'kafka-simulation-form.png',
+      '[data-testid="messaging-log-sim-topic-input"], [data-testid="messaging-log-simulate-button"]',
+    );
     await page.getByRole('button', { name: 'Simulate' }).click();
 
     // The message log outlives a configuration reset, and lists the newest message first: on a server that already ran
@@ -85,7 +89,7 @@ test.describe('Messaging (Kafka) — journal des messages via simulation UI', ()
     await expect(row).toContainText('kafka-svc / order-created');
     await expect(row).toContainText('Matches');
     await expect(page.getByTestId('notification')).toBeHidden();
-    await docsScreenshot(page, 'kafka-message-log.png');
+    await docsScreenshot(page, 'kafka-message-log.png', '[data-testid^="messaging-log-row-"]');
   });
 
   test('un message sans regle correspondante est journalise comme non matche', async ({ page, request }) => {

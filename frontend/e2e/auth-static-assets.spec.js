@@ -115,9 +115,12 @@ test.describe('Auth: assets statiques de la SPA accessibles sans token (AUTH_ENA
     // la liste des services.
     await expect(page.locator('[data-testid="login-form-username-input"]')).toBeVisible();
     await expect(page.locator('[data-testid="login-form-password-input"]')).toBeVisible();
-    await docsScreenshot(page, 'authentication-login-screen.png', {
-      reopenWaitingFor: '[data-testid="login-form-username-input"]',
-    });
+    await docsScreenshot(
+      page,
+      'authentication-login-screen.png',
+      '[data-testid="login-form-username-input"], [data-testid="login-form-submit-button"]',
+      { reopenWaitingFor: '[data-testid="login-form-username-input"]' },
+    );
   });
 
   test('a signed-in super-admin sees their name and the reset button', async ({ page }) => {
@@ -145,7 +148,7 @@ test.describe('Auth: assets statiques de la SPA accessibles sans token (AUTH_ENA
     // Still signed in once the interface has settled.
     await page.waitForLoadState('networkidle');
     await expect(page.locator('[data-testid="app-user-badge"]')).toContainText('alice');
-    await docsScreenshot(page, 'authentication-user-badge.png');
+    await docsScreenshot(page, 'authentication-user-badge.png', '[data-testid="app-user-badge"]');
   });
 
   test('un fichier du bundle assets/ reel se charge sans token', async ({ request }) => {

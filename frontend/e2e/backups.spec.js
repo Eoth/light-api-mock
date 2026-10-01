@@ -94,12 +94,12 @@ test.describe('Config backups & restore', () => {
 
     const row = page.locator('.backup-card', { hasText: targetFilename });
     await expect(row).toBeVisible();
-    await docsScreenshot(page, 'backups-list.png');
+    await docsScreenshot(page, 'backups-list.png', `[data-testid="backup-manager-item-${targetFilename}"]`);
     await row.getByText('Restore').click();
 
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
-    await docsScreenshot(page, 'backups-restore-confirmation.png');
+    await docsScreenshot(page, 'backups-restore-confirmation.png', '[data-testid="confirm-dialog"] .modal-content');
     await dialog.locator('#confirm-keyword-input').fill('RESTORE');
     await dialog.getByRole('button', { name: 'Restore' }).click();
 

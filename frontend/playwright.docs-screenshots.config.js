@@ -1,31 +1,22 @@
-// Config Playwright dediee a la regeneration des captures d'ecran de docs/.
-// Volontairement SEPAREE de playwright.config.js (utilise par
-// `npm run test:e2e`) : positionner DOCS_SCREENSHOTS ici, dans le module de
-// config (execute par Node avant le chargement des fichiers de test, donc
-// fonctionne a l'identique sous PowerShell/cmd/bash sans syntaxe shell
-// specifique), garantit que la suite standard ne prend jamais de capture --
-// `docs-screenshot.js` est un no-op tant que cette variable n'est pas
-// positionnee. Ne cible que les fichiers ou des etapes/appels
-// `docsScreenshot()`/`{"action":"screenshot"}` ont ete ajoutes (voir
-// frontend/e2e/README.md) ; les autres fichiers de la suite ne produisent
-// aucune capture et n'ont pas besoin d'etre executes ici.
+// Playwright configuration that regenerates the screenshots of docs/. Kept apart from playwright.config.js (used by
+// `npm run test:e2e`): DOCS_SCREENSHOTS is set here, in the configuration module that Node runs before loading any
+// test file, so it works the same from PowerShell, cmd or bash, and the standard run never captures anything
+// (docs-screenshot.js only frames the subject until this variable is set).
+//
+// Only the files that take screenshots run: those calling docsScreenshot() and those replaying scenarios, whose
+// "screenshot" steps call it. They are found by reading the files, so a new one cannot be forgotten in a list.
+import fs from 'node:fs';
 import { defineConfig } from '@playwright/test';
 
 process.env.DOCS_SCREENSHOTS = '1';
 
+const e2eDir = new URL('./e2e/', import.meta.url);
+const takesScreenshots = (name) =>
+  /\.spec\.m?js$/.test(name) && /\b(docsScreenshot|runScenario)\(/.test(fs.readFileSync(new URL(name, e2eDir), 'utf8'));
+
 export default defineConfig({
   testDir: './e2e',
-  testMatch: [
-    'scenario-runner.spec.js',
-    'backups.spec.js',
-    'rule-tester.spec.js',
-    'messaging.spec.js',
-    'config.spec.mjs',
-    'rhai-autocomplete.spec.js',
-    'observation-suggestions.spec.js',
-    'request-log.spec.js',
-    'auth-static-assets.spec.js',
-  ],
+  testMatch: fs.readdirSync(e2eDir).filter(takesScreenshots),
   timeout: 15000,
   workers: 1,
   use: {
