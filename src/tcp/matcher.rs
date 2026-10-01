@@ -1,8 +1,5 @@
-// Matching sur octets bruts, first-match (meme philosophie que
-// `engine::matcher` pour HTTP, mais sans reutilisation de code possible :
-// ConditionSource/Operator sont modelises autour de valeurs textuelles
-// extraites d'une requete HTTP structuree, ce qui n'existe pas ici -- on ne
-// dispose que d'une tranche d'octets sans decodage protocolaire).
+// First-match rules on raw bytes, as `engine::matcher` does for HTTP, but with no shared code: HTTP conditions read
+// named text values out of a structured request, and here there is only a slice of bytes, never decoded.
 use crate::tcp::config::{TcpMatcher, TcpRule};
 use crate::tcp::hex;
 
@@ -50,9 +47,8 @@ mod tests {
 
     #[test]
     fn prefix_with_empty_hex_never_matches() {
-        // Un prefixe vide matcherait n'importe quoi silencieusement si on
-        // l'autorisait -- traite comme une regle mal configuree plutot que
-        // comme un joker (celui-ci existe deja explicitement : TcpMatcher::Any).
+        // An empty prefix would match anything, silently: treated as a misconfigured rule, since `TcpMatcher::Any` exists
+        // for a catch-all.
         let m = TcpMatcher::Prefix(String::new());
         assert!(!matches(&m, &[0x30, 0x0c]));
         assert!(!matches(&m, &[]));
@@ -66,8 +62,8 @@ mod tests {
 
     #[test]
     fn regex_matches_arbitrary_bytes_not_just_utf8() {
-        // (?-u) desactive le mode unicode de `regex::bytes` : necessaire pour
-        // matcher des octets hors UTF-8 valide (trames binaires typiques).
+        // (?-u) turns Unicode mode off in `regex::bytes`, so that patterns can match bytes that are not valid UTF-8, as
+        // binary frames usually are.
         let m = TcpMatcher::Regex(r"(?-u)^\x30\x0c".into());
         assert!(matches(&m, &[0x30, 0x0c, 0xff]));
         assert!(!matches(&m, &[0x31, 0x0c]));

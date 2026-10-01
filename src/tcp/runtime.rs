@@ -1,14 +1,9 @@
-// Etat vivant du mock TCP : config actuelle + taches d'ecoute + statut,
-// derriere un verrou partage (meme forme que MockStore, en plus simple --
-// pas de write-behind/backup/rotation, le volume d'ecriture attendu ici est
-// bien plus faible que la config HTTP, cf `tcp::config`).
+// The live state of the TCP mocks: configuration, listener tasks and their status, behind one lock. Simpler than
+// MockStore: no write-behind and no backups, changes being rare and small (see `tcp::config`).
 //
-// `replace()` est le seul point d'entree de mutation (utilise par l'API
-// CRUD, `server/api.rs`) : persiste sur disque (ecriture atomique tmp+
-// rename, meme technique que `MockStore::write_to_disk`) PUIS relance les
-// listeners -- arrete proprement les anciens avant de rebind les nouveaux,
-// pour que le mock TCP puisse etre reconfigure sans redemarrer tout le
-// processus (donc sans couper le serveur HTTP principal).
+// `replace()` is the only way to change it (used by the API, server/api.rs): it writes the file atomically
+// (temporary file, then rename, as MockStore does), then stops the old listeners before starting the new ones, so
+// the TCP mocks change without restarting the process or touching the HTTP server.
 use crate::tcp::config::TcpConfig;
 use crate::tcp::listener::{TcpServiceStatus, spawn_tcp_services};
 use std::path::{Path, PathBuf};
@@ -30,9 +25,8 @@ pub struct TcpRuntime {
 }
 
 impl TcpRuntime {
-    /// Charge `{data_dir}/tcp-config.yaml` (absent/mal forme -> config vide,
-    /// cf `TcpConfig::load`) et demarre les listeners correspondants. Point
-    /// d'entree unique, appele une fois au demarrage (`main.rs`).
+    /// Loads `{data_dir}/tcp-config.yaml` (missing or unreadable means empty, see `TcpConfig::load`) and starts its
+    /// listeners on `bind_ip`. Called once at startup (main.rs).
     pub async fn load_and_spawn(data_dir: &Path, bind_ip: std::net::IpAddr) -> Self {
         let config = TcpConfig::load(data_dir);
         let (handles, statuses) = spawn_tcp_services(&config, bind_ip).await;
@@ -55,16 +49,9 @@ impl TcpRuntime {
         self.inner.read().await.statuses.clone()
     }
 
-    /// Remplace la config integralement, persiste, puis relance TOUS les
-    /// listeners (pas de diff fin "seul ce qui a change repart") : plus
-    /// simple et plus sur pour cette premiere tranche -- le volume de
-    /// services TCP attendu est faible (poignee d'entrees), le cout d'un
-    /// arret/redemarrage complet des listeners a chaque mutation est
-    /// negligeable. `handle.abort()` PUIS `handle.await` (pas juste abort) :
-    /// necessaire pour que le port soit reellement libere avant le rebind
-    /// suivant -- await sur un handle aborte ne retourne qu'une fois la
-    /// tache (et la `TcpListener` qu'elle possede) effectivement detruite,
-    /// pas juste la demande de cancellation envoyee.
+    /// Replaces the whole configuration, writes it, then restarts every listener (no per-service diff: there are a
+    /// handful, and a full restart is cheap and simpler to get right). Each old task is aborted AND awaited: awaiting an
+    /// aborted task returns only once it and its `TcpListener` are dropped, so the port is free before it is bound again.
     pub async fn replace(&self, new_config: TcpConfig) -> std::io::Result<()> {
         let yaml = serde_yaml::to_string(&new_config).map_err(std::io::Error::other)?;
         Self::write_to_disk(&TcpConfig::config_file(&self.data_dir), &yaml)?;
@@ -84,7 +71,7 @@ impl TcpRuntime {
     fn write_to_disk(path: &Path, yaml: &str) -> std::io::Result<()> {
         let parent = path
             .parent()
-            .expect("tcp-config.yaml a toujours un parent (DATA_PATH)");
+            .expect("tcp-config.yaml always has a parent directory (DATA_PATH)");
         std::fs::create_dir_all(parent)?;
         let tmp_path = parent.join(".tcp-config.yaml.tmp");
         std::fs::write(&tmp_path, yaml.as_bytes())?;
@@ -155,15 +142,12 @@ mod tests {
 
     #[tokio::test]
     async fn replace_on_same_port_frees_it_before_rebinding() {
-        // Le cas a risque documente dans replace() : remplacer la config
-        // d'un service SANS changer son port doit reussir (l'ancien
-        // listener doit avoir libere le port avant que le nouveau essaie de
-        // le reprendre), pas echouer en "address already in use".
+        // The risky case of replace(): a service replaced without changing its port must bind again, which requires the old
+        // listener to have released the port ("address already in use" otherwise).
         let dir = temp_dir();
         let runtime = TcpRuntime::load_and_spawn(&dir, crate::tcp::LOOPBACK).await;
 
-        // Port reel (pas 0) : necessaire pour reutiliser EXACTEMENT le meme
-        // port au deuxieme replace() ci-dessous.
+        // A real port (not 0), so that the second replace() reuses exactly the same one.
         let probe = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let port = probe.local_addr().unwrap().port();
         drop(probe);
@@ -182,7 +166,7 @@ mod tests {
         runtime.replace(config).await.unwrap();
         assert!(runtime.statuses().await[0].listening);
 
-        // Meme port, regle differente : le rebind doit reussir.
+        // Same port, another rule: binding again must work.
         let config2 = TcpConfig {
             services: vec![TcpService {
                 name: "svc".into(),
@@ -201,8 +185,7 @@ mod tests {
             "rebind on the same port should succeed: {statuses:?}"
         );
 
-        // Verifie que c'est bien la NOUVELLE regle qui repond (le nouveau
-        // listener a bien pris le relais, pas l'ancien qui zombierait).
+        // The NEW rule answers: the new listener took over, the old one is gone.
         let mut client = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
         client.write_all(b"ping").await.unwrap();
         let mut resp = [0u8; 2];

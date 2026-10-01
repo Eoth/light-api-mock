@@ -1,17 +1,6 @@
-// Ecoute TCP brute, une tache tokio par service configure, en parallele du
-// serveur HTTP principal (jamais sur le meme port : un protocole binaire ne
-// se multiplexe pas par chemin d'URL, cf la note d'etude "TCP brut" du
-// handoff de reprise). Un service TCP existe hors du routeur Axum -- pas
-// d'auth, pas de CORS, pas de middleware HTTP : ce sont des concepts qui ne
-// s'appliquent pas a une socket brute.
-//
-// MOCK UNIQUEMENT (pas de relais/proxy) -- decision explicite, cf
-// `tcp::mod` : un relais qui ne fait que retransmettre n'ajoute aucune
-// valeur de mock, et route le trafic vers un intermediaire qui de toute
-// facon rejoint la meme cible reelle -- l'appelant peut s'y connecter
-// directement, ce qui rend le detour par lightMock a la fois inutile et
-// contraire au principe de sobriete (un saut reseau de plus pour un
-// resultat identique).
+// Raw TCP listening: one task per configured service, next to the HTTP server and never on its port (a binary
+// protocol cannot be routed by URL path). TCP services live outside the Axum router, so no authentication, CORS or
+// HTTP middleware applies: they mean nothing on a raw socket. Mock only, never a relay (see `tcp::mod`).
 use crate::tcp::config::TcpService;
 use crate::tcp::{hex, matcher};
 use std::sync::Arc;
@@ -23,11 +12,8 @@ use tokio::task::JoinHandle;
 const READ_TIMEOUT: Duration = Duration::from_secs(5);
 const DEFAULT_MAX_MESSAGE_SIZE: usize = 16 * 1024;
 
-/// Meme idiome que `request_log::max_body_size`/`message_log::max_body_size`
-/// (env var, defaut 16 Ko) : borne la lecture initiale d'une connexion pour
-/// eviter qu'un client hostile ne fasse grossir la memoire sans limite avant
-/// tout matching (cf le principe de limites de ressources explicites pour le
-/// parsing d'entree non fiable).
+/// Largest first message read from a connection (`TCP_MOCK_MAX_MESSAGE_SIZE`, 16 KiB by default, like
+/// `request_log::max_body_size`), so that a hostile client cannot grow memory before any matching happens.
 pub fn max_message_size() -> usize {
     std::env::var("TCP_MOCK_MAX_MESSAGE_SIZE")
         .ok()
@@ -47,15 +33,11 @@ pub struct TcpServiceStatus {
     pub error: Option<String>,
 }
 
-/// Demarre un accept-loop par service TCP configure au demarrage du
-/// processus. Config figee pour toute la duree du process (pas d'API pour
-/// la modifier a chaud dans cette premiere tranche, cf `tcp::config`) :
-/// chaque tache capture directement le `TcpService` dont elle a besoin, pas
-/// de re-lecture d'un store partage a chaque connexion.
+/// Starts one accept loop per configured service on `bind_ip`. Each task holds the `TcpService` it serves, so a
+/// connection reads no shared state.
 ///
-/// Un service dont le port ne peut pas etre bind (deja pris, permissions...)
-/// est logge en erreur et simplement ignore -- ne doit jamais empecher le
-/// demarrage du serveur HTTP principal ni des autres services TCP.
+/// A service whose port cannot be bound (taken, not permitted) is logged, reported in its status and skipped: it
+/// never keeps the HTTP server or the other TCP services from starting.
 pub async fn spawn_tcp_services(
     config: &crate::tcp::config::TcpConfig,
     bind_ip: std::net::IpAddr,
@@ -118,12 +100,8 @@ pub async fn spawn_tcp_services(
     (handles, statuses)
 }
 
-/// Une connexion = lit un message, matche, repond si une regle matche, puis
-/// ferme. Pas de boucle multi-echanges (cf limitation documentee dans
-/// `tcp::mod`) : suffisant pour un protocole simple requete/reponse, pas
-/// pour une sequence de plusieurs messages sur la meme connexion. Aucun
-/// repli proxy si rien ne matche : sans regle, la connexion ferme
-/// simplement (pas de destination a atteindre, il n'y en a plus).
+/// One connection: read one message, match it, answer if a rule matches, close. No loop over several exchanges (see
+/// `tcp::mod`): enough for a simple request and response. Without a matching rule, the connection just closes.
 async fn handle_connection(mut stream: TcpStream, service: Arc<TcpService>) {
     let mut buf = vec![0u8; max_message_size()];
     let n = match tokio::time::timeout(READ_TIMEOUT, stream.read(&mut buf)).await {
@@ -248,17 +226,14 @@ mod tests {
 
     #[test]
     fn max_message_size_defaults_to_16kb() {
-        // SAFETY-note (pas d'unsafe ici) : simple lecture d'env var absente ;
-        // cette variable n'est fixee par aucun autre test de la suite.
+        // Removing a variable no other test sets.
         unsafe { std::env::remove_var("TCP_MOCK_MAX_MESSAGE_SIZE") };
         assert_eq!(max_message_size(), 16 * 1024);
     }
 
     #[tokio::test]
     async fn spawn_reports_listening_true_for_a_free_port() {
-        // Port 0 = attribue par l'OS, toujours libre par construction ; on ne
-        // peut donc pas exprimer "port deja pris" avec ce meme mecanisme (cf
-        // le test suivant, qui reserve explicitement un port avant coup).
+        // Port 0 lets the OS pick a free port, so it cannot express "port taken" (the next test reserves one first).
         let config = crate::tcp::config::TcpConfig {
             services: vec![TcpService {
                 name: "free-port".into(),
@@ -291,13 +266,8 @@ mod tests {
 
     #[tokio::test]
     async fn spawn_reports_listening_false_when_port_already_taken() {
-        // Reserve un port reel en le bindant nous-memes AVANT d'appeler
-        // spawn_tcp_services avec ce meme port -- garantit un conflit
-        // deterministe (contrairement a un port fixe au hasard, qui pourrait
-        // etre libre sur la machine de CI). "0.0.0.0" et pas "127.0.0.1" :
-        // spawn_tcp_services bind sur "0.0.0.0:{port}" (toutes interfaces),
-        // reserver seulement l'interface loopback ne cree pas toujours un
-        // conflit reel selon l'OS (observe sur Windows).
+        // Reserve a real port on the same address first, for a conflict that does not depend on which ports happen to be
+        // free on the machine.
         let reserved = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let taken_port = reserved.local_addr().unwrap().port();
 
@@ -312,7 +282,7 @@ mod tests {
         assert_eq!(statuses.len(), 1);
         assert!(!statuses[0].listening);
         assert!(statuses[0].error.is_some());
-        // Aucune tache d'ecoute demarree pour ce service en echec.
+        // No listener task for the service that failed.
         assert!(handles.is_empty());
 
         drop(reserved);

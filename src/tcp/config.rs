@@ -1,27 +1,12 @@
-// Schema + chargement du mock TCP brut. Delibrement HORS de
-// `models::MockConfig` (contrairement a une premiere version de cette
-// tranche) : ce module aurait alors force `MockConfig` a exposer un
-// nouveau champ, obligatoire dans TOUT literal `MockConfig { .. }` du
-// crate (~20 sites, presque tous dans des tests HTTP existants deja en
-// production) — un rayon d'impact que "brique separee" est cense eviter
-// par construction. Meme choix que `messaging::KafkaConfig`, qui ne touche
-// jamais non plus a `MockConfig`.
+// Schema and loading of the raw TCP mocks. Kept out of `models::MockConfig` on purpose: a new field there would be
+// required in every `MockConfig { .. }` literal of the crate (about twenty, nearly all in HTTP tests) for a feature
+// most builds do not have, like `messaging::KafkaConfig`.
 //
-// Consequence assumee pour cette premiere tranche : la config TCP vit dans
-// son PROPRE fichier YAML (`tcp-config.yaml`, meme repertoire `DATA_PATH`
-// que `mock-config.yaml`), chargee UNE FOIS au demarrage, pas de
-// write-behind/backup/rotation (ce que fournit `MockStore` pour la config
-// HTTP) tant qu'aucune API ne permet de la modifier a chaud -- rien a
-// proteger en ecriture qui n'existe pas encore.
+// So the TCP configuration has its own file, `tcp-config.yaml`, next to `mock-config.yaml` in `DATA_PATH`, written
+// atomically by `TcpRuntime::replace()`, without the backups and write-behind of `MockStore`: changes are rare and
+// small.
 //
-// AUCUN mode proxy (retire de la premiere version de cette tranche, cf
-// `tcp::mod` pour la decision complete) : un relais TCP brut sans matching
-// n'ajoute aucune valeur de mock, et fait passer le trafic par un
-// intermediaire qui ira de toute facon vers la meme cible relle -- l'
-// appelant peut s'y connecter directement, ce que lightMock imposer un
-// saut reseau supplementaire sans contrepartie contredit. Chaque
-// `TcpService` n'a donc PAS de cible reelle a configurer : uniquement des
-// regles de mock.
+// No proxy mode (see `tcp::mod`): a `TcpService` has mock rules only, never a target.
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
@@ -43,26 +28,21 @@ pub struct TcpService {
 pub struct TcpRule {
     pub name: String,
     pub matcher: TcpMatcher,
-    /// Reponse brute renvoyee au client quand cette regle matche. Encodage
-    /// hexadecimal (pas base64) : evite une dependance externe
-    /// supplementaire, cf `tcp::hex`.
+    /// Raw bytes sent back when this rule matches, as hexadecimal text (see `tcp::hex`).
     #[serde(default)]
     pub response_hex: String,
 }
 
-/// Strategie de matching sur les octets bruts recus a l'ouverture de la
-/// connexion. Premiere regle qui matche gagne (meme philosophie first-match
-/// que `engine::matcher` cote HTTP), evaluee dans l'ordre de
-/// `TcpService::rules` — cf `tcp::matcher`.
+/// How a rule matches the raw bytes received when the connection opens. Rules are tried in the order of
+/// `TcpService::rules` and the first match wins, as for HTTP (see `tcp::matcher`).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", content = "value")]
 pub enum TcpMatcher {
-    /// Prefixe attendu, encode en hexadecimal.
+    /// Expected prefix, as hexadecimal text.
     Prefix(String),
-    /// Pattern `regex::bytes::Regex` applique aux octets bruts (pas d'UTF-8
-    /// garanti).
+    /// A `regex::bytes::Regex` applied to the raw bytes, which need not be UTF-8.
     Regex(String),
-    /// Matche toujours : utile comme regle de repli en fin de liste.
+    /// Always matches: a fallback rule at the end of the list.
     Any,
 }
 
@@ -71,18 +51,10 @@ impl TcpConfig {
         data_dir.join("tcp-config.yaml")
     }
 
-    /// Absence de fichier = config vide (feature activee mais rien a
-    /// ecouter), PAS une erreur : contrairement a `MockStore::load_or_init`,
-    /// ce fichier n'est jamais auto-cree -- il n'existe encore aucune UI/API
-    /// pour le faire naitre, l'utilisateur qui veut s'en servir aujourd'hui
-    /// l'ecrit lui-meme a la main dans `DATA_PATH`.
+    /// No file means no TCP service, not an error: the file is created by the first change through the API.
     ///
-    /// Un fichier present mais illisible/mal forme est logge en erreur et
-    /// degrade vers une config vide plutot que de faire echouer le
-    /// demarrage : contrairement au YAML HTTP (le produit principal, deja
-    /// en production), cette fonctionnalite est encore une premiere
-    /// tranche -- une erreur dedans ne doit jamais empecher le serveur HTTP
-    /// de demarrer.
+    /// A file that cannot be read or parsed is logged as an error and treated as empty rather than stopping the
+    /// start: an optional feature must never keep the HTTP server from starting.
     pub fn load(data_dir: &Path) -> Self {
         let file = Self::config_file(data_dir);
         if !file.exists() {
