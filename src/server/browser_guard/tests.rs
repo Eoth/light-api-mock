@@ -117,14 +117,26 @@ async fn api_cors_is_limited_to_listed_origins_while_mocks_stay_open() {
 async fn a_cross_site_page_cannot_change_the_configuration() {
     let root = spawn_app().await;
     let client = reqwest::Client::new();
-    let resp = client
-        .delete(format!("{root}/api/config/reset"))
-        .header("origin", EVIL)
-        .header("sec-fetch-site", "cross-site")
-        .send()
-        .await
-        .unwrap();
-    assert_eq!(resp.status().as_u16(), 403);
+    let reset = |language: &'static str| {
+        client
+            .delete(format!("{root}/api/config/reset"))
+            .header("origin", EVIL)
+            .header("sec-fetch-site", "cross-site")
+            .header("accept-language", language)
+            .send()
+    };
+    for (language, reason) in [
+        ("en-US", "Cross-site request refused"),
+        ("fr-FR", "Requête inter-sites refusée"),
+    ] {
+        let resp = reset(language).await.unwrap();
+        assert_eq!(resp.status().as_u16(), 403);
+        let body: serde_json::Value = resp.json().await.unwrap();
+        assert!(
+            body["error"].as_str().unwrap().starts_with(reason),
+            "{body}"
+        );
+    }
     let services = client
         .get(format!("{root}/api/services"))
         .send()

@@ -15,6 +15,7 @@
 //! - Response headers: lightMock's own pages and API answers carry a content security policy (no inline script,
 //!   no framing), `nosniff` and `no-referrer`. Responses of the mocked and proxied services are left exactly as
 //!   configured or as the backend sent them: they are what the applications under test expect.
+use crate::i18n::tr;
 use crate::server::validation::is_management_api_route;
 use axum::body::Body;
 use axum::extract::{Request, State};
@@ -94,7 +95,7 @@ impl BrowserGuard {
     }
 
     /// Why the request must be refused, if it must.
-    fn refusal(&self, method: &Method, path: &str, headers: &HeaderMap) -> Option<&'static str> {
+    fn refusal(&self, method: &Method, path: &str, headers: &HeaderMap) -> Option<String> {
         if !is_management_api_route(path) {
             return None;
         }
@@ -104,9 +105,10 @@ impl BrowserGuard {
                 .and_then(|h| h.to_str().ok())
                 .is_some_and(|h| !is_loopback_host(h))
         {
-            return Some(
+            return Some(tr(
                 "Request refused: this lightMock only listens on the local machine; call it through localhost.",
-            );
+                &[],
+            ));
         }
         let cross_site = matches!(
             headers.get("sec-fetch-site").and_then(|v| v.to_str().ok()),
@@ -116,9 +118,10 @@ impl BrowserGuard {
             && cross_site
             && !headers.get("origin").is_some_and(|o| self.allows(o))
         {
-            return Some(
+            return Some(tr(
                 "Cross-site request refused: add this origin to CORS_ALLOWED_ORIGINS to allow it.",
-            );
+                &[],
+            ));
         }
         None
     }
