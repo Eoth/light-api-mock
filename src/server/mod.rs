@@ -201,8 +201,7 @@ mod tests {
     // (lit l'env directement) : un nouveau champ obligatoire sur AppState
     // ajouterait un site de construction de plus a maintenir dans les tests.
     async fn spawn_test_app(auth_config: crate::auth::AuthConfig) -> String {
-        let data_dir =
-            std::env::temp_dir().join(format!("lightmock-servermod-test-{}", fastrand::u64(..)));
+        let data_dir = crate::server::test_support::temp_data_dir("servermod-test");
         std::fs::create_dir_all(&data_dir).unwrap();
         let store = crate::store::MockStore::new(data_dir.join("mock-config.yaml"));
         store

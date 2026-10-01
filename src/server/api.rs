@@ -1959,8 +1959,7 @@ mod tests {
     // `cargo test` seul, sans dependre de la suite Playwright.
     async fn spawn_test_app(config: MockConfig) -> String {
         crate::server::test_support::assert_consistent(&config);
-        let data_dir =
-            std::env::temp_dir().join(format!("lightmock-api-test-{}", fastrand::u64(..)));
+        let data_dir = crate::server::test_support::temp_data_dir("api-test");
         std::fs::create_dir_all(&data_dir).unwrap();
         let store = crate::store::MockStore::new(data_dir.join("mock-config.yaml"));
         store.replace(config).await.unwrap();
@@ -2148,8 +2147,7 @@ mod tests {
     // complet) : seul script_engine est reellement exerce par ces tests,
     // le reste est un etat vide/desactive standard.
     async fn test_state() -> AppState {
-        let data_dir =
-            std::env::temp_dir().join(format!("lightmock-scripttest-{}", fastrand::u64(..)));
+        let data_dir = crate::server::test_support::temp_data_dir("scripttest");
         std::fs::create_dir_all(&data_dir).unwrap();
         let store = crate::store::MockStore::new(data_dir.join("mock-config.yaml"));
         store

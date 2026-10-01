@@ -18,8 +18,34 @@ pub(crate) fn assert_consistent(config: &MockConfig) {
     );
 }
 
+/// Directory of the current test run: `<temp>/lightmock-tests/<pid>-<start time>`. A test cannot know when the
+/// servers it started stop writing, so its directory is not removed by the test itself; instead the first test of
+/// each run removes the runs older than an hour. Tests used to leave one directory per test in the temporary
+/// folder, thousands after a few days.
+static RUN_DIR: std::sync::LazyLock<PathBuf> = std::sync::LazyLock::new(|| {
+    let root = std::env::temp_dir().join("lightmock-tests");
+    if let Ok(runs) = std::fs::read_dir(&root) {
+        let hour_ago = std::time::SystemTime::now() - std::time::Duration::from_secs(3600);
+        for run in runs.flatten() {
+            let stale = run
+                .metadata()
+                .and_then(|m| m.modified())
+                .is_ok_and(|modified| modified < hour_ago);
+            if stale {
+                let _ = std::fs::remove_dir_all(run.path());
+            }
+        }
+    }
+    let started = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or_default();
+    root.join(format!("{}-{started}", std::process::id()))
+});
+
+/// A fresh, empty directory for one test, under the directory of the current run.
 pub(crate) fn temp_data_dir(prefix: &str) -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("lightmock-{prefix}-{}", fastrand::u64(..)));
+    let dir = RUN_DIR.join(format!("{prefix}-{}", fastrand::u64(..)));
     std::fs::create_dir_all(&dir).unwrap();
     dir
 }

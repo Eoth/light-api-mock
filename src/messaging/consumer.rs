@@ -238,7 +238,7 @@ mod tests {
     use crate::models::*;
 
     async fn store_with_rule(conditions: ConditionGroup, response_literal: &str) -> MockStore {
-        let dir = std::env::temp_dir().join(format!("lightmock-msgtest-{}", fastrand::u64(..)));
+        let dir = crate::server::test_support::temp_data_dir("msgtest");
         std::fs::create_dir_all(&dir).unwrap();
         let store = MockStore::new(MockStore::config_file(&dir));
         let config = MockConfig {

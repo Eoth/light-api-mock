@@ -111,8 +111,7 @@ mod tests {
 
     #[test]
     fn load_missing_file_returns_empty_config() {
-        let dir =
-            std::env::temp_dir().join(format!("lightmock-tcp-cfg-test-{}", fastrand::u64(..)));
+        let dir = crate::server::test_support::temp_data_dir("tcp-cfg-test");
         std::fs::create_dir_all(&dir).unwrap();
         let config = TcpConfig::load(&dir);
         assert!(config.services.is_empty());
@@ -120,8 +119,7 @@ mod tests {
 
     #[test]
     fn load_malformed_yaml_falls_back_to_empty_config_without_panicking() {
-        let dir =
-            std::env::temp_dir().join(format!("lightmock-tcp-cfg-test-{}", fastrand::u64(..)));
+        let dir = crate::server::test_support::temp_data_dir("tcp-cfg-test");
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(
             TcpConfig::config_file(&dir),
@@ -159,8 +157,7 @@ mod tests {
 
     #[test]
     fn load_reads_real_file_from_disk() {
-        let dir =
-            std::env::temp_dir().join(format!("lightmock-tcp-cfg-test-{}", fastrand::u64(..)));
+        let dir = crate::server::test_support::temp_data_dir("tcp-cfg-test");
         std::fs::create_dir_all(&dir).unwrap();
         let yaml = r#"
 services:

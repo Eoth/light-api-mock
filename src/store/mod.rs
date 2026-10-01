@@ -636,7 +636,7 @@ mod tests {
     static ENV_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
     fn temp_dir() -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("lightmock-test-{}", fastrand::u64(..)));
+        let dir = crate::server::test_support::temp_data_dir("test");
         std::fs::create_dir_all(&dir).unwrap();
         dir
     }

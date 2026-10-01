@@ -100,8 +100,7 @@ mod tests {
     use tokio::net::TcpStream;
 
     fn temp_dir() -> PathBuf {
-        let dir =
-            std::env::temp_dir().join(format!("lightmock-tcp-runtime-test-{}", fastrand::u64(..)));
+        let dir = crate::server::test_support::temp_data_dir("tcp-runtime-test");
         std::fs::create_dir_all(&dir).unwrap();
         dir
     }

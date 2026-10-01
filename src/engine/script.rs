@@ -1711,7 +1711,7 @@ mod tests {
 
     #[test]
     fn import_cannot_load_a_script_file_from_the_disk() {
-        let dir = std::env::temp_dir().join(format!("lightmock-rhai-import-{}", fastrand::u64(..)));
+        let dir = crate::server::test_support::temp_data_dir("rhai-import");
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(dir.join("secret.rhai"), "fn read() { \"leaked\" }").unwrap();
         let module = dir.join("secret").to_string_lossy().replace('\\', "/");
