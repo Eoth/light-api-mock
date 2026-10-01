@@ -47,7 +47,7 @@ Size L, to split by module
 
 **Progress.** Done: the Rust code (`src/`, `tests/`, `build.rs`, with every test message and log line), the scripts, and the whole UI outside its tests: `main.js`, `App.svelte`, every module of `frontend/src/lib/`, every component of `frontend/src/lib/components/` (473 French lines of 528 before) and the two style sheets of `frontend/src/` (9 lines before). CI fails on a French comment in any of them: `scripts/check-french-comments.mjs` reads comments only (interface strings, fixtures and example data are never reported) and lists the covered paths, which grow with each translated folder. Checking each comment against the code found 14 wrong claims (a wrong file, access rules stated wrongly, a lossless round trip that lost data, styles called shared that are not), corrected rather than translated, and 11 defects, fixed in 9 commits, each with a test that failed first (see the changelog).
 
-**Left**, counted in French comment lines by that script, all in the tests that R11 rewrites: `frontend/e2e/` 422 of its 560 comment lines (`scenario-runner.spec.js` 187), `frontend/src/tests/` 140 of 198 (136 of 194 in the test files, 4 of 4 in `helpers/`); and the French test titles, which are strings, not comments, so the check does not see them.
+**Left**, counted in French comment lines by that script, only in tests: `frontend/e2e/` 422 of its 560 comment lines (`scenario-runner.spec.js` 187), with the French titles of its tests and scenarios (strings, not comments, so the check does not see them); `frontend/src/tests/` 140 of 198 (136 of 194 in the test files, 4 of 4 in `helpers/`), to translate with R11, which rewrites those tests.
 
 **Done when.** No French comment left in `frontend/`, and the CI check covers it.
 
