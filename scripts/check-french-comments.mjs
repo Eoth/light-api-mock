@@ -30,14 +30,17 @@ export const COVERED = [
 
 // Frequent French words that English comments do not use, with and without their accents (comments are often typed
 // without them). Words that English shares are left out: "en" (a language code), "est" (a time zone), "par", "cas"
-// (compare-and-swap), "aux", "sans", "tout", "encore".
+// (compare-and-swap), "aux", "sans", "tout", "encore". The last ones are nouns and verbs that test titles use: a
+// title often goes without the articles that give a sentence away (`groupe: nom accentue accepte`).
 export const FRENCH_WORDS = [
   'les', 'pour', 'avec', 'une', 'sont', 'dans', 'qui', 'deja', 'déjà', 'regle', 'règle', 'requete', 'requête', 'meme',
   'même', 'donc', 'sinon', 'aussi', 'mais', 'etre', 'être', 'cette', 'cela', 'lorsque', 'puis', 'chaque', 'des', 'du',
   'de', 'le', 'la', 'un', 'et', 'ou', 'au', 'ce', 'ces', 'il', 'ne', 'pas', 'si', 'sur', 'à', 'où', 'quand', 'comme',
   'doit', 'peut', 'fait', 'tous', 'toujours', 'jamais', 'rien', 'avant', 'apres', 'après', 'selon', 'entre', 'ici',
   'voir', 'cote', 'côté', 'plutot', 'plutôt', 'seul', 'seule', 'deux', 'reste', 'etat', 'état', 'defaut', 'défaut',
-  'parce',
+  'parce', 'aucun', 'aucune', 'avancee', 'avancée', 'avancees', 'avancées', 'comportement', 'donnees', 'données',
+  'erreur', 'exemple', 'exemples', 'fausse', 'fonctionne', 'groupe', 'groupes', 'pliage', 'purement', 'regles', 'règles',
+  'reponse', 'réponse', 'reponses', 'réponses', 'requetes', 'requêtes', 'reseau', 'réseau',
 ];
 
 // A letter, a digit, "_" or "-" next to a listed word makes it part of another word ("de-duplicate", "en-AU").

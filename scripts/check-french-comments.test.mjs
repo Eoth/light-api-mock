@@ -7,7 +7,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { COVERED, checkComments, commentLines } from './check-french-comments.mjs';
+import { COVERED, checkComments, commentLines, isFrench } from './check-french-comments.mjs';
 
 const SCRIPT = path.join(path.dirname(fileURLToPath(import.meta.url)), 'check-french-comments.mjs');
 
@@ -34,6 +34,21 @@ test('short French comments are recognised, with or without accents, by their wo
     check({ 'a.js': js }).map((p) => p.split(': ')[0]),
     ['a.js:1', 'a.js:3', 'a.js:5', 'a.js:7', 'a.js:9'],
   );
+});
+
+test('terse French, as test titles write it without articles, is recognised', () => {
+  // Titles the end-to-end suite once had, which the articles and pronouns alone did not reveal.
+  const titles = [
+    'groupe: nom accentue accepte',
+    'UI servie sans aucun service',
+    'Service purement mocke : comportement reseau',
+    'service: toggle mock/proxy fonctionne',
+    'identite: suppression sans fausse erreur',
+    'Runner (scenarios JSON) - lot 7 (pliage JSON + options avancees)',
+    'Runner (scenarios JSON) - lot 10 (XML par exemple)',
+    'Runner (scenarios JSON) - lot 16 (diagnostic reponse JSON/XML)',
+  ];
+  assert.deepEqual(titles.filter((title) => !isFrench(title)), []);
 });
 
 test('English that shares letters with French words is not reported', () => {
