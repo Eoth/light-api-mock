@@ -7,26 +7,12 @@ import { createServer } from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// Cas particulier de la suite E2E : contrairement a tous les autres fichiers
-// *.spec.js/*.spec.mjs (qui ciblent le backend PARTAGE deja demarre sur
-// http://localhost:7342 avec AUTH_ENABLED=false, cf frontend/e2e/README.md),
-// ce spec demarre SA PROPRE instance de Mimicway, sur un port dedie, avec
-// AUTH_ENABLED=true. Impossible de reutiliser l'instance partagee pour ce
-// besoin : activer l'auth dessus casserait tous les 80+ autres tests de la
-// suite, qui supposent tous AUTH_ENABLED=false. Necessite le binaire deja
-// compile (`cargo build`, target/debug/mimicway(.exe)) et frontend/dist deja
-// buildee (memes prerequis que `npm run build`/`cargo build`) -- pas de build
-// automatique dans ce spec, comme le reste de la suite E2E qui suppose deja
-// un environnement pret.
+// This file starts its own Mimicway, on a port of its own, with AUTH_ENABLED=true: the other specs share the instance
+// on :7342, which runs without authentication. It needs the binary built (`cargo build`) and frontend/dist, like the
+// rest of the suite.
 //
-// Contexte du bug corrige : auth_middleware (src/auth/middleware.rs)
-// n'exemptait auparavant que 4 routes /api/auth/*, jamais les assets
-// statiques de la SPA (index.html, bundle JS/CSS, favicon) servis par
-// ServeDir (fallback_service, server/mod.rs::build_router). Avec
-// AUTH_ENABLED=true, un navigateur sans token ne pouvait donc meme pas
-// charger la page qui affiche l'ecran de connexion (LoginForm.svelte) --
-// probleme de poule et l'oeuf. Corrige en exemptant precisement ces assets
-// (is_static_asset_route, src/server/validation.rs), jamais /api/*.
+// With authentication on, only the management API asks for a token (auth_middleware, src/auth/middleware.rs): the
+// files of the interface load without one, or a browser could not even reach the login screen.
 
 const repoRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const binaryPath = path.join(
@@ -61,11 +47,11 @@ async function waitForHealth(baseUrl, timeoutMs = 15000) {
     await new Promise((r) => setTimeout(r, 150));
   }
   throw new Error(
-    `Mimicway (instance auth-enabled dediee a ce spec) n'a pas demarre a temps sur ${baseUrl}: ${lastError}`,
+    `Mimicway (instance with authentication, started by this spec) did not start in time on ${baseUrl}: ${lastError}`,
   );
 }
 
-test.describe('Auth: assets statiques de la SPA accessibles sans token (AUTH_ENABLED=true)', () => {
+test.describe('Auth: the files of the interface load without a token (AUTH_ENABLED=true)', () => {
   let child;
   let baseUrl;
   let dataDir;
@@ -83,9 +69,8 @@ test.describe('Auth: assets statiques de la SPA accessibles sans token (AUTH_ENA
         STATIC_DIR: staticDir,
         DATA_PATH: dataDir,
         AUTH_ENABLED: 'true',
-        // Keycloak factice : jamais reellement contacte par ces tests (aucun
-        // login n'est exerce ici) -- juste assez pour satisfaire la garde de
-        // demarrage AuthConfig::from_env() (panique si vide quand enabled).
+        // Never reached, since no login goes to Keycloak here: Mimicway refuses to start with authentication on and
+        // these settings empty (AuthConfig::from_env).
         KEYCLOAK_URL: 'http://127.0.0.1:1',
         KEYCLOAK_REALM: 'test-realm',
         KEYCLOAK_CLIENT_ID: 'mimicway',
@@ -106,13 +91,11 @@ test.describe('Auth: assets statiques de la SPA accessibles sans token (AUTH_ENA
     }
   });
 
-  test('la page d accueil se charge sans token et affiche l ecran de connexion', async ({ page }) => {
+  test('the home page loads without a token and shows the login screen', async ({ page }) => {
     const response = await page.goto(baseUrl + '/');
     expect(response.status()).toBe(200);
-    // Preuve que index.html ET le bundle JS/CSS ont bien charge (pas juste le
-    // HTML brut) : le frontend a demarre, interroge /api/auth/status (deja
-    // exempte), constate enabled=true et affiche LoginForm.svelte plutot que
-    // la liste des services.
+    // The login form only shows once the bundle has run, not from the HTML alone: the interface asked
+    // /api/auth/status (open without a token), found authentication on, and shows LoginForm.svelte.
     await expect(page.locator('[data-testid="login-form-username-input"]')).toBeVisible();
     await expect(page.locator('[data-testid="login-form-password-input"]')).toBeVisible();
     await docsScreenshot(
@@ -151,17 +134,16 @@ test.describe('Auth: assets statiques de la SPA accessibles sans token (AUTH_ENA
     await docsScreenshot(page, 'authentication-user-badge.png', '[data-testid="app-user-badge"]');
   });
 
-  test('un fichier du bundle assets/ reel se charge sans token', async ({ request }) => {
+  test('a file of the built bundle loads without a token', async ({ request }) => {
     const assetFiles = readdirSync(path.join(staticDir, 'assets'));
     const realFile = assetFiles.find((f) => f.endsWith('.js')) || assetFiles[0];
     const res = await request.get(`${baseUrl}/assets/${realFile}`);
     expect(res.status()).toBe(200);
   });
 
-  test('un appel a une route API protegee sans token echoue toujours (401)', async ({ request }) => {
-    // Regression cible : le bypass des assets statiques ne doit RIEN
-    // assouplir cote API -- une route protegee arbitraire (hors les 4 deja
-    // exemptees) doit continuer d'exiger un token.
+  test('a call to the management API without a token still gets 401', async ({ request }) => {
+    // Opening the files of the interface opens nothing of the API: outside its four open routes (health, auth status,
+    // login, token validation), it still asks for a token.
     const res = await request.get(`${baseUrl}/api/services`);
     expect(res.status()).toBe(401);
     const body = await res.json();

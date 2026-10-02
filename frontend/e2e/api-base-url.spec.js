@@ -6,25 +6,12 @@ import { createServer } from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// URL de l'API configurable independamment du Host du frontend : avant
-// cette passe, le frontend deduisait toujours l'URL de l'API de son propre
-// Host (chemin relatif /api/...). Ca casse des que
-// l'infrastructure route /api vers une origine distincte de celle qui sert
-// les assets statiques (ex. Kubernetes/Gloo Edge avec un VirtualService pour
-// le front et un RouteTable/Upstream separe pour le back, cas reel
-// rapporte). Ce spec verifie les DEUX comportements : (1) par defaut (rien
-// configure), rien ne change pour un deploiement co-localise ; (2) une fois
-// API_BASE_URL configure sur le processus qui sert la SPA, le frontend
-// appelle bien l'API sur l'origine configuree, meme quand elle differe de
-// celle qui sert la page elle-meme.
+// The interface calls the API on the origin that served it (relative /api/... paths), unless API_BASE_URL is set on
+// the process that serves it, which tells the page another base through /runtime-config.json: for an infrastructure
+// that routes /api to another origin than the static files. Both cases are checked.
 //
-// Meme cas particulier que auth-static-assets.spec.js : ce spec demarre SES
-// PROPRES instances de Mimicway (jamais l'instance partagee sur
-// http://localhost:7342, cf frontend/e2e/README.md), car le test 2 a
-// justement besoin de DEUX instances sur deux ports distincts. Necessite le
-// binaire deja compile (`cargo build`, target/debug/mimicway(.exe)) et
-// frontend/dist deja buildee, comme le reste de la suite E2E qui suppose un
-// environnement pret.
+// This file starts its own instances of Mimicway, never the shared one on :7342: two of them when front and back stand
+// on different origins. It needs the binary built (`cargo build`) and frontend/dist, like the rest of the suite.
 
 const repoRoot = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const binaryPath = path.join(
@@ -59,7 +46,7 @@ async function waitForHealth(baseUrl, timeoutMs = 15000) {
     await new Promise((r) => setTimeout(r, 150));
   }
   throw new Error(
-    `Mimicway (instance dediee a ce spec) n'a pas demarre a temps sur ${baseUrl}: ${lastError}`,
+    `Mimicway (instance started by this spec) did not start in time on ${baseUrl}: ${lastError}`,
   );
 }
 
@@ -81,8 +68,8 @@ async function spawnMimicway({ port, dataDir, extraEnv = {} }) {
   return { child, baseUrl };
 }
 
-test.describe('URL de l API configurable independamment du Host du frontend', () => {
-  test('comportement par defaut : /runtime-config.json renvoie une URL vide et l app fonctionne (co-localise)', async ({ page }) => {
+test.describe('API base URL apart from the origin of the interface', () => {
+  test('by default, /runtime-config.json gives an empty base and the interface uses its own origin', async ({ page }) => {
     const dataDir = mkdtempSync(path.join(tmpdir(), 'mimicway-apibase-default-'));
     const port = await getFreePort();
     let child;
@@ -95,9 +82,8 @@ test.describe('URL de l API configurable independamment du Host du frontend', ()
       expect((await configRes.json()).api_base_url).toBe('');
 
       await page.goto(baseUrl + '/');
-      // Preuve que l'app a bien appele /api/... en chemin relatif (comme
-      // avant cette passe) et affiche la liste de services : le titre de la
-      // page d'accueil est visible une fois le chargement initial termine.
+      // The list header and its add button show once start-up is over, start-up including the relative /api/...
+      // calls.
       await expect(page.getByText('Mimicway')).toBeVisible();
       await expect(page.locator('[data-testid="app-add-service-button"]')).toBeVisible();
     } finally {
@@ -106,7 +92,7 @@ test.describe('URL de l API configurable independamment du Host du frontend', ()
     }
   });
 
-  test('front et back sur des origines distinctes : la SPA appelle l API sur l URL configuree via API_BASE_URL', async ({ page }) => {
+  test('with front and back on different origins, the interface calls the API at API_BASE_URL', async ({ page }) => {
     const backDataDir = mkdtempSync(path.join(tmpdir(), 'mimicway-apibase-back-'));
     const frontDataDir = mkdtempSync(path.join(tmpdir(), 'mimicway-apibase-front-'));
     const backPort = await getFreePort();
@@ -124,10 +110,8 @@ test.describe('URL de l API configurable independamment du Host du frontend', ()
       }));
       const backBaseUrl = `http://127.0.0.1:${backPort}`;
 
-      // Sert de "back" : seede un service directement sur cette instance,
-      // jamais via le front — la preuve recherchee est que le FRONT (une
-      // instance/store totalement distincte) affiche des donnees qui
-      // n'existent que cote back.
+      // The service exists on the back only, created there directly: the front, whose own store stays empty, can show
+      // it only by calling this API.
       const createRes = await page.request.post(`${backBaseUrl}/api/services`, {
         data: {
           name: 'cross-origin-demo',
@@ -153,17 +137,12 @@ test.describe('URL de l API configurable independamment du Host du frontend', ()
       expect(configRes.status()).toBe(200);
       expect((await configRes.json()).api_base_url).toBe(backBaseUrl);
 
-      // La page est chargee depuis le FRONT, mais le service affiche ne peut
-      // venir que du BACK (le store du front, lui, est vide) : preuve que le
-      // frontend a bien appele l'API configuree, pas son propre Host.
       await page.goto(frontBaseUrl + '/');
-      // Le groupe "Sans groupe" est replie par defaut (etat non persiste
-      // au-dela de la session) : le deplier avant de chercher la carte de
-      // service.
+      // Groups start collapsed, the ungrouped one too.
       await page.locator('[data-testid="service-group-header-ungrouped"]').click();
       await expect(page.locator('[data-testid="service-card-cross-origin-demo"]')).toBeVisible();
 
-      // Le front lui-meme n'a jamais recu ce service dans SON propre store.
+      // The front's own store never got the service.
       const frontOwnServices = await page.request.get(`${frontBaseUrl}/api/services`);
       const frontOwnBody = await frontOwnServices.json();
       expect(frontOwnBody.find((s) => s.name === 'cross-origin-demo')).toBeUndefined();
