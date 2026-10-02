@@ -39,21 +39,23 @@ Size S (what is left)
 
 ### R11. Unit tests in English
 
-Size L, in two parts: the language of the suite, then its comments and titles
+Size M (what is left: the comments and titles)
 
-**Why.** The Vitest suite runs the components in French (`src/tests/setup.js`) and asserts about 700 French texts, while the end-to-end suite and the code use English. Contributors who do not read French cannot follow these tests, and any wording change in the French catalogue breaks them, which blocks R9. Its comments and test titles are mostly French too: they are the last French comments of the repository.
+**Why.** The comments and test titles of the Vitest suite are mostly French: they are the last French comments of the repository, and contributors who do not read French cannot follow these tests.
 
-**What.** Switch `setup.js` to English and rewrite the assertions with the English texts (the catalogue maps each French text to its English key, which makes most replacements mechanical); keep one test file that renders the main components in French, so that the French catalogue stays exercised in context. Then rewrite the comments and test titles of `frontend/src/tests/` in English, keeping only why in comments and checking each claim against the code: 141 French comment lines of 223 (137 of 219 in the JavaScript files, 4 of 4 in the Svelte harnesses of `helpers/`) and 392 French titles of 595, counted by `scripts/check-french-comments.mjs`, which already covers the rest of the repository.
+**Progress.** The suite runs in English: `src/tests/setup.js` applies English and the assertions name the English texts. `src/tests/french.test.js` shows the screens of the pseudo-locale test (one list, `src/tests/helpers/screens.js`) in French, switched from English the way the language select does it, with the texts that French writes its own way; `setup.js` refuses the French catalogue to every other test file but `l10n.test.js`, which `french-catalogue-guard.test.js` checks. With every French translation altered, 7 tests of `french.test.js` fail and nothing else, against 201 tests in 30 files before: rewording the French catalogue (R9) no longer breaks the suite.
 
-**Done when.** `npm test` passes in English, changing a French translation breaks no test outside the French-specific file and `l10n.test.js`, and `scripts/check-french-comments.mjs` covers `frontend/src/tests/` with nothing to report.
+**What.** Rewrite the comments and test titles of `frontend/src/tests/` in English, keeping only why in comments and checking each claim against the code: 141 French comment lines of 263 (137 of 259 in the JavaScript files, 4 of 4 in the Svelte harnesses of `helpers/`) and 392 French titles of 596, counted by `scripts/check-french-comments.mjs`, which already covers the rest of the repository; then add the folder to the paths it covers.
+
+**Done when.** `scripts/check-french-comments.mjs` covers `frontend/src/tests/` with nothing to report.
 
 ### R9. Polish the French catalogues
 
 Size S
 
-**Depends on** R11. · **Why.** Many French messages were written without accents ("reserve", "deja", "regle"), which reads as careless to French users.
+**Why.** Many French messages were written without accents ("reserve", "deja", "regle"), which reads as careless to French users.
 
-**What.** Restore accents and typography (non-breaking space before `:`, `«»` quotes) in `src/locales/fr.json` and `frontend/src/locales/fr.json`; the existing catalogue tests keep placeholders intact. Fix the mistranslations the French screenshots show, such as "Réécriture annuaire" for "Directory URL rewriting" and an example name that differs from the English one ("ex: get-siret" for "e.g. get-customer"). Give both typed confirmation keywords the same rule: the restore confirmation asks for a translated keyword (`RESTAURER`), the reset confirmation for `RESET` in every language (`App.svelte`); a translated keyword must stay easy to type on any keyboard, and the guide names it in each language. Then regenerate the screenshots (`npm run docs:screenshots`): the French images show the catalogue as it is today.
+**What.** Restore accents and typography (non-breaking space before `:`, `«»` quotes) in `src/locales/fr.json` and `frontend/src/locales/fr.json`; the existing catalogue tests keep placeholders intact. Fix the mistranslations the French screenshots show, such as "Réécriture annuaire" for "Directory URL rewriting" and an example name that differs from the English one ("ex: get-siret" for "e.g. get-customer"). Give both typed confirmation keywords the same rule: the restore confirmation asks for a translated keyword (`RESTAURER`), the reset confirmation for `RESET` in every language (`App.svelte`); a translated keyword must stay easy to type on any keyboard, and the guide names it in each language. Update the French texts that `frontend/src/tests/french.test.js` expects, the only unit tests that read the French catalogue. Then regenerate the screenshots (`npm run docs:screenshots`): the French images show the catalogue as it is today.
 
 **Done when.** A spell check of both French catalogues passes, and the French screenshots are regenerated from them.
 
@@ -469,8 +471,18 @@ Size S
 
 Size S
 
-**Why.** Under CPU load (another build running), the pseudo-locale test of the application shell (`src/tests/l10n.test.js`, "the application shell, its list and its dialogs") failed once and passed when run again: it waits for the first render with the default one-second `waitFor`, after importing and mounting the whole application. A test that fails without a defect teaches people to ignore red.
+**Why.** Under CPU load (another build running), the pseudo-locale test of the application shell (`src/tests/l10n.test.js`, "the application shell, its list and its dialogs") failed once and passed when run again: it waits for the first render with the default one-second `waitFor`, after importing and mounting the whole application. `src/tests/french.test.js` renders the same screens (`src/tests/helpers/screens.js`): with two `cargo test --workspace` of other projects running (CPU at 65 %), "the application shell…" and "the service screens" of both files went past the five-second test timeout, and passed run alone. A test that fails without a defect teaches people to ignore red.
 
-**What.** Find the unit tests that wait on rendering with the default timeout after heavy work, and make them wait on a condition with a timeout sized for a loaded CI runner, or do the heavy import once per file.
+**What.** Find the unit tests that wait on rendering with the default timeout after heavy work, and make them wait on a condition with a timeout sized for a loaded CI runner, or do the heavy import once per file (for the two files above: load the components of `helpers/screens.js` before the timed tests).
 
 **Done when.** The UI unit tests pass ten times in a row while a `cargo build` runs on the same machine.
+
+### E12. Messages on screen follow a language switch
+
+Size M
+
+**Why.** Switching languages re-renders the whole interface at once, except the messages already on screen: they keep the language they were written in. The error of the by-example JSON and XML builders stays English after switching to French, so does the sign-in form's "The user name is required." (both checked in a unit test), and the same holds wherever a component stores a translated sentence rather than what it says: 17 form and parse errors (service, rule, group, TCP and sign-in forms, by-example builders) and about fifty notifications translated before they are shown. The leftover reads as a missed translation.
+
+**What.** Store what a message says, not its translation: a function that translates it (`() => t("…")`, which keeps the message a literal for the extraction), called when rendering; notifications accept the same form. An error text sent by the server stays in the language of the request that got it.
+
+**Done when.** `frontend/src/tests/french.test.js` opens each screen's state before switching languages (today it opens them after, because of this) and still finds no English text left.
