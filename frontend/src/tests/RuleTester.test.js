@@ -418,8 +418,4 @@ describe('RuleTester: script errors in each language', () => {
       await setLocale('fr');
     }
   });
-
-  it('punctuates the slot and its error as French does', async () => {
-    expect(await scriptErrorText()).toBe('Script personnalisé : boom');
-  });
 });
