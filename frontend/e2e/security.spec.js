@@ -132,11 +132,15 @@ test.describe('Uniqueness: service_key collision', () => {
     expect(res.status()).toBe(404);
   });
 
-  test('no silent overwrite via PUT on existing name', async ({ request }) => {
+  test('a second service with an existing name leaves the first one unchanged', async ({ request }) => {
     await request.post(`${API}/services`, {
       data: validService('keep-me', { listen_path: '/v1/original/*' }),
     });
 
+    const second = await request.post(`${API}/services`, {
+      data: validService('keep-me', { listen_path: '/v1/other/*' }),
+    });
+    expect(second.status()).toBe(409);
     const check = await request.get(`${API}/services/keep-me`);
     const svc = await check.json();
     expect(svc.listen_path).toBe('/v1/original/*');
