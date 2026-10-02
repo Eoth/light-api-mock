@@ -2,7 +2,7 @@
   "domain": "rules",
   "scenarios": [
     {
-      "scenario": "Creer une regle simple sur un service existant",
+      "scenario": "Create a simple rule on an existing service",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
@@ -15,7 +15,7 @@
       ]
     },
     {
-      "scenario": "Afficher les regles existantes d'un service",
+      "scenario": "Show the rules of a service",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
@@ -25,7 +25,7 @@
       ]
     },
     {
-      "scenario": "Le bouton Ajouter une regle fonctionne quand des regles existent deja",
+      "scenario": "The add button opens the rule form when the service has rules",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
@@ -35,7 +35,7 @@
       ]
     },
     {
-      "scenario": "Le bouton Modifier (crayon) ouvre le formulaire de la regle",
+      "scenario": "The edit button of a rule opens its form",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
@@ -45,7 +45,7 @@
       ]
     },
     {
-      "scenario": "Le bouton Supprimer retire la regle de la liste",
+      "scenario": "The delete button removes the rule from the list",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
@@ -56,7 +56,7 @@
       ]
     },
     {
-      "scenario": "Annuler le formulaire de regle revient a la liste",
+      "scenario": "Cancelling the rule form goes back to the list",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
@@ -68,7 +68,7 @@
       ]
     },
     {
-      "scenario": "Une regle qui chevauche une regle existante declenche un avertissement de conflit",
+      "scenario": "A rule that overlaps an existing one raises a conflict warning",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
@@ -82,7 +82,7 @@
       ]
     },
     {
-      "scenario": "Une regle qui ne chevauche aucune regle existante ne declenche aucun avertissement",
+      "scenario": "A rule that overlaps no other raises no warning",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
@@ -96,7 +96,7 @@
       ]
     },
     {
-      "scenario": "Enregistrer quand meme malgre l'avertissement de conflit fonctionne",
+      "scenario": "Save a rule anyway despite the conflict warning",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
@@ -110,7 +110,7 @@
       ]
     },
     {
-      "scenario": "L'action Proxy est absente pour une regle d'un service purement mocke",
+      "scenario": "A rule of a purely mocked service has no proxy action",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
@@ -122,7 +122,7 @@
       ]
     },
     {
-      "scenario": "Modifier une regle proxy heritee sur un service purement mocke affiche un avertissement avant sauvegarde",
+      "scenario": "Editing a leftover proxy rule of a purely mocked service warns before saving",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
@@ -136,7 +136,7 @@
       ]
     },
     {
-      "scenario": "Options avancees repliees par defaut pour une nouvelle regle",
+      "scenario": "The advanced options of a new rule start folded",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
@@ -151,7 +151,7 @@
       ]
     },
     {
-      "scenario": "Options avancees s ouvre automatiquement si une regle existante a deja du post_script",
+      "scenario": "The advanced options open by themselves for a rule that has a post-script",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
@@ -161,7 +161,7 @@
       ]
     },
     {
-      "scenario": "Saisir du contenu dans le pre-script puis plier/deplier les options avancees ne perd rien",
+      "scenario": "Folding the advanced options keeps the pre-script typed in them",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
@@ -181,7 +181,7 @@
       ]
     },
     {
-      "scenario": "Replier un noeud JSON imbrique masque ses sous-champs sans perdre leur contenu",
+      "scenario": "Folding a nested JSON object hides its fields and keeps their content",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
@@ -209,7 +209,7 @@
       ]
     },
     {
-      "scenario": "Deux regles sur le meme service routees par le header SOAPAction (illustration doc)",
+      "scenario": "Set up one rule per SOAPAction header value on a service (doc illustration)",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
@@ -239,7 +239,7 @@
       ]
     },
     {
-      "scenario": "Configurer une regle qui repete un element de reponse par element de la requete (illustration doc)",
+      "scenario": "A script answers one element per element of the request (doc illustration)",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
@@ -260,7 +260,7 @@
       ]
     },
     {
-      "scenario": "Configurer une regle via le mode XML par exemple (coller un exemple SOAP)",
+      "scenario": "Build an XML response from a pasted example",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
@@ -280,7 +280,7 @@
       ]
     },
     {
-      "scenario": "Configurer une regle via le mode JSON par exemple (coller un exemple)",
+      "scenario": "Build a JSON response from a pasted example",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
@@ -299,7 +299,7 @@
       ]
     },
     {
-      "scenario": "Modifier une condition existante d'une regle (edition en place)",
+      "scenario": "Edit a condition of a rule in place",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
@@ -329,7 +329,7 @@
       ]
     },
     {
-      "scenario": "Condition XPath sur un XML SOAP namespace + extraction d une valeur vers la reponse (illustration doc)",
+      "scenario": "Match a SOAP body by XPath and copy one of its values into the response (doc illustration)",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
@@ -355,7 +355,7 @@
       ]
     },
     {
-      "scenario": "Editer une regle JSON par exemple restaure la vue assistee avec le pipe applique",
+      "scenario": "A JSON response built by example reopens in that view, with its pipe",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
@@ -379,7 +379,7 @@
       ]
     },
     {
-      "scenario": "Editer une regle JSON en detail restaure la vue detaillee, pas le template avance",
+      "scenario": "A JSON response built in detail reopens in the detailed view, not as an advanced template",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
@@ -402,7 +402,7 @@
       ]
     },
     {
-      "scenario": "Editer une regle XML par exemple restaure la vue assistee avec le pipe applique",
+      "scenario": "An XML response built by example reopens in that view, with its pipe",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
@@ -425,7 +425,7 @@
       ]
     },
     {
-      "scenario": "Extraire une valeur du corps SOAP via la source XPath du builder XML guide",
+      "scenario": "Copy a value of the SOAP body into a detailed XML response with the XPath source",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
@@ -447,7 +447,7 @@
       ]
     },
     {
-      "scenario": "Replier un champ objet en vue JSON par exemple ne perd aucune donnee",
+      "scenario": "Folding an object of a JSON response built by example loses no data",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
@@ -470,7 +470,7 @@
       ]
     },
     {
-      "scenario": "Convertir un template avance XML valide vers le format XML sans avertissement",
+      "scenario": "Turn a valid XML advanced template into an XML response by example",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
@@ -489,7 +489,7 @@
       ]
     },
     {
-      "scenario": "Revenir a la vue par exemple depuis le detail JSON preserve le contenu",
+      "scenario": "Going back from the detailed JSON view to the example keeps every field",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
@@ -514,7 +514,7 @@
       ]
     },
     {
-      "scenario": "La source Resultat du script reste utilisable en vue JSON detail",
+      "scenario": "The script result source of the detailed JSON view asks which key to read",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
@@ -536,7 +536,7 @@
       ]
     },
     {
-      "scenario": "Convertir une date saisie dans un format personnalise en millisecondes via parse_date (illustration doc)",
+      "scenario": "Turn a date in a custom format into milliseconds with parse_date (doc illustration)",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },

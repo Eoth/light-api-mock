@@ -1,36 +1,6 @@
-// Tests E2E utilisant l'infrastructure data-driven (selectors.json +
-// scenario-runner.js, cf frontend/e2e/README.md). Beaucoup de ces tests
-// REMPLACENT un test equivalent qui pilotait auparavant l'UI directement
-// dans un fichier *.spec.js/*.spec.mjs classique (rules.spec.mjs,
-// critical-flows.spec.js, insee.spec.mjs, write-behind.spec.js,
-// security.spec.js, group-expansion-persistence.spec.js, config.spec.mjs) --
-// l'ancien test est supprime de son fichier source une fois son equivalent
-// JSON valide vert, pour eviter un doublon testant deux fois le meme
-// parcours. Seuls les parcours qui pilotent reellement l'UI sont candidats
-// a cette migration (un test purement API-only n'a rien a gagner au format
-// scenario JSON).
-//
-// Les scenarios eux-memes sont regroupes par domaine fonctionnel dans
-// frontend/e2e/scenarios/{home,groups,rules,services}.scenarios.json (un
-// fichier par domaine, un tableau de scenarios par fichier).
-// `loadScenario(domainFile, scenarioName)` en extrait un seul.
-//
-// Exception non migree : "l'URL de test affichee en edition correspond a
-// celle de la vue liste..." (critical-flows.spec.js) compare une URL
-// affichee a une valeur dynamique (code de groupe) connue seulement a
-// l'execution -- pas modelisable avec des assertions JSON statiques sans
-// nouvelle capacite de valeur dynamique dans le runner. Reste un test
-// Playwright classique.
-//
-// Les sections "Lot N" ci-dessous, chacune juste au-dessus des tests
-// qu'elle introduit, documentent au fil de l'eau la couverture E2E ajoutee :
-// detecteur de conflit de regles, service "purement mocke", pliage des
-// arbres JSON/XML + repli par defaut des Options avancees pre_script/
-// post_script, illustrations pour la documentation utilisateur, portage du
-// mode "coller un exemple" au XML, condition XPath sur un corps SOAP,
-// edition en place d'une condition de regle, restauration de la vue
-// d'origine a l'edition d'une reponse, source "XPath (XML/SOAP)" du builder
-// de reponse, correctifs de rendu JSON/XML, et `parse_date`.
+// Replays the scenarios of scenarios/*.scenarios.json (see scenario-runner.js). A scenario only drives the interface:
+// each test prepares its data through the API first, and checks after the scenario what the interface does not show
+// (what the mock answers, what was saved), with real calls.
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -72,29 +42,25 @@ function validRule(name, overrides = {}) {
   };
 }
 
-test.describe('Runner data-driven (scenarios JSON)', () => {
+test.describe('Scenarios: services and rules', () => {
   test.beforeEach(async ({ request }) => {
     await request.delete(`${API}/config/reset`);
   });
 
-  test('creer un service (scenario JSON)', async ({ page }) => {
-    await runScenario(page, loadScenario('services.scenarios.json', 'Creer un service via le formulaire'));
+  test('create a service with the form', async ({ page }) => {
+    await runScenario(page, loadScenario('services.scenarios.json', 'Create a service with the form'));
   });
 
-  test('the service form offers the SOAP type (JSON scenario)', async ({ page }) => {
+  test('the service form offers the SOAP type', async ({ page }) => {
     await runScenario(page, loadScenario('services.scenarios.json', 'The service form offers the SOAP type'));
   });
 
-  test('creer une regle simple (scenario JSON)', async ({ page, request }) => {
-    // Prealable hors runner : le scenario ne couvre que le parcours UI de
-    // creation de regle, pas la creation du service support -- reste
-    // dans le champ des actions minimales (goto/click/fill/assert...),
-    // pas de nouvelle action "apiRequest" ajoutee par anticipation.
+  test('create a simple rule', async ({ page, request }) => {
     await request.post(`${API}/services`, { data: validService('scenario-rule-svc') });
-    await runScenario(page, loadScenario('rules.scenarios.json', 'Creer une regle simple sur un service existant'));
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Create a simple rule on an existing service'));
   });
 
-  test('afficher les regles existantes (scenario JSON)', async ({ page, request }) => {
+  test('show the rules of a service', async ({ page, request }) => {
     await request.post(`${API}/services`, { data: validService('e2e-svc', {
       rules: [
         validRule('rule-alpha'),
@@ -103,62 +69,48 @@ test.describe('Runner data-driven (scenarios JSON)', () => {
         }),
       ],
     }) });
-    await runScenario(page, loadScenario('rules.scenarios.json', "Afficher les regles existantes d'un service"));
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Show the rules of a service'));
   });
 });
 
-test.describe('Runner data-driven (scenarios JSON) - lot 2', () => {
+test.describe('Scenarios: home screen, service list and groups', () => {
   test.beforeEach(async ({ request }) => {
     await request.delete(`${API}/config/reset`);
   });
 
-  // Les 2 tests "groupe deplie ..." ci-dessous remplacent l'integralite de
-  // l'ancien frontend/e2e/group-expansion-persistence.spec.js (supprime,
-  // ses 2 tests sont entierement migres ici). Contexte
-  // produit conserve de ce fichier : ils verifient le niveau 1 de
-  // persistance de l'etat "groupe deplie/replie" (voir
-  // group-expansion-state.svelte.js) -- l'etat doit survivre a une
-  // navigation vers l'edition d'un service et retour (store partage hors
-  // du cycle de vie de ServiceList.svelte), mais PAS a un rechargement
-  // complet de la page (F5), limite volontaire.
-
-  test('charge le service de demo (scenario JSON)', async ({ page }) => {
-    await runScenario(page, loadScenario('home.scenarios.json', 'Charger le service de demo depuis la liste vide'));
+  test('load the example service', async ({ page }) => {
+    await runScenario(page, loadScenario('home.scenarios.json', 'Load the example service from the empty list'));
   });
 
-  test('page d accueil affiche le titre (scenario JSON)', async ({ page }) => {
-    await runScenario(page, loadScenario('home.scenarios.json', "La page d'accueil se charge avec le titre Mimicway"));
+  test('the home screen shows the title', async ({ page }) => {
+    await runScenario(page, loadScenario('home.scenarios.json', 'The home screen loads with the Mimicway title'));
   });
 
-  test('liste affiche un service cree via l API (scenario JSON)', async ({ page, request }) => {
+  test('the list shows a service created through the API', async ({ page, request }) => {
     await request.post(`${API}/services`, { data: validService('ui-test-svc') });
-    await runScenario(page, loadScenario('services.scenarios.json', "La liste affiche un service cree via l'API dans son groupe"));
+    await runScenario(page, loadScenario('services.scenarios.json', 'The list shows a service created through the API, in its group'));
   });
 
-  test('page groupes accessible depuis la nav (scenario JSON)', async ({ page }) => {
-    await runScenario(page, loadScenario('groups.scenarios.json', 'La page Groupes est accessible depuis la nav principale'));
+  test('the groups page opens from the navigation bar', async ({ page }) => {
+    await runScenario(page, loadScenario('groups.scenarios.json', 'Open the groups page from the navigation bar'));
   });
 
-  test('groupe deplie persiste apres retour d edition (scenario JSON)', async ({ page, request }) => {
+  // The expanded groups are kept in memory outside the service list (group-expansion-state.svelte.js): they survive
+  // leaving the list and coming back, not a reload of the page.
+  test('an expanded group stays expanded after opening one of its services', async ({ page, request }) => {
     await request.post(`${API}/groups`, { data: { name: 'persist-grp', code: '', admins: [], members: [] } });
     await request.post(`${API}/services`, { data: validService('persist-svc', { group_name: 'persist-grp' }) });
-    await runScenario(page, loadScenario('groups.scenarios.json', "Un groupe deplie reste visible apres retour depuis l'edition d'un service"));
+    await runScenario(page, loadScenario('groups.scenarios.json', 'An expanded group stays expanded after opening one of its services'));
   });
 
-  test('groupe deplie reinitialise apres rechargement (scenario JSON)', async ({ page, request }) => {
+  test('reloading the page collapses an expanded group', async ({ page, request }) => {
     await request.post(`${API}/groups`, { data: { name: 'reload-grp', code: '', admins: [], members: [] } });
     await request.post(`${API}/services`, { data: validService('reload-svc', { group_name: 'reload-grp' }) });
-    await runScenario(page, loadScenario('groups.scenarios.json', "Un rechargement complet de la page reinitialise l'etat deplie d'un groupe"));
+    await runScenario(page, loadScenario('groups.scenarios.json', 'Reloading the page collapses an expanded group'));
   });
 });
 
-// frontend/e2e/rules.spec.mjs a ete SUPPRIME entierement au lot 3 (comme
-// group-expansion-persistence.spec.js au lot 2) : ses 6 derniers tests
-// (les 3 premiers etaient deja migres au lot 1) sont tous migres ici, un
-// fichier source vide de tests n'avait plus de raison d'exister.
-//
-// Fixture partagee lot 3 : un service avec 2 regles (rule-alpha, rule-beta),
-// identique a l'ancien svcPayload de rules.spec.mjs.
+// A service with two rules, the second one conditioned on a query parameter.
 function ruleTestService(name) {
   return validService(name, {
     rules: [
@@ -170,29 +122,29 @@ function ruleTestService(name) {
   });
 }
 
-test.describe('Runner data-driven (scenarios JSON) - lot 3', () => {
+test.describe('Scenarios: rule list, service card and search', () => {
   test.beforeEach(async ({ request }) => {
     await request.delete(`${API}/config/reset`);
   });
 
-  test('regle: bouton ajouter fonctionne avec regles existantes (scenario JSON)', async ({ page, request }) => {
+  test('the add button opens the rule form when the service has rules', async ({ page, request }) => {
     await request.post(`${API}/services`, { data: ruleTestService('e2e-svc') });
-    await runScenario(page, loadScenario('rules.scenarios.json', 'Le bouton Ajouter une regle fonctionne quand des regles existent deja'));
+    await runScenario(page, loadScenario('rules.scenarios.json', 'The add button opens the rule form when the service has rules'));
   });
 
-  test('regle: bouton modifier ouvre le formulaire (scenario JSON)', async ({ page, request }) => {
+  test('the edit button opens the rule form', async ({ page, request }) => {
     await request.post(`${API}/services`, { data: ruleTestService('e2e-svc') });
-    await runScenario(page, loadScenario('rules.scenarios.json', 'Le bouton Modifier (crayon) ouvre le formulaire de la regle'));
+    await runScenario(page, loadScenario('rules.scenarios.json', 'The edit button of a rule opens its form'));
   });
 
-  test('regle: bouton supprimer retire la regle (scenario JSON)', async ({ page, request }) => {
+  test('the delete button removes the rule', async ({ page, request }) => {
     await request.post(`${API}/services`, { data: ruleTestService('e2e-svc') });
-    await runScenario(page, loadScenario('rules.scenarios.json', 'Le bouton Supprimer retire la regle de la liste'));
+    await runScenario(page, loadScenario('rules.scenarios.json', 'The delete button removes the rule from the list'));
   });
 
-  test('service: toggle mock/proxy fonctionne (scenario JSON)', async ({ page, request }) => {
+  test('the switch of a service card turns its mock off', async ({ page, request }) => {
     await request.post(`${API}/services`, { data: ruleTestService('e2e-svc') });
-    await runScenario(page, loadScenario('services.scenarios.json', "Le toggle mock/proxy d'un service fonctionne"));
+    await runScenario(page, loadScenario('services.scenarios.json', 'Turn the mock of e2e-svc off from its card'));
 
     // The switch saves the service at once: it now forwards to its target.
     await expect
@@ -200,47 +152,47 @@ test.describe('Runner data-driven (scenarios JSON) - lot 3', () => {
       .toBe(false);
   });
 
-  test('liste: recherche filtre les services (scenario JSON)', async ({ page, request }) => {
+  test('a search that matches no service says so', async ({ page, request }) => {
     await request.post(`${API}/services`, { data: ruleTestService('e2e-svc') });
     await request.post(`${API}/services`, { data: validService('other-svc') });
-    await runScenario(page, loadScenario('services.scenarios.json', 'La recherche filtre les services et affiche un message si aucun resultat'));
+    await runScenario(page, loadScenario('services.scenarios.json', 'A search that matches no service says so'));
   });
 
-  test('regle: annuler le formulaire revient a la liste (scenario JSON)', async ({ page, request }) => {
+  test('cancelling the rule form goes back to the list', async ({ page, request }) => {
     await request.post(`${API}/services`, { data: ruleTestService('e2e-svc') });
-    await runScenario(page, loadScenario('rules.scenarios.json', 'Annuler le formulaire de regle revient a la liste'));
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Cancelling the rule form goes back to the list'));
   });
 
-  test('UI accessible apres creation d un service (scenario JSON)', async ({ page, request }) => {
+  test('the home screen still loads once a service exists', async ({ page, request }) => {
     await request.post(`${API}/services`, { data: validService('security-svc') });
-    await runScenario(page, loadScenario('home.scenarios.json', "La page d'accueil se charge avec le titre Mimicway"));
+    await runScenario(page, loadScenario('home.scenarios.json', 'The home screen loads with the Mimicway title'));
   });
 });
 
-test.describe('Runner data-driven (scenarios JSON) - lot 4', () => {
+test.describe('Scenarios: groups, service identity and persistence', () => {
   test.beforeEach(async ({ request }) => {
     await request.delete(`${API}/config/reset`);
   });
 
-  test('groupe: formulaire ne demande que le nom (scenario JSON)', async ({ page }) => {
-    await runScenario(page, loadScenario('groups.scenarios.json', "Le formulaire de creation de groupe ne demande qu'un nom, le code est auto-genere"));
+  test('a group is created from its name alone', async ({ page }) => {
+    await runScenario(page, loadScenario('groups.scenarios.json', 'Create a group from its name alone'));
   });
 
-  test('groupe: nom accentue accepte (scenario JSON)', async ({ page }) => {
-    await runScenario(page, loadScenario('groups.scenarios.json', 'Un nom de groupe accentue/espace est accepte'));
+  test('a group name may hold accents and spaces', async ({ page }) => {
+    await runScenario(page, loadScenario('groups.scenarios.json', 'Create a group whose name holds accents and spaces'));
   });
 
-  test('groupe: creer plusieurs groupes a la suite (scenario JSON)', async ({ page }) => {
-    await runScenario(page, loadScenario('groups.scenarios.json', 'Creer plusieurs groupes a la suite ne bloque jamais sur une collision de code'));
+  test('groups created in a row never collide on their code', async ({ page }) => {
+    await runScenario(page, loadScenario('groups.scenarios.json', 'Create three groups in a row without a code collision'));
   });
 
-  test('identite: suppression ne supprime pas l homonyme (scenario JSON)', async ({ page, request }) => {
+  test('deleting a service keeps the service of the same name in another group', async ({ page, request }) => {
     await request.post(`${API}/groups`, { data: { name: 'ambig-grp-a', code: '', admins: [], members: [] } });
     await request.post(`${API}/groups`, { data: { name: 'ambig-grp-b', code: '', admins: [], members: [] } });
     await request.post(`${API}/services`, { data: validService('ambig-svc', { group_name: 'ambig-grp-a' }) });
     await request.post(`${API}/services`, { data: validService('ambig-svc', { group_name: 'ambig-grp-b' }) });
 
-    await runScenario(page, loadScenario('services.scenarios.json', "Supprimer un service dans un groupe ne supprime pas son homonyme d'un autre groupe"));
+    await runScenario(page, loadScenario('services.scenarios.json', 'Delete a service of a group, and keep the service of the same name in another group'));
 
     await expect(async () => {
       const stillB = await request.get(`${API}/groups/ambig-grp-b/services/ambig-svc`);
@@ -250,23 +202,21 @@ test.describe('Runner data-driven (scenarios JSON) - lot 4', () => {
     }).toPass();
   });
 
-  test('identite: suppression sans fausse erreur (scenario JSON)', async ({ page, request }) => {
+  test('deleting a service reports its success, not an error', async ({ page, request }) => {
     await request.post(`${API}/services`, { data: validService('no-crash-svc') });
-    await runScenario(page, loadScenario('services.scenarios.json', "Supprimer un service n'affiche pas de fausse erreur apres le succes"));
+    await runScenario(page, loadScenario('services.scenarios.json', 'Deleting a service reports its success, not an error'));
   });
 
-  test('insee: service visible dans l UI (scenario JSON)', async ({ page, request }) => {
+  test('a service with a path parameter shows in the list', async ({ page, request }) => {
     await request.post(`${API}/services`, { data: validService('tpl-test', { listen_path: '/items/{id}' }) });
-    await runScenario(page, loadScenario('services.scenarios.json', 'Le service mocke type INSEE est visible dans la liste UI'));
+    await runScenario(page, loadScenario('services.scenarios.json', 'A service with a path parameter in its listen path shows in the list'));
   });
 
-  test('write-behind: toggle mock persiste sur disque (scenario JSON)', async ({ page, request }) => {
+  test('turning the mock off from the card reaches the configuration file', async ({ page, request }) => {
     await request.post(`${API}/services`, { data: validService('write-behind-svc') });
-    await runScenario(page, loadScenario('services.scenarios.json', "Basculer le mode mock/proxy d'un service via l'UI"));
+    await runScenario(page, loadScenario('services.scenarios.json', 'Turn the mock of write-behind-svc off from its card'));
 
-    // Assertion filesystem hors runner (pas une interaction UI, cf
-    // README.md) : l'ecriture disque est asynchrone (write-behind), on
-    // attend que le contenu apparaisse reellement.
+    // The configuration file is written in the background (write-behind): wait until it holds the change.
     await expect(async () => {
       const yaml = readConfigFromDisk();
       expect(yaml).toContain('name: write-behind-svc');
@@ -275,14 +225,10 @@ test.describe('Runner data-driven (scenarios JSON) - lot 4', () => {
   });
 });
 
-// Lot 5 : couverture E2E neuve (pas une migration) pour le detecteur de
-// conflit entre regles a la sauvegarde (POST /api/rule-conflicts).
-// "conflict-rule-one" (GET, sans sous-chemin, sans condition —
-// la regle la plus generale possible) sert de base : toute autre regle GET
-// sans sous-chemin ni condition creee ensuite sur ce meme service la
-// chevauche trivialement (ensembles de conditions vides identiques,
-// cf MatchEngine::find_rule_conflicts).
-test.describe('Runner data-driven (scenarios JSON) - lot 5 (detecteur de conflit)', () => {
+// The rule form asks the server for overlapping rules before saving (POST /api/rule-conflicts). conflict-rule-one is a
+// GET with no sub-path and no condition, the most general rule there is: any other GET rule without sub-path or
+// condition overlaps it (MatchEngine::find_rule_conflicts).
+test.describe('Scenarios: conflict warning between rules', () => {
   test.beforeEach(async ({ request }) => {
     await request.delete(`${API}/config/reset`);
     await request.post(`${API}/services`, {
@@ -290,64 +236,60 @@ test.describe('Runner data-driven (scenarios JSON) - lot 5 (detecteur de conflit
     });
   });
 
-  test('regle en conflit: avertissement affiche (scenario JSON)', async ({ page }) => {
-    await runScenario(page, loadScenario('rules.scenarios.json', 'Une regle qui chevauche une regle existante declenche un avertissement de conflit'));
+  test('a rule that overlaps another raises a warning', async ({ page }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'A rule that overlaps an existing one raises a conflict warning'));
   });
 
-  test('regle sans conflit: aucun avertissement (scenario JSON)', async ({ page }) => {
-    await runScenario(page, loadScenario('rules.scenarios.json', 'Une regle qui ne chevauche aucune regle existante ne declenche aucun avertissement'));
+  test('a rule that overlaps no other raises none', async ({ page }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'A rule that overlaps no other raises no warning'));
   });
 
-  test('regle en conflit: enregistrer quand meme fonctionne (scenario JSON)', async ({ page }) => {
-    await runScenario(page, loadScenario('rules.scenarios.json', "Enregistrer quand meme malgre l'avertissement de conflit fonctionne"));
+  test('save anyway keeps the overlapping rule', async ({ page }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Save a rule anyway despite the conflict warning'));
   });
 });
 
-// Lot 6 : couverture E2E neuve (pas une migration) pour le service
-// "purement mocke" (real_target_url vide).
-test.describe('Runner data-driven (scenarios JSON) - lot 6 (service purement mocke)', () => {
+// A purely mocked service has no target (empty real_target_url): it can only mock.
+test.describe('Scenarios: purely mocked services', () => {
   test.beforeEach(async ({ request }) => {
     await request.delete(`${API}/config/reset`);
   });
 
-  test('creer un service purement mocke (scenario JSON)', async ({ page }) => {
-    await runScenario(page, loadScenario('services.scenarios.json', 'Creer un service purement mocke via le formulaire'));
+  test('create a purely mocked service', async ({ page }) => {
+    await runScenario(page, loadScenario('services.scenarios.json', 'Create a purely mocked service with the form'));
   });
 
-  test('decocher purement mocke reaffiche la cible sans perte de regles (scenario JSON)', async ({ page, request }) => {
+  test('turning purely mocked off shows the target again and keeps the rules', async ({ page, request }) => {
     await request.post(`${API}/services`, {
       data: validService('purely-mocked-existing', { real_target_url: '', rules: [validRule('existing-rule')] }),
     });
-    await runScenario(page, loadScenario('services.scenarios.json', 'Decocher purement mocke reaffiche la cible sans perte des regles'));
+    await runScenario(page, loadScenario('services.scenarios.json', 'Turning purely mocked off shows the target field again and keeps the rules'));
   });
 
-  test('action Proxy absente pour une regle d un service purement mocke (scenario JSON)', async ({ page, request }) => {
+  test('a rule of a purely mocked service has no proxy action', async ({ page, request }) => {
     await request.post(`${API}/services`, {
       data: validService('purely-mocked-for-rule', { real_target_url: '' }),
     });
-    await runScenario(page, loadScenario('rules.scenarios.json', "L'action Proxy est absente pour une regle d'un service purement mocke"));
+    await runScenario(page, loadScenario('rules.scenarios.json', 'A rule of a purely mocked service has no proxy action'));
   });
 
-  test('bascule a posteriori avec regle Proxy existante avertit sans bloquer (scenario JSON)', async ({ page, request }) => {
+  test('making a service with a proxy rule purely mocked warns without blocking', async ({ page, request }) => {
     await request.post(`${API}/services`, {
       data: validService('svc-with-proxy-rule', { rules: [validRule('legacy-proxy-rule', { action: 'proxy' })] }),
     });
-    await runScenario(page, loadScenario('services.scenarios.json', 'Bascule a posteriori vers purement mocke avec une regle Proxy existante affiche un avertissement'));
+    await runScenario(page, loadScenario('services.scenarios.json', 'Making a service with a proxy rule purely mocked warns, and saves once confirmed'));
   });
 
-  test('modifier une regle proxy heritee avertit avant de persister le changement vers mock (scenario JSON)', async ({ page, request }) => {
+  test('saving a leftover proxy rule of a purely mocked service warns, then makes it a mock', async ({ page, request }) => {
     await request.post(`${API}/services`, {
       data: validService('purely-mocked-stale-proxy', {
         real_target_url: '',
         rules: [validRule('stale-proxy-rule', { action: 'proxy' })],
       }),
     });
-    await runScenario(page, loadScenario('rules.scenarios.json', 'Modifier une regle proxy heritee sur un service purement mocke affiche un avertissement avant sauvegarde'));
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Editing a leftover proxy rule of a purely mocked service warns before saving'));
 
-    // Verification hors runner (pas une interaction UI) : le clic sur
-    // "Enregistrer quand meme" a bien persiste le changement reel
-    // proxy -> mock, pas seulement fait disparaitre l'avertissement a
-    // l'ecran.
+    // Saving anyway changed the saved rule, from proxy to mock, not only the warning on screen.
     const resp = await request.get(`${API}/services/purely-mocked-stale-proxy`);
     const body = await resp.json();
     const rule = body.rules.find((r) => r.name === 'stale-proxy-rule');
@@ -356,14 +298,9 @@ test.describe('Runner data-driven (scenarios JSON) - lot 6 (service purement moc
   });
 });
 
-// Lot 7 : couverture E2E neuve (pas une migration) pour le pliage des
-// arbres JSON/XML et le repli par defaut des Options avancees
-// (pre_script/post_script). Seul le pliage JSON est couvert ici en E2E (le
-// mecanisme XML est strictement identique --
-// meme composant de pliage, meme attribut `hidden` -- deja verifie en
-// profondeur par XmlResponseBuilder.test.js ; dupliquer un parcours UI
-// quasi identique en E2E n'aurait ajoute aucune garantie supplementaire).
-test.describe('Runner data-driven (scenarios JSON) - lot 7 (pliage JSON + options avancees)', () => {
+// Folding is driven here in the JSON builder only. The XML builder has a fold of its own (both keep their folds with
+// fold-paths.js), covered by XmlResponseBuilder.test.js.
+test.describe('Scenarios: folded JSON objects and advanced options', () => {
   test.beforeEach(async ({ request }) => {
     await request.delete(`${API}/config/reset`);
     await request.post(`${API}/services`, {
@@ -373,32 +310,28 @@ test.describe('Runner data-driven (scenarios JSON) - lot 7 (pliage JSON + option
     });
   });
 
-  test('options avancees repliees par defaut pour une nouvelle regle (scenario JSON)', async ({ page }) => {
-    await runScenario(page, loadScenario('rules.scenarios.json', 'Options avancees repliees par defaut pour une nouvelle regle'));
+  test('the advanced options of a new rule start folded', async ({ page }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'The advanced options of a new rule start folded'));
   });
 
-  test('options avancees s ouvre automatiquement si post_script deja rempli (scenario JSON)', async ({ page }) => {
-    await runScenario(page, loadScenario('rules.scenarios.json', 'Options avancees s ouvre automatiquement si une regle existante a deja du post_script'));
+  test('the advanced options open by themselves when a post-script exists', async ({ page }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'The advanced options open by themselves for a rule that has a post-script'));
   });
 
-  test('saisir du contenu dans le pre-script survit au pliage/depliage des options avancees (scenario JSON)', async ({ page, request }) => {
-    await runScenario(page, loadScenario('rules.scenarios.json', 'Saisir du contenu dans le pre-script puis plier/deplier les options avancees ne perd rien'));
+  test('a pre-script survives folding the advanced options', async ({ page, request }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Folding the advanced options keeps the pre-script typed in them'));
 
-    // Verification hors runner : le contenu saisi dans le pre-script avant
-    // le pliage a bien ete persiste (preuve reelle, pas seulement que le
-    // champ redevient visible a l'ecran).
+    // The pre-script typed before folding was saved, not only shown again.
     const resp = await request.get(`${API}/services/fold-adv-svc`);
     const body = await resp.json();
     const rule = body.rules.find((r) => r.name === 'fold-adv-rule');
     expect(rule.pre_script).toBe('"greeting"');
   });
 
-  test('replier un noeud JSON imbrique ne perd pas son contenu (scenario JSON)', async ({ page, request }) => {
-    await runScenario(page, loadScenario('rules.scenarios.json', 'Replier un noeud JSON imbrique masque ses sous-champs sans perdre leur contenu'));
+  test('folding a nested JSON object keeps its fields', async ({ page, request }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Folding a nested JSON object hides its fields and keeps their content'));
 
-    // Verification hors runner : le sous-champ saisi pendant que le noeud
-    // parent etait replie (puis redeplie) a bien ete persiste dans le
-    // template genere.
+    // The field typed inside the object, then folded away and shown again, is in the saved template.
     const resp = await request.get(`${API}/services/fold-adv-svc`);
     const body = await resp.json();
     const rule = body.rules.find((r) => r.name === 'fold-json-rule');
@@ -408,33 +341,22 @@ test.describe('Runner data-driven (scenarios JSON) - lot 7 (pliage JSON + option
   });
 });
 
-// Lot 8 : couverture E2E neuve (pas une migration) illustrant, pour la doc
-// utilisateur (docs/en/matching-rules.md), qu'un meme service peut deja
-// repondre differemment selon le header SOAPAction via deux regles
-// independantes (chacune avec sa propre condition Header/SOAPAction) --
-// aucune fonctionnalite nouvelle, juste la capture des deux ecrans de
-// configuration de condition.
-test.describe('Runner data-driven (scenarios JSON) - lot 8 (doc SOAPAction)', () => {
+// The two condition forms shown by the guide (matching-rules.md): one rule per value of the SOAPAction header.
+test.describe('Scenarios: rules on the SOAPAction header', () => {
   test.beforeEach(async ({ request }) => {
     await request.delete(`${API}/config/reset`);
     await request.post(`${API}/services`, { data: validService('soap-routing-demo') });
   });
 
-  test('deux regles routees par SOAPAction sur le meme service (scenario JSON)', async ({ page }) => {
-    await runScenario(page, loadScenario('rules.scenarios.json', 'Deux regles sur le meme service routees par le header SOAPAction (illustration doc)'));
+  test('one rule per SOAPAction value is set up with a header condition', async ({ page }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Set up one rule per SOAPAction header value on a service (doc illustration)'));
   });
 });
 
-// Lot 9 : couverture E2E neuve (pas une migration) illustrant, pour la doc
-// utilisateur (docs/en/rhai-scripts.md), le pattern "la requete contient une
-// liste d'objets, la reponse doit contenir le meme nombre d'elements
-// construits par position" via parse_json/to_json (script Rhai). Seul
-// l'exemple JSON est illustre en UI (l'exemple XML/SOAP equivalent est deja
-// verifie bout-en-bout par les tests d'integration Rust dans
-// src/server/intercept.rs -- dupliquer un parcours UI quasi identique en
-// E2E n'aurait ajoute aucune garantie supplementaire, cf §3 sobriete des
-// tests du projet).
-test.describe('Runner data-driven (scenarios JSON) - lot 9 (repetition JSON/XML)', () => {
+// The pattern of rhai-scripts.md: the request holds a list, and a script (parse_json, to_json) builds one response
+// element per item. The same pattern on XML is covered by the server's tests
+// (xml_repetition_pattern_builds_one_response_item_per_request_item, src/server/intercept.rs).
+test.describe('Scenarios: one response element per request element', () => {
   test.beforeEach(async ({ request }) => {
     await request.delete(`${API}/config/reset`);
     await request.post(`${API}/services`, {
@@ -442,13 +364,10 @@ test.describe('Runner data-driven (scenarios JSON) - lot 9 (repetition JSON/XML)
     });
   });
 
-  test('configurer une regle de repetition JSON via l UI produit bien N elements de reponse (scenario JSON)', async ({ page, request }) => {
-    await runScenario(page, loadScenario('rules.scenarios.json', 'Configurer une regle qui repete un element de reponse par element de la requete (illustration doc)'));
+  test('a script answers one element per element of the request', async ({ page, request }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'A script answers one element per element of the request (doc illustration)'));
 
-    // Verification hors runner (pas une interaction UI) : la regle
-    // configuree via le formulaire produit reellement le comportement
-    // documente -- un vrai appel HTTP avec 2 lignes doit renvoyer 2
-    // elements, chacun construit a partir de la ligne correspondante.
+    // A call with two lines gets two elements, each built from its line.
     const resp = await request.post('http://localhost:7342/repeat-pattern-svc/calcul', {
       data: { lines: [{ sku: 'REF-001', qty: 3 }, { sku: 'REF-002', qty: 1 }] },
     });
@@ -464,16 +383,9 @@ test.describe('Runner data-driven (scenarios JSON) - lot 9 (repetition JSON/XML)
   });
 });
 
-// Lot 10 : couverture E2E neuve (pas une migration) pour le portage du mode
-// "coller un exemple" au XML (XmlPasteBuilder.svelte, miroir de
-// JsonPasteBuilder.svelte avec breadcrumb/pliage/attributs XML en plus).
-// Colle un exemple XML imbrique
-// (enveloppe avec un attribut de namespace), navigue dans le noeud enfant
-// via le fil d'Ariane, transforme une valeur en variable de path param, puis
-// verifie hors runner qu'une vraie requete HTTP produit bien le XML attendu
-// (valeur substituee + attribut/contenu fixe preserves) -- pas seulement que
-// le formulaire se soumet sans erreur.
-test.describe('Runner data-driven (scenarios JSON) - lot 10 (XML par exemple)', () => {
+// A nested XML example is pasted (XmlPasteBuilder.svelte), its child node entered through the breadcrumb, and one of
+// its values taken from the path parameter.
+test.describe('Scenarios: XML response by example', () => {
   test.beforeEach(async ({ request }) => {
     await request.delete(`${API}/config/reset`);
     await request.post(`${API}/services`, {
@@ -481,15 +393,11 @@ test.describe('Runner data-driven (scenarios JSON) - lot 10 (XML par exemple)', 
     });
   });
 
-  test('configurer une regle via le mode XML par exemple produit le XML attendu (scenario JSON)', async ({ page, request }) => {
-    await runScenario(page, loadScenario('rules.scenarios.json', 'Configurer une regle via le mode XML par exemple (coller un exemple SOAP)'));
+  test('a response built from an XML example answers the expected XML', async ({ page, request }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Build an XML response from a pasted example'));
 
-    // Verification hors runner : la regle configuree visuellement (paste +
-    // navigation breadcrumb + assignation source=path sur un champ imbrique)
-    // produit reellement, a l'execution, un XML ou le siret colle a
-    // l'origine (fixe) a bien ete remplace par le path param de la vraie
-    // requete, tandis que le nom (jamais reassigne) et l'attribut de
-    // namespace de la racine (jamais touche) restent preserves tels quels.
+    // The pasted SIRET gives way to the one of the call; the name and the namespace attribute of the root, left
+    // alone, come out as pasted.
     const resp = await request.get('http://localhost:7342/xml-paste-demo/quote/12345678901234');
     expect(resp.status()).toBe(200);
     const xml = await resp.text();
@@ -500,14 +408,8 @@ test.describe('Runner data-driven (scenarios JSON) - lot 10 (XML par exemple)', 
   });
 });
 
-// Lot 11 : couverture E2E neuve (pas une migration), comble un trou constate
-// a l'audit documentaire de docs/ -- le mode "exemple d'abord" JSON
-// (JsonPasteBuilder.svelte) n'avait jamais ete illustre par une capture,
-// contrairement a sa variante XML (lot 10). Colle un exemple JSON plat,
-// verifie la detection des champs, puis reassigne un champ en parametre de
-// chemin et verifie hors runner qu'une vraie requete HTTP produit bien la valeur
-// substituee -- pas seulement que le formulaire se soumet sans erreur.
-test.describe('Runner data-driven (scenarios JSON) - lot 11 (JSON par exemple)', () => {
+// A flat JSON example is pasted (JsonPasteBuilder.svelte) and one of its fields taken from the path parameter.
+test.describe('Scenarios: JSON response by example', () => {
   test.beforeEach(async ({ request }) => {
     await request.delete(`${API}/config/reset`);
     await request.post(`${API}/services`, {
@@ -515,8 +417,8 @@ test.describe('Runner data-driven (scenarios JSON) - lot 11 (JSON par exemple)',
     });
   });
 
-  test('configurer une regle via le mode JSON par exemple produit le JSON attendu (scenario JSON)', async ({ page, request }) => {
-    await runScenario(page, loadScenario('rules.scenarios.json', 'Configurer une regle via le mode JSON par exemple (coller un exemple)'));
+  test('a response built from a JSON example answers the expected JSON', async ({ page, request }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Build a JSON response from a pasted example'));
 
     const resp = await request.get('http://localhost:7342/json-paste-demo/entreprise/44306184100047');
     expect(resp.status()).toBe(200);
@@ -527,15 +429,9 @@ test.describe('Runner data-driven (scenarios JSON) - lot 11 (JSON par exemple)',
   });
 });
 
-// Lot 12 : couverture E2E neuve (pas une migration) -- configure via l'UI
-// une condition XPath sur un XML SOAP namespace (Envelope/Body/recherche)
-// et un script d'extraction
-// (parse_xml_items) qui reinjecte le Siret de la requete dans la reponse.
-// Verifie hors runner (vraie requete HTTP avec un corps SOAP realiste,
-// Header non-autoferme sibling de Body) que la condition matche bien et que
-// le Siret extrait se retrouve dans la reponse -- pas seulement que le
-// formulaire se soumet sans erreur.
-test.describe('Runner data-driven (scenarios JSON) - lot 12 (XPath SOAP + extraction)', () => {
+// A rule matches a SOAP operation by XPath (Envelope/Body/recherche, namespace prefixes ignored), and its script
+// (parse_xml_items) copies the SIRET of the request into the response.
+test.describe('Scenarios: XPath condition on a SOAP body', () => {
   test.beforeEach(async ({ request }) => {
     await request.delete(`${API}/config/reset`);
     await request.post(`${API}/services`, {
@@ -543,14 +439,11 @@ test.describe('Runner data-driven (scenarios JSON) - lot 12 (XPath SOAP + extrac
     });
   });
 
-  test('configurer une condition XPath SOAP + extraction via l UI produit bien le Siret dans la reponse (scenario JSON)', async ({ page, request }) => {
-    await runScenario(page, loadScenario('rules.scenarios.json', 'Condition XPath sur un XML SOAP namespace + extraction d une valeur vers la reponse (illustration doc)'));
+  test('an XPath condition and a script copy the SIRET of a SOAP request into the response', async ({ page, request }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Match a SOAP body by XPath and copy one of its values into the response (doc illustration)'));
 
-    // Verification hors runner : requete SOAP realiste, avec un
-    // <Header></Header> non-autoferme sibling de <Body> (structure qui
-    // declenchait le bug corrige de walk_xml) -- la condition XPath doit
-    // matcher malgre le Header, et le Siret de la requete doit se retrouver
-    // tel quel dans la reponse.
+    // An empty <Header></Header> precedes the Body, as in real SOAP requests: the XPath lookup (walk_xml) must step
+    // over it.
     const resp = await request.post('http://localhost:7342/soap-extraction-demo/service', {
       headers: { 'Content-Type': 'text/xml' },
       data: '<SOAP:Envelope><SOAP-ENV:Header></SOAP-ENV:Header><SOAP-ENV:Body><ns3:recherche><ns3:Nom>Test</ns3:Nom><ns3:Siret>98765432109876</ns3:Siret></ns3:recherche></SOAP-ENV:Body></SOAP:Envelope>',
@@ -561,14 +454,9 @@ test.describe('Runner data-driven (scenarios JSON) - lot 12 (XPath SOAP + extrac
   });
 });
 
-// Lot 13 : couverture E2E neuve (pas une migration), pour l'edition en place
-// d'une condition de regle (jusqu'ici il fallait supprimer puis recreer).
-// Cree une regle avec une condition QueryParam, l'edite en cliquant dessus
-// (bascule vers Header, nouvelle cle, nouvelle valeur), sauvegarde, puis
-// verifie hors runner via de vraies requetes HTTP que le MATCHING refletebien
-// la nouvelle condition (et plus l'ancienne) -- pas seulement que le
-// formulaire affiche le nouveau libelle.
-test.describe('Runner data-driven (scenarios JSON) - lot 13 (edition en place d une condition)', () => {
+// A condition of a saved rule is reopened by a click and changed (query parameter mode=legacy becomes header
+// X-Mode=new-value): what the rule matches must change with it, not only its label.
+test.describe('Scenarios: editing a condition in place', () => {
   test.beforeEach(async ({ request }) => {
     await request.delete(`${API}/config/reset`);
     await request.post(`${API}/services`, {
@@ -576,24 +464,21 @@ test.describe('Runner data-driven (scenarios JSON) - lot 13 (edition en place d 
     });
   });
 
-  test('editer une condition existante en place change reellement le comportement de matching (scenario JSON)', async ({ page, request }) => {
-    await runScenario(page, loadScenario('rules.scenarios.json', "Modifier une condition existante d'une regle (edition en place)"));
+  test('a condition edited in place changes what the rule matches', async ({ page, request }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Edit a condition of a rule in place'));
 
-    // Verification hors runner : la nouvelle condition (Header X-Mode=new-value)
-    // doit matcher...
+    // The new condition matches...
     const withNewHeader = await request.post('http://localhost:7342/edit-condition-svc/service', {
       headers: { 'X-Mode': 'new-value' },
     });
     expect(withNewHeader.status()).toBe(200);
 
-    // ... alors que l'ANCIENNE condition (query param mode=legacy), qui a ete
-    // remplacee et non simplement complementee, ne doit plus matcher du tout
-    // (service purement mocke : aucune regle ne correspond -> 404).
+    // ... the old one, replaced rather than added to, no longer does (a purely mocked service answers 404 when no
+    // rule matches)...
     const withOldQueryParam = await request.post('http://localhost:7342/edit-condition-svc/service?mode=legacy');
     expect(withOldQueryParam.status()).toBe(404);
 
-    // ... et l'ancienne VALEUR sur la nouvelle cle ne doit pas non plus
-    // matcher, pour ecarter un faux positif ou seule la cle aurait change.
+    // ... and neither does the old value under the new key, which would mean only the key had changed.
     const withWrongValue = await request.post('http://localhost:7342/edit-condition-svc/service', {
       headers: { 'X-Mode': 'legacy' },
     });
@@ -601,16 +486,9 @@ test.describe('Runner data-driven (scenarios JSON) - lot 13 (edition en place d 
   });
 });
 
-// Lot 14 : couverture E2E neuve (pas une migration), pour la restauration
-// de la vue d'origine a l'edition d'une reponse. Avant cette passe, editer
-// une regle construite via n'importe quel mode structure
-// (JSON/XML, par exemple/guide) atterrissait TOUJOURS en "Template avance",
-// meme heuristique retour 1 corrigee par Rule.response_mode (backend) +
-// RuleResponseSection.svelte::computeInitialEditorState(). Verifie aussi le
-// retour 2 (pipes desormais disponibles en mode "par exemple") et, de facto,
-// le retour 3 (les boutons de Format fusionnes JSON/XML + reveal "Modifier en
-// detail" sont le seul chemin desormais disponible pour atteindre ces vues).
-test.describe('Runner data-driven (scenarios JSON) - lot 14 (restauration de la vue d origine + pipes en mode par exemple)', () => {
+// A rule records the view its response was built in (Rule.response_mode, read by computeInitialEditorState in
+// RuleResponseSection.svelte), and reopens in it rather than as an advanced template.
+test.describe('Scenarios: a response reopens in the view it was built in', () => {
   test.beforeEach(async ({ request }) => {
     await request.delete(`${API}/config/reset`);
     await request.post(`${API}/services`, {
@@ -624,13 +502,11 @@ test.describe('Runner data-driven (scenarios JSON) - lot 14 (restauration de la 
     });
   });
 
-  test('editer une regle JSON par exemple restaure la vue assistee, pipe applique (scenario JSON)', async ({ page, request }) => {
-    await runScenario(page, loadScenario('rules.scenarios.json', 'Editer une regle JSON par exemple restaure la vue assistee avec le pipe applique'));
+  test('a JSON response built by example reopens in that view, its pipe applied', async ({ page, request }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'A JSON response built by example reopens in that view, with its pipe'));
 
-    // Le scenario reouvre la regle et change le pipe upper -> lower AVANT de
-    // resauvegarder : verifie hors runner que ce changement, fait depuis la
-    // vue restauree (pas depuis un "template avance" reconstruit a vide),
-    // est reellement celui qui a ete persiste.
+    // In the reopened view, the scenario turns the pipe from upper to lower before saving again: an answer in lower
+    // case shows that this second save is the one kept.
     const resp = await request.get('http://localhost:7342/view-restore-json/echo/abc123');
     expect(resp.status()).toBe(200);
     const body = await resp.json();
@@ -638,12 +514,12 @@ test.describe('Runner data-driven (scenarios JSON) - lot 14 (restauration de la 
     expect(body.note).toBe('bonjour');
   });
 
-  test('editer une regle JSON en detail restaure la vue detaillee, pas le template avance (scenario JSON)', async ({ page, request }) => {
-    await runScenario(page, loadScenario('rules.scenarios.json', 'Editer une regle JSON en detail restaure la vue detaillee, pas le template avance'));
+  test('a JSON response built in detail reopens in the detailed view', async ({ page, request }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'A JSON response built in detail reopens in the detailed view, not as an advanced template'));
   });
 
-  test('editer une regle XML par exemple restaure la vue assistee, pipe applique (scenario JSON)', async ({ page, request }) => {
-    await runScenario(page, loadScenario('rules.scenarios.json', 'Editer une regle XML par exemple restaure la vue assistee avec le pipe applique'));
+  test('an XML response built by example reopens in that view, its pipe applied', async ({ page, request }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'An XML response built by example reopens in that view, with its pipe'));
 
     const resp = await request.get('http://localhost:7342/view-restore-xml/echo/abc123');
     expect(resp.status()).toBe(200);
@@ -653,19 +529,10 @@ test.describe('Runner data-driven (scenarios JSON) - lot 14 (restauration de la 
   });
 });
 
-// Lot 15 : couverture E2E neuve (pas une migration), pour la source "XPath
-// (XML/SOAP)" ajoutee au builder de reponse XML (guide + par exemple). Avant
-// cette passe, la seule option d'extraction depuis le corps de requete
-// disponible dans ce menu etait "Echo body" (JSON pointer, non fonctionnel
-// pour un corps XML/SOAP -- silencieusement vide) ; extraire une valeur XML
-// necessitait un script Rhai complet (parse_xml_items). Configure via l'UI
-// reelle une regle dont la reponse XML guidee reinjecte une valeur XPath du
-// corps SOAP (avec un pipe substr pour ne garder que les 9 premiers
-// caracteres), verifie hors runner via une vraie requete SOAP (avec un
-// Header non-autoferme sibling de Body, structure qui declenchait auparavant
-// un bug de matching XPath desormais corrige) que la valeur extraite et
-// tronquee se retrouve dans la reponse.
-test.describe('Runner data-driven (scenarios JSON) - lot 15 (source XPath dans le builder XML)', () => {
+// The XPath source of the XML builder reads a value of an XML or SOAP request body, where a JSON pointer finds
+// nothing. Here it copies the SIRET of the request through the pipe substr(0,9), which keeps its first nine
+// characters; the request has an empty <Header></Header> before its Body, as real SOAP requests do.
+test.describe('Scenarios: XPath source of the XML builder', () => {
   test.beforeEach(async ({ request }) => {
     await request.delete(`${API}/config/reset`);
     await request.post(`${API}/services`, {
@@ -673,8 +540,8 @@ test.describe('Runner data-driven (scenarios JSON) - lot 15 (source XPath dans l
     });
   });
 
-  test('la source XPath du builder XML guide extrait et tronque une valeur du corps SOAP (scenario JSON)', async ({ page, request }) => {
-    await runScenario(page, loadScenario('rules.scenarios.json', 'Extraire une valeur du corps SOAP via la source XPath du builder XML guide'));
+  test('the XPath source copies a value of the SOAP body, cut by a pipe', async ({ page, request }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Copy a value of the SOAP body into a detailed XML response with the XPath source'));
 
     const resp = await request.post('http://localhost:7342/xpath-echo-demo/service', {
       headers: { 'Content-Type': 'text/xml' },
@@ -686,11 +553,9 @@ test.describe('Runner data-driven (scenarios JSON) - lot 15 (source XPath dans l
   });
 });
 
-// Lot 16 (4 tests, couverture neuve) : un scenario par symptome corrige dans
-// le rendu des reponses JSON/XML. Chacun verifie explicitement le cas qui
-// echouait avant le correctif, pas seulement que le formulaire se soumet
-// sans erreur.
-test.describe('Runner data-driven (scenarios JSON) - lot 16 (diagnostic reponse JSON/XML)', () => {
+// Each scenario moves a response between the views of its builders; the mock's answer shows that nothing was lost
+// on the way.
+test.describe('Scenarios: response builders keep their data across views', () => {
   test.beforeEach(async ({ request }) => {
     await request.delete(`${API}/config/reset`);
     await request.post(`${API}/services`, {
@@ -707,54 +572,42 @@ test.describe('Runner data-driven (scenarios JSON) - lot 16 (diagnostic reponse 
     });
   });
 
-  test('symptome 1 : replier un champ objet en vue JSON par exemple ne perd aucune donnee (scenario JSON)', async ({ page, request }) => {
-    await runScenario(page, loadScenario('rules.scenarios.json', 'Replier un champ objet en vue JSON par exemple ne perd aucune donnee'));
+  test('folding an object of a JSON response by example loses no data', async ({ page, request }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Folding an object of a JSON response built by example loses no data'));
 
-    // Avant le correctif, ce chevron de pliage n'existait pas du tout dans
-    // cette vue (JsonPasteBuilder.svelte) -- le scenario ci-dessus l'exerce
-    // deja explicitement (repli/depli en cours de route) ; on verifie ici
-    // que ni le champ non touche (nom) ni le champ modifie APRES un cycle
-    // repli/depli (siret) n'ont ete perdus ou corrompus par le pliage.
+    // The untouched field and the one filled after folding and unfolding both reach the answer.
     const resp = await request.post('http://localhost:7342/json-fold-demo/service');
     expect(resp.status()).toBe(200);
     const body = await resp.json();
     expect(body).toEqual({ client: { nom: 'ACME', siret: '12345678901234' } });
   });
 
-  test('symptome 2 : un template XML valide en mode avance se convertit vers XML sans echouer (scenario JSON)', async ({ page, request }) => {
-    await runScenario(page, loadScenario('rules.scenarios.json', 'Convertir un template avance XML valide vers le format XML sans avertissement'));
+  test('a valid XML advanced template turns into an XML response by example', async ({ page, request }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Turn a valid XML advanced template into an XML response by example'));
 
-    // Avant le correctif, cette conversion echouait TOUJOURS (meme pour un
-    // XML valide) -- le scenario n'aurait jamais pu depasser les deux
-    // assertVisible sur la vue "par exemple" XML (elles auraient trouve la
-    // banniere d'avertissement a la place). Verifie ici que le contenu
-    // ET l'attribut de racine ont ete correctement repris jusqu'a la
-    // sauvegarde (pas seulement que le formulaire s'est soumis).
+    // The scenario's last two assertVisible only pass once the template has become fields of the by-example view (a
+    // failed conversion shows a warning instead); the answer shows that the content and the root attribute came along.
     const resp = await request.post('http://localhost:7342/advanced-to-xml-demo/service');
     expect(resp.status()).toBe(200);
     const xml = await resp.text();
     expect(xml).toBe('<devisResponse ver="1"><nom>ACME</nom></devisResponse>');
   });
 
-  test('symptome 3 : revenir a la vue par exemple depuis le detail JSON preserve le contenu (scenario JSON)', async ({ page, request }) => {
-    await runScenario(page, loadScenario('rules.scenarios.json', 'Revenir a la vue par exemple depuis le detail JSON preserve le contenu'));
+  test('going back from the detailed JSON view to the example keeps every field', async ({ page, request }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Going back from the detailed JSON view to the example keeps every field'));
 
-    // Avant le correctif, aucun bouton retour n'existait -- le scenario
-    // n'aurait jamais pu cliquer dessus. Verifie ici que le champ ajoute EN
-    // DETAIL (siret) ET le champ d'origine collé (nom) sont bien tous deux
-    // persistes apres l'aller-retour detail -> par exemple -> sauvegarde.
+    // The field added in the detailed view and the pasted one both reach the answer.
     const resp = await request.post('http://localhost:7342/back-to-paste-demo/service');
     expect(resp.status()).toBe(200);
     const body = await resp.json();
     expect(body).toEqual({ nom: 'ACME', siret: '12345678901234' });
   });
 
-  test('symptome 4 : la source Resultat du script reste utilisable en vue JSON detail (scenario JSON)', async ({ page, request }) => {
-    await runScenario(page, loadScenario('rules.scenarios.json', 'La source Resultat du script reste utilisable en vue JSON detail'));
+  test('the script result source of the detailed JSON view takes the key to read', async ({ page, request }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'The script result source of the detailed JSON view asks which key to read'));
 
-    // Avant le correctif, le champ de saisie de la cle du script etait
-    // masque : impossible de preciser QUELLE cle du resultat de script
-    // utiliser, la regle n'aurait donc jamais pu produire {{script.nom}}.
+    // The key of the script result is typed in a field of its own: without it, the response could not read
+    // {{script.nom}}.
     const resp = await request.post('http://localhost:7342/script-value-detail-demo/service');
     expect(resp.status()).toBe(200);
     const body = await resp.json();
@@ -762,13 +615,9 @@ test.describe('Runner data-driven (scenarios JSON) - lot 16 (diagnostic reponse 
   });
 });
 
-// Lot 17 (1 test, couverture neuve) : `parse_date`, sens inverse de
-// date_now/date_past/date_future. Configure via l'UI reelle
-// une regle dont le script appelle parse_date(request.query.date, "dd/MM/yyyy")
-// et verifie hors runner qu'une vraie requete HTTP renvoie bien la date
-// saisie convertie en millisecondes depuis epoch -- pas seulement que le
-// formulaire se soumet sans erreur.
-test.describe('Runner data-driven (scenarios JSON) - lot 17 (parse_date)', () => {
+// parse_date, the reverse of date_now, date_past and date_future: the script reads a date of the request in the
+// pattern dd/MM/yyyy and answers it in milliseconds since the epoch.
+test.describe('Scenarios: parse_date', () => {
   test.beforeEach(async ({ request }) => {
     await request.delete(`${API}/config/reset`);
     await request.post(`${API}/services`, {
@@ -776,18 +625,18 @@ test.describe('Runner data-driven (scenarios JSON) - lot 17 (parse_date)', () =>
     });
   });
 
-  test('configurer une regle avec parse_date via l UI produit bien la date en millisecondes (scenario JSON)', async ({ page, request }) => {
-    await runScenario(page, loadScenario('rules.scenarios.json', 'Convertir une date saisie dans un format personnalise en millisecondes via parse_date (illustration doc)'));
+  test('parse_date turns a date of the request into milliseconds', async ({ page, request }) => {
+    await runScenario(page, loadScenario('rules.scenarios.json', 'Turn a date in a custom format into milliseconds with parse_date (doc illustration)'));
 
     const resp = await request.get('http://localhost:7342/parse-date-demo/convert?date=15/03/2026');
     expect(resp.status()).toBe(200);
     const body = await resp.json();
-    // 15/03/2026 00:00:00 UTC, cf src/engine/script.rs::parse_date_iso_pattern_date_only.
+    // 15/03/2026 00:00:00 UTC, as in parse_date_fr_pattern_date_only (src/engine/script.rs).
     expect(body.ms).toBe(1773532800000);
   });
 });
 
-test.describe('Runner data-driven (scenarios JSON) - lot 18 (rule form states shown in the guide)', () => {
+test.describe('Scenarios: rule form states shown in the guide', () => {
   test.beforeEach(async ({ request }) => {
     await request.delete(`${API}/config/reset`);
     for (const name of ['catalog-svc', 'nested-demo', 'chaos-demo', 'fake-demo']) {
@@ -795,7 +644,7 @@ test.describe('Runner data-driven (scenarios JSON) - lot 18 (rule form states sh
     }
   });
 
-  test('AND and OR conditions combine as the guide says (scenario JSON)', async ({ page, request }) => {
+  test('AND and OR conditions combine as the guide says', async ({ page, request }) => {
     await runScenario(page, loadScenario('rules.scenarios.json', 'Combine AND and OR conditions on a rule (doc illustration)'));
 
     const call = (channel, version) =>
@@ -808,14 +657,14 @@ test.describe('Runner data-driven (scenarios JSON) - lot 18 (rule form states sh
     expect((await call('web', null)).status()).toBe(404);
   });
 
-  test('the breadcrumb enters a nested object without changing what the rule answers (scenario JSON)', async ({ page, request }) => {
+  test('the breadcrumb enters a nested object without changing what the rule answers', async ({ page, request }) => {
     await runScenario(page, loadScenario('rules.scenarios.json', 'Enter a nested object of the detailed JSON builder through its breadcrumb (doc illustration)'));
 
     const resp = await request.get('http://localhost:7342/nested-demo/v1/customer');
     expect(await resp.json()).toEqual({ customer: { address: { city: 'Lyon', postcode: '69000' } } });
   });
 
-  test('the chaos settings are saved with the rule (scenario JSON)', async ({ page, request }) => {
+  test('the chaos settings are saved with the rule', async ({ page, request }) => {
     await runScenario(page, loadScenario('rules.scenarios.json', 'Set the latency and the error rate of the chaos mode (doc illustration)'));
 
     const services = await (await request.get(`${API}/services`)).json();
@@ -823,7 +672,7 @@ test.describe('Runner data-driven (scenarios JSON) - lot 18 (rule form states sh
     expect(rule.response.chaos).toMatchObject({ delay_min_ms: 200, delay_max_ms: 800, error_rate: 0.2, error_status: 503 });
   });
 
-  test('fake data replaces the pasted values on every call (scenario JSON)', async ({ page, request }) => {
+  test('fake data replaces the pasted values on every call', async ({ page, request }) => {
     await runScenario(page, loadScenario('rules.scenarios.json', 'Replace pasted values with fake data (doc illustration)'));
 
     // The generated values are random, and may even repeat the pasted ones: the saved template says what was chosen.

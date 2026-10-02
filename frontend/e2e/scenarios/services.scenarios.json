@@ -2,7 +2,7 @@
   "domain": "services",
   "scenarios": [
     {
-      "scenario": "Creer un service via le formulaire",
+      "scenario": "Create a service with the form",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "app.addServiceButton" },
@@ -29,7 +29,7 @@
       ]
     },
     {
-      "scenario": "La liste affiche un service cree via l'API dans son groupe",
+      "scenario": "The list shows a service created through the API, in its group",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
@@ -37,7 +37,7 @@
       ]
     },
     {
-      "scenario": "La recherche filtre les services et affiche un message si aucun resultat",
+      "scenario": "A search that matches no service says so",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "fill", "target": "serviceList.searchInput", "value": "xyz-unique" },
@@ -45,7 +45,7 @@
       ]
     },
     {
-      "scenario": "Le toggle mock/proxy d'un service fonctionne",
+      "scenario": "Turn the mock of e2e-svc off from its card",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
@@ -53,7 +53,7 @@
       ]
     },
     {
-      "scenario": "Basculer le mode mock/proxy d'un service via l'UI",
+      "scenario": "Turn the mock of write-behind-svc off from its card",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
@@ -61,7 +61,7 @@
       ]
     },
     {
-      "scenario": "Supprimer un service dans un groupe ne supprime pas son homonyme d'un autre groupe",
+      "scenario": "Delete a service of a group, and keep the service of the same name in another group",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ambig-grp-a" } },
@@ -74,7 +74,7 @@
       ]
     },
     {
-      "scenario": "Supprimer un service n'affiche pas de fausse erreur apres le succes",
+      "scenario": "Deleting a service reports its success, not an error",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
@@ -85,7 +85,7 @@
       ]
     },
     {
-      "scenario": "Le service mocke type INSEE est visible dans la liste UI",
+      "scenario": "A service with a path parameter in its listen path shows in the list",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
@@ -93,7 +93,7 @@
       ]
     },
     {
-      "scenario": "Creer un service purement mocke via le formulaire",
+      "scenario": "Create a purely mocked service with the form",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "app.addServiceButton" },
@@ -107,7 +107,7 @@
       ]
     },
     {
-      "scenario": "Decocher purement mocke reaffiche la cible sans perte des regles",
+      "scenario": "Turning purely mocked off shows the target field again and keeps the rules",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },
@@ -122,7 +122,7 @@
       ]
     },
     {
-      "scenario": "Bascule a posteriori vers purement mocke avec une regle Proxy existante affiche un avertissement",
+      "scenario": "Making a service with a proxy rule purely mocked warns, and saves once confirmed",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "ungrouped" } },

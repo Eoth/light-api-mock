@@ -2,14 +2,14 @@
   "domain": "home",
   "scenarios": [
     {
-      "scenario": "La page d'accueil se charge avec le titre Mimicway",
+      "scenario": "The home screen loads with the Mimicway title",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "assertText", "target": "app.titleButton", "value": "Mimicway" }
       ]
     },
     {
-      "scenario": "Charger le service de demo depuis la liste vide",
+      "scenario": "Load the example service from the empty list",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "app.loadDemoButton" },

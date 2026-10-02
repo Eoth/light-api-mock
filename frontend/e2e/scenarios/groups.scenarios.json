@@ -2,7 +2,7 @@
   "domain": "groups",
   "scenarios": [
     {
-      "scenario": "La page Groupes est accessible depuis la nav principale",
+      "scenario": "Open the groups page from the navigation bar",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "app.navGroupsButton" },
@@ -10,7 +10,7 @@
       ]
     },
     {
-      "scenario": "Le formulaire de creation de groupe ne demande qu'un nom, le code est auto-genere",
+      "scenario": "Create a group from its name alone",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "app.navGroupsButton" },
@@ -23,7 +23,7 @@
       ]
     },
     {
-      "scenario": "Un nom de groupe accentue/espace est accepte",
+      "scenario": "Create a group whose name holds accents and spaces",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "app.navGroupsButton" },
@@ -34,7 +34,7 @@
       ]
     },
     {
-      "scenario": "Creer plusieurs groupes a la suite ne bloque jamais sur une collision de code",
+      "scenario": "Create three groups in a row without a code collision",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "app.navGroupsButton" },
@@ -53,7 +53,7 @@
       ]
     },
     {
-      "scenario": "Un groupe deplie reste visible apres retour depuis l'edition d'un service",
+      "scenario": "An expanded group stays expanded after opening one of its services",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "persist-grp" } },
@@ -65,7 +65,7 @@
       ]
     },
     {
-      "scenario": "Un rechargement complet de la page reinitialise l'etat deplie d'un groupe",
+      "scenario": "Reloading the page collapses an expanded group",
       "steps": [
         { "action": "goto", "page": "services" },
         { "action": "click", "target": "serviceGroup.header", "params": { "groupId": "reload-grp" } },
