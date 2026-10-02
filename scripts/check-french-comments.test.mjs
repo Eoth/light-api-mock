@@ -134,12 +134,20 @@ function commented(file, ...lines) {
   return lines.map((line) => `${open}${line}${close}\n`).join('');
 }
 
+// Files that must be checked, whatever the patterns of COVERED: the end-to-end suite and the tooling configuration of
+// the interface.
+const MUST_BE_COVERED = [
+  'frontend/e2e/login.spec.js',
+  'frontend/e2e/config.spec.mjs',
+  'frontend/e2e/scenario-runner.js',
+  'frontend/vite.config.js',
+];
+
 test('the command fails on a French comment in every covered path, and ignores the others', () => {
   const root = mkdtempSync(path.join(tmpdir(), 'french-comments-'));
   try {
-    const files = Object.fromEntries(
-      COVERED.map((pattern) => [sampleOf(pattern), commented(sampleOf(pattern), 'The first line is fine.')]),
-    );
+    const probes = [...new Set([...COVERED.map(sampleOf), ...MUST_BE_COVERED])];
+    const files = Object.fromEntries(probes.map((file) => [file, commented(file, 'The first line is fine.')]));
     files['notes/sample.js'] = '// Pas encore traduit, pour plus tard.\n';
     for (const [file, text] of Object.entries(files)) {
       mkdirSync(path.join(root, path.dirname(file)), { recursive: true });
@@ -150,11 +158,10 @@ test('the command fails on a French comment in every covered path, and ignores t
     const clean = spawnSync(process.execPath, [SCRIPT, root], { encoding: 'utf8' });
     assert.equal(clean.status, 0, clean.stderr);
 
-    for (const pattern of COVERED) {
-      const file = sampleOf(pattern);
+    for (const file of probes) {
       writeFileSync(path.join(root, file), commented(file, 'The first line is fine.', 'Mais pas la seconde.'));
       const broken = spawnSync(process.execPath, [SCRIPT, root], { encoding: 'utf8' });
-      assert.equal(broken.status, 1, `${pattern}: ${broken.stdout}`);
+      assert.equal(broken.status, 1, `${file}: ${broken.stdout}`);
       assert.match(broken.stderr, new RegExp(`^${file.replaceAll('.', '\\.')}:2: .*Mais pas la seconde\\.`, 'm'));
       writeFileSync(path.join(root, file), commented(file, 'The first line is fine.'));
     }
