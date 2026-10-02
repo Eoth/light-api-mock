@@ -817,11 +817,11 @@
   .advanced-options-panel { margin-top: var(--space-2); }
 
   .header-row { display: flex; gap: var(--space-2); align-items: center; margin-bottom: var(--space-1-5); }
-  .header-row input { flex: 1; padding: var(--space-1-5) var(--space-2); border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); font-size: var(--text-m); }
+  .header-row input { flex: 1; min-width: 0; padding: var(--space-1-5) var(--space-2); border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); font-size: var(--text-m); }
 
   .fragment-card { border: var(--line-thin) solid var(--color-border); border-radius: var(--radius-m); padding: var(--space-3); margin-bottom: var(--space-2); background: var(--color-bg); }
   .fragment-header { display: flex; align-items: center; gap: var(--space-2); }
-  .fragment-header select { flex: 1; padding: var(--space-1-5) var(--space-2); border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); font-size: var(--text-m); }
+  .fragment-header select { flex: 1; min-width: 0; padding: var(--space-1-5) var(--space-2); border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); font-size: var(--text-m); }
   .fragment-actions { display: flex; gap: var(--space-1); flex-shrink: 0; }
   .fragment-body { margin-top: var(--space-2); }
   .fragment-body textarea { width: 100%; padding: var(--space-1-5) var(--space-2); border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); font-size: var(--text-m); font-family: var(--font-code); resize: vertical; }
@@ -835,7 +835,7 @@
   .template-help code { background: var(--color-bg); padding: var(--space-0-5) var(--space-1); border-radius: var(--radius-s); font-size: var(--text-s); }
 
   .pick-row { display: flex; gap: var(--space-1-5); align-items: center; margin-bottom: var(--space-1); }
-  .pick-row input { flex: 1; padding: var(--space-1-5) var(--space-2); border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); font-size: var(--text-m); }
+  .pick-row input { flex: 1; min-width: 0; padding: var(--space-1-5) var(--space-2); border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); font-size: var(--text-m); }
 
   .inline-label { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-m); font-weight: var(--weight-medium); margin-bottom: var(--space-1-5); }
   .inline-label input { padding: var(--space-1-5) var(--space-2); border: var(--line-thin) solid var(--color-control); border-radius: var(--radius-m); font-size: var(--text-m); }

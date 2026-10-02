@@ -138,11 +138,16 @@ table, code { font-variant-numeric: tabular-nums; }
   display: flex; gap: var(--space-3); justify-content: flex-end; margin-top: var(--space-4);
 }
 
+/* A table wider than the screen scrolls inside this box, not the whole page. The box is also the containing block
+   of what its cells position absolutely (visually hidden labels), which would otherwise widen the page. */
+.table-scroll { overflow-x: auto; position: relative; }
+
 /* ── Sections ───────────────────────────────────────────────── */
 
 /* A fieldset that holds one part of a form (the action of a rule, its conditions, its response), and the parts
    of a section, under a hairline. */
-.section { border: var(--line-thin) solid var(--color-border); border-radius: var(--radius-m); padding: var(--space-3); margin-bottom: var(--space-4); }
+/* min-width: a fieldset is otherwise as wide as its widest content, and would widen a narrow screen. */
+.section { border: var(--line-thin) solid var(--color-border); border-radius: var(--radius-m); padding: var(--space-3); margin-bottom: var(--space-4); min-width: 0; }
 .section legend { font-weight: var(--weight-strong); font-size: var(--text-m); padding: 0 var(--space-1-5); }
 .section-help { font-size: var(--text-s); color: var(--color-text-muted); margin: 0 0 var(--space-2); }
 .sub-section { margin-top: var(--space-3); padding-top: var(--space-3); border-top: var(--line-thin) solid var(--color-border); }

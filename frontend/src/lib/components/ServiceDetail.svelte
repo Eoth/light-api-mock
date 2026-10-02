@@ -250,9 +250,10 @@
   }
 
   .detail-dl { margin: 0; }
-  .dl-row { display: flex; gap: var(--space-2); margin-bottom: var(--space-1-5); }
+  /* On a narrow screen a value goes under its label, and a long URL breaks rather than widening the page. */
+  .dl-row { display: flex; flex-wrap: wrap; column-gap: var(--space-2); margin-bottom: var(--space-1-5); }
   dt { font-weight: var(--weight-medium); color: var(--color-text-muted); min-width: 10rem; }
-  dd { margin: 0; }
+  dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
   code { font-size: var(--text-m); background: var(--color-bg); padding: var(--space-0-5) var(--space-1-5); border-radius: var(--radius-s); }
 
   .detail-actions {

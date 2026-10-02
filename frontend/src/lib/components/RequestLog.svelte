@@ -147,7 +147,7 @@
     </p>
   {:else}
     <p class="result-count">{activeFilterCount > 0 ? tCount(filteredLogs().length, "{0} request (filtered)", "{0} requests (filtered)") : tCount(filteredLogs().length, "{0} request", "{0} requests")}</p>
-    <div class="table-wrap">
+    <div class="table-scroll">
       <table class="log-table" aria-label={t("Latest requests")}>
         <thead>
           <tr>
@@ -252,7 +252,6 @@
 
   .loading, .empty { color: var(--color-text-muted); text-align: center; padding: var(--space-8); }
 
-  .table-wrap { overflow-x: auto; }
   .log-table { width: 100%; border-collapse: collapse; font-size: var(--text-s); }
   .log-table th { background: var(--color-bg); font-weight: var(--weight-strong); text-align: left; padding: var(--space-2); border-bottom: var(--line-thick) solid var(--color-border); }
   .log-table td { padding: var(--space-1-5) var(--space-2); border-bottom: var(--line-thin) solid var(--color-border); vertical-align: middle; }
