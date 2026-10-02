@@ -28,9 +28,9 @@ describe('RuleConditionsEditor: edition en place d\'une condition existante', ()
 
     expect(queryByTestId('rule-form-edit-condition-allof-button-1')).not.toBeInTheDocument();
     expect(getByLabelText('Source').value).toBe('Header');
-    expect(getByLabelText('Clé / Chemin').value).toBe('X-Trace');
+    expect(getByLabelText('Key / path').value).toBe('X-Trace');
     // Operateur "Exists" -> pas de champ valeur
-    expect(() => getByLabelText('Valeur attendue')).toThrow();
+    expect(() => getByLabelText('Expected value')).toThrow();
     // La condition 0, non editee, reste affichee normalement
     expect(getByTestId('rule-form-edit-condition-allof-button-0')).toBeInTheDocument();
   });
@@ -42,7 +42,7 @@ describe('RuleConditionsEditor: edition en place d\'une condition existante', ()
     });
 
     await fireEvent.click(getByTestId('rule-form-edit-condition-allof-button-0'));
-    await setInput(getByLabelText('Valeur attendue'), '2');
+    await setInput(getByLabelText('Expected value'), '2');
     await fireEvent.submit(container.querySelector('form'));
 
     expect(onAllOfChange).toHaveBeenCalledTimes(1);
@@ -61,8 +61,8 @@ describe('RuleConditionsEditor: edition en place d\'une condition existante', ()
 
     await fireEvent.click(getByTestId('rule-form-edit-condition-allof-button-0'));
     await fireEvent.change(getByLabelText('Source'), { target: { value: 'Header' } });
-    await setInput(getByLabelText('Clé / Chemin'), 'X-Custom');
-    await setInput(getByLabelText('Valeur attendue'), 'yes');
+    await setInput(getByLabelText('Key / path'), 'X-Custom');
+    await setInput(getByLabelText('Expected value'), 'yes');
     await fireEvent.submit(container.querySelector('form'));
 
     const updated = onAllOfChange.mock.calls[0][0];
@@ -76,7 +76,7 @@ describe('RuleConditionsEditor: edition en place d\'une condition existante', ()
     });
 
     await fireEvent.click(getByTestId('rule-form-edit-condition-allof-button-0'));
-    await setInput(getByLabelText('Valeur attendue'), 'devrait-etre-ignore');
+    await setInput(getByLabelText('Expected value'), 'devrait-etre-ignore');
     await fireEvent.click(getByTestId('condition-form-cancel-button'));
 
     expect(onAllOfChange).not.toHaveBeenCalled();
@@ -87,14 +87,14 @@ describe('RuleConditionsEditor: edition en place d\'une condition existante', ()
     const { getByTestId, getByLabelText } = render(RuleConditionsEditor, { props: { allOf } });
 
     await fireEvent.click(getByTestId('rule-form-edit-condition-allof-button-0'));
-    await setInput(getByLabelText('Valeur attendue'), 'en-cours-de-frappe');
+    await setInput(getByLabelText('Expected value'), 'en-cours-de-frappe');
 
     await fireEvent.click(getByTestId('rule-form-add-condition-allof-button'));
     // Le formulaire d'edition de la condition 0 a disparu (remplace par celui d'ajout) :
     // la condition 0 reaffiche son bouton avec son libelle d'origine, inchange.
     expect(getByTestId('rule-form-edit-condition-allof-button-0')).toHaveTextContent('QueryParam(debug) Eq(1)');
     // Le formulaire d'ajout, lui, est vierge (pas de fuite de la saisie d'edition abandonnee)
-    expect(getByLabelText('Valeur attendue').value).toBe('');
+    expect(getByLabelText('Expected value').value).toBe('');
   });
 
   it('supprimer une condition avant celle en cours d\'edition garde l\'edition alignee sur la bonne condition', async () => {
@@ -107,13 +107,13 @@ describe('RuleConditionsEditor: edition en place d\'une condition existante', ()
 
     // Edite la condition d'index 1 (Header/X-Trace)
     await fireEvent.click(getByTestId('rule-form-edit-condition-allof-button-1'));
-    expect(getByLabelText('Clé / Chemin').value).toBe('X-Trace');
+    expect(getByLabelText('Key / path').value).toBe('X-Trace');
 
     // Supprime la condition d'index 0 (a partir du bouton de suppression, hors edition) :
     // le formulaire d'edition doit rester sur Header/X-Trace, pas se refermer ni
     // se retrouver a editer un autre index par decalage.
     await fireEvent.click(getByTestId('rule-form-remove-condition-allof-button-0'));
-    expect(getByLabelText('Clé / Chemin').value).toBe('X-Trace');
+    expect(getByLabelText('Key / path').value).toBe('X-Trace');
   });
 
   it('conditions OU (any_of) supportent la meme edition en place, independamment de ET', async () => {
@@ -124,7 +124,7 @@ describe('RuleConditionsEditor: edition en place d\'une condition existante', ()
     });
 
     await fireEvent.click(getByTestId('rule-form-edit-condition-anyof-button-0'));
-    await setInput(getByLabelText('Valeur attendue'), 'y');
+    await setInput(getByLabelText('Expected value'), 'y');
     await fireEvent.submit(container.querySelector('form'));
 
     expect(onAnyOfChange).toHaveBeenCalledWith([

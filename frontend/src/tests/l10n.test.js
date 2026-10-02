@@ -180,7 +180,7 @@ describe('pseudo-locale: no visible word escapes t', () => {
 
   afterAll(() => {
     useTranslator(null);
-    setLocale('fr');
+    setLocale('en');
   });
 
   for (const { name, screens } of SCREEN_GROUPS) {

@@ -10,7 +10,7 @@ const mockRules = [
 describe('RuleList', () => {
   it('affiche un message quand pas de regles', () => {
     const { getByText } = render(RuleList, { props: { rules: [] } });
-    expect(getByText(/Aucune regle definie/)).toBeInTheDocument();
+    expect(getByText('No rule defined. Requests will get 404.')).toBeInTheDocument();
   });
 
   it('affiche toutes les regles', () => {
@@ -28,14 +28,14 @@ describe('RuleList', () => {
   it('le bouton ajouter appelle onAddRule', async () => {
     const onAddRule = vi.fn();
     const { getByText } = render(RuleList, { props: { rules: mockRules, onAddRule } });
-    await fireEvent.click(getByText('+ Ajouter une regle'));
+    await fireEvent.click(getByText('+ Add a rule'));
     expect(onAddRule).toHaveBeenCalledOnce();
   });
 
   it('le bouton modifier appelle onEditRule avec l index', async () => {
     const onEditRule = vi.fn();
     const { getAllByTitle } = render(RuleList, { props: { rules: mockRules, onEditRule } });
-    const editBtns = getAllByTitle('Modifier');
+    const editBtns = getAllByTitle('Edit');
     await fireEvent.click(editBtns[0]);
     expect(onEditRule).toHaveBeenCalledWith(0);
   });
@@ -43,7 +43,7 @@ describe('RuleList', () => {
   it('le bouton supprimer appelle onDeleteRule avec l index', async () => {
     const onDeleteRule = vi.fn();
     const { getAllByTitle } = render(RuleList, { props: { rules: mockRules, onDeleteRule } });
-    const deleteBtns = getAllByTitle('Supprimer');
+    const deleteBtns = getAllByTitle('Delete');
     await fireEvent.click(deleteBtns[1]);
     expect(onDeleteRule).toHaveBeenCalledWith(1);
   });
@@ -51,7 +51,7 @@ describe('RuleList', () => {
   it('le bouton ajouter fonctionne meme avec des regles existantes', async () => {
     const onAddRule = vi.fn();
     const { getByText } = render(RuleList, { props: { rules: mockRules, onAddRule } });
-    const btn = getByText('+ Ajouter une regle');
+    const btn = getByText('+ Add a rule');
     expect(btn).not.toBeDisabled();
     await fireEvent.click(btn);
     expect(onAddRule).toHaveBeenCalledOnce();
@@ -59,8 +59,8 @@ describe('RuleList', () => {
 
   it('les boutons monter/descendre sont desactives aux extremites', () => {
     const { getAllByTitle } = render(RuleList, { props: { rules: mockRules } });
-    const upBtns = getAllByTitle('Monter');
-    const downBtns = getAllByTitle('Descendre');
+    const upBtns = getAllByTitle('Move up');
+    const downBtns = getAllByTitle('Move down');
     expect(upBtns[0]).toBeDisabled();
     expect(downBtns[downBtns.length - 1]).toBeDisabled();
     expect(downBtns[0]).not.toBeDisabled();

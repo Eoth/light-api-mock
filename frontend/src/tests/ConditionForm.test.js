@@ -22,7 +22,7 @@ describe('ConditionForm: selection stricte du path param', () => {
 
   it('affiche un badge du nombre de path params disponibles avant ouverture du select', () => {
     const { getByText } = render(ConditionForm, { props: { availablePathParams: ['id', 'orderId', 'userId'] } });
-    expect(getByText(/3 paramètres de chemin disponibles : id, orderId, userId/)).toBeInTheDocument();
+    expect(getByText('3 path parameters available: id, orderId, userId')).toBeInTheDocument();
   });
 
   it('propose un select ferme (pas de saisie libre) pour la cle quand PathParam est choisi', async () => {
@@ -30,7 +30,7 @@ describe('ConditionForm: selection stricte du path param', () => {
     const sourceSelect = getByLabelText('Source');
     await fireEvent.change(sourceSelect, { target: { value: 'PathParam' } });
 
-    const keyField = getByLabelText('Paramètre de chemin');
+    const keyField = getByLabelText('Path parameter');
     expect(keyField.tagName).toBe('SELECT');
     const options = [...keyField.querySelectorAll('option')].map((o) => o.value).filter(Boolean);
     expect(options).toEqual(['id', 'orderId']);
@@ -46,7 +46,7 @@ describe('ConditionForm: selection stricte du path param', () => {
     const sourceSelect = getByLabelText('Source');
     const options = [...sourceSelect.querySelectorAll('option')].map((o) => o.value);
     expect(options).toContain('PathParam');
-    const keyField = getByLabelText('Paramètre de chemin');
+    const keyField = getByLabelText('Path parameter');
     const keyOptions = [...keyField.querySelectorAll('option')].map((o) => o.value).filter(Boolean);
     expect(keyOptions).toContain('legacyParam');
   });
@@ -57,7 +57,7 @@ describe('ConditionForm: autocompletion query param', () => {
     const { getByLabelText, container } = render(ConditionForm, {
       props: { queryParamSuggestions: ['debug', 'trace'] },
     });
-    const keyField = getByLabelText('Clé / Chemin');
+    const keyField = getByLabelText('Key / path');
     expect(keyField.getAttribute('list')).toBe('cond-query-param-suggestions');
     const datalist = container.querySelector('#cond-query-param-suggestions');
     const options = [...datalist.querySelectorAll('option')].map((o) => o.value);
@@ -69,8 +69,8 @@ describe('ConditionForm: autocompletion query param', () => {
     const { getByLabelText, container } = render(ConditionForm, {
       props: { queryParamSuggestions: ['debug'], onSave },
     });
-    await setInput(getByLabelText('Clé / Chemin'), 'brand-new-param');
-    await setInput(getByLabelText('Valeur attendue'), '1');
+    await setInput(getByLabelText('Key / path'), 'brand-new-param');
+    await setInput(getByLabelText('Expected value'), '1');
     await fireEvent.submit(container.querySelector('form'));
     expect(onSave).toHaveBeenCalledWith({
       source: { type: 'QueryParam', key: 'brand-new-param' },
@@ -82,16 +82,16 @@ describe('ConditionForm: autocompletion query param', () => {
 describe('ConditionForm: libelles distincts edition vs ajout', () => {
   it('affiche "Valider" et un aria-label d\'ajout quand condition est absente', () => {
     const { getByRole } = render(ConditionForm, { props: {} });
-    expect(getByRole('form', { name: 'Ajouter une condition' })).toBeInTheDocument();
-    expect(getByRole('button', { name: 'Valider' })).toBeInTheDocument();
+    expect(getByRole('form', { name: 'Add a condition' })).toBeInTheDocument();
+    expect(getByRole('button', { name: 'OK' })).toBeInTheDocument();
   });
 
   it('affiche "Enregistrer" et un aria-label d\'edition quand une condition existante est fournie', () => {
     const { getByRole } = render(ConditionForm, {
       props: { condition: { source: { type: 'Header', key: 'X-Trace' }, operator: { type: 'Exists' } } },
     });
-    expect(getByRole('form', { name: 'Modifier la condition' })).toBeInTheDocument();
-    expect(getByRole('button', { name: 'Enregistrer' })).toBeInTheDocument();
+    expect(getByRole('form', { name: 'Edit the condition' })).toBeInTheDocument();
+    expect(getByRole('button', { name: 'Save' })).toBeInTheDocument();
   });
 });
 
@@ -99,10 +99,10 @@ describe('ConditionForm: distinction visuelle des sources', () => {
   it('utilise des libelles distincts pour PathParam et QueryParam', () => {
     const { getByLabelText } = render(ConditionForm, { props: { availablePathParams: ['id'] } });
     const optionTexts = [...getByLabelText('Source').querySelectorAll('option')].map((o) => o.textContent);
-    const pathLabel = optionTexts.find((t) => t.includes('chemin'));
-    const queryLabel = optionTexts.find((t) => t.includes('requete'));
+    const pathLabel = optionTexts.find((t) => t.includes('Path parameter'));
+    const queryLabel = optionTexts.find((t) => t.includes('Query parameter'));
     expect(pathLabel).not.toEqual(queryLabel);
     expect(pathLabel).toContain('{param}');
-    expect(queryLabel).toContain('?cle=valeur');
+    expect(queryLabel).toContain('?key=value');
   });
 });

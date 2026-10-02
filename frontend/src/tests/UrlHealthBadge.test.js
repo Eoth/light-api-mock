@@ -12,16 +12,16 @@ vi.mock('../lib/api.js', () => ({
 describe('UrlHealthBadge', () => {
   it('affiche "Non testé" avant tout test', () => {
     const { getByText } = render(UrlHealthBadge, { props: { serviceName: 'svc-a' } });
-    expect(getByText('Non testé')).toBeInTheDocument();
+    expect(getByText('Not tested')).toBeInTheDocument();
   });
 
   it('teste la cible au clic et affiche "Accessible" si joignable', async () => {
     pingService.mockResolvedValue({ reachable: true, checked_at: Date.now(), error: null });
     const { getByText } = render(UrlHealthBadge, { props: { serviceName: 'svc-a' } });
 
-    await fireEvent.click(getByText(/Tester la cible/));
+    await fireEvent.click(getByText('Test the target (network only)'));
 
-    await waitFor(() => expect(getByText('Accessible')).toBeInTheDocument());
+    await waitFor(() => expect(getByText('Reachable')).toBeInTheDocument());
     expect(pingService).toHaveBeenCalledWith('svc-a', null);
   });
 
@@ -29,24 +29,24 @@ describe('UrlHealthBadge', () => {
     pingService.mockResolvedValue({ reachable: false, checked_at: Date.now(), error: 'connection refused' });
     const { getByText } = render(UrlHealthBadge, { props: { serviceName: 'svc-b' } });
 
-    await fireEvent.click(getByText(/Tester la cible/));
+    await fireEvent.click(getByText('Test the target (network only)'));
 
-    await waitFor(() => expect(getByText('Inaccessible')).toBeInTheDocument());
-    expect(getByText(/Seul le mode mock est utilisable/)).toBeInTheDocument();
+    await waitFor(() => expect(getByText('Unreachable')).toBeInTheDocument());
+    expect(getByText(/^Only the mock mode can be used for this service/)).toBeInTheDocument();
   });
 
   it('affiche une erreur si l\'appel echoue', async () => {
     pingService.mockRejectedValue(new Error('502 Bad Gateway'));
     const { getByText } = render(UrlHealthBadge, { props: { serviceName: 'svc-c' } });
 
-    await fireEvent.click(getByText(/Tester la cible/));
+    await fireEvent.click(getByText('Test the target (network only)'));
 
     await waitFor(() => expect(getByText('502 Bad Gateway')).toBeInTheDocument());
   });
 
   it('mentionne explicitement qu\'il s\'agit d\'un test reseau, pas applicatif', () => {
     const { getByText } = render(UrlHealthBadge, { props: { serviceName: 'svc-d' } });
-    expect(getByText(/reseau uniquement/)).toBeInTheDocument();
+    expect(getByText(/network only/)).toBeInTheDocument();
   });
 
   it('affiche "Expiré" quand le dernier test date de plus de PING_TTL_MS', async () => {
@@ -54,12 +54,12 @@ describe('UrlHealthBadge', () => {
     pingService.mockResolvedValue({ reachable: true, checked_at: Date.now(), error: null });
     const { getByText } = render(UrlHealthBadge, { props: { serviceName: 'svc-e' } });
 
-    await fireEvent.click(getByText(/Tester la cible/));
-    await vi.waitFor(() => expect(getByText('Accessible')).toBeInTheDocument());
+    await fireEvent.click(getByText('Test the target (network only)'));
+    await vi.waitFor(() => expect(getByText('Reachable')).toBeInTheDocument());
 
     await vi.advanceTimersByTimeAsync(130_000);
 
-    expect(getByText('Expiré')).toBeInTheDocument();
+    expect(getByText('Expired')).toBeInTheDocument();
     vi.useRealTimers();
   });
 });

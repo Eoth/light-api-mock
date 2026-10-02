@@ -1,7 +1,6 @@
 import { render, fireEvent, waitFor } from '@testing-library/svelte';
 import { describe, it, expect, vi } from 'vitest';
 import RuleTester from '../lib/components/RuleTester.svelte';
-import { setLocale } from '../lib/i18n.svelte.js';
 import { testRule } from '../lib/api.js';
 
 vi.mock('../lib/api.js', () => ({
@@ -55,21 +54,21 @@ describe('RuleTester: filtrage des entrees sans detail', () => {
     const { getByText } = render(RuleTester, {
       props: { serviceName: 'svc-a', logs: [], getDraftRule: draft() },
     });
-    expect(getByText(/Aucune requête n'a encore été capturée/)).toBeInTheDocument();
+    expect(getByText('No request has been captured for this service yet.')).toBeInTheDocument();
   });
 
   it('affiche un message quand seules des entrees sans detail existent', () => {
     const { getByText } = render(RuleTester, {
       props: { serviceName: 'svc-a', logs: [logWithoutDetail], getDraftRule: draft() },
     });
-    expect(getByText(/proxy direct/)).toBeInTheDocument();
+    expect(getByText(/requests proxied directly/)).toBeInTheDocument();
   });
 
   it('ne liste que les entrees avec detail capture dans le selecteur', () => {
     const { getByLabelText, queryByText } = render(RuleTester, {
       props: { serviceName: 'svc-a', logs: [logWithDetail, logWithoutDetail], getDraftRule: draft() },
     });
-    const select = getByLabelText('Requête capturée');
+    const select = getByLabelText('Captured request');
     const options = [...select.querySelectorAll('option')].filter((o) => o.value !== '');
     expect(options).toHaveLength(1);
     expect(queryByText(/passthrough/)).not.toBeInTheDocument();
@@ -98,9 +97,9 @@ describe('RuleTester: appel API et affichage du resultat', () => {
       },
     });
 
-    const select = getByLabelText('Requête capturée');
+    const select = getByLabelText('Captured request');
     await fireEvent.change(select, { target: { value: '0' } });
-    await fireEvent.click(getByRole('button', { name: /Tester contre cette requête/ }));
+    await fireEvent.click(getByRole('button', { name: /Test against this request/ }));
 
     await waitFor(() => expect(testRule).toHaveBeenCalled());
     const [payload] = testRule.mock.calls[0];
@@ -135,8 +134,8 @@ describe('RuleTester: appel API et affichage du resultat', () => {
       },
     });
 
-    await fireEvent.change(getByLabelText('Requête capturée'), { target: { value: '0' } });
-    await fireEvent.click(getByRole('button', { name: /Tester contre cette requête/ }));
+    await fireEvent.change(getByLabelText('Captured request'), { target: { value: '0' } });
+    await fireEvent.click(getByRole('button', { name: /Test against this request/ }));
 
     await waitFor(() => expect(testRule).toHaveBeenCalled());
     // .at(-1) plutot que mock.calls[0] : testRule est un mock PARTAGE (pas
@@ -161,7 +160,7 @@ describe('RuleTester: appel API et affichage du resultat', () => {
           condition: { source: { type: 'QueryParam', key: 'foo' }, operator: { type: 'Eq', value: 'bar' } },
           matched: false,
           found_value: null,
-          hint: "'foo' n'a pas ete trouve comme parametre de requete, mais est present comme parametre de chemin dans cette requete",
+          hint: "'foo' was not found as a query parameter, but it is present as a path parameter in this request",
         },
       ],
       any_of: [],
@@ -171,13 +170,13 @@ describe('RuleTester: appel API et affichage du resultat', () => {
       props: { serviceName: 'svc-a', logs: [logWithDetail], getDraftRule: draft() },
     });
 
-    await fireEvent.change(getByLabelText('Requête capturée'), { target: { value: '0' } });
-    await fireEvent.click(getByRole('button', { name: /Tester contre cette requête/ }));
+    await fireEvent.change(getByLabelText('Captured request'), { target: { value: '0' } });
+    await fireEvent.click(getByRole('button', { name: /Test against this request/ }));
 
-    await waitFor(() => expect(getByText(/ne matcherait pas cette requête/)).toBeInTheDocument());
-    expect(getByText(/ne correspond pas/)).toBeInTheDocument();
-    expect(getByText(/valeur trouvée : absente/)).toBeInTheDocument();
-    expect(getByText(/present comme parametre de chemin/)).toBeInTheDocument();
+    await waitFor(() => expect(getByText('✗ This rule would not match this request')).toBeInTheDocument());
+    expect(getByText(/: does not match \(/)).toBeInTheDocument();
+    expect(getByText(/\(value found: none\)/)).toBeInTheDocument();
+    expect(getByText(/present as a path parameter/)).toBeInTheDocument();
   });
 
   it('affiche une banniere d\'avertissement quand le corps capture est tronque', async () => {
@@ -202,10 +201,10 @@ describe('RuleTester: appel API et affichage du resultat', () => {
       props: { serviceName: 'svc-a', logs: [logWithDetail], getDraftRule: draft() },
     });
 
-    await fireEvent.change(getByLabelText('Requête capturée'), { target: { value: '0' } });
-    await fireEvent.click(getByRole('button', { name: /Tester contre cette requête/ }));
+    await fireEvent.change(getByLabelText('Captured request'), { target: { value: '0' } });
+    await fireEvent.click(getByRole('button', { name: /Test against this request/ }));
 
-    await waitFor(() => expect(getByText(/corps de cette requête a été tronqué/)).toBeInTheDocument());
+    await waitFor(() => expect(getByText('⚠ The body of this request was truncated in the log: comparisons on the body may be wrong.')).toBeInTheDocument());
   });
 
   it('affiche un message clair quand un script echoue a l\'execution', async () => {
@@ -230,11 +229,11 @@ describe('RuleTester: appel API et affichage du resultat', () => {
       },
     });
 
-    await fireEvent.change(getByLabelText('Requête capturée'), { target: { value: '0' } });
-    await fireEvent.click(getByRole('button', { name: /Tester contre cette requête/ }));
+    await fireEvent.change(getByLabelText('Captured request'), { target: { value: '0' } });
+    await fireEvent.click(getByRole('button', { name: /Test against this request/ }));
 
     await waitFor(() => expect(getByTestId('rule-tester-script-errors')).toBeInTheDocument());
-    expect(getByText(/a échoué à l'exécution/)).toBeInTheDocument();
+    expect(getByText(/^⚠ A script failed to run:/)).toBeInTheDocument();
     expect(getByTestId('rule-tester-script-error-script')).toBeInTheDocument();
     expect(getByText(/totally_undefined_fn/)).toBeInTheDocument();
   });
@@ -259,8 +258,8 @@ describe('RuleTester: appel API et affichage du resultat', () => {
       },
     });
 
-    await fireEvent.change(getByLabelText('Requête capturée'), { target: { value: '0' } });
-    await fireEvent.click(getByRole('button', { name: /Tester contre cette requête/ }));
+    await fireEvent.change(getByLabelText('Captured request'), { target: { value: '0' } });
+    await fireEvent.click(getByRole('button', { name: /Test against this request/ }));
 
     await waitFor(() => expect(queryByTestId('rule-tester-result')).toBeInTheDocument());
     expect(queryByTestId('rule-tester-script-errors')).not.toBeInTheDocument();
@@ -295,8 +294,8 @@ describe('RuleTester: appel API et affichage du resultat', () => {
       },
     });
 
-    await fireEvent.change(getByLabelText('Requête capturée'), { target: { value: '0' } });
-    await fireEvent.click(getByRole('button', { name: /Tester contre cette requête/ }));
+    await fireEvent.change(getByLabelText('Captured request'), { target: { value: '0' } });
+    await fireEvent.click(getByRole('button', { name: /Test against this request/ }));
 
     await waitFor(() => expect(getByTestId('rule-tester-script-results')).toBeInTheDocument());
     expect(getByTestId('rule-tester-script-result-script')).toBeInTheDocument();
@@ -333,8 +332,8 @@ describe('RuleTester: appel API et affichage du resultat', () => {
       },
     });
 
-    await fireEvent.change(getByLabelText('Requête capturée'), { target: { value: '0' } });
-    await fireEvent.click(getByRole('button', { name: /Tester contre cette requête/ }));
+    await fireEvent.change(getByLabelText('Captured request'), { target: { value: '0' } });
+    await fireEvent.click(getByRole('button', { name: /Test against this request/ }));
 
     await waitFor(() => expect(getByTestId('rule-tester-script-results')).toBeInTheDocument());
     expect(getByText('{{script.ville}}')).toBeInTheDocument();
@@ -362,8 +361,8 @@ describe('RuleTester: appel API et affichage du resultat', () => {
       },
     });
 
-    await fireEvent.change(getByLabelText('Requête capturée'), { target: { value: '0' } });
-    await fireEvent.click(getByRole('button', { name: /Tester contre cette requête/ }));
+    await fireEvent.change(getByLabelText('Captured request'), { target: { value: '0' } });
+    await fireEvent.click(getByRole('button', { name: /Test against this request/ }));
 
     await waitFor(() => expect(getByTestId('rule-tester-script-results')).toBeInTheDocument());
     expect(getByText('{{script}}')).toBeInTheDocument();
@@ -387,15 +386,15 @@ describe('RuleTester: appel API et affichage du resultat', () => {
       props: { serviceName: 'svc-a', logs: [logWithDetail], getDraftRule: draft() },
     });
 
-    await fireEvent.change(getByLabelText('Requête capturée'), { target: { value: '0' } });
-    await fireEvent.click(getByRole('button', { name: /Tester contre cette requête/ }));
+    await fireEvent.change(getByLabelText('Captured request'), { target: { value: '0' } });
+    await fireEvent.click(getByRole('button', { name: /Test against this request/ }));
 
     await waitFor(() => expect(queryByTestId('rule-tester-result')).toBeInTheDocument());
     expect(queryByTestId('rule-tester-script-results')).not.toBeInTheDocument();
   });
 });
 
-describe('RuleTester: script errors in each language', () => {
+describe('RuleTester: script errors', () => {
   async function scriptErrorText() {
     testRule.mockResolvedValue({
       method_matches: true, sub_path_matches: true, path_params: {}, overall_matched: true, body_truncated: false,
@@ -411,11 +410,6 @@ describe('RuleTester: script errors in each language', () => {
   }
 
   it('punctuates the slot and its error as English does', async () => {
-    await setLocale('en');
-    try {
-      expect(await scriptErrorText()).toBe('Custom script: boom');
-    } finally {
-      await setLocale('fr');
-    }
+    expect(await scriptErrorText()).toBe('Custom script: boom');
   });
 });

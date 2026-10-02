@@ -4,8 +4,8 @@ import RemovableList from '../lib/components/RemovableList.svelte';
 
 describe('RemovableList', () => {
   it('affiche le texte vide quand il n\'y a pas d\'items', () => {
-    const { getByText } = render(RemovableList, { props: { items: [], emptyText: 'Rien ici.' } });
-    expect(getByText('Rien ici.')).toBeInTheDocument();
+    const { getByText } = render(RemovableList, { props: { items: [], emptyText: 'Nothing here.' } });
+    expect(getByText('Nothing here.')).toBeInTheDocument();
   });
 
   it('affiche chaque item avec un bouton de suppression', () => {
@@ -14,8 +14,8 @@ describe('RemovableList', () => {
     });
     expect(getByText('alice')).toBeInTheDocument();
     expect(getByText('bob')).toBeInTheDocument();
-    expect(getByLabelText('Retirer alice')).toBeInTheDocument();
-    expect(getByLabelText('Retirer bob')).toBeInTheDocument();
+    expect(getByLabelText('Remove alice')).toBeInTheDocument();
+    expect(getByLabelText('Remove bob')).toBeInTheDocument();
   });
 
   it('appelle onRemove avec l\'item correspondant', async () => {
@@ -23,7 +23,7 @@ describe('RemovableList', () => {
     const { getByLabelText } = render(RemovableList, {
       props: { items: ['alice', 'bob'], onRemove },
     });
-    await fireEvent.click(getByLabelText('Retirer bob'));
+    await fireEvent.click(getByLabelText('Remove bob'));
     expect(onRemove).toHaveBeenCalledWith('bob');
   });
 

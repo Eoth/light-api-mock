@@ -3,9 +3,9 @@ import { describe, it, expect, vi } from 'vitest';
 import JsonPasteBuilder from '../lib/components/JsonPasteBuilder.svelte';
 
 async function pasteAndParse(getByLabelText, getByText, json) {
-  const textarea = getByLabelText(/Collez un exemple/);
+  const textarea = getByLabelText('Paste an example of the JSON response');
   await fireEvent.input(textarea, { target: { value: json } });
-  await fireEvent.click(getByText('Analyser et variabiliser'));
+  await fireEvent.click(getByText('Analyze and make it variable'));
 }
 
 describe('JsonPasteBuilder (exampleJsonToFields via tpl-utils.js)', () => {
@@ -34,13 +34,13 @@ describe('JsonPasteBuilder (exampleJsonToFields via tpl-utils.js)', () => {
   it('affiche une erreur sur un JSON invalide', async () => {
     const { getByLabelText, getByText } = render(JsonPasteBuilder);
     await pasteAndParse(getByLabelText, getByText, '{invalid');
-    await waitFor(() => expect(getByText(/JSON invalide/)).toBeInTheDocument());
+    await waitFor(() => expect(getByText(/^Invalid JSON: ./)).toBeInTheDocument());
   });
 
   it('rejette un tableau vide avec un message explicite', async () => {
     const { getByLabelText, getByText } = render(JsonPasteBuilder);
     await pasteAndParse(getByLabelText, getByText, '[]');
-    await waitFor(() => expect(getByText(/tableau est vide/)).toBeInTheDocument());
+    await waitFor(() => expect(getByText('The array is empty. Paste an array with at least one element.')).toBeInTheDocument());
   });
 });
 
@@ -55,14 +55,14 @@ describe('JsonPasteBuilder — startParsed (restauration a l\'edition, retour 1)
     const { getByText, queryByLabelText } = render(JsonPasteBuilder, { props: { fields, startParsed: true } });
 
     expect(getByText('siret')).toBeInTheDocument();
-    expect(queryByLabelText(/Collez un exemple/)).not.toBeInTheDocument();
+    expect(queryByLabelText('Paste an example of the JSON response')).not.toBeInTheDocument();
   });
 
   it('affiche la zone de collage quand startParsed=false (defaut), meme avec des fields fournis', () => {
     const fields = [{ key: 'siret', fieldType: 'value', source: 'fixed', value: '123', pipe: '', asNumber: false }];
     const { getByLabelText, queryByText } = render(JsonPasteBuilder, { props: { fields } });
 
-    expect(getByLabelText(/Collez un exemple/)).toBeInTheDocument();
+    expect(getByLabelText('Paste an example of the JSON response')).toBeInTheDocument();
     expect(queryByText('siret')).not.toBeInTheDocument();
   });
 });
@@ -87,26 +87,26 @@ describe('JsonPasteBuilder — pliage des champs objet (correctif diagnostic)', 
     const onUpdate = vi.fn();
     const { getByLabelText, getByText, queryByText } = render(JsonPasteBuilder, { props: { onUpdate } });
     await pasteAndParse(getByLabelText, getByText, nestedJson);
-    await waitFor(() => expect(getByLabelText('Replier client')).toBeInTheDocument());
+    await waitFor(() => expect(getByLabelText('Collapse client')).toBeInTheDocument());
     onUpdate.mockClear();
 
-    await fireEvent.click(getByLabelText('Replier client'));
+    await fireEvent.click(getByLabelText('Collapse client'));
 
-    expect(getByLabelText('Deplier client')).toHaveAttribute('aria-expanded', 'false');
+    expect(getByLabelText('Expand client')).toHaveAttribute('aria-expanded', 'false');
     expect(queryByText('nom')).not.toBeVisible();
-    expect(getByText('(2 masques)')).toBeInTheDocument();
+    expect(getByText('(2 hidden items)')).toBeInTheDocument();
     expect(onUpdate).not.toHaveBeenCalled();
   });
 
   it('deplier restaure l\'affichage des enfants', async () => {
     const { getByLabelText, getByText, queryByText } = render(JsonPasteBuilder);
     await pasteAndParse(getByLabelText, getByText, nestedJson);
-    await waitFor(() => expect(getByLabelText('Replier client')).toBeInTheDocument());
+    await waitFor(() => expect(getByLabelText('Collapse client')).toBeInTheDocument());
 
-    await fireEvent.click(getByLabelText('Replier client'));
+    await fireEvent.click(getByLabelText('Collapse client'));
     expect(queryByText('nom')).not.toBeVisible();
 
-    await fireEvent.click(getByLabelText('Deplier client'));
+    await fireEvent.click(getByLabelText('Expand client'));
     expect(getByText('nom')).toBeVisible();
   });
 
@@ -114,7 +114,7 @@ describe('JsonPasteBuilder — pliage des champs objet (correctif diagnostic)', 
     const { getByLabelText, getByText, queryByLabelText } = render(JsonPasteBuilder);
     await pasteAndParse(getByLabelText, getByText, '{"nom":"ACME"}');
     await waitFor(() => expect(getByText('nom')).toBeInTheDocument());
-    expect(queryByLabelText('Replier nom')).not.toBeInTheDocument();
+    expect(queryByLabelText('Collapse nom')).not.toBeInTheDocument();
   });
 });
 
@@ -126,7 +126,7 @@ describe('JsonPasteBuilder — pipes (retour 2)', () => {
     const { getByLabelText, getByText, queryByLabelText } = render(JsonPasteBuilder);
     await pasteAndParse(getByLabelText, getByText, '{"nom":"ACME"}');
     await waitFor(() => expect(getByText('nom')).toBeInTheDocument());
-    expect(queryByLabelText('Pipe de transformation pour nom')).not.toBeInTheDocument();
+    expect(queryByLabelText('Transformation pipe for nom')).not.toBeInTheDocument();
   });
 
   it('affiche un champ pipe des qu\'une source non-fixe est choisie, et le transmet via onUpdate', async () => {
@@ -135,8 +135,8 @@ describe('JsonPasteBuilder — pipes (retour 2)', () => {
     await pasteAndParse(getByLabelText, getByText, '{"siret":"123"}');
     await waitFor(() => expect(getByText('siret')).toBeInTheDocument());
 
-    await fireEvent.change(getByLabelText('Source pour siret'), { target: { value: 'path' } });
-    const pipeInput = getByLabelText('Pipe de transformation pour siret');
+    await fireEvent.change(getByLabelText('Source for siret'), { target: { value: 'path' } });
+    const pipeInput = getByLabelText('Transformation pipe for siret');
     await fireEvent.input(pipeInput, { target: { value: 'upper' } });
 
     const [fields] = onUpdate.mock.calls.at(-1);

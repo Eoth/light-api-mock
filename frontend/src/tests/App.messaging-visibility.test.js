@@ -31,12 +31,12 @@ describe('App — visibilite du bouton "Messages Kafka" (feature messaging-kafka
     api.getMessagingStatus.mockRejectedValue(new Error('404 Not Found'));
     const { queryByTitle } = render(App);
     await waitFor(() => expect(api.getServices).toHaveBeenCalled());
-    expect(queryByTitle('Journal des messages Kafka')).not.toBeInTheDocument();
+    expect(queryByTitle('Kafka message log')).not.toBeInTheDocument();
   });
 
   it('affiche le bouton quand /api/messaging/status renvoie available=true (binaire avec la feature)', async () => {
     api.getMessagingStatus.mockResolvedValue({ available: true });
     const { queryByTitle } = render(App);
-    await waitFor(() => expect(queryByTitle('Journal des messages Kafka')).toBeInTheDocument());
+    await waitFor(() => expect(queryByTitle('Kafka message log')).toBeInTheDocument());
   });
 });

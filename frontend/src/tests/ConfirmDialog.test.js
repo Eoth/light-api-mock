@@ -10,19 +10,19 @@ describe('ConfirmDialog', () => {
 
   it('affiche le titre et le message quand open est true', () => {
     const { getByRole, getByText } = render(ConfirmDialog, {
-      props: { open: true, title: 'Supprimer le service', message: 'Cette action est irreversible.' },
+      props: { open: true, title: 'Delete the service', message: 'This cannot be undone.' },
     });
     expect(getByRole('dialog')).toBeInTheDocument();
-    expect(getByText('Supprimer le service')).toBeInTheDocument();
-    expect(getByText('Cette action est irreversible.')).toBeInTheDocument();
+    expect(getByText('Delete the service')).toBeInTheDocument();
+    expect(getByText('This cannot be undone.')).toBeInTheDocument();
   });
 
   it('appelle onConfirm au clic sur le bouton de confirmation', async () => {
     const onConfirm = vi.fn();
     const { getByText } = render(ConfirmDialog, {
-      props: { open: true, title: 'Test', confirmLabel: 'Oui, supprimer', onConfirm },
+      props: { open: true, title: 'Test', confirmLabel: 'Yes, delete', onConfirm },
     });
-    await fireEvent.click(getByText('Oui, supprimer'));
+    await fireEvent.click(getByText('Yes, delete'));
     expect(onConfirm).toHaveBeenCalled();
   });
 
@@ -31,7 +31,7 @@ describe('ConfirmDialog', () => {
     const { getByText } = render(ConfirmDialog, {
       props: { open: true, title: 'Test', onCancel },
     });
-    await fireEvent.click(getByText('Annuler'));
+    await fireEvent.click(getByText('Cancel'));
     expect(onCancel).toHaveBeenCalled();
   });
 
@@ -47,10 +47,10 @@ describe('ConfirmDialog', () => {
   it('desactive le bouton de confirmation tant que le mot-cle n\'est pas saisi exactement', async () => {
     const onConfirm = vi.fn();
     const { getByText, getByLabelText } = render(ConfirmDialog, {
-      props: { open: true, title: 'Reset', confirmLabel: 'Confirmer', confirmKeyword: 'RESET', onConfirm },
+      props: { open: true, title: 'Reset', confirmLabel: 'Confirm', confirmKeyword: 'RESET', onConfirm },
     });
 
-    const confirmBtn = getByText('Confirmer');
+    const confirmBtn = getByText('Confirm');
     expect(confirmBtn).toBeDisabled();
 
     const input = getByLabelText(/RESET/);

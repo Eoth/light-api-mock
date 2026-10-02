@@ -9,7 +9,7 @@ const mockServices = [
   { name: 'insee-api', listen_path: '/v4/api/insee/*', real_target_url: 'http://insee:80', is_mocked: true, group_name: 'team-a', rules: [{ name: 'siret' }] },
 ];
 
-const searchPlaceholder = /Rechercher par nom, chemin, URL ou groupe/;
+const searchPlaceholder = 'Search by name, path, URL or group...';
 
 describe('ServiceList', () => {
   beforeEach(() => {
@@ -21,20 +21,20 @@ describe('ServiceList', () => {
 
   it('affiche un etat vide quand pas de services', () => {
     const { getByText } = render(ServiceList, { props: { services: [] } });
-    expect(getByText('Aucun service configure')).toBeInTheDocument();
+    expect(getByText('No service configured')).toBeInTheDocument();
   });
 
   it('affiche les groupes plies par defaut', () => {
     const { getByText, queryByText } = render(ServiceList, { props: { services: mockServices } });
     expect(getByText('team-a')).toBeInTheDocument();
-    expect(getByText('Sans groupe')).toBeInTheDocument();
+    expect(getByText('No group')).toBeInTheDocument();
     expect(queryByText('svc-users')).not.toBeInTheDocument();
   });
 
   it('affiche les noms de groupes', () => {
     const { getByText } = render(ServiceList, { props: { services: mockServices } });
     expect(getByText('team-a')).toBeInTheDocument();
-    expect(getByText('Sans groupe')).toBeInTheDocument();
+    expect(getByText('No group')).toBeInTheDocument();
   });
 
   it('affiche la barre de recherche quand il y a des services', () => {
@@ -63,7 +63,7 @@ describe('ServiceList', () => {
     const { getByPlaceholderText, getByText } = render(ServiceList, { props: { services: mockServices } });
     const search = getByPlaceholderText(searchPlaceholder);
     await fireEvent.input(search, { target: { value: 'zzzzz' } });
-    expect(getByText(/Aucun service ne correspond/)).toBeInTheDocument();
+    expect(getByText('No service matches “zzzzz”')).toBeInTheDocument();
   });
 
   it('affiche le compteur de resultats pendant la recherche', async () => {
@@ -98,7 +98,7 @@ describe('ServiceList', () => {
     const onSelect = vi.fn();
     const first = render(ServiceList, { props: { services: mockServices, onSelect } });
     await fireEvent.click(first.getByText('team-a'));
-    const configureBtn = first.getByRole('button', { name: 'Configurer le service insee-api' });
+    const configureBtn = first.getByRole('button', { name: 'Configure the service insee-api' });
     await fireEvent.click(configureBtn);
     expect(onSelect).toHaveBeenCalledWith('insee-api', 'team-a');
     first.unmount();

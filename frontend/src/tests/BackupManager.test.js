@@ -16,7 +16,7 @@ describe('BackupManager', () => {
   it('affiche un etat vide quand aucune sauvegarde n\'existe', async () => {
     getBackups.mockResolvedValue([]);
     const { getByText } = render(BackupManager);
-    await waitFor(() => expect(getByText(/Aucune sauvegarde disponible/)).toBeInTheDocument());
+    await waitFor(() => expect(getByText('No backup available yet.')).toBeInTheDocument());
   });
 
   it('affiche la liste des sauvegardes avec nom, taille et badge protege', async () => {
@@ -28,11 +28,11 @@ describe('BackupManager', () => {
 
     await waitFor(() => expect(getByText('mock-config-1690000000000-000001.yaml')).toBeInTheDocument());
     expect(getByText('pre-reset-1690000000000.yaml')).toBeInTheDocument();
-    expect(getByText('Protegee (pre-reset)')).toBeInTheDocument();
+    expect(getByText('Protected (before a reset)')).toBeInTheDocument();
 
     const metas = container.querySelectorAll('.backup-meta');
-    expect(metas[0].textContent).toContain('2.0 Ko');
-    expect(metas[1].textContent).toContain('512 o');
+    expect(metas[0].textContent).toContain('2.0 KB');
+    expect(metas[1].textContent).toContain('512 B');
   });
 
   it('ouvre la confirmation au clic sur Restaurer sans appeler l\'API tout de suite', async () => {
@@ -42,7 +42,7 @@ describe('BackupManager', () => {
     const { getByText, getByRole } = render(BackupManager);
 
     await waitFor(() => expect(getByText('mock-config-1-000001.yaml')).toBeInTheDocument());
-    await fireEvent.click(getByText('Restaurer'));
+    await fireEvent.click(getByText('Restore'));
 
     expect(getByRole('dialog')).toBeInTheDocument();
     expect(restoreBackup).not.toHaveBeenCalled();
@@ -57,16 +57,16 @@ describe('BackupManager', () => {
     const { getByText } = render(BackupManager, { props: { onNotify } });
 
     await waitFor(() => expect(getByText('mock-config-1-000001.yaml')).toBeInTheDocument());
-    await fireEvent.click(getByText('Restaurer'));
+    await fireEvent.click(getByText('Restore'));
 
     const keywordInput = document.getElementById('confirm-keyword-input');
-    await fireEvent.input(keywordInput, { target: { value: 'RESTAURER' } });
-    await waitFor(() => expect(getByText('Restaurer', { selector: '.btn-danger' })).not.toBeDisabled());
-    await fireEvent.click(getByText('Restaurer', { selector: '.btn-danger' }));
+    await fireEvent.input(keywordInput, { target: { value: 'RESTORE' } });
+    await waitFor(() => expect(getByText('Restore', { selector: '.btn-danger' })).not.toBeDisabled());
+    await fireEvent.click(getByText('Restore', { selector: '.btn-danger' }));
 
     await waitFor(() => expect(restoreBackup).toHaveBeenCalledWith('mock-config-1-000001.yaml'));
     await waitFor(() => expect(getBackups).toHaveBeenCalledTimes(2));
-    expect(onNotify).toHaveBeenCalledWith(expect.stringContaining('restauree'), 'success');
+    expect(onNotify).toHaveBeenCalledWith('Configuration restored from "mock-config-1-000001.yaml"', 'success');
   });
 
   it('annule sans appeler l\'API', async () => {
@@ -76,19 +76,19 @@ describe('BackupManager', () => {
     const { getByText } = render(BackupManager);
 
     await waitFor(() => expect(getByText('mock-config-1-000001.yaml')).toBeInTheDocument());
-    await fireEvent.click(getByText('Restaurer'));
-    await fireEvent.click(getByText('Annuler'));
+    await fireEvent.click(getByText('Restore'));
+    await fireEvent.click(getByText('Cancel'));
 
     expect(restoreBackup).not.toHaveBeenCalled();
   });
 
   it('notifie une erreur quand le backend refuse (403, droits admin requis)', async () => {
-    getBackups.mockRejectedValue(new Error('Acces refuse'));
+    getBackups.mockRejectedValue(new Error('Access denied'));
     const onNotify = vi.fn();
     render(BackupManager, { props: { onNotify } });
 
     await waitFor(() => expect(onNotify).toHaveBeenCalledWith(
-      expect.stringContaining('Acces refuse'),
+      expect.stringContaining('Access denied'),
       'error',
     ));
   });
@@ -97,18 +97,18 @@ describe('BackupManager', () => {
     getBackups.mockResolvedValue([
       { filename: 'mock-config-1-000001.yaml', protected: false, size_bytes: 100, created_at_ms: 1690000000000 },
     ]);
-    restoreBackup.mockRejectedValue(new Error('Acces refuse'));
+    restoreBackup.mockRejectedValue(new Error('Access denied'));
     const onNotify = vi.fn();
     const { getByText } = render(BackupManager, { props: { onNotify } });
 
     await waitFor(() => expect(getByText('mock-config-1-000001.yaml')).toBeInTheDocument());
-    await fireEvent.click(getByText('Restaurer'));
+    await fireEvent.click(getByText('Restore'));
     const keywordInput = document.getElementById('confirm-keyword-input');
-    await fireEvent.input(keywordInput, { target: { value: 'RESTAURER' } });
-    await fireEvent.click(getByText('Restaurer', { selector: '.btn-danger' }));
+    await fireEvent.input(keywordInput, { target: { value: 'RESTORE' } });
+    await fireEvent.click(getByText('Restore', { selector: '.btn-danger' }));
 
     await waitFor(() => expect(onNotify).toHaveBeenCalledWith(
-      expect.stringContaining('Acces refuse'),
+      expect.stringContaining('Access denied'),
       'error',
     ));
   });
@@ -117,8 +117,8 @@ describe('BackupManager', () => {
     getBackups.mockResolvedValue([]);
     const onBack = vi.fn();
     const { getByText } = render(BackupManager, { props: { onBack } });
-    await waitFor(() => expect(getByText(/Aucune sauvegarde/)).toBeInTheDocument());
-    await fireEvent.click(getByText('Retour'));
+    await waitFor(() => expect(getByText('No backup available yet.')).toBeInTheDocument());
+    await fireEvent.click(getByText('Back'));
     expect(onBack).toHaveBeenCalled();
   });
 });

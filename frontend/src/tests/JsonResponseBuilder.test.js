@@ -22,7 +22,7 @@ const nestedFields = [
 describe('JsonResponseBuilder — breadcrumb de navigation', () => {
   it('n\'affiche pas de breadcrumb tant qu\'on est a la racine', () => {
     const { queryByLabelText } = render(JsonResponseBuilder, { props: { fields: nestedFields } });
-    expect(queryByLabelText('Chemin des donnees')).not.toBeInTheDocument();
+    expect(queryByLabelText('Data path')).not.toBeInTheDocument();
   });
 
   it('affiche le rendu complet par defaut (pas de perte de fonctionnalite)', () => {
@@ -36,28 +36,28 @@ describe('JsonResponseBuilder — breadcrumb de navigation', () => {
   it('navigue dans un objet imbrique via le bouton "Naviguer"', async () => {
     const { getByLabelText, getByRole } = render(JsonResponseBuilder, { props: { fields: nestedFields } });
 
-    await fireEvent.click(getByLabelText('Naviguer dans unite_legale'));
+    await fireEvent.click(getByLabelText('Go into unite_legale'));
 
-    const breadcrumb = getByRole('navigation', { name: 'Chemin des donnees' });
+    const breadcrumb = getByRole('navigation', { name: 'Data path' });
     expect(breadcrumb).toBeInTheDocument();
-    expect(breadcrumb).toHaveTextContent('racine');
+    expect(breadcrumb).toHaveTextContent('root');
     expect(breadcrumb).toHaveTextContent('unite_legale');
   });
 
   it('permet de remonter en cliquant sur "racine" dans le breadcrumb', async () => {
     const { getByLabelText, getByText, getByDisplayValue } = render(JsonResponseBuilder, { props: { fields: nestedFields } });
 
-    await fireEvent.click(getByLabelText('Naviguer dans unite_legale'));
-    await fireEvent.click(getByLabelText('Naviguer dans adresse'));
+    await fireEvent.click(getByLabelText('Go into unite_legale'));
+    await fireEvent.click(getByLabelText('Go into adresse'));
     expect(getByDisplayValue('ville')).toBeInTheDocument();
 
-    await fireEvent.click(getByText('racine'));
+    await fireEvent.click(getByText('root'));
     expect(getByDisplayValue('unite_legale')).toBeInTheDocument();
   });
 
   it('le dernier segment du breadcrumb n\'est pas cliquable (aria-current page)', async () => {
     const { getByLabelText, getByText } = render(JsonResponseBuilder, { props: { fields: nestedFields } });
-    await fireEvent.click(getByLabelText('Naviguer dans unite_legale'));
+    await fireEvent.click(getByLabelText('Go into unite_legale'));
 
     const current = getByText('unite_legale', { selector: 'span' }).closest('li');
     expect(current).toHaveAttribute('aria-current', 'page');
@@ -69,8 +69,8 @@ describe('JsonResponseBuilder — breadcrumb de navigation', () => {
       props: { fields: nestedFields, onUpdate },
     });
 
-    await fireEvent.click(getByLabelText('Naviguer dans unite_legale'));
-    await fireEvent.click(getByText('+ Ajouter un champ'));
+    await fireEvent.click(getByLabelText('Go into unite_legale'));
+    await fireEvent.click(getByText('+ Add a field'));
 
     const [updated] = onUpdate.mock.calls.at(-1);
     expect(updated[0].children).toHaveLength(3);
@@ -81,7 +81,7 @@ describe('JsonResponseBuilder — breadcrumb de navigation', () => {
 describe('JsonResponseBuilder — pliage/depliage des noeuds imbriques', () => {
   it('tout est deplie par defaut (aucune regression sur le rendu existant)', () => {
     const { getByLabelText, getByDisplayValue } = render(JsonResponseBuilder, { props: { fields: nestedFields } });
-    expect(getByLabelText('Replier unite_legale')).toHaveAttribute('aria-expanded', 'true');
+    expect(getByLabelText('Collapse unite_legale')).toHaveAttribute('aria-expanded', 'true');
     expect(getByDisplayValue('nom')).toBeVisible();
     expect(getByDisplayValue('adresse')).toBeVisible();
     expect(getByDisplayValue('ville')).toBeVisible();
@@ -91,10 +91,10 @@ describe('JsonResponseBuilder — pliage/depliage des noeuds imbriques', () => {
     const onUpdate = vi.fn();
     const { getByLabelText, getByDisplayValue } = render(JsonResponseBuilder, { props: { fields: nestedFields, onUpdate } });
 
-    const toggle = getByLabelText('Replier unite_legale');
+    const toggle = getByLabelText('Collapse unite_legale');
     await fireEvent.click(toggle);
 
-    expect(getByLabelText('Deplier unite_legale')).toHaveAttribute('aria-expanded', 'false');
+    expect(getByLabelText('Expand unite_legale')).toHaveAttribute('aria-expanded', 'false');
     expect(getByDisplayValue('nom')).not.toBeVisible();
     expect(getByDisplayValue('adresse')).not.toBeVisible();
     expect(getByDisplayValue('ville')).not.toBeVisible();
@@ -105,10 +105,10 @@ describe('JsonResponseBuilder — pliage/depliage des noeuds imbriques', () => {
   it('depliage restaure le contenu masque, aucune donnee perdue', async () => {
     const { getByLabelText, getByDisplayValue } = render(JsonResponseBuilder, { props: { fields: nestedFields } });
 
-    await fireEvent.click(getByLabelText('Replier unite_legale'));
-    await fireEvent.click(getByLabelText('Deplier unite_legale'));
+    await fireEvent.click(getByLabelText('Collapse unite_legale'));
+    await fireEvent.click(getByLabelText('Expand unite_legale'));
 
-    expect(getByLabelText('Replier unite_legale')).toHaveAttribute('aria-expanded', 'true');
+    expect(getByLabelText('Collapse unite_legale')).toHaveAttribute('aria-expanded', 'true');
     expect(getByDisplayValue('nom')).toBeVisible();
     expect(getByDisplayValue('adresse')).toBeVisible();
     expect(getByDisplayValue('ville')).toBeVisible();
@@ -116,8 +116,8 @@ describe('JsonResponseBuilder — pliage/depliage des noeuds imbriques', () => {
 
   it('un champ de type "valeur" (sans enfants) n\'a pas de chevron de pliage', () => {
     const { queryByLabelText } = render(JsonResponseBuilder, { props: { fields: nestedFields } });
-    expect(queryByLabelText('Replier nom')).not.toBeInTheDocument();
-    expect(queryByLabelText('Deplier nom')).not.toBeInTheDocument();
+    expect(queryByLabelText('Collapse nom')).not.toBeInTheDocument();
+    expect(queryByLabelText('Expand nom')).not.toBeInTheDocument();
   });
 });
 
@@ -132,17 +132,17 @@ describe('JsonResponseBuilder — source "Resultat du script"', () => {
   it('affiche le champ de saisie de valeur quand la source "script" est choisie', async () => {
     const { getByLabelText } = render(JsonResponseBuilder, { props: { fields: scriptField } });
 
-    await fireEvent.change(getByLabelText('Source de la valeur'), { target: { value: 'script' } });
+    await fireEvent.change(getByLabelText('Source of the value'), { target: { value: 'script' } });
 
-    expect(getByLabelText('Valeur')).toBeInTheDocument();
+    expect(getByLabelText('Value')).toBeInTheDocument();
   });
 
   it('transmet la cle du script saisie via onUpdate', async () => {
     const onUpdate = vi.fn();
     const { getByLabelText } = render(JsonResponseBuilder, { props: { fields: scriptField, onUpdate } });
 
-    await fireEvent.change(getByLabelText('Source de la valeur'), { target: { value: 'script' } });
-    await fireEvent.input(getByLabelText('Valeur'), { target: { value: 'total' } });
+    await fireEvent.change(getByLabelText('Source of the value'), { target: { value: 'script' } });
+    await fireEvent.input(getByLabelText('Value'), { target: { value: 'total' } });
 
     const [updated] = onUpdate.mock.calls.at(-1);
     expect(updated[0].source).toBe('script');

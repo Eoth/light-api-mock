@@ -29,13 +29,13 @@ describe('App — visibilite du bouton Reset (SHOW_RESET_BUTTON)', () => {
     api.getAuthStatus.mockResolvedValue({ enabled: false, show_reset_button: false });
     const { queryByTitle } = render(App);
     await waitFor(() => expect(api.getServices).toHaveBeenCalled());
-    expect(queryByTitle('Supprimer tous les services')).not.toBeInTheDocument();
+    expect(queryByTitle('Remove every service')).not.toBeInTheDocument();
   });
 
   it('affiche le bouton Reset quand auth desactivee et show_reset_button=true', async () => {
     api.getAuthStatus.mockResolvedValue({ enabled: false, show_reset_button: true });
     const { queryByTitle } = render(App);
-    await waitFor(() => expect(queryByTitle('Supprimer tous les services')).toBeInTheDocument());
+    await waitFor(() => expect(queryByTitle('Remove every service')).toBeInTheDocument());
   });
 });
 

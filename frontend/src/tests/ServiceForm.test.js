@@ -2,7 +2,7 @@ import { render, fireEvent } from '@testing-library/svelte';
 import { describe, it, expect, vi } from 'vitest';
 import ServiceForm from '../lib/components/ServiceForm.svelte';
 
-const PURELY_MOCKED_LABEL = 'Service purement mocké';
+const PURELY_MOCKED_LABEL = 'Purely mocked service';
 
 async function setInput(el, value) {
   el.value = value;
@@ -19,39 +19,39 @@ describe('ServiceForm validation', () => {
     const onSave = vi.fn();
     const { getByLabelText, container, getByRole } = render(ServiceForm, { props: { onSave } });
 
-    await setInput(getByLabelText('Nom du service'), '');
+    await setInput(getByLabelText('Service name'), '');
     await submitForm(container);
     expect(onSave).not.toHaveBeenCalled();
-    expect(getByRole('alert')).toHaveTextContent('Le nom du service est requis');
+    expect(getByRole('alert')).toHaveTextContent('The service name is required.');
   });
 
   it('refuse le nom reserve "api"', async () => {
     const onSave = vi.fn();
     const { getByLabelText, container, getByRole } = render(ServiceForm, { props: { onSave } });
 
-    await setInput(getByLabelText('Nom du service'), 'api');
+    await setInput(getByLabelText('Service name'), 'api');
     await submitForm(container);
     expect(onSave).not.toHaveBeenCalled();
-    expect(getByRole('alert')).toHaveTextContent('reserve');
+    expect(getByRole('alert')).toHaveTextContent('The name "api" is reserved by Mimicway');
   });
 
   it('refuse le nom reserve "index.html"', async () => {
     const onSave = vi.fn();
     const { getByLabelText, container, getByRole } = render(ServiceForm, { props: { onSave } });
 
-    await setInput(getByLabelText('Nom du service'), 'index.html');
+    await setInput(getByLabelText('Service name'), 'index.html');
     await submitForm(container);
     expect(onSave).not.toHaveBeenCalled();
-    expect(getByRole('alert')).toHaveTextContent('reserve');
+    expect(getByRole('alert')).toHaveTextContent('The name "index.html" is reserved by Mimicway');
   });
 
   it('accepte un listen_path vide (catch-all)', async () => {
     const onSave = vi.fn().mockResolvedValue({});
     const { getByLabelText, container } = render(ServiceForm, { props: { onSave } });
 
-    await setInput(getByLabelText('Nom du service'), 'my-svc');
-    await setInput(getByLabelText(/Chemin d'ecoute/), '');
-    await setInput(getByLabelText('URL cible réelle'), 'http://backend:8080');
+    await setInput(getByLabelText('Service name'), 'my-svc');
+    await setInput(getByLabelText('Listen path (optional)'), '');
+    await setInput(getByLabelText('Real target URL'), 'http://backend:8080');
     await submitForm(container);
     expect(onSave).toHaveBeenCalled();
   });
@@ -60,9 +60,9 @@ describe('ServiceForm validation', () => {
     const onSave = vi.fn().mockResolvedValue({});
     const { getByLabelText, container } = render(ServiceForm, { props: { onSave } });
 
-    await setInput(getByLabelText('Nom du service'), 'my-svc');
-    await setInput(getByLabelText(/Chemin d'ecoute/), '/');
-    await setInput(getByLabelText('URL cible réelle'), 'http://backend:8080');
+    await setInput(getByLabelText('Service name'), 'my-svc');
+    await setInput(getByLabelText('Listen path (optional)'), '/');
+    await setInput(getByLabelText('Real target URL'), 'http://backend:8080');
     await submitForm(container);
     expect(onSave).toHaveBeenCalled();
   });
@@ -71,9 +71,9 @@ describe('ServiceForm validation', () => {
     const onSave = vi.fn().mockResolvedValue({});
     const { getByLabelText, container } = render(ServiceForm, { props: { onSave } });
 
-    await setInput(getByLabelText('Nom du service'), 'my-svc');
-    await setInput(getByLabelText(/Chemin d'ecoute/), '/*');
-    await setInput(getByLabelText('URL cible réelle'), 'http://backend:8080');
+    await setInput(getByLabelText('Service name'), 'my-svc');
+    await setInput(getByLabelText('Listen path (optional)'), '/*');
+    await setInput(getByLabelText('Real target URL'), 'http://backend:8080');
     await submitForm(container);
     expect(onSave).toHaveBeenCalled();
   });
@@ -82,9 +82,9 @@ describe('ServiceForm validation', () => {
     const onSave = vi.fn().mockResolvedValue({});
     const { getByLabelText, container } = render(ServiceForm, { props: { onSave } });
 
-    await setInput(getByLabelText('Nom du service'), 'my-svc');
-    await setInput(getByLabelText(/Chemin d'ecoute/), '/v1/users/*');
-    await setInput(getByLabelText('URL cible réelle'), 'http://backend:8080');
+    await setInput(getByLabelText('Service name'), 'my-svc');
+    await setInput(getByLabelText('Listen path (optional)'), '/v1/users/*');
+    await setInput(getByLabelText('Real target URL'), 'http://backend:8080');
     await submitForm(container);
     expect(onSave).toHaveBeenCalled();
   });
@@ -93,10 +93,10 @@ describe('ServiceForm validation', () => {
     const onSave = vi.fn();
     const { getByLabelText, container, getByRole } = render(ServiceForm, { props: { onSave } });
 
-    await setInput(getByLabelText('Nom du service'), 'my/svc');
+    await setInput(getByLabelText('Service name'), 'my/svc');
     await submitForm(container);
     expect(onSave).not.toHaveBeenCalled();
-    expect(getByRole('alert')).toHaveTextContent('separateur');
+    expect(getByRole('alert')).toHaveTextContent('A service name cannot contain a path separator (/ or \\).');
   });
 
   it('permet la soumission meme si nom existe (unicite geree par le backend par groupe)', async () => {
@@ -105,8 +105,8 @@ describe('ServiceForm validation', () => {
       props: { onSave, existingNames: ['existing-svc'] },
     });
 
-    await setInput(getByLabelText('Nom du service'), 'existing-svc');
-    await setInput(getByLabelText('URL cible réelle'), 'http://backend:8080');
+    await setInput(getByLabelText('Service name'), 'existing-svc');
+    await setInput(getByLabelText('Real target URL'), 'http://backend:8080');
     await submitForm(container);
     expect(onSave).toHaveBeenCalled();
   });
@@ -125,7 +125,7 @@ describe('ServiceForm validation', () => {
       props: { service: existingService, existingNames: ['existing-svc'], isEdit: true, onSave },
     });
 
-    await setInput(getByLabelText('URL cible réelle'), 'http://new-backend:9090');
+    await setInput(getByLabelText('Real target URL'), 'http://new-backend:9090');
     await submitForm(container);
     expect(onSave).toHaveBeenCalled();
   });
@@ -143,12 +143,12 @@ describe('ServiceForm validation', () => {
       props: { service: existingService, isEdit: true },
     });
 
-    expect(getByLabelText('Nom du service')).toBeDisabled();
+    expect(getByLabelText('Service name')).toBeDisabled();
   });
 
   it('laisse le champ nom editable lors d\'un clonage (service pre-rempli sans isEdit)', async () => {
     const clonedService = {
-      name: 'existing-svc-copie',
+      name: 'existing-svc-copy',
       listen_path: '/v1/*',
       real_target_url: 'http://backend:8080',
       is_mocked: true,
@@ -160,12 +160,12 @@ describe('ServiceForm validation', () => {
       props: { service: clonedService, onSave },
     });
 
-    const nameInput = getByLabelText('Nom du service');
+    const nameInput = getByLabelText('Service name');
     expect(nameInput).not.toBeDisabled();
-    expect(nameInput.value).toBe('existing-svc-copie');
+    expect(nameInput.value).toBe('existing-svc-copy');
 
     await setInput(nameInput, 'renamed-clone');
-    await setInput(getByLabelText('URL cible réelle'), 'http://backend:8080');
+    await setInput(getByLabelText('Real target URL'), 'http://backend:8080');
     await submitForm(container);
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ name: 'renamed-clone' }));
   });
@@ -174,28 +174,28 @@ describe('ServiceForm validation', () => {
     const onSave = vi.fn();
     const { getByLabelText, container, getByRole } = render(ServiceForm, { props: { onSave } });
 
-    await setInput(getByLabelText('Nom du service'), 'my svc');
+    await setInput(getByLabelText('Service name'), 'my svc');
     await submitForm(container);
     expect(onSave).not.toHaveBeenCalled();
-    expect(getByRole('alert')).toHaveTextContent('lettres, chiffres, tirets');
+    expect(getByRole('alert')).toHaveTextContent('A service name can only contain letters, digits, dashes (-) and underscores (_).');
   });
 
   it('refuse un nom contenant un caractere special', async () => {
     const onSave = vi.fn();
     const { getByLabelText, container, getByRole } = render(ServiceForm, { props: { onSave } });
 
-    await setInput(getByLabelText('Nom du service'), 'svc@name!');
+    await setInput(getByLabelText('Service name'), 'svc@name!');
     await submitForm(container);
     expect(onSave).not.toHaveBeenCalled();
-    expect(getByRole('alert')).toHaveTextContent('lettres, chiffres, tirets');
+    expect(getByRole('alert')).toHaveTextContent('A service name can only contain letters, digits, dashes (-) and underscores (_).');
   });
 
   it('accepte un nom avec underscores et chiffres', async () => {
     const onSave = vi.fn().mockResolvedValue({});
     const { getByLabelText, container } = render(ServiceForm, { props: { onSave } });
 
-    await setInput(getByLabelText('Nom du service'), 'svc_v2-42');
-    await setInput(getByLabelText('URL cible réelle'), 'http://backend:8080');
+    await setInput(getByLabelText('Service name'), 'svc_v2-42');
+    await setInput(getByLabelText('Real target URL'), 'http://backend:8080');
     await submitForm(container);
     expect(onSave).toHaveBeenCalled();
   });
@@ -207,12 +207,12 @@ describe('ServiceForm service purement mocké', () => {
     const { getByLabelText, getByRole, queryByLabelText, container } = render(ServiceForm, { props: { onSave } });
 
     // Non coche par defaut : le champ cible est requis comme avant.
-    expect(getByLabelText('URL cible réelle')).toBeInTheDocument();
+    expect(getByLabelText('Real target URL')).toBeInTheDocument();
 
     await fireEvent.click(getByRole('switch', { name: PURELY_MOCKED_LABEL }));
-    expect(queryByLabelText('URL cible réelle')).not.toBeInTheDocument();
+    expect(queryByLabelText('Real target URL')).not.toBeInTheDocument();
 
-    await setInput(getByLabelText('Nom du service'), 'sans-cible');
+    await setInput(getByLabelText('Service name'), 'sans-cible');
     await submitForm(container);
 
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
@@ -236,7 +236,7 @@ describe('ServiceForm service purement mocké', () => {
     });
 
     expect(getByRole('switch', { name: PURELY_MOCKED_LABEL })).toHaveAttribute('aria-checked', 'true');
-    expect(queryByLabelText('URL cible réelle')).not.toBeInTheDocument();
+    expect(queryByLabelText('Real target URL')).not.toBeInTheDocument();
   });
 
   it('decocher reaffiche le champ cible sans perte des regles existantes', async () => {
@@ -255,7 +255,7 @@ describe('ServiceForm service purement mocké', () => {
     });
 
     await fireEvent.click(getByRole('switch', { name: PURELY_MOCKED_LABEL }));
-    const targetInput = getByLabelText('URL cible réelle');
+    const targetInput = getByLabelText('Real target URL');
     await setInput(targetInput, 'http://nouvelle-cible:8080');
     await submitForm(container);
 

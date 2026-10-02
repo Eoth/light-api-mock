@@ -121,7 +121,7 @@ describe('validateTemplateAsJson', () => {
   it('rejects malformed JSON', () => {
     const err = validateTemplateAsJson('{"name":}');
     expect(err).not.toBeNull();
-    expect(err).toContain('JSON invalide');
+    expect(err).toMatch(/^Invalid JSON: ./);
   });
 
   it('rejects unbalanced braces', () => {
@@ -542,7 +542,7 @@ describe('exampleXmlToFields', () => {
   });
 
   it('rejette une racine sans aucun element imbrique (uniquement du texte)', () => {
-    expect(() => exampleXmlToFields('<response>juste du texte</response>')).toThrow(/aucun element imbrique/);
+    expect(() => exampleXmlToFields('<response>just text</response>')).toThrow('The XML root holds no nested element. Paste XML with at least one child element.');
   });
 
   it('rejette une chaine vide', () => {
@@ -618,6 +618,6 @@ describe('templateToXmlFields', () => {
   });
 
   it('rejette un template sans element racine', () => {
-    expect(() => templateToXmlFields('juste du texte')).toThrow(TypeError);
+    expect(() => templateToXmlFields('just text')).toThrow(TypeError);
   });
 });

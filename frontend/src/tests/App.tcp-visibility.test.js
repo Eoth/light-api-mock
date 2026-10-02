@@ -33,12 +33,12 @@ describe('App — visibilite du bouton "Mock TCP" (feature tcp-mock)', () => {
     api.getTcpStatus.mockRejectedValue(new Error('404 Not Found'));
     const { queryByTitle } = render(App);
     await waitFor(() => expect(api.getServices).toHaveBeenCalled());
-    expect(queryByTitle('Mock TCP brut')).not.toBeInTheDocument();
+    expect(queryByTitle('Raw TCP mock')).not.toBeInTheDocument();
   });
 
   it('affiche le bouton quand /api/tcp/status repond (binaire avec la feature, meme liste vide)', async () => {
     api.getTcpStatus.mockResolvedValue([]);
     const { queryByTitle } = render(App);
-    await waitFor(() => expect(queryByTitle('Mock TCP brut')).toBeInTheDocument());
+    await waitFor(() => expect(queryByTitle('Raw TCP mock')).toBeInTheDocument());
   });
 });

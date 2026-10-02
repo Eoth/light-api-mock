@@ -31,7 +31,7 @@ describe('TcpServiceManager', () => {
     getTcpServices.mockResolvedValue([]);
     getTcpStatus.mockResolvedValue([]);
     const { getByText } = render(TcpServiceManager);
-    await waitFor(() => expect(getByText(/Aucun service TCP configure/)).toBeInTheDocument());
+    await waitFor(() => expect(getByText('No TCP service configured yet.')).toBeInTheDocument());
   });
 
   it('affiche un service avec son port, son nombre de regles et le statut d\'ecoute', async () => {
@@ -42,8 +42,8 @@ describe('TcpServiceManager', () => {
     await waitFor(() => expect(getByTestId('tcp-manager-item-heartbeat')).toBeInTheDocument());
     expect(getByText('heartbeat')).toBeInTheDocument();
     expect(getByText(':9000')).toBeInTheDocument();
-    expect(getByText('1 regle')).toBeInTheDocument();
-    expect(getByText('Ecoute active')).toBeInTheDocument();
+    expect(getByText('1 rule')).toBeInTheDocument();
+    expect(getByText('Listening')).toBeInTheDocument();
   });
 
   it('affiche un badge d\'echec de bind avec le detail en titre quand listening=false', async () => {
@@ -51,8 +51,8 @@ describe('TcpServiceManager', () => {
     getTcpStatus.mockResolvedValue([{ name: 'heartbeat', listen_port: 9000, listening: false, error: 'address in use' }]);
     const { getByText } = render(TcpServiceManager);
 
-    await waitFor(() => expect(getByText('Echec du bind')).toBeInTheDocument());
-    expect(getByText('Echec du bind').getAttribute('title')).toBe('address in use');
+    await waitFor(() => expect(getByText('Bind failed')).toBeInTheDocument());
+    expect(getByText('Bind failed').getAttribute('title')).toBe('address in use');
   });
 
   it('ouvre le formulaire de creation avec une regle vide par defaut', async () => {
@@ -125,14 +125,14 @@ describe('TcpServiceManager', () => {
     await fireEvent.input(getByTestId('tcp-manager-form-port-input'), { target: { value: '9000' } });
     await fireEvent.click(getByTestId('tcp-manager-form-save-button'));
 
-    await waitFor(() => expect(getByTestId('tcp-manager-form-error')).toHaveTextContent('Au moins une regle est requise'));
+    await waitFor(() => expect(getByTestId('tcp-manager-form-error')).toHaveTextContent('At least one rule is required (otherwise no connection gets an answer).'));
     expect(createTcpService).not.toHaveBeenCalled();
   });
 
   it('affiche l\'erreur backend (ex: port deja pris) sans fermer le formulaire', async () => {
     getTcpServices.mockResolvedValue([]);
     getTcpStatus.mockResolvedValue([]);
-    createTcpService.mockRejectedValue(new Error('Le port 9000 est deja utilise par un autre service TCP.'));
+    createTcpService.mockRejectedValue(new Error('Port 9000 is already used by another TCP service.'));
     const { getByTestId } = render(TcpServiceManager);
 
     await waitFor(() => expect(getByTestId('tcp-manager-add-button')).toBeInTheDocument());
@@ -142,7 +142,7 @@ describe('TcpServiceManager', () => {
     await fireEvent.input(getByTestId('tcp-manager-rule-0-name-input'), { target: { value: 'r' } });
     await fireEvent.click(getByTestId('tcp-manager-form-save-button'));
 
-    await waitFor(() => expect(getByTestId('tcp-manager-form-error')).toHaveTextContent('deja utilise'));
+    await waitFor(() => expect(getByTestId('tcp-manager-form-error')).toHaveTextContent('Port 9000 is already used by another TCP service.'));
     expect(getByTestId('tcp-manager-form')).toBeInTheDocument();
   });
 
@@ -190,7 +190,7 @@ describe('TcpServiceManager', () => {
     await fireEvent.click(getByTestId('confirm-dialog-confirm-button'));
 
     await waitFor(() => expect(deleteTcpService).toHaveBeenCalledWith('heartbeat'));
-    expect(onNotify).toHaveBeenCalledWith(expect.stringContaining('supprime'), 'success');
+    expect(onNotify).toHaveBeenCalledWith('TCP service "heartbeat" deleted', 'success');
   });
 
   it('appelle onBack au clic sur Retour', async () => {

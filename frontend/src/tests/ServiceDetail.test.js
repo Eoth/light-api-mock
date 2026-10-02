@@ -33,8 +33,8 @@ describe('ServiceDetail - suppression (regression crash null)', () => {
       props: { service: svc(), onNotify, onDelete },
     });
 
-    await fireEvent.click(getByText('Supprimer'));
-    await fireEvent.click(getByText('Oui, supprimer'));
+    await fireEvent.click(getByText('Delete'));
+    await fireEvent.click(getByText('Yes, delete'));
 
     // Simule la course reactive : le parent (App.svelte) a deja retire le
     // service courant (prop devient null) AVANT que la promesse de
@@ -60,8 +60,8 @@ describe('ServiceDetail - suppression (regression crash null)', () => {
       props: { service: svc({ group_name: 'team-a' }), onNotify, onDelete },
     });
 
-    await fireEvent.click(getByText('Supprimer'));
-    await fireEvent.click(getByText('Oui, supprimer'));
+    await fireEvent.click(getByText('Delete'));
+    await fireEvent.click(getByText('Yes, delete'));
 
     await waitFor(() => expect(deleteService).toHaveBeenCalledWith('svc-a', 'team-a'));
     expect(onDelete).toHaveBeenCalledWith('svc-a', 'team-a');
@@ -77,7 +77,7 @@ describe('ServiceDetail - formulaire d edition (regression URL sans code de grou
       },
     });
 
-    await fireEvent.click(getByText('Modifier le service'));
+    await fireEvent.click(getByText('Edit the service'));
 
     await waitFor(() => expect(getByText(/\/ab3f9\/svc-a\/v1\/\*/)).toBeInTheDocument());
   });

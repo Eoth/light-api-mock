@@ -22,7 +22,7 @@ const nestedFields = [
 describe('XmlResponseBuilder — pliage/depliage des noeuds parents', () => {
   it('tout est deplie par defaut (aucune regression sur le rendu existant)', () => {
     const { getByLabelText, getByDisplayValue } = render(XmlResponseBuilder, { props: { fields: nestedFields } });
-    expect(getByLabelText('Replier unite_legale')).toHaveAttribute('aria-expanded', 'true');
+    expect(getByLabelText('Collapse unite_legale')).toHaveAttribute('aria-expanded', 'true');
     expect(getByDisplayValue('nom')).toBeVisible();
     expect(getByDisplayValue('adresse')).toBeVisible();
     expect(getByDisplayValue('ville')).toBeVisible();
@@ -32,9 +32,9 @@ describe('XmlResponseBuilder — pliage/depliage des noeuds parents', () => {
     const onUpdate = vi.fn();
     const { getByLabelText, getByDisplayValue } = render(XmlResponseBuilder, { props: { fields: nestedFields, onUpdate } });
 
-    await fireEvent.click(getByLabelText('Replier unite_legale'));
+    await fireEvent.click(getByLabelText('Collapse unite_legale'));
 
-    expect(getByLabelText('Deplier unite_legale')).toHaveAttribute('aria-expanded', 'false');
+    expect(getByLabelText('Expand unite_legale')).toHaveAttribute('aria-expanded', 'false');
     expect(getByDisplayValue('nom')).not.toBeVisible();
     expect(getByDisplayValue('adresse')).not.toBeVisible();
     expect(getByDisplayValue('ville')).not.toBeVisible();
@@ -44,18 +44,18 @@ describe('XmlResponseBuilder — pliage/depliage des noeuds parents', () => {
   it('depliage restaure le contenu masque, aucune donnee perdue', async () => {
     const { getByLabelText, getByDisplayValue } = render(XmlResponseBuilder, { props: { fields: nestedFields } });
 
-    await fireEvent.click(getByLabelText('Replier unite_legale'));
-    await fireEvent.click(getByLabelText('Deplier unite_legale'));
+    await fireEvent.click(getByLabelText('Collapse unite_legale'));
+    await fireEvent.click(getByLabelText('Expand unite_legale'));
 
-    expect(getByLabelText('Replier unite_legale')).toHaveAttribute('aria-expanded', 'true');
+    expect(getByLabelText('Collapse unite_legale')).toHaveAttribute('aria-expanded', 'true');
     expect(getByDisplayValue('nom')).toBeVisible();
     expect(getByDisplayValue('ville')).toBeVisible();
   });
 
   it('un noeud de type "Contenu" (sans enfants) n\'a pas de chevron de pliage', () => {
     const { queryByLabelText } = render(XmlResponseBuilder, { props: { fields: nestedFields } });
-    expect(queryByLabelText('Replier nom')).not.toBeInTheDocument();
-    expect(queryByLabelText('Deplier nom')).not.toBeInTheDocument();
+    expect(queryByLabelText('Collapse nom')).not.toBeInTheDocument();
+    expect(queryByLabelText('Expand nom')).not.toBeInTheDocument();
   });
 });
 
@@ -72,14 +72,14 @@ describe('XmlResponseBuilder — source "XPath (XML/SOAP)"', () => {
   it('choisir la source XPath affiche un champ Valeur avec un placeholder XPath', async () => {
     const { getByLabelText } = render(XmlResponseBuilder, { props: { fields: flatValueField } });
     await fireEvent.change(getByLabelText('Source'), { target: { value: 'xpath' } });
-    expect(getByLabelText('Valeur')).toHaveAttribute('placeholder', 'ex: Envelope/Body/recherche/Siret');
+    expect(getByLabelText('Value')).toHaveAttribute('placeholder', 'e.g. Envelope/Body/search/Id');
   });
 
   it('renseigner le chemin XPath emet un onUpdate avec source xpath et la valeur saisie', async () => {
     const onUpdate = vi.fn();
     const { getByLabelText } = render(XmlResponseBuilder, { props: { fields: flatValueField, onUpdate } });
     await fireEvent.change(getByLabelText('Source'), { target: { value: 'xpath' } });
-    await fireEvent.input(getByLabelText('Valeur'), { target: { value: 'Envelope/Body/recherche/Siret' } });
+    await fireEvent.input(getByLabelText('Value'), { target: { value: 'Envelope/Body/recherche/Siret' } });
     const lastCall = onUpdate.mock.calls.at(-1)[0];
     expect(lastCall[0]).toMatchObject({ source: 'xpath', value: 'Envelope/Body/recherche/Siret' });
   });
@@ -95,14 +95,14 @@ describe('XmlResponseBuilder — source "Resultat script"', () => {
   it('affiche le champ de saisie de valeur quand la source "script" est choisie', async () => {
     const { getByLabelText } = render(XmlResponseBuilder, { props: { fields: flatValueField } });
     await fireEvent.change(getByLabelText('Source'), { target: { value: 'script' } });
-    expect(getByLabelText('Valeur')).toBeInTheDocument();
+    expect(getByLabelText('Value')).toBeInTheDocument();
   });
 
   it('transmet la cle du script saisie via onUpdate', async () => {
     const onUpdate = vi.fn();
     const { getByLabelText } = render(XmlResponseBuilder, { props: { fields: flatValueField, onUpdate } });
     await fireEvent.change(getByLabelText('Source'), { target: { value: 'script' } });
-    await fireEvent.input(getByLabelText('Valeur'), { target: { value: 'total' } });
+    await fireEvent.input(getByLabelText('Value'), { target: { value: 'total' } });
     const lastCall = onUpdate.mock.calls.at(-1)[0];
     expect(lastCall[0]).toMatchObject({ source: 'script', value: 'total' });
   });

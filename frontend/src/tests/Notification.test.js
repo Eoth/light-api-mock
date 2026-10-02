@@ -9,12 +9,12 @@ describe('Notification', () => {
   });
 
   it('affiche le message quand visible est true', () => {
-    const { getByText } = render(Notification, { props: { message: 'Operation reussie', type: 'success', visible: true } });
-    expect(getByText('Operation reussie')).toBeInTheDocument();
+    const { getByText } = render(Notification, { props: { message: 'Saved', type: 'success', visible: true } });
+    expect(getByText('Saved')).toBeInTheDocument();
   });
 
   it('a le role alert pour l accessibilite', () => {
-    const { getByRole } = render(Notification, { props: { message: 'Erreur', type: 'error', visible: true } });
+    const { getByRole } = render(Notification, { props: { message: 'Failed', type: 'error', visible: true } });
     expect(getByRole('alert')).toBeInTheDocument();
   });
 });

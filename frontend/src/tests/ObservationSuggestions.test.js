@@ -33,7 +33,7 @@ describe('ObservationSuggestions', () => {
     const { getByText } = render(ObservationSuggestions, {
       props: { serviceName: 'svc-a', isMocked: false },
     });
-    await waitFor(() => expect(getByText('Observer ce service')).toBeInTheDocument());
+    await waitFor(() => expect(getByText('Observe this service')).toBeInTheDocument());
   });
 
   it('reflete un service deja observe au chargement', async () => {
@@ -41,7 +41,7 @@ describe('ObservationSuggestions', () => {
     const { getByText } = render(ObservationSuggestions, {
       props: { serviceName: 'svc-a', isMocked: false },
     });
-    await waitFor(() => expect(getByText('Arrêter d\'observer')).toBeInTheDocument());
+    await waitFor(() => expect(getByText('Stop observing')).toBeInTheDocument());
   });
 
   it('active l\'observation au clic et appelle observeService avec le bon service/groupe', async () => {
@@ -49,11 +49,11 @@ describe('ObservationSuggestions', () => {
     const { getByText } = render(ObservationSuggestions, {
       props: { serviceName: 'svc-a', groupName: 'team-a', isMocked: false },
     });
-    await waitFor(() => expect(getByText('Observer ce service')).toBeInTheDocument());
+    await waitFor(() => expect(getByText('Observe this service')).toBeInTheDocument());
 
-    await fireEvent.click(getByText('Observer ce service'));
+    await fireEvent.click(getByText('Observe this service'));
 
-    await waitFor(() => expect(getByText('Arrêter d\'observer')).toBeInTheDocument());
+    await waitFor(() => expect(getByText('Stop observing')).toBeInTheDocument());
     expect(observeService).toHaveBeenCalledWith('svc-a', 'team-a');
   });
 
@@ -63,25 +63,25 @@ describe('ObservationSuggestions', () => {
     const { getByText } = render(ObservationSuggestions, {
       props: { serviceName: 'svc-a', isMocked: false },
     });
-    await waitFor(() => expect(getByText('Arrêter d\'observer')).toBeInTheDocument());
+    await waitFor(() => expect(getByText('Stop observing')).toBeInTheDocument());
 
-    await fireEvent.click(getByText('Arrêter d\'observer'));
+    await fireEvent.click(getByText('Stop observing'));
 
-    await waitFor(() => expect(getByText('Observer ce service')).toBeInTheDocument());
+    await waitFor(() => expect(getByText('Observe this service')).toBeInTheDocument());
     expect(unobserveService).toHaveBeenCalledWith('svc-a', null);
   });
 
   it('affiche une erreur si l\'activation echoue', async () => {
-    observeService.mockRejectedValue(new Error('service purement proxifie requis'));
+    observeService.mockRejectedValue(new Error('a purely proxied service is required'));
     const { getByText } = render(ObservationSuggestions, {
       props: { serviceName: 'svc-a', isMocked: false },
     });
-    await waitFor(() => expect(getByText('Observer ce service')).toBeInTheDocument());
+    await waitFor(() => expect(getByText('Observe this service')).toBeInTheDocument());
 
-    await fireEvent.click(getByText('Observer ce service'));
+    await fireEvent.click(getByText('Observe this service'));
 
     await waitFor(() =>
-      expect(getByText('service purement proxifie requis')).toBeInTheDocument()
+      expect(getByText('a purely proxied service is required')).toBeInTheDocument()
     );
   });
 
@@ -102,12 +102,12 @@ describe('ObservationSuggestions', () => {
     const { getByText, getByTestId } = render(ObservationSuggestions, {
       props: { serviceName: 'svc-a', isMocked: false },
     });
-    await waitFor(() => expect(getByText('Arrêter d\'observer')).toBeInTheDocument());
+    await waitFor(() => expect(getByText('Stop observing')).toBeInTheDocument());
 
-    await fireEvent.click(getByText('Actualiser les suggestions'));
+    await fireEvent.click(getByText('Refresh the suggestions'));
 
     await waitFor(() => expect(getByText('GET orders/1')).toBeInTheDocument());
-    expect(getByText('sans condition (3 appels identiques)')).toBeInTheDocument();
+    expect(getByText('no condition (3 identical calls)')).toBeInTheDocument();
     expect(getByTestId('observation-suggestion-svc-a-0-0')).toBeInTheDocument();
   });
 
@@ -138,16 +138,16 @@ describe('ObservationSuggestions', () => {
     const { getByText, getAllByText } = render(ObservationSuggestions, {
       props: { serviceName: 'svc-a', isMocked: false, onUseSuggestion },
     });
-    await waitFor(() => expect(getByText('Arrêter d\'observer')).toBeInTheDocument());
+    await waitFor(() => expect(getByText('Stop observing')).toBeInTheDocument());
 
-    await fireEvent.click(getByText('Actualiser les suggestions'));
+    await fireEvent.click(getByText('Refresh the suggestions'));
 
     await waitFor(() =>
-      expect(getByText('si Paramètre de requête "id" = "1"')).toBeInTheDocument()
+      expect(getByText('if Query parameter "id" = "1"')).toBeInTheDocument()
     );
-    expect(getByText('si Paramètre de requête "id" = "2"')).toBeInTheDocument();
+    expect(getByText('if Query parameter "id" = "2"')).toBeInTheDocument();
 
-    const useButtons = getAllByText('Utiliser cette suggestion');
+    const useButtons = getAllByText('Use this suggestion');
     expect(useButtons).toHaveLength(2);
     await fireEvent.click(useButtons[0]);
 
@@ -174,11 +174,11 @@ describe('ObservationSuggestions', () => {
     const { getByText } = render(ObservationSuggestions, {
       props: { serviceName: 'svc-a', isMocked: false },
     });
-    await waitFor(() => expect(getByText('Arrêter d\'observer')).toBeInTheDocument());
+    await waitFor(() => expect(getByText('Stop observing')).toBeInTheDocument());
 
-    await fireEvent.click(getByText('Actualiser les suggestions'));
+    await fireEvent.click(getByText('Refresh the suggestions'));
 
-    await waitFor(() => expect(getByText(/Réponses variables observées/)).toBeInTheDocument());
-    expect(getByText(/4 appels, 3/)).toBeInTheDocument();
+    await waitFor(() => expect(getByText(/^Varying responses observed/)).toBeInTheDocument());
+    expect(getByText(/\(4 calls, 3 distinct responses\)/)).toBeInTheDocument();
   });
 });

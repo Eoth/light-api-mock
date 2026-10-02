@@ -26,10 +26,10 @@ describe('RuleForm: rule name uniqueness', () => {
       props: { existingRules: [{ name: 'existing-rule' }], onSave },
     });
 
-    await setInput(getByLabelText('Nom de la regle'), 'existing-rule');
+    await setInput(getByLabelText('Rule name'), 'existing-rule');
     await submitForm(container);
     expect(onSave).not.toHaveBeenCalled();
-    expect(getByRole('alert')).toHaveTextContent('existe deja');
+    expect(getByRole('alert')).toHaveTextContent('A rule named "existing-rule" already exists in this service.');
   });
 
   it('refuse un doublon insensible a la casse', async () => {
@@ -38,10 +38,10 @@ describe('RuleForm: rule name uniqueness', () => {
       props: { existingRules: [{ name: 'My-Rule' }], onSave },
     });
 
-    await setInput(getByLabelText('Nom de la regle'), 'my-rule');
+    await setInput(getByLabelText('Rule name'), 'my-rule');
     await submitForm(container);
     expect(onSave).not.toHaveBeenCalled();
-    expect(getByRole('alert')).toHaveTextContent('existe deja');
+    expect(getByRole('alert')).toHaveTextContent('A rule named "my-rule" already exists in this service.');
   });
 
   it('accepte un nom unique', async () => {
@@ -51,7 +51,7 @@ describe('RuleForm: rule name uniqueness', () => {
       props: { existingRules: [{ name: 'other-rule' }], onSave },
     });
 
-    await setInput(getByLabelText('Nom de la regle'), 'new-rule');
+    await setInput(getByLabelText('Rule name'), 'new-rule');
     await submitForm(container);
     await waitFor(() => expect(onSave).toHaveBeenCalled());
   });
@@ -79,10 +79,10 @@ describe('RuleForm: rule name uniqueness', () => {
       props: { onSave },
     });
 
-    await setInput(getByLabelText('Nom de la regle'), '');
+    await setInput(getByLabelText('Rule name'), '');
     await submitForm(container);
     expect(onSave).not.toHaveBeenCalled();
-    expect(getByRole('alert')).toHaveTextContent('requis');
+    expect(getByRole('alert')).toHaveTextContent('The rule name is required.');
   });
 });
 
@@ -92,7 +92,7 @@ describe('RuleForm: pre_script / post_script', () => {
     const onSave = vi.fn();
     const { getByLabelText, container } = render(RuleForm, { props: { onSave } });
 
-    await setInput(getByLabelText('Nom de la regle'), 'r1');
+    await setInput(getByLabelText('Rule name'), 'r1');
     await submitForm(container);
 
     await waitFor(() => expect(onSave).toHaveBeenCalled());
@@ -103,16 +103,16 @@ describe('RuleForm: pre_script / post_script', () => {
 
   it('les toggles Pré-script et Post-script sont replies par defaut derriere "Options avancées"', () => {
     const { getByRole, queryByRole } = render(RuleForm);
-    expect(getByRole('button', { name: /Options avancées/, expanded: false })).toBeInTheDocument();
-    expect(queryByRole('switch', { name: 'Pré-script (préparation)' })).not.toBeInTheDocument();
-    expect(queryByRole('switch', { name: 'Post-script (finalisation)' })).not.toBeInTheDocument();
+    expect(getByRole('button', { name: /Advanced options/, expanded: false })).toBeInTheDocument();
+    expect(queryByRole('switch', { name: 'Pre-script (preparation)' })).not.toBeInTheDocument();
+    expect(queryByRole('switch', { name: 'Post-script (finalization)' })).not.toBeInTheDocument();
   });
 
   it('deplier "Options avancées" affiche les toggles Pré-script et Post-script', async () => {
     const { getByRole } = render(RuleForm);
-    await fireEvent.click(getByRole('button', { name: /Options avancées/ }));
-    expect(getByRole('switch', { name: 'Pré-script (préparation)' })).toBeInTheDocument();
-    expect(getByRole('switch', { name: 'Post-script (finalisation)' })).toBeInTheDocument();
+    await fireEvent.click(getByRole('button', { name: /Advanced options/ }));
+    expect(getByRole('switch', { name: 'Pre-script (preparation)' })).toBeInTheDocument();
+    expect(getByRole('switch', { name: 'Post-script (finalization)' })).toBeInTheDocument();
   });
 
   it('inclut pre_script et post_script dans le payload une fois actives et remplis', async () => {
@@ -120,10 +120,10 @@ describe('RuleForm: pre_script / post_script', () => {
     const onSave = vi.fn();
     const { getByLabelText, getByRole, container } = render(RuleForm, { props: { onSave } });
 
-    await setInput(getByLabelText('Nom de la regle'), 'r2');
-    await fireEvent.click(getByRole('button', { name: /Options avancées/ }));
-    await fireEvent.click(getByRole('switch', { name: 'Pré-script (préparation)' }));
-    await fireEvent.click(getByRole('switch', { name: 'Post-script (finalisation)' }));
+    await setInput(getByLabelText('Rule name'), 'r2');
+    await fireEvent.click(getByRole('button', { name: /Advanced options/ }));
+    await fireEvent.click(getByRole('switch', { name: 'Pre-script (preparation)' }));
+    await fireEvent.click(getByRole('switch', { name: 'Post-script (finalization)' }));
 
     const preTextarea = container.querySelector('#rule-pre-script');
     const postTextarea = container.querySelector('#rule-post-script');
@@ -145,9 +145,9 @@ describe('RuleForm: pre_script / post_script', () => {
     const onSave = vi.fn();
     const { getByLabelText, getByRole, container } = render(RuleForm, { props: { onSave } });
 
-    await setInput(getByLabelText('Nom de la regle'), 'r3');
-    await fireEvent.click(getByRole('button', { name: /Options avancées/ }));
-    await fireEvent.click(getByRole('switch', { name: 'Pré-script (préparation)' }));
+    await setInput(getByLabelText('Rule name'), 'r3');
+    await fireEvent.click(getByRole('button', { name: /Advanced options/ }));
+    await fireEvent.click(getByRole('switch', { name: 'Pre-script (preparation)' }));
     await submitForm(container);
 
     await waitFor(() => expect(onSave).toHaveBeenCalled());
@@ -166,39 +166,39 @@ describe('RuleForm: ouverture automatique des "Options avancées"', () => {
 
   it('reste repliee a l\'ouverture d\'une regle sans pre_script ni post_script', () => {
     const { getByRole, queryByRole } = render(RuleForm, { props: { rule: baseRule } });
-    expect(getByRole('button', { name: /Options avancées/, expanded: false })).toBeInTheDocument();
-    expect(queryByRole('switch', { name: 'Pré-script (préparation)' })).not.toBeInTheDocument();
+    expect(getByRole('button', { name: /Advanced options/, expanded: false })).toBeInTheDocument();
+    expect(queryByRole('switch', { name: 'Pre-script (preparation)' })).not.toBeInTheDocument();
   });
 
   it('s\'ouvre automatiquement si post_script a deja du contenu', () => {
-    const rule = { ...baseRule, post_script: '"deja configure"' };
+    const rule = { ...baseRule, post_script: '"already set"' };
     const { getByRole } = render(RuleForm, { props: { rule } });
-    expect(getByRole('button', { name: /Options avancées/, expanded: true })).toBeInTheDocument();
-    expect(getByRole('switch', { name: 'Post-script (finalisation)' })).toBeInTheDocument();
+    expect(getByRole('button', { name: /Advanced options/, expanded: true })).toBeInTheDocument();
+    expect(getByRole('switch', { name: 'Post-script (finalization)' })).toBeInTheDocument();
   });
 
   it('s\'ouvre automatiquement si pre_script a deja du contenu', () => {
-    const rule = { ...baseRule, pre_script: '"deja configure"' };
+    const rule = { ...baseRule, pre_script: '"already set"' };
     const { getByRole } = render(RuleForm, { props: { rule } });
-    expect(getByRole('button', { name: /Options avancées/, expanded: true })).toBeInTheDocument();
-    expect(getByRole('switch', { name: 'Pré-script (préparation)' })).toBeInTheDocument();
+    expect(getByRole('button', { name: /Advanced options/, expanded: true })).toBeInTheDocument();
+    expect(getByRole('switch', { name: 'Pre-script (preparation)' })).toBeInTheDocument();
   });
 
   it('replier/deplier "Options avancées" ne fait perdre aucun contenu deja saisi', async () => {
     const { getByRole, container } = render(RuleForm);
 
-    await fireEvent.click(getByRole('button', { name: /Options avancées/ }));
-    await fireEvent.click(getByRole('switch', { name: 'Pré-script (préparation)' }));
+    await fireEvent.click(getByRole('button', { name: /Advanced options/ }));
+    await fireEvent.click(getByRole('switch', { name: 'Pre-script (preparation)' }));
     const preTextarea = container.querySelector('#rule-pre-script');
     await setInput(preTextarea, '"contenu saisi"');
 
     // Replier la zone : le contenu ne doit pas etre reinitialise (pas de
     // demontage du composant, juste un attribut `hidden`).
-    await fireEvent.click(getByRole('button', { name: /Options avancées/ }));
+    await fireEvent.click(getByRole('button', { name: /Advanced options/ }));
     expect(container.querySelector('#rule-pre-script').value).toBe('"contenu saisi"');
 
-    await fireEvent.click(getByRole('button', { name: /Options avancées/ }));
-    expect(getByRole('switch', { name: 'Pré-script (préparation)' })).toBeInTheDocument();
+    await fireEvent.click(getByRole('button', { name: /Advanced options/ }));
+    expect(getByRole('switch', { name: 'Pre-script (preparation)' })).toBeInTheDocument();
     expect(container.querySelector('#rule-pre-script')).toBeVisible();
     expect(container.querySelector('#rule-pre-script').value).toBe('"contenu saisi"');
   });
@@ -207,13 +207,13 @@ describe('RuleForm: ouverture automatique des "Options avancées"', () => {
 describe('RuleForm: assistance de saisie path/query param', () => {
   it('ne rend pas le testeur de regle sans serviceName (retrocompat)', () => {
     const { queryByText } = render(RuleForm);
-    expect(queryByText('Tester contre une requête réelle')).not.toBeInTheDocument();
+    expect(queryByText('Test against a real request')).not.toBeInTheDocument();
   });
 
   it('rend le testeur de regle quand serviceName est fourni', async () => {
     getLogs.mockResolvedValue([]);
     const { getByText } = render(RuleForm, { props: { serviceName: 'svc-a' } });
-    await waitFor(() => expect(getByText('Tester contre une requête réelle')).toBeInTheDocument());
+    await waitFor(() => expect(getByText('Test against a real request')).toBeInTheDocument());
   });
 
   it('combine les path params du service et du sous-chemin de la regle', async () => {
@@ -221,8 +221,8 @@ describe('RuleForm: assistance de saisie path/query param', () => {
     const { getByLabelText, getByRole } = render(RuleForm, {
       props: { serviceName: 'svc-a', listenPath: '/orders/{id}' },
     });
-    await setInput(getByLabelText('Sous-chemin (optionnel)'), '/items/{itemId}');
-    await fireEvent.click(getByRole('button', { name: '+ Condition ET' }));
+    await setInput(getByLabelText('Sub-path (optional)'), '/items/{itemId}');
+    await fireEvent.click(getByRole('button', { name: '+ AND condition' }));
     const sourceSelect = getByLabelText('Source');
     expect(sourceSelect.querySelector('option[value="PathParam"]')).toBeInTheDocument();
   });
@@ -245,7 +245,7 @@ describe('RuleForm: detecteur de conflit a la sauvegarde', () => {
       props: { existingRules, draftPosition: 1, onSave },
     });
 
-    await setInput(getByLabelText('Nom de la regle'), 'new-rule');
+    await setInput(getByLabelText('Rule name'), 'new-rule');
     await submitForm(container);
 
     await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
@@ -261,7 +261,7 @@ describe('RuleForm: detecteur de conflit a la sauvegarde', () => {
       props: { existingRules, draftPosition: 1, onSave },
     });
 
-    await setInput(getByLabelText('Nom de la regle'), 'new-rule');
+    await setInput(getByLabelText('Rule name'), 'new-rule');
     await submitForm(container);
 
     const warning = await findByTestId('rule-form-conflict-warning');
@@ -279,7 +279,7 @@ describe('RuleForm: detecteur de conflit a la sauvegarde', () => {
       props: { existingRules, draftPosition: 0, onSave },
     });
 
-    await setInput(getByLabelText('Nom de la regle'), 'new-rule');
+    await setInput(getByLabelText('Rule name'), 'new-rule');
     await submitForm(container);
     await findByTestId('rule-form-conflict-warning');
 
@@ -297,7 +297,7 @@ describe('RuleForm: detecteur de conflit a la sauvegarde', () => {
       props: { existingRules, draftPosition: 1, onSave },
     });
 
-    await setInput(getByLabelText('Nom de la regle'), 'new-rule');
+    await setInput(getByLabelText('Rule name'), 'new-rule');
     await submitForm(container);
     await findByTestId('rule-form-conflict-warning');
 
@@ -307,13 +307,13 @@ describe('RuleForm: detecteur de conflit a la sauvegarde', () => {
   });
 
   it('sauvegarde quand meme si la verification de conflit echoue (fail-open)', async () => {
-    checkRuleConflicts.mockRejectedValue(new Error('reseau indisponible'));
+    checkRuleConflicts.mockRejectedValue(new Error('network unreachable'));
     const onSave = vi.fn();
     const { getByLabelText, container } = render(RuleForm, {
       props: { existingRules, draftPosition: 1, onSave },
     });
 
-    await setInput(getByLabelText('Nom de la regle'), 'new-rule');
+    await setInput(getByLabelText('Rule name'), 'new-rule');
     await submitForm(container);
 
     await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
@@ -553,7 +553,7 @@ describe('RuleForm: restauration de la vue d\'origine a l\'edition (retour 1)', 
       response: {
         status: 200,
         headers: [],
-        body: [{ type: 'Literal', value: 'texte brut' }],
+        body: [{ type: 'Literal', value: 'plain text' }],
         chaos: null,
       },
     };
@@ -621,7 +621,7 @@ describe('RuleForm: fusion Format x Assiste/Detail (retour 3)', () => {
 // sur l'equivalent JSON (tryAdvancedToJsonGuided), qui reussissait deja.
 describe('RuleForm: conversion Template avance -> XML (correctif symptome 2)', () => {
   async function buildAdvancedXmlTemplate(container, getByLabelText, tpl) {
-    await setInput(getByLabelText('Nom de la regle'), 'test-rule');
+    await setInput(getByLabelText('Rule name'), 'test-rule');
     await fireEvent.click(container.querySelector('[data-testid="rule-form-mode-button-advanced"]'));
     const typeSelect = container.querySelector('[data-testid="rule-form-fragment-type-select-0"]');
     await fireEvent.change(typeSelect, { target: { value: 'Template' } });
@@ -656,7 +656,7 @@ describe('RuleForm: conversion Template avance -> XML (correctif symptome 2)', (
 
     await fireEvent.click(container.querySelector('[data-testid="rule-form-mode-button-xml"]'));
 
-    expect(queryByRole('alert')).toHaveTextContent('Conversion impossible');
+    expect(queryByRole('alert')).toHaveTextContent('Cannot convert:');
   });
 });
 
@@ -737,7 +737,7 @@ describe('RuleForm: pipes en mode "par exemple" (retour 2)', () => {
     const onSave = vi.fn();
     const { getByLabelText, container } = render(RuleForm, { props: { onSave } });
 
-    await setInput(getByLabelText('Nom de la regle'), 'pipe-rule');
+    await setInput(getByLabelText('Rule name'), 'pipe-rule');
     await fireEvent.click(container.querySelector('[data-testid="rule-form-mode-button-json"]'));
     const textarea = container.querySelector('[data-testid="json-paste-builder-textarea"]');
     await setInput(textarea, '{"siret":"00000000000000"}');

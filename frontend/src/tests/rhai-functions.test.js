@@ -33,9 +33,9 @@ describe('RHAI_FUNCTIONS (source unique)', () => {
   it('inclut parse_date, l\'inverse de date_now/date_past/date_future', () => {
     const parseDate = RHAI_FUNCTIONS.find((f) => f.name === 'parse_date');
     expect(parseDate).toBeTruthy();
-    expect(parseDate.signature).toBe('parse_date(texte, "pattern")');
-    expect(parseDate.description).toContain('millisecondes');
-    expect(parseDate.description.toLowerCase()).toContain('erreur');
+    expect(parseDate.signature).toBe('parse_date(text, "pattern")');
+    expect(parseDate.description).toContain('milliseconds');
+    expect(parseDate.description.toLowerCase()).toContain('error');
   });
 
   it('inclut les 4 accesseurs de contexte de requete (path/query/headers/body)', () => {
@@ -48,7 +48,7 @@ describe('RHAI_FUNCTIONS (source unique)', () => {
 
   it('documente que les noms d\'en-tete sont normalises en minuscules', () => {
     const headers = RHAI_FUNCTIONS.find((f) => f.name === 'request.headers');
-    expect(headers.description.toLowerCase()).toContain('minuscule');
+    expect(headers.description.toLowerCase()).toContain('lowercase');
   });
 });
 

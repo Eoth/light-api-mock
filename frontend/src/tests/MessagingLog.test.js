@@ -24,7 +24,7 @@ describe('MessagingLog', () => {
     const { getByText } = render(MessagingLog);
     await waitFor(() => expect(getByText('orders.in')).toBeInTheDocument());
     expect(getByText('svc-a / rule-1')).toBeInTheDocument();
-    expect(getByText('Matche')).toBeInTheDocument();
+    expect(getByText('Matches')).toBeInTheDocument();
   });
 
   it('affiche un badge "Tronque" quand le corps a ete tronque', async () => {
@@ -36,8 +36,8 @@ describe('MessagingLog', () => {
       },
     ]);
     const { getByText } = render(MessagingLog);
-    await waitFor(() => expect(getByText('Tronque')).toBeInTheDocument());
-    expect(getByText('Non matche')).toBeInTheDocument();
+    await waitFor(() => expect(getByText('Truncated')).toBeInTheDocument());
+    expect(getByText('Does not match')).toBeInTheDocument();
   });
 
   it('n\'affiche pas de badge "Tronque" quand le corps n\'est pas tronque', async () => {
@@ -50,13 +50,13 @@ describe('MessagingLog', () => {
     ]);
     const { getByText, queryByText } = render(MessagingLog);
     await waitFor(() => expect(getByText('orders.reply')).toBeInTheDocument());
-    expect(queryByText('Tronque')).not.toBeInTheDocument();
+    expect(queryByText('Truncated')).not.toBeInTheDocument();
   });
 
   it('affiche l\'etat vide quand aucun message n\'est journalise', async () => {
     getMessagingLogs.mockResolvedValue([]);
     const { getByText } = render(MessagingLog);
-    await waitFor(() => expect(getByText('Aucun message Kafka traite pour le moment.')).toBeInTheDocument());
+    await waitFor(() => expect(getByText('No Kafka message processed yet.')).toBeInTheDocument());
   });
 
   it('envoie une simulation via le formulaire et rafraichit le journal', async () => {
@@ -66,10 +66,10 @@ describe('MessagingLog', () => {
     const { getByLabelText, getByText, container } = render(MessagingLog, { onNotify });
     await waitFor(() => expect(getMessagingLogs).toHaveBeenCalledTimes(1));
 
-    const topicInput = getByLabelText('Topic du message simule');
+    const topicInput = getByLabelText('Topic of the simulated message');
     await fireEvent.input(topicInput, { target: { value: 'orders.in' } });
 
-    await fireEvent.click(getByText('Simuler'));
+    await fireEvent.click(getByText('Simulate'));
 
     await waitFor(() => expect(simulateMessage).toHaveBeenCalledWith('orders.in', expect.any(String)));
     await waitFor(() => expect(getMessagingLogs).toHaveBeenCalledTimes(2));
@@ -82,9 +82,9 @@ describe('MessagingLog', () => {
     const { getByText } = render(MessagingLog, { onNotify });
     await waitFor(() => expect(getMessagingLogs).toHaveBeenCalled());
 
-    await fireEvent.click(getByText('Simuler'));
+    await fireEvent.click(getByText('Simulate'));
 
     expect(simulateMessage).not.toHaveBeenCalled();
-    expect(onNotify).toHaveBeenCalledWith(expect.stringContaining('Le topic est requis'), 'error');
+    expect(onNotify).toHaveBeenCalledWith('A topic is required to simulate a message.', 'error');
   });
 });

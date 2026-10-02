@@ -18,13 +18,14 @@ describe('RequestLog date/heure', () => {
 
     await waitFor(() => expect(getByText('svc-a')).toBeInTheDocument());
 
-    const expected = new Date(ts).toLocaleString('fr-FR', {
+    // English has no regional date format of its own: dates follow the browser's locale (intlLocale()), the French
+    // order is checked by french.test.js.
+    const expected = new Date(ts).toLocaleString(undefined, {
       day: '2-digit', month: '2-digit', year: '2-digit',
       hour: '2-digit', minute: '2-digit', second: '2-digit',
     });
     const cell = container.querySelector('.col-time');
     expect(cell.textContent).toBe(expected);
-    expect(cell.textContent).toMatch(/\d{2}\/\d{2}\/\d{2}/);
   });
 
   it('affiche l\'en-tete de colonne "Date/Heure"', async () => {
@@ -32,6 +33,6 @@ describe('RequestLog date/heure', () => {
       { timestamp: Date.now(), service_name: 'svc-a', method: 'GET', path: '/svc-a/foo', mode: 'mock', rule_matched: 'r1', target_url: null, status: 200 },
     ]);
     const { getByText } = render(RequestLog);
-    await waitFor(() => expect(getByText('Date/Heure')).toBeInTheDocument());
+    await waitFor(() => expect(getByText('Date/time')).toBeInTheDocument());
   });
 });
