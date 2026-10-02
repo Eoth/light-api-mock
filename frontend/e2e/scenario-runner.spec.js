@@ -193,6 +193,11 @@ test.describe('Runner data-driven (scenarios JSON) - lot 3', () => {
   test('service: toggle mock/proxy fonctionne (scenario JSON)', async ({ page, request }) => {
     await request.post(`${API}/services`, { data: ruleTestService('e2e-svc') });
     await runScenario(page, loadScenario('services.scenarios.json', "Le toggle mock/proxy d'un service fonctionne"));
+
+    // The switch saves the service at once: it now forwards to its target.
+    await expect
+      .poll(async () => (await (await request.get(`${API}/services/e2e-svc`)).json()).is_mocked)
+      .toBe(false);
   });
 
   test('liste: recherche filtre les services (scenario JSON)', async ({ page, request }) => {
