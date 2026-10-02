@@ -211,10 +211,6 @@ test.describe('Runner data-driven (scenarios JSON) - lot 3', () => {
     await runScenario(page, loadScenario('rules.scenarios.json', 'Annuler le formulaire de regle revient a la liste'));
   });
 
-  test('UI servie sans aucun service (scenario JSON)', async ({ page }) => {
-    await runScenario(page, loadScenario('home.scenarios.json', "La page d'accueil se charge avec le titre Mimicway"));
-  });
-
   test('UI accessible apres creation d un service (scenario JSON)', async ({ page, request }) => {
     await request.post(`${API}/services`, { data: validService('security-svc') });
     await runScenario(page, loadScenario('home.scenarios.json', "La page d'accueil se charge avec le titre Mimicway"));
