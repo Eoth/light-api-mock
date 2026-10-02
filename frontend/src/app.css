@@ -191,6 +191,8 @@ table, code { font-variant-numeric: tabular-nums; }
 .badge-mock { background: var(--color-mock-bg); color: var(--color-mock-text); border-style: dashed; border-color: var(--color-mock); }
 .badge-proxy { background: var(--color-proxy-bg); color: var(--color-proxy-text); border-color: var(--color-proxy); }
 .badge-error { background: var(--color-danger-bg); color: var(--color-danger-text); border-color: var(--color-danger); }
+.badge-success { background: var(--color-success-bg); color: var(--color-success-text); border-color: var(--color-success); }
+.badge-info { background: var(--color-info-bg); color: var(--color-info-text); border-color: var(--color-info); }
 .badge-unknown { background: transparent; color: var(--color-text-muted); border-color: var(--color-control); }
 .badge-testing { background: var(--color-warning-bg); color: var(--color-warning-text); border-color: var(--color-warning); }
 .badge-reachable { background: var(--color-success); color: var(--color-on-success); }

@@ -79,7 +79,7 @@ Ratios are against the surface or background the role is set on. The test measur
 | `.form-field`, `.form-row`, `.field-hint`, `.form-error`, `.form-actions` | fields with their label, hint and error |
 | `.section`, `.section-help`, `.sub-section` | the fieldsets of a form and their parts |
 | `.callout` with `.callout-warning`, `.callout-danger`; `.callout-title`, `.callout-list`, `.callout-actions` | what to weigh before going on, in the flow of a form |
-| `.badge`, `.badge-pill` with `.badge-mock`, `.badge-proxy`, `.badge-error`, `.badge-unknown`, `.badge-testing`, `.badge-reachable`, `.badge-unreachable`, `.badge-expired`; `.method-badge` | a mode, a state, an HTTP method: a shape class, then a color class |
+| `.badge`, `.badge-pill` with `.badge-mock`, `.badge-proxy`, `.badge-success`, `.badge-info`, `.badge-error`, `.badge-unknown`, `.badge-testing`, `.badge-reachable`, `.badge-unreachable`, `.badge-expired`; `.method-badge` | a mode, a state, an HTTP method: a shape class, then a color class |
 | `.modal-overlay`, `.modal-content`, `.modal-header`, `.modal-footer` | dialogs |
 | `.data-breadcrumb`, `.collapsed-indicator`, `.preview-code` | the JSON and XML response builders |
 

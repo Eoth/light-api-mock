@@ -56,7 +56,8 @@
   }
 
   function directionBadge(direction) {
-    return direction === 'out' ? 'badge-proxy' : 'badge-mock';
+    // The reply Mimicway publishes is the imitation, drawn like a mock; a message received is information.
+    return direction === 'out' ? 'badge-mock' : 'badge-info';
   }
 
   function directionLabel(direction) {
@@ -177,7 +178,7 @@
                 {log.rule_matched ? `${log.service_name} / ${log.rule_matched}` : '-'}
               </td>
               <td>
-                <span class="badge {log.matched ? 'badge-mock' : 'badge-error'}">{log.matched ? t("Matches") : t("Does not match")}</span>
+                <span class="badge {log.matched ? 'badge-success' : 'badge-error'}">{log.matched ? t("Matches") : t("Does not match")}</span>
                 {#if log.body_truncated}
                   <span class="badge badge-testing">{t("Truncated")}</span>
                 {/if}
