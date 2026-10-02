@@ -389,18 +389,6 @@ Size S per language
 
 ## 4. Engineering backlog
 
-### E1. A design system of its own
-
-Size M
-
-**Why.** The UI borrowed the tokens of a design system that belongs to someone else; its colors are scattered through the components, seven of the variables they read are defined nowhere (so they keep their light value in the dark theme), and button, form and layout styles are repeated in many components, so a visual change touches every file.
-
-**What.** Drop the borrowed tokens. Give the UI its own design system, Phasme: one tokens file, light and dark themes with measured contrasts; components read only its semantic tokens and share its classes, keeping only what is specific to them.
-
-**Progress.** The borrowed tokens file is gone and `app.css` holds the values it read, so nothing rendered changed; a CI check fails on any tracked file that names the former design system. Components still define their own `.section`, `.btn-icon`, `.btn-xs` and warning boxes (`RuleResponseSection`, `RuleActionSelector`, `RuleConditionsEditor`, `RuleWarnings`, `ServiceForm`, the builders), and `ConditionForm` its own `.form-field`.
-
-**Done when.** Every color of the UI comes from a token, in both themes, with WCAG AA contrasts checked by a test; no variable is read without being defined; no component redefines `.btn`, `.form-field`, `.section`, `.btn-icon`, `.btn-xs` or a warning box.
-
 ### E2. Response builder leftovers
 
 Size M
@@ -480,3 +468,23 @@ Size S
 **What.** Group the request-scoped values in one struct, and give the entry constructors a parameter struct.
 
 **Done when.** No `too_many_arguments` allowance is left in `src/`.
+
+### E10. Serve the interface compressed
+
+Size S
+
+**Why.** The embedded interface is served as it was built, uncompressed, whatever the browser accepts: 290.6 kB of JavaScript, 70.6 kB of CSS and a 48.1 kB French catalogue, against 87.3 kB, 9.7 kB and 17.0 kB with gzip (measured with `gzip -9`). The assets are cached for a year, so the cost comes back with each release and each new browser, notably over a slow cluster ingress.
+
+**What.** Compress the built files once, at build time, with the zlib that Node already ships (no new Rust dependency), embed the `.gz` variants next to the originals, and serve one with `Content-Encoding: gzip` and `Vary: Accept-Encoding` when the request accepts it; `index.html` and `STATIC_DIR` keep working as today.
+
+**Done when.** An end-to-end test reads the main script with and without `Accept-Encoding: gzip` and gets the compressed and the plain bytes, and the reviewer guide still lists every file the binary serves.
+
+### E11. Unit tests that depend on the speed of the machine
+
+Size S
+
+**Why.** Under CPU load (another build running), the pseudo-locale test of the application shell (`src/tests/l10n.test.js`, "the application shell, its list and its dialogs") failed once and passed when run again: it waits for the first render with the default one-second `waitFor`, after importing and mounting the whole application. A test that fails without a defect teaches people to ignore red.
+
+**What.** Find the unit tests that wait on rendering with the default timeout after heavy work, and make them wait on a condition with a timeout sized for a loaded CI runner, or do the heavy import once per file.
+
+**Done when.** The UI unit tests pass ten times in a row while a `cargo build` runs on the same machine.
