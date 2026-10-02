@@ -33,7 +33,7 @@ async function openAddRuleForm(page) {
   await page.getByRole('button', { name: /Add a rule/ }).click();
 }
 
-test('autocompletion : la selection au clic insere la fonction avec ses parametres', async ({ page }) => {
+test('autocompletion: a click inserts the function with its parameters', async ({ page }) => {
   await openAddRuleForm(page);
   await page.locator('input#rule-name').fill('ac-rule-click');
   await page.getByRole('switch', { name: 'Custom script' }).click();
@@ -55,7 +55,7 @@ test('autocompletion : la selection au clic insere la fonction avec ses parametr
   await expect(page.getByRole('listbox')).not.toBeVisible();
 });
 
-test('autocompletion : navigation clavier (fleches + Entree) insere la fonction active', async ({ page }) => {
+test('autocompletion: Enter inserts the highlighted function', async ({ page }) => {
   await openAddRuleForm(page);
   await page.locator('input#rule-name').fill('ac-rule-kbd');
   await page.getByRole('switch', { name: 'Custom script' }).click();
@@ -70,7 +70,7 @@ test('autocompletion : navigation clavier (fleches + Entree) insere la fonction 
   await expect(scriptField).toHaveValue('date_now("iso")');
 });
 
-test('autocompletion : Echap ferme la liste sans rien inserer', async ({ page }) => {
+test('autocompletion: Escape closes the list and inserts nothing', async ({ page }) => {
   await openAddRuleForm(page);
   await page.locator('input#rule-name').fill('ac-rule-esc');
   await page.getByRole('switch', { name: 'Custom script' }).click();
@@ -85,7 +85,7 @@ test('autocompletion : Echap ferme la liste sans rien inserer', async ({ page })
   await expect(scriptField).toHaveValue('uuid');
 });
 
-test('autocompletion : Ctrl+Espace ouvre la liste complete sans prefixe tape', async ({ page }) => {
+test('autocompletion: Ctrl+Space opens the list with nothing typed', async ({ page }) => {
   await openAddRuleForm(page);
   await page.locator('input#rule-name').fill('ac-rule-ctrlspace');
   await page.getByRole('switch', { name: 'Custom script' }).click();
@@ -99,7 +99,7 @@ test('autocompletion : Ctrl+Espace ouvre la liste complete sans prefixe tape', a
   await expect(await options.count()).toBeGreaterThan(5);
 });
 
-test('la fonction inseree via autocompletion est bien enregistree telle quelle', async ({ page, request }) => {
+test('a function inserted by autocompletion is saved as inserted', async ({ page, request }) => {
   await openAddRuleForm(page);
   await page.locator('input#rule-name').fill('ac-rule-persist');
   await page.getByRole('switch', { name: 'Custom script' }).click();
@@ -109,7 +109,7 @@ test('la fonction inseree via autocompletion est bien enregistree telle quelle',
   await scriptField.type('seeded_int');
   const option = page.getByRole('option', { name: /^seeded_int/ });
   await option.click();
-  // Les parametres suggeres sont deja selectionnes : la frappe les remplace.
+  // The suggested parameters come selected: typing replaces them.
   await page.keyboard.type('request.path.id, 0, 10');
 
   await page.getByRole('button', { name: /Add the rule/ }).click();

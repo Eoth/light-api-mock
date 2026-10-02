@@ -4,18 +4,9 @@ import { docsScreenshot } from './docs-screenshot.js';
 const API = 'http://localhost:7342/api';
 const BASE = 'http://localhost:7342';
 
-// Verifie de bout en bout le testeur de regle (rejeu en lecture seule contre
-// un log reel) et l'assistance de saisie path/query param :
-// - une condition mal choisie (query param au lieu de path param) testee
-//   contre une vraie requete du log affiche un detail explicite (pas juste
-//   "ca ne matche pas") ;
-// - la selection du path param est stricte (select ferme, pas de saisie
-//   libre) ;
-// - l'option "Parametre de chemin" est masquee sur un service a URL statique ;
-// - l'autocompletion query param propose les cles vues dans le trafic reel ;
-// - un corps capture tronque (> REQUEST_LOG_MAX_BODY_SIZE) declenche un
-//   avertissement explicite quand la condition testee porte sur le corps,
-//   et n'en declenche PAS quand aucune condition testee ne depend du corps.
+// The rule tester replays the rule being edited, read only, against a request of the log, and says why it would or
+// would not match it; the condition form helps with path and query parameters. Each test sends a real request first,
+// so that the log holds one.
 
 function validService(name, overrides = {}) {
   return {
@@ -46,18 +37,17 @@ async function openAddRuleForm(page, serviceName) {
   await page.getByRole('button', { name: /Add a rule/ }).click();
 }
 
-test.describe('Testeur de regle : condition mal choisie contre une vraie requete', () => {
+test.describe('Rule tester: conditions against a real request', () => {
   test.beforeEach(async ({ request }) => {
     await request.delete(`${API}/config/reset`);
   });
 
-  test('detecte et explique un path param saisi comme query param', async ({ page, request }) => {
+  test('explains a path parameter entered as a query parameter', async ({ page, request }) => {
     await request.post(`${API}/services`, {
       data: validService('tester-svc', { listen_path: '/{id}/*' }),
     });
 
-    // Requete reelle capturee (aucune regle encore definie -> "no-rule", mais
-    // le detail de la requete est quand meme retenu).
+    // No rule yet: the request gets a 404, and the log keeps it all the same.
     const captured = await request.get(`${BASE}/tester-svc/42/details`);
     expect(captured.status()).toBe(404);
 
@@ -70,11 +60,8 @@ test.describe('Testeur de regle : condition mal choisie contre une vraie requete
     await page.locator('#cond-val').fill('42');
     await page.getByRole('button', { name: 'OK' }).click();
 
-    // RequestLog n'est jamais purge par /config/reset (seule la config
-    // services/regles l'est) : selectionner la premiere occurrence (la plus
-    // recente, cf recent() cote backend) plutot que de supposer un compte
-    // exact d'entrees, pour rester robuste si un run precedent a laisse une
-    // entree homonyme dans le journal.
+    // A configuration reset leaves the request log alone, and the log lists the newest request first (recent(),
+    // src/server/request_log.rs): the first entry of this path is this run's, whatever earlier runs left.
     const logSelect = page.locator('#rule-tester-log');
     await expect(logSelect).toBeVisible();
     const matchingOption = logSelect.locator('option', { hasText: 'tester-svc/42/details' }).first();
@@ -97,7 +84,7 @@ test.describe('Testeur de regle : condition mal choisie contre une vraie requete
     });
   });
 
-  test('la selection du path param est stricte (select ferme, pas de saisie libre)', async ({ page, request }) => {
+  test('a path parameter is picked from those of the listen path, not typed', async ({ page, request }) => {
     await request.post(`${API}/services`, {
       data: validService('strict-svc', { listen_path: '/{orderId}/*' }),
     });
@@ -112,7 +99,7 @@ test.describe('Testeur de regle : condition mal choisie contre une vraie requete
     expect(optionValues.filter(Boolean)).toEqual(['orderId']);
   });
 
-  test('masque l\'option "Parametre de chemin" sur un service a URL statique', async ({ page, request }) => {
+  test('a service with a static listen path offers no path parameter source', async ({ page, request }) => {
     await request.post(`${API}/services`, {
       data: validService('static-svc', { listen_path: '/fixed/path' }),
     });
@@ -125,7 +112,7 @@ test.describe('Testeur de regle : condition mal choisie contre une vraie requete
     expect(optionValues).not.toContain('PathParam');
   });
 
-  test('autocompletion query param propose les cles vues dans le trafic reel', async ({ page, request }) => {
+  test('query parameter names seen in the traffic are suggested', async ({ page, request }) => {
     await request.post(`${API}/services`, {
       data: validService('autocomplete-qp-svc', { listen_path: '/*' }),
     });
@@ -144,18 +131,17 @@ test.describe('Testeur de regle : condition mal choisie contre une vraie requete
       .evaluateAll((opts) => opts.map((o) => o.value));
     expect(suggestions).toContain('customerRef');
 
-    // Non contraignant : une valeur inedite reste saisissable.
+    // A suggestion, not a constraint: a name never seen can still be typed.
     await keyField.fill('brandNewParam');
     await expect(keyField).toHaveValue('brandNewParam');
   });
 
-  test('avertit quand le corps capture est tronque et la condition testee porte sur le corps', async ({ page, request }) => {
+  test('warns when the logged body was truncated and a tested condition reads the body', async ({ page, request }) => {
     await request.post(`${API}/services`, {
       data: validService('truncation-svc', { listen_path: '/*' }),
     });
 
-    // Corps > REQUEST_LOG_MAX_BODY_SIZE (16 Ko par defaut) pour declencher
-    // une troncature reelle dans RequestLog.
+    // Larger than REQUEST_LOG_MAX_BODY_SIZE (16 KiB by default): the log keeps it truncated.
     const largeBody = 'x'.repeat(20000);
     await request.post(`${BASE}/truncation-svc/anything`, {
       data: largeBody,
@@ -165,7 +151,7 @@ test.describe('Testeur de regle : condition mal choisie contre une vraie requete
     await openAddRuleForm(page, 'truncation-svc');
     await page.locator('input#rule-name').fill('body-based-rule');
 
-    // BodyRaw : source basee sur le corps entier, sensible a la troncature.
+    // BodyRaw reads the whole body, so a truncated one can change its outcome.
     await page.getByRole('button', { name: '+ AND condition' }).click();
     await page.locator('#cond-source').selectOption('BodyRaw');
     await page.locator('#cond-op').selectOption('Exists');
@@ -183,7 +169,7 @@ test.describe('Testeur de regle : condition mal choisie contre une vraie requete
     await expect(page.getByText(/body of this request was truncated/)).toBeVisible();
   });
 
-  test('n\'avertit PAS de troncature quand aucune condition testee ne porte sur le corps', async ({ page, request }) => {
+  test('no truncation warning when no tested condition reads the body', async ({ page, request }) => {
     await request.post(`${API}/services`, {
       data: validService('truncation-noop-svc', { listen_path: '/*' }),
     });
@@ -196,13 +182,11 @@ test.describe('Testeur de regle : condition mal choisie contre une vraie requete
 
     await openAddRuleForm(page, 'truncation-noop-svc');
     await page.locator('input#rule-name').fill('query-only-rule');
-    // La requete capturee est un POST : aligner la methode de la regle pour
-    // que method_matches soit vrai, sinon "overall_matched" serait faux pour
-    // une raison sans rapport avec le corps/la troncature teste ici.
+    // The logged request is a POST: the rule takes that method, so that the outcome (overall_matched) does not
+    // turn on the method (method_matches).
     await page.locator('#rule-method').selectOption('POST');
 
-    // QueryParam : ne depend jamais du corps, donc la troncature du corps
-    // capture n'a aucune incidence sur ce test -- pas d'avertissement attendu.
+    // A query parameter never depends on the body: no warning expected.
     await page.getByRole('button', { name: '+ AND condition' }).click();
     await page.locator('#cond-source').selectOption('QueryParam');
     await page.locator('#cond-key').fill('foo');
@@ -223,18 +207,14 @@ test.describe('Testeur de regle : condition mal choisie contre une vraie requete
   });
 });
 
-// Visibilite des erreurs d'execution de script : avant cette extension,
-// /api/rule-test ne rejouait que le matching, jamais les scripts — un
-// script casse (fonction Rhai inexistante) restait invisible du testeur,
-// exactement comme en production (soft-fail + log serveur uniquement). Ces
-// 2 tests couvrent le cas d'erreur ET le cas nominal (map/lookup correct)
-// demandes en E2E.
-test.describe('Testeur de regle : execution des scripts', () => {
+// The tester runs the rule's scripts too (POST /api/rule-test): a script that fails at run time shows there, where the
+// mock itself only logs the error and carries on.
+test.describe('Rule tester: scripts', () => {
   test.beforeEach(async ({ request }) => {
     await request.delete(`${API}/config/reset`);
   });
 
-  test('un script en erreur a l\'execution affiche un message clair, pas un echec silencieux', async ({ page, request }) => {
+  test('a script that fails at run time shows its error', async ({ page, request }) => {
     await request.post(`${API}/services`, {
       data: validService('script-error-svc', { listen_path: '/*' }),
     });
@@ -243,10 +223,7 @@ test.describe('Testeur de regle : execution des scripts', () => {
     await openAddRuleForm(page, 'script-error-svc');
     await page.locator('input#rule-name').fill('script-casse');
 
-    // Active le bloc "Script personnalisé" et y saisit un appel de fonction
-    // Rhai INEXISTANTE — la classe d'erreur diagnostiquee comme cause
-    // racine (validate() ne la detecte pas, seule une vraie execution le
-    // peut).
+    // A call to a function that does not exist: compiling the script (validate) accepts it, only running it fails.
     await page.getByRole('switch', { name: /Custom script/ }).click();
     await page.locator('#rule-script').fill('totally_undefined_fn(1, 2)');
 
@@ -266,24 +243,20 @@ test.describe('Testeur de regle : execution des scripts', () => {
     await docsScreenshot(page, 'rule-tester-script-error.png', '[data-testid="rule-tester-script-errors"]');
   });
 
-  test('un script de correspondance (map/lookup) correct ne produit aucune erreur', async ({ page, request }) => {
-    // listen_path avec {name} : le path param est deja extrait au niveau
-    // SERVICE (capture du detail de requete), donc disponible via
-    // request.path.name des la capture, sans meme avoir besoin d'un
-    // sous-chemin de regle.
+  test('a correct lookup script shows no error', async ({ page, request }) => {
+    // The path parameter comes from the listen path of the service, so the logged request has request.path.name
+    // without any sub-path on the rule.
     await request.post(`${API}/services`, {
       data: validService('lookup-e2e-svc', { listen_path: '/lookup/{name}' }),
     });
     const captured = await request.get(`${BASE}/lookup-e2e-svc/lookup/billing`);
-    expect(captured.status()).toBe(404); // pas encore de regle -> no-rule, mais capture quand meme
+    expect(captured.status()).toBe(404); // no rule yet, logged all the same
 
     await openAddRuleForm(page, 'lookup-e2e-svc');
     await page.locator('input#rule-name').fill('lookup-service');
 
-    // Meme script, meme syntaxe verifiee, que le test d'integration backend
-    // (map_lookup_by_path_param_returns_correct_target_and_falls_back_for_unknown_key,
-    // src/server/intercept.rs) et que l'exemple documente dans
-    // docs/en/rhai-scripts.md.
+    // The script of the guide's example (rhai-scripts.md) and of the server's test
+    // map_lookup_by_path_param_returns_correct_target_and_falls_back_for_unknown_key (src/server/intercept.rs).
     await page.getByRole('switch', { name: /Custom script/ }).click();
     await page.locator('#rule-script').fill(
       'let mapping = #{ "billing": "svc-billing-042", "orders": "svc-orders-017" };\n' +
@@ -303,19 +276,14 @@ test.describe('Testeur de regle : execution des scripts', () => {
     await expect(page.getByTestId('rule-tester-script-errors')).not.toBeVisible();
   });
 
-  // Visibilite d'un resultat REUSSI mais errone : un script sans la moindre
-  // erreur d'execution peut quand meme produire un resultat que l'auteur de
-  // la regle n'attendait pas. Ce test reproduit exactement ce cas (liste de
-  // villes + seeded_pick, objet pioche imbrique sous une cle) et verifie que
-  // le testeur montre desormais le contenu REEL produit, y compris le champ
-  // imbrique serialise en JSON valide (correctif de dynamic_field_to_string,
-  // src/engine/script.rs).
-  test('affiche le resultat reel d\'un script reussi (seeded_pick sur une liste d\'objets)', async ({ page, request }) => {
+  // A script can succeed and still return what its author did not expect: the tester shows what it returned, a nested
+  // object as JSON (dynamic_field_to_string, src/engine/script.rs).
+  test('shows what a successful script returned, a nested object as JSON', async ({ page, request }) => {
     await request.post(`${API}/services`, {
       data: validService('seeded-pick-object-svc', { listen_path: '/quote/{siret}' }),
     });
     const captured = await request.get(`${BASE}/seeded-pick-object-svc/quote/44306184100047`);
-    expect(captured.status()).toBe(404); // pas encore de regle -> no-rule, mais capture quand meme
+    expect(captured.status()).toBe(404); // no rule yet, logged all the same
 
     await openAddRuleForm(page, 'seeded-pick-object-svc');
     await page.locator('input#rule-name').fill('quote-rule');
@@ -339,19 +307,17 @@ test.describe('Testeur de regle : execution des scripts', () => {
     await page.getByRole('button', { name: /Test against this request/ }).click();
 
     await expect(page.getByText(/would match this request/)).toBeVisible();
-    // Aucune erreur d'execution (c'est le point du diagnostic : le script
-    // ne plante jamais dans ce scenario).
+    // No run-time error: the script succeeds, only its result is in question.
     await expect(page.getByTestId('rule-tester-script-errors')).not.toBeVisible();
 
     const resultPanel = page.getByTestId('rule-tester-script-results');
     await expect(resultPanel).toBeVisible();
     const slotPanel = page.getByTestId('rule-tester-script-result-script');
     await expect(slotPanel).toBeVisible();
-    // "quoteId" : champ scalaire, valeur exacte visible.
+    // A plain field shows its value.
     await expect(slotPanel).toContainText('{{script.quoteId}}');
     await expect(slotPanel).toContainText('fixed-id');
-    // "ville" : champ imbrique -- doit apparaitre comme du JSON valide
-    // (name/cp/insee), jamais la syntaxe Rhai #{...} d'avant le correctif.
+    // A nested field shows as valid JSON, never in Rhai's #{...} notation.
     await expect(slotPanel).toContainText('{{script.ville}}');
     await expect(slotPanel).not.toContainText('#{');
     const villeFieldText = await slotPanel.textContent();

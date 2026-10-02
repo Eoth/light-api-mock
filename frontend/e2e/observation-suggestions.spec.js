@@ -4,12 +4,9 @@ import http from 'node:http';
 
 const API = 'http://localhost:7342/api';
 
-// Fausse cible reelle qui varie sa reponse selon ?id= -- exerce le piege
-// central du chantier (deux appels au meme endpoint, reponses legitimement
-// differentes) plutot qu'un cas trivial ou tout endpoint repond pareil.
-// Content-Length explicite : Node envoie "chunked" par defaut sans ca, ce qui
-// desactiverait silencieusement la capture cote Mimicway (voir
-// ProxyClient::forward_with_capture, src/engine/proxy.rs).
+// A real target whose answer depends on ?id=: two calls to the same endpoint get different answers, the case that
+// suggestions exist for. It sends Content-Length: without it, Node answers chunked, and Mimicway does not capture a
+// body of unknown size (ProxyClient::forward_with_capture, src/engine/proxy.rs).
 function startFakeTarget() {
   return new Promise((resolve) => {
     const server = http.createServer((req, res) => {
@@ -39,12 +36,12 @@ function proxyService(name, targetPort) {
   };
 }
 
-test.describe('Observation de trafic proxy et suggestions de regles', () => {
+test.describe('Observed proxy traffic and suggested rules', () => {
   test.beforeEach(async ({ request }) => {
     await request.delete(`${API}/config/reset`);
   });
 
-  test('observer un service, generer du trafic reel variable, obtenir puis sauvegarder une suggestion', async ({
+  test('observe a service, send it varied traffic, then get a suggestion and save it', async ({
     page,
     request,
   }) => {
@@ -73,8 +70,8 @@ test.describe('Observation de trafic proxy et suggestions de regles', () => {
       await expect(toggleBtn).toHaveText('Stop observing');
       await docsScreenshot(page, 'observation-panel-on.png', '[data-testid="observation-panel-orders-proxy"]');
 
-      // Vrai trafic proxifie, alterne id=1/id=2 -- 3 appels de chaque cote,
-      // au-dela du seuil minimal avant qu'une suggestion soit calculee.
+      // Real proxied traffic, id=1 and id=2 three times each: six samples of the route, above the three a suggestion
+      // waits for (TRAFFIC_OBSERVATION_MIN_SAMPLES).
       for (let i = 0; i < 3; i++) {
         const r1 = await request.get('http://localhost:7342/orders-proxy/orders?id=1');
         expect(r1.status()).toBe(200);
@@ -92,9 +89,7 @@ test.describe('Observation de trafic proxy et suggestions de regles', () => {
         '[data-testid="observation-suggestion-orders-proxy-0-0"], [data-testid="observation-suggestion-orders-proxy-0-1"]',
       );
 
-      // "Utiliser cette suggestion" doit pre-remplir le formulaire de regle
-      // existant (methode/sous-chemin/condition), pas creer la regle
-      // directement -- l'utilisateur reste maitre de la sauvegarde.
+      // Using a suggestion fills the rule form (method, sub-path, condition) and saves nothing: the user decides.
       await page.getByTestId('observation-use-suggestion-orders-proxy-0-0').click();
       await expect(page.getByTestId('rule-form-method-select')).toHaveValue('GET');
       await expect(page.getByTestId('rule-form-subpath-input')).toHaveValue('/orders');
@@ -119,11 +114,10 @@ test.describe('Observation de trafic proxy et suggestions de regles', () => {
     }
   });
 
-  test('une variance sans champ discriminant fiable ne propose aucune regle', async ({ page, request }) => {
+  test('answers that vary with nothing in the request get no suggested rule', async ({ page, request }) => {
     test.setTimeout(30000);
-    // Cible qui alterne sa reponse SANS rapport avec un champ de la requete
-    // (meme appel exact, reponses differentes) -- doit rester sans
-    // suggestion actionnable plutot que de figer la premiere reponse vue.
+    // The same call gets a different answer each time: no rule can tell them apart, and freezing the first answer seen
+    // would be wrong.
     let counter = 0;
     const target = await new Promise((resolve) => {
       const server = http.createServer((req, res) => {

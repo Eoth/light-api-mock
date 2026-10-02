@@ -3,12 +3,9 @@ import { docsScreenshot } from './docs-screenshot.js';
 
 const API = 'http://localhost:7342/api';
 
-// Ces tests ne s'executent que contre un backend compile avec
-// `--features messaging-kafka` (sinon /api/messaging/* renvoie 404 partout).
-// Aucun broker Kafka reel n'est requis : le scenario passe
-// par "Simuler un message" (POST /api/messaging/simulate), qui declenche le
-// meme pipeline (match -> rendu -> journal) qu'un vrai message Kafka sans
-// dependre d'un producteur externe — voir src/messaging/consumer.rs.
+// These tests run against a server built with `--features messaging-kafka` only (otherwise /api/messaging/* answers
+// 404), but need no Kafka broker: a simulated message (POST /api/messaging/simulate) goes through the same matching,
+// rendering and log as a message read from Kafka (process_message, src/messaging/consumer.rs).
 async function messagingAvailable(request) {
   const res = await request.get(`${API}/messaging/status`);
   if (!res.ok()) return false;
@@ -27,10 +24,9 @@ function messagingService(name, overrides = {}) {
     wsdl_mode: 'auto',
     rules: [
       {
-        // method est un champ obligatoire du modele Rule partage avec le
-        // HTTP (valide par validate_service contre VALID_METHODS, qui
-        // n'inclut PAS "ANY") mais ignore par le matching de message (voir
-        // src/messaging/matcher.rs) : n'importe quelle valeur valide convient.
+        // The rule model is shared with HTTP, where method is required (validate_service checks it against
+        // VALID_METHODS, which has no ANY); matching a message ignores it (src/messaging/matcher.rs): any valid method
+        // does.
         name: 'order-created',
         method: 'POST',
         sub_path: null,
@@ -56,14 +52,14 @@ function messagingService(name, overrides = {}) {
   };
 }
 
-test.describe('Messaging (Kafka) — journal des messages via simulation UI', () => {
+test.describe('Messaging (Kafka): the message log, fed by simulated messages', () => {
   test.beforeEach(async ({ request }) => {
     const available = await messagingAvailable(request);
     test.skip(!available, 'backend not built with --features messaging-kafka');
     await request.delete(`${API}/config/reset`);
   });
 
-  test('simuler un message matche l\'affiche dans le journal avec service/regle', async ({ page, request }) => {
+  test('a simulated message that matches shows in the log with its service and rule', async ({ page, request }) => {
     const created = await request.post(`${API}/services`, { data: messagingService('kafka-svc') });
     expect(created.ok()).toBe(true);
 
@@ -92,7 +88,7 @@ test.describe('Messaging (Kafka) — journal des messages via simulation UI', ()
     await docsScreenshot(page, 'kafka-message-log.png', '[data-testid^="messaging-log-row-"]');
   });
 
-  test('un message sans regle correspondante est journalise comme non matche', async ({ page, request }) => {
+  test('a message that no rule matches is logged as such', async ({ page, request }) => {
     const created = await request.post(`${API}/services`, { data: messagingService('kafka-svc-2') });
     expect(created.ok()).toBe(true);
 
@@ -109,7 +105,7 @@ test.describe('Messaging (Kafka) — journal des messages via simulation UI', ()
     await expect(row).toContainText('Does not match');
   });
 
-  test('un corps de message volumineux est journalise avec le badge "Tronque"', async ({ page, request }) => {
+  test('a large message body is logged with the Truncated badge', async ({ page, request }) => {
     test.setTimeout(30000);
     const created = await request.post(`${API}/services`, { data: messagingService('kafka-svc-3') });
     expect(created.ok()).toBe(true);
@@ -128,14 +124,14 @@ test.describe('Messaging (Kafka) — journal des messages via simulation UI', ()
     await expect(row).toBeVisible();
     await expect(row).toContainText('Truncated');
 
-    // Le detail doit conserver la taille REELLE malgre la troncature de l'apercu.
+    // The details give the real size, though the logged body is truncated.
     await row.locator('.btn-detail').click({ timeout: 20000 });
     const dialog = page.getByRole('dialog', { name: 'Message details' });
     await expect(dialog).toBeVisible();
     await expect(dialog).toContainText(`${bigPayload.length} bytes`);
   });
 
-  test('simuler sans topic affiche une notification d\'erreur et ne journalise rien', async ({ page, request }) => {
+  test('simulating without a topic shows an error', async ({ page, request }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
     await page.getByTitle('Kafka message log').click();
