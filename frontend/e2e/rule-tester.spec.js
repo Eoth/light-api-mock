@@ -37,16 +37,13 @@ async function openService(page, serviceName) {
   const group = page.locator('button[aria-expanded]').first();
   if ((await group.count()) > 0 && (await group.getAttribute('aria-expanded')) === 'false') {
     await group.click();
-    await page.waitForTimeout(200);
   }
   await page.getByRole('button', { name: new RegExp(`Configure the service ${serviceName}`) }).click();
-  await page.waitForTimeout(200);
 }
 
 async function openAddRuleForm(page, serviceName) {
   await openService(page, serviceName);
   await page.getByRole('button', { name: /Add a rule/ }).click();
-  await page.waitForTimeout(200);
 }
 
 test.describe('Testeur de regle : condition mal choisie contre une vraie requete', () => {

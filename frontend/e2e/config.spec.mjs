@@ -29,11 +29,11 @@ test('demo service repond avec les path params', async ({ page, request }) => {
   await page.goto('/');
   await page.waitForLoadState('networkidle');
   await page.getByRole('button', { name: /Load an example/ }).click();
-  await page.waitForTimeout(500);
 
-  const resp = await request.get('http://localhost:7342/users-api/users/42');
-  expect(resp.status()).toBe(200);
-  const json = await resp.json();
+  // The example is created through the API: its service answers once that call is done.
+  const call = () => request.get('http://localhost:7342/users-api/users/42');
+  await expect.poll(async () => (await call()).status()).toBe(200);
+  const json = await (await call()).json();
   expect(json.id).toBe(42);
   expect(json.name).toBeTruthy();
   expect(json.meta.timestamp).toBeGreaterThan(1700000000000);

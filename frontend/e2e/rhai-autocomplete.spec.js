@@ -28,10 +28,8 @@ async function openAddRuleForm(page) {
   const group = page.locator('button[aria-expanded]').first();
   if (await group.getAttribute('aria-expanded') === 'false') {
     await group.click();
-    await page.waitForTimeout(200);
   }
   await page.getByRole('button', { name: /Configure/ }).first().click();
-  await page.waitForTimeout(300);
   await page.getByRole('button', { name: /Add a rule/ }).click();
 }
 
@@ -115,11 +113,12 @@ test('la fonction inseree via autocompletion est bien enregistree telle quelle',
   await page.keyboard.type('request.path.id, 0, 10');
 
   await page.getByRole('button', { name: /Add the rule/ }).click();
-  await page.waitForTimeout(500);
 
-  const res = await request.get(`${API}/services/autocomplete-svc`);
-  const svc = await res.json();
-  const rule = svc.rules.find((r) => r.name === 'ac-rule-persist');
-  expect(rule).toBeTruthy();
-  expect(rule.script).toBe('seeded_int(request.path.id, 0, 10)');
+  // The rule is saved through the API: wait for that call rather than for a fixed time.
+  await expect
+    .poll(async () => {
+      const svc = await (await request.get(`${API}/services/autocomplete-svc`)).json();
+      return svc.rules.find((r) => r.name === 'ac-rule-persist')?.script;
+    })
+    .toBe('seeded_int(request.path.id, 0, 10)');
 });
