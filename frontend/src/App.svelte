@@ -13,6 +13,7 @@
   import BackupManager from './lib/components/BackupManager.svelte';
   import ConfirmDialog from './lib/components/ConfirmDialog.svelte';
   import { t, getLocale, setLocale, LOCALES } from './lib/i18n.svelte.js';
+  import { applyTheme, initialTheme, saveTheme } from './lib/theme.js';
 
   let services = $state([]);
   let resetPending = $state(false);
@@ -29,15 +30,11 @@
   let selectedServiceGroup = $state(null);
   let view = $state('list');
   let loading = $state(true);
-  let darkMode = $state(
-    typeof localStorage !== 'undefined' && localStorage.getItem('mimicway-theme') !== null
-      ? localStorage.getItem('mimicway-theme') === 'dark'
-      : typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches
-  );
+  let darkMode = $state(initialTheme() === 'dark');
 
   $effect(() => {
-    document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');
-    localStorage.setItem('mimicway-theme', darkMode ? 'dark' : 'light');
+    applyTheme(darkMode ? 'dark' : 'light');
+    saveTheme(darkMode ? 'dark' : 'light');
   });
 
   const demoService = {

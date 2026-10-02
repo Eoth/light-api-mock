@@ -3,6 +3,7 @@ import App from './App.svelte';
 import { loadRuntimeConfig } from './lib/runtime-config.js';
 import { initLocale } from './lib/i18n.svelte.js';
 import { migrateLegacyStorage } from './lib/legacy-storage.js';
+import { applyTheme, initialTheme } from './lib/theme.js';
 import './tokens.css';
 import './app.css';
 
@@ -12,6 +13,8 @@ import './app.css';
 (async () => {
   // Before anything reads the saved language, theme or session.
   migrateLegacyStorage();
+  // The theme first, so that the page does not show light while the configuration and the language load.
+  applyTheme(initialTheme());
   await Promise.all([loadRuntimeConfig(), initLocale()]);
   mount(App, { target: document.getElementById('app') });
 })();
