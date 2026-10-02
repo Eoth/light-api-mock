@@ -21,11 +21,7 @@ test.beforeEach(async ({ request }) => {
   await request.delete(`${API}/config/reset`);
 });
 
-// "bouton demo charge le service quand liste vide" migre vers frontend/e2e/scenario-runner.spec.js
-// (scenario "Charger le service de demo depuis la liste vide" dans
-// frontend/e2e/scenarios/home.scenarios.json).
-
-test('demo service repond avec les path params', async ({ page, request }) => {
+test('the example service answers with its path parameter', async ({ page, request }) => {
   await page.goto('/');
   await page.waitForLoadState('networkidle');
   await page.getByRole('button', { name: /Load an example/ }).click();
@@ -39,7 +35,7 @@ test('demo service repond avec les path params', async ({ page, request }) => {
   expect(json.meta.timestamp).toBeGreaterThan(1700000000000);
 });
 
-test('export telecharge un fichier JSON valide', async ({ page, request }) => {
+test('export downloads a valid JSON file', async ({ page, request }) => {
   await request.post(`${API}/services`, { data: validService('export-test') });
 
   await page.goto('/');
@@ -58,7 +54,7 @@ test('export telecharge un fichier JSON valide', async ({ page, request }) => {
   expect(config.services.some(s => s.name === 'export-test')).toBe(true);
 });
 
-test('import charge une configuration via API', async ({ request }) => {
+test('a configuration is imported through the API', async ({ request }) => {
   const config = {
     services: [validService('imported-svc')],
     groups: [],

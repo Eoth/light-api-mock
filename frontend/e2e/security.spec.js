@@ -21,10 +21,6 @@ test.describe('Security: route protection', () => {
     await request.delete(`${API}/config/reset`);
   });
 
-  // "UI is served on / even with no services" migre vers frontend/e2e/scenario-runner.spec.js
-  // (reutilise le scenario "La page d'accueil se charge avec le titre Mimicway" de
-  // frontend/e2e/scenarios/home.scenarios.json).
-
   test('API accepts service with empty listen_path (catch-all)', async ({ request }) => {
     const res = await request.post(`${API}/services`, {
       data: validService('catchall-svc', { listen_path: '' }),
@@ -45,10 +41,6 @@ test.describe('Security: route protection', () => {
     });
     expect(res.status()).toBe(400);
   });
-
-  // "UI remains accessible after creating a valid service" migre vers frontend/e2e/scenario-runner.spec.js
-  // (reutilise le scenario "La page d'accueil se charge avec le titre Mimicway" de
-  // frontend/e2e/scenarios/home.scenarios.json).
 
   test('internal API routes remain accessible with services registered', async ({ request }) => {
     await request.post(`${API}/services`, {

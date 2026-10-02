@@ -4,20 +4,12 @@ import { resolve } from 'node:path';
 
 const API = 'http://localhost:7342/api';
 
-// Le store persiste desormais en write-behind : la mutation en memoire est
-// instantanee, l'ecriture sur mock-config.yaml est deleguee a une tache de
-// fond (voir src/store/mod.rs). Ce fichier verifie ce mecanisme de
-// bout en bout via une VRAIE interaction UI, en relisant directement le
-// fichier YAML sur disque plutot que l'API /api/services (qui ne lit que le
-// snapshot en memoire et ne prouverait donc rien sur la persistance reelle).
-// Une relecture du fichier reflete exactement ce qu'un load_or_init() reel
-// lirait au redemarrage du pod — "simuler un redemarrage" sans avoir a tuer
-// le process serveur utilise par toute la suite e2e.
+// The store applies a change in memory at once and writes mock-config.yaml in a background task (write-behind,
+// src/store/mod.rs). The test reads that file rather than the API, which answers from memory: the file is what a
+// restart would load (load_or_init), without stopping the server the whole suite shares.
 //
-// Hypothese (partagee avec le reste de la suite e2e qui cible deja
-// localhost:7342) : le serveur tourne avec la convention documentee dans
-// README.md (DATA_PATH=./data depuis la racine du repo). Surchargeable via
-// la variable d'env DATA_PATH si le serveur e2e est lance autrement.
+// The file is looked for in DATA_PATH when Playwright gets it, else in ./data at the root of the repository, where
+// README.md starts the server.
 const dataDir = process.env.DATA_PATH || resolve(process.cwd(), '../data');
 const CONFIG_FILE = resolve(dataDir, 'mock-config.yaml');
 
@@ -43,10 +35,6 @@ test.describe('Write-behind: persistence after a simulated store restart', () =>
   test.beforeEach(async ({ request }) => {
     await request.delete(`${API}/config/reset`);
   });
-
-  // "a service mutation made through the UI survives a re-read of the on-disk config" migre vers
-  // frontend/e2e/scenario-runner.spec.js (scenario "Basculer le mode mock/proxy d'un
-  // service via l'UI" dans frontend/e2e/scenarios/services.scenarios.json).
 
   test('a service deleted through the API disappears from the on-disk config once persisted', async ({ request }) => {
     await request.post(`${API}/services`, { data: validService('write-behind-delete-svc') });

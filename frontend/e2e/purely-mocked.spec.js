@@ -1,12 +1,7 @@
 import { test, expect } from '@playwright/test';
 
-// Service "purement mocke" (real_target_url vide). Ce fichier ne pilote
-// jamais l'UI (que des `request.get/post`, assertions sur le code HTTP/le
-// corps de reponse) : un test API-only n'a pas sa place dans un scenario
-// JSON data-driven (aucune etape UI reelle a modeliser) -- meme convention
-// que les tests API-only deja presents dans
-// critical-flows.spec.js/insee.spec.mjs/security.spec.js, cf
-// frontend/e2e/README.md.
+// A purely mocked service (empty real_target_url) has nothing to forward to: a request no rule matches gets a 404 that
+// says why, where a mocked service that has a target answers a plain 404.
 const BASE = 'http://localhost:7342';
 const API = `${BASE}/api`;
 
@@ -24,12 +19,12 @@ function validService(name, overrides = {}) {
   };
 }
 
-test.describe('Service purement mocke : comportement reseau', () => {
+test.describe('Purely mocked service: what it answers', () => {
   test.beforeEach(async ({ request }) => {
     await request.delete(`${API}/config/reset`);
   });
 
-  test('une requete sans regle correspondante renvoie un 404 explicite mentionnant l\'absence de cible', async ({ request }) => {
+  test('a request no rule matches gets a 404 that names the service purely mocked', async ({ request }) => {
     await request.post(`${API}/services`, {
       data: validService('nocible-nomatch', { real_target_url: '' }),
     });
@@ -40,7 +35,7 @@ test.describe('Service purement mocke : comportement reseau', () => {
     expect(body).toContain('purely mocked');
   });
 
-  test('une requete sans regle correspondante sur un service AVEC cible reste generique (pas de mention de cible absente)', async ({ request }) => {
+  test('on a service with a target, the 404 of an unmatched request is a plain one', async ({ request }) => {
     await request.post(`${API}/services`, {
       data: validService('avecible-nomatch'),
     });
@@ -51,7 +46,7 @@ test.describe('Service purement mocke : comportement reseau', () => {
     expect(body).not.toContain('purely mocked');
   });
 
-  test('un service purement mocke avec une regle qui matche continue de repondre normalement', async ({ request }) => {
+  test('a purely mocked service still answers with the rule that matches', async ({ request }) => {
     await request.post(`${API}/services`, {
       data: validService('nocible-avecregle', {
         real_target_url: '',

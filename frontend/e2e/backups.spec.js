@@ -23,10 +23,8 @@ async function backupFilenames(request) {
   return new Set(backups.map((b) => b.filename));
 }
 
-// Identifie le fichier de backup cree par une ecriture precise en comparant
-// l'ensemble des noms de fichiers avant/apres (difference d'ensembles) —
-// evite toute hypothese fragile sur le tri ou les timestamps, meme si
-// d'autres tests de la suite ont deja rempli backups/ auparavant.
+// The backup that one write creates, found by comparing the file names before and after it: no assumption on their
+// order or their dates, whatever the earlier tests of the suite left in backups/.
 async function newBackupFilename(request, action) {
   const before = await backupFilenames(request);
   await action();
@@ -66,25 +64,17 @@ test.describe('Config backups & restore', () => {
     expect(res.status()).toBe(404);
   });
 
-  // NB: le refus "sans droits admin" (403 via require_super_admin) n'est pas
-  // testable en E2E dans cet environnement : le serveur de test tourne avec
-  // AUTH_ENABLED=false (par defaut), auquel cas AuthUser::anonymous() a
-  // is_super_admin=true et require_super_admin() passe toujours — il n'existe
-  // pas de session "utilisateur non-admin" reelle a produire sans backend
-  // Keycloak (meme limitation deja acceptee pour /api/config/reset). Le
-  // garde-fou lui-meme est couvert par un test unitaire Rust
-  // (server::api::tests::require_super_admin_rejects_non_admin) et le
-  // comportement UI en cas de 403 par un test Vitest simulant le rejet
-  // (BackupManager.test.js : "notifie une erreur quand le backend refuse").
+  // The refusal of a user who is not a super-admin (403, require_super_admin) cannot be reached here: without
+  // authentication, every caller is an anonymous super-admin. The server's tests cover the refusal
+  // (require_super_admin_rejects_non_admin, src/server/api.rs), and BackupManager.test.js how the interface reports it.
 
   test('UI restore flow: click through to a restored config', async ({ page, request }) => {
     const targetFilename = await newBackupFilename(request, () =>
       request.post(`${API}/services`, { data: validService('restore-target-svc') })
     );
 
-    // Une seconde ecriture modifie l'etat courant : elle doit disparaitre une
-    // fois la restauration effectuee vers le backup capture ci-dessus (etat
-    // "aucun service").
+    // That backup holds the configuration from before the write, with no service. A second write changes the current
+    // one, which the restore must undo.
     await request.post(`${API}/services`, { data: validService('restore-decoy-svc') });
 
     await page.goto('/');
