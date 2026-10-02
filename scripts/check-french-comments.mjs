@@ -1,19 +1,21 @@
 #!/usr/bin/env node
-// Fails when a comment of a covered file is written in French. Comments are in English, the language every reviewer
-// and contributor shares; French belongs in the translation catalogues. Strings are not comments: a sentence of the
-// interface, a test fixture or example data is never reported, whatever its language.
+// Fails when a comment or a test title of a covered file is written in French. Comments and test titles are in
+// English, the language every reviewer and contributor shares; French belongs in the translation catalogues. Other
+// strings are never reported, whatever their language: a sentence of the interface, a test fixture, example data.
 //
 // Each file is scanned with the comment and string syntax of its language (Rust, JavaScript, Svelte, CSS), so that a
-// "//" inside a URL, a regular expression or a string is not taken for a comment. A comment line is French when it
-// holds one of FRENCH_WORDS or an elision, outside code quoted with backticks.
+// "//" inside a URL, a regular expression or a string is not taken for a comment. A test title is the first argument
+// of test(), describe() or it() (with modifiers such as test.describe.skip), or the name of a scenario in a scenario
+// file (JSON). A line or a title is French when it holds one of FRENCH_WORDS or an elision, outside code quoted with
+// backticks.
 // Usage: node scripts/check-french-comments.mjs [repository root] (defaults to this script's repository).
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// Git pathspecs of the files whose comments must stay in English ("*" stays within a directory, "**" crosses them).
-// A path joins the list once its comments are translated, so that it cannot slip back.
+// Git pathspecs of the files whose comments and test titles must stay in English ("*" stays within a directory, "**"
+// crosses them). A path joins the list once it is translated, so that it cannot slip back.
 export const COVERED = [
   'src/**/*.rs',
   'tests/**/*.rs',
@@ -22,6 +24,7 @@ export const COVERED = [
   'frontend/*.js',
   'frontend/e2e/**/*.js',
   'frontend/e2e/**/*.mjs',
+  'frontend/e2e/scenarios/*.json',
   'frontend/src/main.js',
   'frontend/src/*.css',
   'frontend/src/App.svelte',
@@ -57,7 +60,22 @@ const FRENCH = new RegExp(
 // Code quoted in a comment (`de`, `la`) is not prose.
 const QUOTED_CODE = /`[^`]*`/g;
 
-const SYNTAX_BY_EXTENSION = { '.rs': 'rust', '.js': 'js', '.mjs': 'js', '.svelte': 'svelte', '.css': 'css' };
+const SYNTAX_BY_EXTENSION = {
+  '.rs': 'rust',
+  '.js': 'js',
+  '.mjs': 'js',
+  '.svelte': 'svelte',
+  '.css': 'css',
+  '.json': 'json',
+};
+
+// Functions whose first argument is a test title (Playwright, Vitest, node:test), and what may follow them before the
+// opening parenthesis: modifiers (test.describe.skip) and blank space, up to the opening quote of the title.
+const TEST_FUNCTIONS = new Set(['test', 'describe', 'it']);
+const TITLE_CALL =
+  /(?:\s*\.\s*(?:describe|only|skip|fixme|fail|slow|serial|parallel|step|todo|concurrent))*\s*\(\s*['"`]/y;
+// A scenario name in a scenario file: "scenario": "…".
+const SCENARIO_NAME = /"scenario"\s*:\s*("(?:\\.|[^"\\])*")/g;
 
 // Words after which a "/" starts a regular expression rather than a division.
 const KEYWORDS_BEFORE_EXPRESSION = new Set([
@@ -74,11 +92,12 @@ function matchAt(pattern, text, index) {
   return pattern.exec(text);
 }
 
-// Collects comments as one { line, text } per line they span.
+// Collects comments as one { line, text } per line they span, and test titles as one { line, text } each.
 class Comments {
   constructor(text) {
     this.text = text;
     this.lines = [];
+    this.titles = [];
     this.lineStarts = [0];
     for (let i = 0; i < text.length; i++) if (text[i] === '\n') this.lineStarts.push(i + 1);
   }
@@ -99,6 +118,33 @@ class Comments {
     this.text.slice(start, end).split('\n').forEach((text, offset) => {
       this.lines.push({ line: first + offset, text: text.replace(/\r$/, '') });
     });
+  }
+
+  // The title whose string literal opens at `start` (a quote or a backtick): escapes resolved, interpolations shown
+  // as ${…}, since their content is code.
+  addTitle(start) {
+    const { text } = this;
+    const quote = text[start];
+    let title = '';
+    let depth = 0;
+    for (let i = start + 1; i < text.length; i++) {
+      const c = text[i];
+      if (depth > 0) {
+        if (c === '{') depth++;
+        else if (c === '}') depth--;
+      } else if (c === '\\') {
+        title += text[++i] ?? '';
+      } else if (c === quote || (c === '\n' && quote !== '`')) {
+        break;
+      } else if (quote === '`' && c === '$' && text[i + 1] === '{') {
+        title += '${…}';
+        depth = 1;
+        i++;
+      } else {
+        title += c;
+      }
+    }
+    this.titles.push({ line: this.lineOf(start), text: title });
   }
 }
 
@@ -159,6 +205,8 @@ function scanJs(comments, index, limit, inBraces) {
   // Brace depth at which each open template literal entered a `${`.
   const templates = [];
   let regexAllowed = true;
+  // The last character of code read, comments and blank space aside: a word after a "." is a property or a method.
+  let previous = '';
   let i = index;
   const enterTemplate = (from) => {
     const part = scanTemplateText(text, from, limit);
@@ -176,10 +224,12 @@ function scanJs(comments, index, limit, inBraces) {
       const end = lineEnd(text, i, limit);
       comments.add(i, end);
       i = end;
+      continue;
     } else if (c === '/' && next === '*') {
       const end = after(text, i + 2, limit, '*/');
       comments.add(i, end);
       i = end;
+      continue;
     } else if (c === '"' || c === "'") {
       i = skipQuoted(text, i, limit);
       regexAllowed = false;
@@ -206,12 +256,23 @@ function scanJs(comments, index, limit, inBraces) {
         regexAllowed = true;
       }
     } else if (matchAt(WORD, text, i)) {
-      regexAllowed = KEYWORDS_BEFORE_EXPRESSION.has(text.slice(i, WORD.lastIndex));
-      i = WORD.lastIndex;
+      const end = WORD.lastIndex;
+      const word = text.slice(i, end);
+      // The title is a string the loop then skips like any other; only its position is taken here.
+      if (TEST_FUNCTIONS.has(word) && previous !== '.' && matchAt(TITLE_CALL, text, end)) {
+        comments.addTitle(TITLE_CALL.lastIndex - 1);
+      }
+      regexAllowed = KEYWORDS_BEFORE_EXPRESSION.has(word);
+      i = end;
     } else {
-      if (!/\s/.test(c)) regexAllowed = c !== ')' && c !== ']';
+      if (/\s/.test(c)) {
+        i++;
+        continue;
+      }
+      regexAllowed = c !== ')' && c !== ']';
       i++;
     }
+    previous = text[i - 1];
   }
   return limit;
 }
@@ -307,15 +368,32 @@ function scanRust(comments) {
   }
 }
 
-/** The comment lines of `text`, written in `syntax` ('rust', 'js', 'svelte' or 'css'), as { line, text }. */
-export function commentLines(text, syntax) {
+// JSON has no comments; in a scenario file, the names of the scenarios are test titles.
+function scanJson(comments) {
+  for (const match of comments.text.matchAll(SCENARIO_NAME)) {
+    comments.titles.push({ line: comments.lineOf(match.index), text: JSON.parse(match[1]) });
+  }
+}
+
+function scan(text, syntax) {
   const comments = new Comments(text);
   if (syntax === 'rust') scanRust(comments);
   else if (syntax === 'js') scanJs(comments, 0, text.length, false);
   else if (syntax === 'svelte') scanSvelte(comments);
   else if (syntax === 'css') scanCss(comments, 0, text.length);
+  else if (syntax === 'json') scanJson(comments);
   else throw new Error(`unknown syntax ${syntax}`);
-  return comments.lines;
+  return comments;
+}
+
+/** The comment lines of `text`, written in `syntax` ('rust', 'js', 'svelte', 'css' or 'json'), as { line, text }. */
+export function commentLines(text, syntax) {
+  return scan(text, syntax).lines;
+}
+
+/** The test titles of `text`, written in `syntax`, as { line, text }. */
+export function testTitles(text, syntax) {
+  return scan(text, syntax).titles;
 }
 
 export function isFrench(commentText) {
@@ -323,10 +401,10 @@ export function isFrench(commentText) {
 }
 
 /**
- * Returns the French comment lines found in `files` (repository-relative paths with `/` separators), as
- * "file:line: comment"; `read(file)` returns the text of a file.
+ * Returns the French comment lines and test titles found in `files` (repository-relative paths with `/` separators),
+ * as "file:line: comment" and "file:line: title "…""; `read(file)` returns the text of a file.
  */
-export function checkComments(files, read) {
+export function checkFiles(files, read) {
   const problems = [];
   for (const file of files) {
     const syntax = SYNTAX_BY_EXTENSION[path.posix.extname(file)];
@@ -334,9 +412,13 @@ export function checkComments(files, read) {
       problems.push(`${file}: no comment syntax known for this kind of file`);
       continue;
     }
-    for (const { line, text } of commentLines(read(file), syntax)) {
-      if (isFrench(text)) problems.push(`${file}:${line}: ${text.trim()}`);
-    }
+    const { lines, titles } = scan(read(file), syntax);
+    const found = [
+      ...lines.filter(({ text }) => isFrench(text)).map(({ line, text }) => ({ line, problem: text.trim() })),
+      ...titles.filter(({ text }) => isFrench(text)).map(({ line, text }) => ({ line, problem: `title "${text}"` })),
+    ];
+    found.sort((a, b) => a.line - b.line);
+    problems.push(...found.map(({ line, problem }) => `${file}:${line}: ${problem}`));
   }
   return problems;
 }
@@ -348,13 +430,13 @@ function main() {
   const files = execFileSync('git', ['ls-files', '--', ...pathspecs], { cwd: root, encoding: 'utf8' })
     .split('\n')
     .filter(Boolean);
-  const problems = checkComments(files, (file) => readFileSync(path.join(root, file), 'utf8'));
+  const problems = checkFiles(files, (file) => readFileSync(path.join(root, file), 'utf8'));
   if (problems.length) {
     console.error(problems.join('\n'));
-    console.error(`\n${problems.length} French comment line(s): comments are written in English.`);
+    console.error(`\n${problems.length} French comment line(s) or test title(s): both are written in English.`);
     process.exit(1);
   }
-  console.log(`The comments of ${files.length} covered files are in English.`);
+  console.log(`The comments and test titles of ${files.length} covered files are in English.`);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();

@@ -120,7 +120,7 @@ jobs:
         run: node --test scripts/*.test.mjs
       - name: Every page and screenshot exists in English and French, with the same headings and images
         run: node scripts/check-doc-translations.mjs
-      - name: Comments are in English (paths listed in the script)
+      - name: Comments and test titles are in English (paths listed in the script)
         run: node scripts/check-french-comments.mjs
       - name: No tracked file names the former design system
         run: node scripts/check-former-design-system.mjs

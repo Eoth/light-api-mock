@@ -7,12 +7,12 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { COVERED, checkComments, commentLines, isFrench } from './check-french-comments.mjs';
+import { COVERED, checkFiles, commentLines, isFrench, testTitles } from './check-french-comments.mjs';
 
 const SCRIPT = path.join(path.dirname(fileURLToPath(import.meta.url)), 'check-french-comments.mjs');
 
 function check(files) {
-  return checkComments(Object.keys(files), (file) => files[file]);
+  return checkFiles(Object.keys(files), (file) => files[file]);
 }
 
 test('English comments pass, a French line comment is reported with its line', () => {
@@ -118,6 +118,62 @@ test('Rust: strings, raw strings, character literals and lifetimes do not hide o
   ]);
 });
 
+test('test titles are read from test(), describe() and it(), with their modifiers', () => {
+  const js = [
+    "test('Garde les règles dans leur ordre', () => {});",
+    "test.describe('The services', () => {",
+    '  describe.skip("pour plus tard", () => {});',
+    '  it(`ne répond pas à ${name} ici`, () => {});',
+    '});',
+    'test.describe.serial(',
+    "  'Les groupes',",
+    '  () => {},',
+    ');',
+    '// A comment that ends with a period.',
+    "test('Après un commentaire', () => {});",
+  ].join('\n');
+  assert.deepEqual(
+    testTitles(js, 'js').map(({ line, text }) => [line, text]),
+    [
+      [1, 'Garde les règles dans leur ordre'],
+      [2, 'The services'],
+      [3, 'pour plus tard'],
+      [4, 'ne répond pas à ${…} ici'],
+      [7, 'Les groupes'],
+      [11, 'Après un commentaire'],
+    ],
+  );
+});
+
+test('a method named test, a string or a comment holds no title', () => {
+  const js = [
+    "/les/.test('les règles');",
+    "pattern?.test('les règles');",
+    'const s = "test(\'les règles\')";',
+    "// test('the rules') in a comment",
+    "const t = `test('les règles')`;",
+  ].join('\n');
+  assert.deepEqual(testTitles(js, 'js'), []);
+});
+
+test('a French test title is reported with its line, an English one passes', () => {
+  const js = "test('keeps the order of the rules', () => {});\ntest('garde l\\'ordre des règles', () => {});\n";
+  assert.deepEqual(check({ 'a.spec.js': js }), ["a.spec.js:2: title \"garde l'ordre des règles\""]);
+});
+
+test('the names of the scenarios of a scenario file are titles, their steps are data', () => {
+  const json = [
+    '{',
+    '  "domain": "rules",',
+    '  "scenarios": [',
+    '    { "scenario": "Create a rule", "steps": [] },',
+    '    { "scenario": "Créer une règle", "steps": [{ "action": "fill", "value": "une valeur" }] }',
+    '  ]',
+    '}',
+  ].join('\n');
+  assert.deepEqual(check({ 'rules.scenarios.json': json }), ['rules.scenarios.json:5: title "Créer une règle"']);
+});
+
 test('a file in an unknown syntax is reported rather than skipped', () => {
   assert.deepEqual(check({ 'a.py': '# pour' }), ['a.py: no comment syntax known for this kind of file']);
 });
@@ -128,22 +184,32 @@ function sampleOf(pattern) {
 }
 
 // A file of comment lines, written in the comment syntax of `file`: in Svelte markup and in CSS, "//" is not a comment.
+// JSON has no comments: a scenario file gets one scenario per line, named after it.
 function commented(file, ...lines) {
   const extension = path.posix.extname(file);
+  if (extension === '.json') {
+    return `{"scenarios": [${lines.map((line) => `{"scenario": ${JSON.stringify(line)}}`).join(',\n')}]}\n`;
+  }
   const [open, close] = { '.svelte': ['<!-- ', ' -->'], '.css': ['/* ', ' */'] }[extension] ?? ['// ', ''];
   return lines.map((line) => `${open}${line}${close}\n`).join('');
 }
 
-// Files that must be checked, whatever the patterns of COVERED: the end-to-end suite and the tooling configuration of
-// the interface.
+// A file of tests, one per line, named after the lines.
+function titled(...lines) {
+  return lines.map((line) => `test(${JSON.stringify(line)}, () => {});\n`).join('');
+}
+
+// Files that must be checked, whatever the patterns of COVERED: the end-to-end suite, its scenarios and the tooling
+// configuration of the interface.
 const MUST_BE_COVERED = [
   'frontend/e2e/login.spec.js',
   'frontend/e2e/config.spec.mjs',
   'frontend/e2e/scenario-runner.js',
+  'frontend/e2e/scenarios/home.scenarios.json',
   'frontend/vite.config.js',
 ];
 
-test('the command fails on a French comment in every covered path, and ignores the others', () => {
+test('the command fails on a French comment or test title in every covered path, and ignores the others', () => {
   const root = mkdtempSync(path.join(tmpdir(), 'french-comments-'));
   try {
     const probes = [...new Set([...COVERED.map(sampleOf), ...MUST_BE_COVERED])];
@@ -163,6 +229,14 @@ test('the command fails on a French comment in every covered path, and ignores t
       const broken = spawnSync(process.execPath, [SCRIPT, root], { encoding: 'utf8' });
       assert.equal(broken.status, 1, `${file}: ${broken.stdout}`);
       assert.match(broken.stderr, new RegExp(`^${file.replaceAll('.', '\\.')}:2: .*Mais pas la seconde\\.`, 'm'));
+      writeFileSync(path.join(root, file), commented(file, 'The first line is fine.'));
+    }
+
+    for (const file of probes.filter((probe) => /\.m?js$/.test(probe))) {
+      writeFileSync(path.join(root, file), titled('The first test is fine.', 'Mais pas le second.'));
+      const broken = spawnSync(process.execPath, [SCRIPT, root], { encoding: 'utf8' });
+      assert.equal(broken.status, 1, `${file}: ${broken.stdout}`);
+      assert.match(broken.stderr, new RegExp(`^${file.replaceAll('.', '\\.')}:2: title "Mais pas le second\\."`, 'm'));
       writeFileSync(path.join(root, file), commented(file, 'The first line is fine.'));
     }
   } finally {

@@ -67,7 +67,7 @@ One file per functional domain, holding several scenarios:
 - `goto` takes a `page`, not a URL: the UI has no router, so only `"services"` (the root) is mapped; other views are reached by clicking their navigation button (`app.navLogsButton`, `app.navGroupsButton`…).
 - Scenarios only interact with the UI. Data setup (creating a service through the API, resetting the configuration) belongs to the spec that replays the scenario (`test.beforeEach`, `request.post(...)`), as in `scenario-runner.spec.js`.
 
-Add a scenario to the domain file it belongs to, with a name unique in that file; a new domain is a deliberate choice, listed above. Replay it from a spec:
+Add a scenario to the domain file it belongs to, with a name unique in that file; a new domain is a deliberate choice, listed above. Scenario names, like test titles and comments, are written in English: CI fails otherwise (`scripts/check-french-comments.mjs`). Replay it from a spec:
 
 ```js
 import { test } from '@playwright/test';
