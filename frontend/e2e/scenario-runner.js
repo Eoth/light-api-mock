@@ -1,15 +1,8 @@
-// Petit interpreteur JSON pour des scenarios E2E "esprit Gherkin lisible"
-// (une suite d'etapes dans l'ordre), sans dependance BDD lourde (pas de
-// cucumber, pas de parseur Gherkin reel). Les scenarios sont regroupes par
-// domaine fonctionnel dans frontend/e2e/scenarios/*.scenarios.json : un
-// fichier de domaine est {domain, scenarios: [{scenario, steps[]}, ...]}
-// (pas un fichier par scenario individuel). Les
-// selecteurs ne sont JAMAIS en dur dans un scenario : `target` est un nom
-// logique "composant.cle" resolu via selectors.json (SOURCE UNIQUE des
-// selecteurs). Voir frontend/e2e/README.md pour le format complet et
-// comment ajouter un nouveau scenario/selecteur. L'action "screenshot"
-// (docs/<langue>/screenshots) est un no-op sauf regeneration explicite -- voir
-// docs-screenshot.js et frontend/e2e/README.md, section captures.
+// Replays the scenarios of scenarios/*.scenarios.json: readable lists of UI steps, run in order, with no BDD
+// dependency. A domain file holds several scenarios ({ domain, scenarios: [{ scenario, steps }] }). A step names its
+// target logically ("component.key"), resolved through selectors.json, the one place that holds the selectors of the
+// scenarios, so that a change of markup is fixed there once. Format and how to add a scenario: README.md next to this
+// file.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -19,34 +12,28 @@ import { docsScreenshot } from './docs-screenshot.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const selectors = JSON.parse(fs.readFileSync(path.join(__dirname, 'selectors.json'), 'utf8'));
 
-// Une SPA cote client (etat `view` dans App.svelte, pas de routeur d'URL
-// reel) : seule la racine correspond a une vraie navigation navigateur.
-// Les autres "pages" (logs, groupes, ...) se rejoignent par des clics
-// (action `click` sur un bouton de nav), pas par `goto` -- etendre cette
-// map uniquement si une vraie route serveur existe un jour pour ce nom.
+// The interface has no router (the view is a state of App.svelte): only its root is a URL. The other views are
+// reached by clicking their navigation button; a page joins this map only once the server serves it at its own URL.
 const PAGE_PATHS = {
   services: '/',
 };
 
-// Resout un nom logique "composant.cle" (+ params optionnels pour les
-// selecteurs a discriminant, ex. {name: "mon-service"}) vers un selecteur
-// CSS concret via selectors.json. Lance une erreur explicite si le
-// composant/la cle n'existe pas, ou si un placeholder {xxx} du template
-// n'a pas ete fourni dans params -- ce sont des erreurs d'auteur de
-// scenario, pas des echecs de test a masquer.
+// The CSS selector of a logical name "component.key", its {placeholders} filled from `params` (a card per service
+// takes { name: "my-service" }). An unknown name or a missing parameter throws: it is a mistake in the scenario, never
+// a failure to hide.
 export function resolveTarget(target, params = {}) {
   const [component, key] = String(target).split('.');
   const group = selectors[component];
   if (!group) {
-    throw new Error(`selectors.json: composant inconnu "${component}" (cible "${target}")`);
+    throw new Error(`selectors.json: unknown component "${component}" (target "${target}")`);
   }
   const template = group[key];
   if (!template) {
-    throw new Error(`selectors.json: cle inconnue "${key}" dans le composant "${component}" (cible "${target}")`);
+    throw new Error(`selectors.json: unknown key "${key}" in component "${component}" (target "${target}")`);
   }
   return template.replace(/\{(\w+)\}/g, (match, name) => {
     if (!(name in params)) {
-      throw new Error(`Parametre "${name}" manquant pour resoudre la cible "${target}" (template: ${template})`);
+      throw new Error(`Missing parameter "${name}" for target "${target}" (selector: ${template})`);
     }
     return String(params[name]);
   });
@@ -58,7 +45,7 @@ async function runStep(page, step) {
     case 'goto': {
       const url = PAGE_PATHS[step.page];
       if (url === undefined) {
-        throw new Error(`goto: page inconnue "${step.page}" (etendre PAGE_PATHS dans scenario-runner.js si c'est une vraie route)`);
+        throw new Error(`goto: unknown page "${step.page}" (only a page the server serves at its own URL joins PAGE_PATHS)`);
       }
       await page.goto(url);
       await page.waitForLoadState('networkidle');
@@ -107,39 +94,36 @@ async function runStep(page, step) {
       return;
     }
     default:
-      throw new Error(`Action non supportee "${action}". Actions disponibles : goto, click, fill, selectOption, assertVisible, assertHidden, assertText, resizeToContent, screenshot.`);
+      throw new Error(`Unsupported action "${action}". Actions: goto, click, fill, selectOption, assertVisible, assertHidden, assertText, resizeToContent, screenshot.`);
   }
 }
 
-// Execute un scenario JSON {scenario, steps[]} dans l'ordre. Chaque etape
-// echouee est re-levee avec son index et son contenu pour un diagnostic
-// direct (pas besoin de deviner quelle etape a echoue dans un long
-// scenario).
+// Runs the steps of a scenario in order. A failing step is thrown again with its number and content, so that a long
+// scenario says where it stopped.
 export async function runScenario(page, scenario) {
   for (let i = 0; i < scenario.steps.length; i++) {
     const step = scenario.steps[i];
     try {
       await runStep(page, step);
     } catch (e) {
-      throw new Error(`Scenario "${scenario.scenario}", etape ${i + 1}/${scenario.steps.length} (${JSON.stringify(step)}) : ${e.message}`);
+      throw new Error(`Scenario "${scenario.scenario}", step ${i + 1}/${scenario.steps.length} (${JSON.stringify(step)}): ${e.message}`);
     }
   }
 }
 
-// Charge un fichier de domaine complet ({domain, scenarios: [...]}).
+// A whole domain file: { domain, scenarios: [...] }.
 export function loadDomain(filename) {
   const p = path.join(__dirname, 'scenarios', filename);
   return JSON.parse(fs.readFileSync(p, 'utf8'));
 }
 
-// Charge UN scenario nomme depuis un fichier de domaine. Erreur explicite
-// si le nom ne correspond a aucun scenario du fichier -- erreur d'auteur de
-// test, pas un echec a masquer.
+// One scenario of a domain file, by name. An unknown name throws: it is a mistake in the test, never a failure to
+// hide.
 export function loadScenario(filename, scenarioName) {
   const domain = loadDomain(filename);
   const found = domain.scenarios.find((s) => s.scenario === scenarioName);
   if (!found) {
-    throw new Error(`"${filename}" (domaine "${domain.domain}") ne contient aucun scenario nomme "${scenarioName}"`);
+    throw new Error(`"${filename}" (domain "${domain.domain}") has no scenario named "${scenarioName}"`);
   }
   return found;
 }
