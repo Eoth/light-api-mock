@@ -174,7 +174,7 @@
   <div class="list-header">
     <h2>{t("Service groups")}</h2>
     <div class="header-actions">
-      <button type="button" class="btn btn-primary btn-sm" onclick={() => { showForm = !showForm; formError = ''; }} data-testid="group-manager-new-group-button">
+      <button type="button" class="btn btn-sm {showForm ? 'btn-secondary' : 'btn-primary'}" onclick={() => { showForm = !showForm; formError = ''; }} data-testid="group-manager-new-group-button">
         {showForm ? t("Cancel") : t("+ New group")}
       </button>
       <button type="button" class="btn btn-outline btn-sm" onclick={onBack} data-testid="group-manager-back-button">{t("Back")}</button>
