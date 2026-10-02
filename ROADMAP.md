@@ -18,7 +18,7 @@ Each item has an identifier that never changes, a size (S: a day or less, M: a f
 
 ## Order of work
 
-1. [Ready for an international launch](#1-ready-for-an-international-launch): R2, R10, R6, R11, R12, R13, R14, R9.
+1. [Ready for an international launch](#1-ready-for-an-international-launch): R2, R10, R11, R12, R13, R14, R9.
 2. [Trust and operations](#2-trust-and-operations): T1 to T11.
 3. [Make it indispensable](#3-make-it-indispensable): U1 to U16, in the listed order.
 4. [Engineering backlog](#4-engineering-backlog): taken alongside, when they unblock an item above.
@@ -37,29 +37,15 @@ Size S (what is left)
 
 **Done when.** `cosign verify` and `gh attestation verify` succeed on the published image and binaries, and the README quick start runs as written.
 
-### R6. English code comments
-
-Size L, to split by module
-
-**Why.** Reviewers read the code. The server's comments were French session narratives rather than the reason the code is the way it is; the UI's components and tests still are.
-
-**What.** Module by module, in reading order of the [reviewer guide](REVIEWING.md), rewrite comments in English and keep only what explains *why* (an invariant, a pitfall, a specification reference); history stays in Git. Translate test names and test messages at the same time.
-
-**Progress.** Done: the Rust code (`src/`, `tests/`, `build.rs`, with every test message and log line), the scripts, and the whole UI outside its tests: `main.js`, `App.svelte`, every module of `frontend/src/lib/`, every component of `frontend/src/lib/components/` (473 French lines of 528 before) and the two style sheets of `frontend/src/` (9 lines before). CI fails on a French comment in any of them: `scripts/check-french-comments.mjs` reads comments only (interface strings, fixtures and example data are never reported) and lists the covered paths, which grow with each translated folder. Checking each comment against the code found 14 wrong claims (a wrong file, access rules stated wrongly, a lossless round trip that lost data, styles called shared that are not), corrected rather than translated, and 11 defects, fixed in 9 commits, each with a test that failed first (see the changelog).
-
-**Left**, counted in French comment lines by that script, only in tests: `frontend/e2e/` 422 of its 566 comment lines (`scenario-runner.spec.js` 187), with the French titles of its tests and scenarios (strings, not comments, so the check does not see them); `frontend/src/tests/` 140 of 198 (136 of 194 in the test files, 4 of 4 in `helpers/`), to translate with R11, which rewrites those tests.
-
-**Done when.** No French comment left in `frontend/`, and the CI check covers it.
-
 ### R11. Unit tests in English
 
-Size M
+Size L, in two parts: the language of the suite, then its comments and titles
 
-**Why.** The Vitest suite runs the components in French (`src/tests/setup.js`) and asserts about 700 French texts, while the end-to-end suite and the code use English. Contributors who do not read French cannot follow these tests, and any wording change in the French catalogue breaks them, which blocks R9.
+**Why.** The Vitest suite runs the components in French (`src/tests/setup.js`) and asserts about 700 French texts, while the end-to-end suite and the code use English. Contributors who do not read French cannot follow these tests, and any wording change in the French catalogue breaks them, which blocks R9. Its comments and test titles are mostly French too: they are the last French comments of the repository.
 
-**What.** Switch `setup.js` to English and rewrite the assertions with the English texts (the catalogue maps each French text to its English key, which makes most replacements mechanical); keep one test file that renders the main components in French, so that the French catalogue stays exercised in context.
+**What.** Switch `setup.js` to English and rewrite the assertions with the English texts (the catalogue maps each French text to its English key, which makes most replacements mechanical); keep one test file that renders the main components in French, so that the French catalogue stays exercised in context. Then rewrite the comments and test titles of `frontend/src/tests/` in English, keeping only why in comments and checking each claim against the code: 141 French comment lines of 223 (137 of 219 in the JavaScript files, 4 of 4 in the Svelte harnesses of `helpers/`) and 392 French titles of 595, counted by `scripts/check-french-comments.mjs`, which already covers the rest of the repository.
 
-**Done when.** `npm test` passes in English, and changing a French translation breaks no test outside the French-specific file and `l10n.test.js`.
+**Done when.** `npm test` passes in English, changing a French translation breaks no test outside the French-specific file and `l10n.test.js`, and `scripts/check-french-comments.mjs` covers `frontend/src/tests/` with nothing to report.
 
 ### R9. Polish the French catalogues
 
