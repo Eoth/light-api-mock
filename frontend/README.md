@@ -65,6 +65,8 @@ The rule form offers five **formats**: JSON, XML, Text, Advanced template, Empty
 
 Every visible sentence goes through `t("English text")`, written once where it is used; `src/locales/fr.json` maps it to French. `src/tests/l10n.test.js` extracts every message, fails on a missing or unused catalogue entry or a lost placeholder, and renders the components in a pseudo-locale to catch any text that escapes translation. Data (names, URLs, values typed by users) carries `translate="no"`.
 
+The unit tests run in English and assert the English texts. `src/tests/french.test.js` shows the same screens as the pseudo-locale test in French; only it and `l10n.test.js` may load the French catalogue (`src/tests/setup.js` refuses it to every other test file), so rewording a French translation breaks no other test.
+
 ## Accessibility
 
 Built to WCAG 2.1 AA (RGAA): skip link, visible labels, `aria-describedby` on hints and errors, `role="switch"` and `role="radio"` where they apply, `role="alert"` notifications, visible focus, 4.5:1 contrast in both themes, keyboard alternatives to drag and drop.
