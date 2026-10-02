@@ -88,7 +88,7 @@ test('create a service', async ({ page }) => {
 2. Add the entry under its component with a camelCase key (`nameInput`, `submitButton`).
 3. For a repeated element, use a placeholder named like the `params` key that fills it: `"card": "[data-testid=\"service-card-{name}\"]"`.
 
-No selector is written anywhere else. To compare `selectors.json` with the code:
+A scenario never writes a selector itself (classic specs locate their elements in their own code). To compare `selectors.json` with the code:
 
 ```bash
 grep -rhoE 'data-testid="[^"]*"' frontend/src --include="*.svelte" | sort -u
