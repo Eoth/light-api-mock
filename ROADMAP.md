@@ -18,7 +18,7 @@ Each item has an identifier that never changes, a size (S: a day or less, M: a f
 
 ## Order of work
 
-1. [Ready for an international launch](#1-ready-for-an-international-launch): R2, R10, R11, R12, R13, R14, R9.
+1. [Ready for an international launch](#1-ready-for-an-international-launch): R2, R10 (with R15, R16, R17, R18), R11, R12, R13, R14, R9.
 2. [Trust and operations](#2-trust-and-operations): T1 to T11.
 3. [Make it indispensable](#3-make-it-indispensable): U1 to U16, in the listed order.
 4. [Engineering backlog](#4-engineering-backlog): taken alongside, when they unblock an item above.
@@ -33,9 +33,9 @@ Size S (what is left)
 
 **Progress.** `.github/workflows/release.yml` (checked with actionlint) builds, on a `vX.Y.Z` tag, static Linux binaries (x86_64, arm64), macOS (Intel, Apple Silicon) and Windows binaries with the UI inside, a multi-architecture image on GHCR assembled from those binaries, CycloneDX SBOMs for the crates and the shipped UI packages, checksums, build provenance attestations for everything, and a keyless cosign signature of the image. The release procedure is in CONTRIBUTING.md and the verification commands in SECURITY.md.
 
-**What.** Cut the first release (0.2.0) with it, make the GHCR package public, and fix whatever the first run reveals.
+**What.** Attach the signatures and the provenance of the archives to the release as assets, since the OpenSSF Scorecard (R10) looks for them there, not in GitHub's attestation store: a release with none scores 0 on its Signed-Releases check (high risk), signature files (`.sigstore.json`) 8, SLSA provenance (`.intoto.jsonl`) 10. Then cut the first release (0.2.0), make the GHCR package public, and fix whatever the first run reveals.
 
-**Done when.** `cosign verify` and `gh attestation verify` succeed on the published image and binaries, and the README quick start runs as written.
+**Done when.** `cosign verify` and `gh attestation verify` succeed on the published image and binaries, the README quick start runs as written, and the Scorecard report gives Signed-Releases 10 and detects the publishing workflow (Packaging).
 
 ### R11. Unit tests in English
 
@@ -91,15 +91,55 @@ Size S
 
 ### R10. Public supply-chain score
 
-Size S (what is left)
+Size L, split: R2 (signed releases), R15, R16, R17, R18, and the item below
 
-**Why.** Reviewers increasingly start from the OpenSSF Scorecard: it checks pinned dependencies, token permissions, branch protection, signed releases, CI tests and more, and shows the result as a badge.
+**Why.** Reviewers increasingly start from the OpenSSF Scorecard: it checks pinned dependencies, token permissions, branch protection, signed releases, CI tests and more, and shows the result as a badge. A low score turns people away before they read anything else.
 
-**Progress.** The repository is public, `.github/workflows/scorecard.yml` publishes the score weekly and on pushes to `develop`, and the README shows the badge. Actions and base images are pinned by digest, workflow permissions are read-only by default, and releases are signed.
+**Progress.** The repository is public, `.github/workflows/scorecard.yml` publishes the score weekly and on pushes to `develop`, and the README shows the badge. The first report (commit 91964b8) gave 6.4: 10 on Dangerous-Workflow, Token-Permissions, Binary-Artifacts, Security-Policy, License, Maintained and Dependency-Update-Tool; 9 on Pinned-Dependencies; 7 on Vulnerabilities, now fixed (jsonwebtoken 11, quinn-proto 0.11.19, a justified exception for smartstring in `osv-scanner.toml`, and CI runs osv-scanner, the scanner Scorecard uses); 0 on Code-Review, Branch-Protection, SAST, Fuzzing, CII-Best-Practices and Contributors; CI-Tests, Packaging and Signed-Releases inconclusive (no pull request, no release yet).
 
-**What.** Read the first published report and fix what it flags. Branch protection with required reviews and status checks on `develop` and `main` is a repository setting for the maintainers.
+**What.** The maintainers aim at 9.5. Computed with Scorecard's weights (critical 10, high 7.5, medium 5, low 2.5), once every item below is done: about 8.4 without R17 (Branch-Protection at 3, Code-Review at 0), 9.5 with it (Branch-Protection stays at 8: its next tier asks for two reviewers), 9.55 with a silver badge; 10 is out of reach for a one-maintainer project, since Contributors asks for regular contributors from three organizations. Here: replace the rustup installer piped to `sh` in `scripts/bootstrap-linux.sh` (Pinned-Dependencies), by a download checked against a pinned hash or by instructions, whichever Scorecard accepts.
 
-**Done when.** The score is 8 or more.
+**Done when.** The published score is 9.5 or more.
+
+### R15. Static analysis on every change
+
+Size S
+
+**Why.** Scorecard's SAST check is at 0: no static analysis runs. CodeQL finds classes of bugs tests rarely reach (injection, unsafe path handling, workflow mistakes) and costs nothing on a public repository.
+
+**What.** A CodeQL workflow for JavaScript and TypeScript, Rust and the GitHub workflows (no build needed), on pushes to `develop` and `main`, on pull requests and weekly, pinned by commit like the other actions, with `security-events: write` on its job only. Fix or dismiss with a reason each finding of the first run.
+
+**Done when.** Scorecard's SAST check is at 10 and the code scanning page lists no open alert.
+
+### R16. Fuzzing the parsers of untrusted input
+
+Size M
+
+**Why.** Every request a mock receives is untrusted, and Mimicway parses it: paths and query strings, JSON bodies read by JSON Pointer, XML bodies read by XPath, templates, hexadecimal TCP payloads, imported configurations. Scorecard's Fuzzing check is at 0, and it does not see what exists (Rust property tests with proptest): it recognizes OSS-Fuzz, ClusterFuzzLite, and property tests with fast-check in JavaScript.
+
+**What.** Fuzz targets (cargo-fuzz) for the server's parsers and matchers, run by ClusterFuzzLite on pull requests and nightly; fast-check property tests for the UI's own parsers (templates to fields and back in `tpl-utils.js`, `hex-utils.js`, `path-params.js`). Every crash found becomes a fix with its regression test.
+
+**Done when.** Scorecard's Fuzzing check is at 10 and each target has run for an hour without a crash, or what it found is fixed.
+
+### R17. Reviewed changes on protected branches
+
+Size M. Decision taken by the maintainers (2026-10-03): changes are proposed by a machine account and approved by the maintainer.
+
+**Why.** Code-Review and Branch-Protection are high-risk checks, both at 0. Code-Review counts the last 30 changes approved by a person other than their author; reviews by bots, AI included, do not count. Here the code is written by an automated agent and the maintainer is the one reader who can approve it, which is what the check asks for, provided the review is real.
+
+**What.** The maintainer creates a machine account (GitHub allows one, run by a person, for automation), gives it write access, and adds a ruleset on `develop` and `main`: no force push, no deletion, pull request with one approval, the CI jobs as required checks, no bypass. Each change becomes a pull request from that account, small enough to read in ten minutes, with a review packet in its description (what changes and why, what could go wrong, what to look at first, how it was checked) and an independent automated review posted as comments (fresh-context agents, CodeQL, mutation testing). CONTRIBUTING describes the flow; the rule on commit hours applies to merges.
+
+**Done when.** The last 30 changes of `develop` are approved pull requests (Code-Review 10), Branch-Protection is at 8 and CI-Tests at 10.
+
+### R18. OpenSSF Best Practices badge
+
+Size S
+
+**Why.** Scorecard's CII-Best-Practices check is at 0. The badge (passing 5, silver 7, gold 10, gold needing several maintainers) records practices Scorecard cannot detect, with the evidence for each.
+
+**What.** Fill the questionnaire at bestpractices.dev with the evidence the repository already holds (security policy, CI, tests, signed releases, vulnerability handling), fix what passing still lacks, aim at silver, and show the badge in both READMEs.
+
+**Done when.** The badge is at passing or above and Scorecard reads it.
 
 ## 2. Trust and operations
 
