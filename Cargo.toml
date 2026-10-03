@@ -14,8 +14,9 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "net
 # HTTP client for proxy forwarding
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "stream"] }
 
-# JWT validation (Keycloak auth)
-jsonwebtoken = "9"
+# JWT validation (Keycloak auth). Its crypto backend is AWS-LC (aws-lc-rs): the pure-Rust one brings the rsa crate,
+# whose RUSTSEC-2023-0071 has no fix. No PEM support: keys come from the realm key set (JWKS).
+jsonwebtoken = { version = "11", default-features = false, features = ["aws_lc_rs"] }
 
 # Serialization
 serde = { version = "1", features = ["derive", "rc"] }
@@ -64,7 +65,8 @@ rdkafka = { version = "0.36", features = ["cmake-build"], optional = true }
 # stable toolchains on every platform, never part of the shipped binary.
 proptest = "1"
 # Generate signing keys and encode them for the fake Keycloak realm of the authentication tests. Both are already
-# in the dependency graph through jsonwebtoken (same versions), so they add nothing to build.
+# in the dependency graph, ring through rustls and base64 through the HTTP stack (same versions), so they add
+# nothing to build.
 ring = "0.17"
 base64 = "0.22"
 

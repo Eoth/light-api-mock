@@ -1,0 +1,5 @@
+# AWS-LC, the crypto backend of jsonwebtoken, assembles its x86_64 Windows code with NASM. The aws-lc-sys crate ships
+# that same code already assembled, from AWS-LC's own sources: using it spares every Windows build a NASM install.
+# Other targets ignore this setting.
+[env]
+AWS_LC_SYS_PREBUILT_NASM = "1"
