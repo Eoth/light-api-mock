@@ -1,0 +1,7 @@
+# Advisories osv-scanner reports that do not apply, each with its reason. OSV is the database the CI's osv-scanner job
+# and the OpenSSF Scorecard read. Keep in step with the ignore list of deny.toml: the CI runs both tools, so an entry
+# missing from one of them fails its job.
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0249"
+reason = "smartstring is unmaintained, with no known vulnerability; it is internal to rhai, the script engine, whose latest release still depends on it"

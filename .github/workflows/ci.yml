@@ -88,6 +88,14 @@ jobs:
       - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
         with:
           command: check
+      # cargo deny reads the RustSec database only; OSV also holds the GitHub advisories (a jsonwebtoken one was
+      # missing from RustSec), and it is what the OpenSSF Scorecard reads. Exceptions: osv-scanner.toml.
+      - name: Known vulnerabilities of every lock file (OSV)
+        uses: google/osv-scanner-action/osv-scanner-action@a345acffa64b0eaede81a3d9aae6141214d9c8fc # v2.6.0
+        with:
+          scan-args: |-
+            --recursive
+            ./
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
