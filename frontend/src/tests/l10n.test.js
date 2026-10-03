@@ -134,6 +134,17 @@ describe('translations', () => {
 
 vi.mock('../lib/api.js');
 
+// Dates are written by Intl, in the locale of the interface or else of the browser, never by t: their words (an "AM",
+// a month) are localized there, so the pseudo-locale counts them as translated.
+vi.mock('../lib/format-date.js', async (importOriginal) => {
+  const real = await importOriginal();
+  return {
+    ...real,
+    formatDateTime: (...args) => `⟦${real.formatDateTime(...args)}⟧`,
+    formatDateTimePrecise: (...args) => `⟦${real.formatDateTimePrecise(...args)}⟧`,
+  };
+});
+
 // Words that are the same in every language: product name, protocol and data-format identifiers, and examples of
 // code. Anything else visible must come from t.
 const UNTRANSLATED = new Set(['Mimicway', 'GET', 'POST', 'mock', 'proxy', 'no-rule', 'Content-Type', 'application/json',

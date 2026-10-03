@@ -25,27 +25,13 @@ describe('formatDateTime', () => {
 describe('formatDateTimePrecise', () => {
   const ts = new Date('2026-01-10T12:05:09').getTime();
 
-  it('formate en fr-FR avec jour/mois/annee/heure/minute/seconde en 2 chiffres (usage RequestLog/MessagingLog)', () => {
-    const expected = new Date(ts).toLocaleString('fr-FR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
-    expect(formatDateTimePrecise(ts)).toBe(expected);
+  // Outside French, the interface has no regional form of its own: the logs follow the browser's locale, en-US in
+  // these tests (setup.js). The French form is checked in context by french.test.js.
+  it('writes every part with two digits, in the browser locale when the interface is in English', () => {
+    expect(formatDateTimePrecise(ts)).toMatch(/^01\/10\/26, 12:05:09\sPM$/);
   });
 
-  it('accepte une locale explicite differente', () => {
-    const expected = new Date(ts).toLocaleString('en-US', {
-      day: '2-digit',
-      month: '2-digit',
-      year: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
-    expect(formatDateTimePrecise(ts, 'en-US')).toBe(expected);
+  it('takes an explicit locale', () => {
+    expect(formatDateTimePrecise(ts, 'fr-FR')).toBe('10/01/26 12:05:09');
   });
 });
