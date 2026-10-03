@@ -68,7 +68,7 @@ proptest = "1"
 # in the dependency graph, ring through rustls and base64 through the HTTP stack (same versions), so they add
 # nothing to build.
 ring = "0.17"
-base64 = "0.22"
+base64 = "0.23"
 
 [features]
 # Kafka messaging (consumer, publisher, message log). Off by default: without it, rdkafka is neither downloaded
